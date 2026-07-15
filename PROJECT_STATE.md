@@ -10,10 +10,10 @@
 
 ## 当前任务
 
-- 活动任务卡：`tasks/active-task.md` — `TASK-P0-004`，建立 Gameplay Tags 配置基线。
-- 当前任务：P004 已完成协调规划，等待低级执行模型首次只读复述，并等待用户随后单独确认。
-- 当前状态：`TASK-P0-003` 已由高级模型审查者判定为 `PASS WITH FOLLOW-UP`；P004 尚未实施或验证。
-- 最近完成任务：`TASK-P0-003` — 配置并验证 Enhanced Input 与 GAS 基础插件/模块依赖。
+- 活动任务卡：无；`TASK-P0-004` 已归档，下一任务尚未创建。
+- 当前任务：P004 已完成执行与独立审查；下一任务建议为 `TASK-P0-005`。
+- 当前状态：`TASK-P0-004` 判定为 `PASS WITH FOLLOW-UP`；Gameplay Tags 配置和重开持久性已验证，按需目录、地图、工具链/C++ 标准和 PIE 仍未完成。
+- 最近完成任务：`TASK-P0-004` — 建立并验证 Gameplay Tags 配置基线。
 
 ## 当前阻塞点
 
@@ -36,7 +36,7 @@
 
 - 未验证 Visual Studio Community 2026 与 UE5.6 的 UBT/UHT、Development Editor 构建兼容性。
 - 已报告完成首次 Editor 打开，但未完成 Editor 重开或空白 PIE；尚未产生任何 Gameplay、GAS、Blueprint 或资产验证。
-- Gameplay Tags 配置、`Map_ProjectSetup`、Editor 重开、空白 PIE 和 Phase 0 最终归档尚未验证。P004 计划使用八个根 Tag：Ability、State、Status、Event、Damage、Element、Cooldown、UI；计划不等于实现。
+- Gameplay Tags 配置已完成；按需目录、`Map_ProjectSetup`、Editor 重开、空白 PIE 和 Phase 0 最终归档尚未完成。
 
 ## 当前代码状态
 
@@ -64,8 +64,8 @@
 
 ## 下一个推荐任务
 
-- **唯一推荐任务：** 低级执行模型首次只读 `tasks/active-task.md`，复述 P004 后停止，等待用户单独确认。
-- P004 仅处理 Gameplay Tags 配置基线；仍不得越过地图、Editor 重开和 PIE 门禁进入 Phase 1。
+- **唯一推荐任务：** 由高级协调者规划 `TASK-P0-005`，创建并设置 `Map_ProjectSetup`。
+- P004 仅完成 Gameplay Tags 配置基线；仍不得越过地图和 PIE 门禁进入 Phase 1。
 
 ## 新模型接入时必须读取的文件
 
