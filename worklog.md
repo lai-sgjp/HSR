@@ -649,3 +649,29 @@ Stage 7 在 Stage 6 前执行，因为项目 Phase 8 弱点击破早于 Phase 9 
 - 已归档 P003 活动卡和执行结果，并创建独立审查结果。
 - Phase 0 仅勾选插件/模块依赖 checkpoint；未勾选 Tags 配置、地图、PIE、工具链/C++ 标准或最终归档。
 - 本审查者未创建或执行 `TASK-P0-004`，审查完成后待机。
+
+## 2026-07-16｜高级模型协调者：TASK-P0-004 协调规划
+
+### 当前门禁
+
+- Phase 0 保持 `Not verified`；P003 已审查为 `PASS WITH FOLLOW-UP`，审查 commit 为 `96a3858a5fd4e3a292b1fd7fe4ee8b4023a16250`。
+- 当前唯一活动任务为 P004；计划不构成 Gameplay Tags 实施或 Editor 验证证据。
+
+### 四角色规划结论
+
+- Prompt Planner：P004 只建立 Gameplay Tags Config 导入入口与八个根 Tag。
+- Prompt Reviewer：要求分别记录 Config diff、Editor 首次查询、关闭重开持久性和第一处解析/重复错误。
+- Architect：只使用 `Config/DefaultGameplayTags.ini`；不增加 Native Tags、代码、Gameplay/GAS 对象或资产。
+- Safety Reviewer：其他 Config 路径需要显式扩权；禁止批量 Config、地图、PIE、构建、缓存清理和 P005。
+
+### 实际协调修改
+
+- 创建 `tasks/active-task.md`，编号 `TASK-P0-004`。
+- 更新 `PROJECT_STATE.md` 当前任务、未完成项和下一步。
+- 根命名空间按用户本轮明确要求固定为 Ability、State、Status、Event、Damage、Element、Cooldown、UI；本任务不创建 Weakness。
+
+### 未实施内容
+
+- 未创建或修改 `Config/DefaultGameplayTags.ini`，未启动 Editor，未运行构建或 PIE。
+- 未勾选 P004 实施 checkpoint，未创建 P005，未 push。
+- 下一步仅为低级执行模型只读活动卡、完整复述并等待用户单独确认。

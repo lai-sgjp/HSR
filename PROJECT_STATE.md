@@ -10,9 +10,9 @@
 
 ## 当前任务
 
-- 活动任务卡：无；`TASK-P0-003` 已归档，等待协调者后续规划。
-- 当前任务：无，不得由本审查者创建或执行 `TASK-P0-004`。
-- 当前状态：`TASK-P0-003` 已由高级模型审查者判定为 `PASS WITH FOLLOW-UP`。
+- 活动任务卡：`tasks/active-task.md` — `TASK-P0-004`，建立 Gameplay Tags 配置基线。
+- 当前任务：P004 已完成协调规划，等待低级执行模型首次只读复述，并等待用户随后单独确认。
+- 当前状态：`TASK-P0-003` 已由高级模型审查者判定为 `PASS WITH FOLLOW-UP`；P004 尚未实施或验证。
 - 最近完成任务：`TASK-P0-003` — 配置并验证 Enhanced Input 与 GAS 基础插件/模块依赖。
 
 ## 当前阻塞点
@@ -36,7 +36,7 @@
 
 - 未验证 Visual Studio Community 2026 与 UE5.6 的 UBT/UHT、Development Editor 构建兼容性。
 - 已报告完成首次 Editor 打开，但未完成 Editor 重开或空白 PIE；尚未产生任何 Gameplay、GAS、Blueprint 或资产验证。
-- Gameplay Tags 根命名空间与配置、`Map_ProjectSetup`、Editor 重开、空白 PIE 和 Phase 0 最终归档尚未验证。
+- Gameplay Tags 配置、`Map_ProjectSetup`、Editor 重开、空白 PIE 和 Phase 0 最终归档尚未验证。P004 计划使用八个根 Tag：Ability、State、Status、Event、Damage、Element、Cooldown、UI；计划不等于实现。
 
 ## 当前代码状态
 
@@ -64,8 +64,8 @@
 
 ## 下一个推荐任务
 
-- **唯一推荐任务：** 等待高级协调者基于 P003 审查结果规划相邻任务；本审查者不创建后续活动卡。
-- 后续仍不得越过 Gameplay Tags 配置、地图、Editor 重开和 PIE 门禁进入 Phase 1。
+- **唯一推荐任务：** 低级执行模型首次只读 `tasks/active-task.md`，复述 P004 后停止，等待用户单独确认。
+- P004 仅处理 Gameplay Tags 配置基线；仍不得越过地图、Editor 重开和 PIE 门禁进入 Phase 1。
 
 ## 新模型接入时必须读取的文件
 
@@ -107,3 +107,11 @@
 - Gameplay Tags 内容、地图、Editor 重开、PIE、实际 C++ 标准和 Phase 0 最终门禁仍未验证。
 
 当文件内容不一致时，按以下顺序处理：用户当前明确要求 → `.agents/agents.md` 长期规则 → `tasks/active-task.md` 本轮契约 → `PROJECT_STATE.md` 快照 → 专项设计文档 → `todo_plan.md` → `worklog.md`。发现冲突时不得猜测，应由高级模型根据证据修正文件。
+
+## 2026-07-16 P004 协调更新
+
+- 已创建唯一活动任务 `TASK-P0-004`，只建立并验证 Gameplay Tags 配置基线。
+- 预期实现文件仅为 `Config/DefaultGameplayTags.ini` 与 `tasks/execution-result.md`；额外 Config 路径必须停止并申请扩权。
+- 根 Tag 以用户本轮明确指定的八项为准：Ability、State、Status、Event、Damage、Element、Cooldown、UI；P004 不创建 Weakness 或任何子 Tag。
+- 低级模型必须先复述并以 `等待用户确认执行 TASK-P0-004。` 结束；确认前零工具调用。
+- 本轮未实施 Config、未启动 Editor、未运行构建/PIE、未勾选 P004 checkpoint，也未创建 P005。
