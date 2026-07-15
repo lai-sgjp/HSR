@@ -31,22 +31,22 @@
 
 ## 低级模型任务门禁
 
-- [ ] 交付任务前选择且只选择模板 A、B 或 C。
-- [ ] 替换模板中的全部 `【占位符】`。
-- [ ] `【允许修改的文件】` 使用明确路径，未列入的文件视为禁止修改。
-- [ ] 确认任务只包含一个可以独立验收的小目标。
-- [ ] 高级模型在交付前读取 agents、todo、worklog、对应 Phase 和专项设计文档，并把必要上下文写入 `tasks/active-task.md`。
-- [ ] 低级模型只以 `tasks/active-task.md` 为上下文入口，只接触任务卡明确列出的目标文件。
-- [ ] 发现需要扩大文件或功能范围时停止并请求授权。
-- [ ] 最终按真实结果区分已完成、已验证、未验证和 Editor 手动操作。
+- [x] 交付任务前选择且只选择模板 A、B 或 C。
+- [x] 替换模板中的全部 `【占位符】`。
+- [x] `【允许修改的文件】` 使用明确路径，未列入的文件视为禁止修改。
+- [x] 确认任务只包含一个可以独立验收的小目标。
+- [x] 高级模型在交付前读取 agents、todo、worklog、对应 Phase 和专项设计文档，并把必要上下文写入 `tasks/active-task.md`。
+- [x] 低级模型只以 `tasks/active-task.md` 为上下文入口，只接触任务卡明确列出的目标文件。
+- [x] 发现需要扩大文件或功能范围时停止并请求授权。
+- [x] 最终按真实结果区分已完成、已验证、未验证和 Editor 手动操作。
 
 ## 阶段 Skill 使用门禁（可选）
 
-- [ ] 只有用户询问阶段下一步、门禁或最佳实践时才调用 `phase-next-steps`。
-- [ ] 调用前读取当前 agents、todo、worklog、README、roadmap 和 Phase 文档。
-- [ ] Skill 只推荐一个相邻小任务，不自动修改文件或推进 Phase。
-- [ ] 推荐必须区分 Codex 文件工作、用户 Editor 操作和验证证据。
-- [ ] Skill 建议不替代用户当前回合的明确要求，也不替代实际编译/PIE 证据。
+- [x] 只有用户询问阶段下一步、门禁或最佳实践时才调用 `phase-next-steps`。
+- [x] 调用前读取当前 agents、todo、worklog、README、roadmap 和 Phase 文档。
+- [x] Skill 只推荐一个相邻小任务，不自动修改文件或推进 Phase。
+- [x] 推荐必须区分 Codex 文件工作、用户 Editor 操作和验证证据。
+- [x] Skill 建议不替代用户当前回合的明确要求，也不替代实际编译/PIE 证据。
 
 ## 本轮文档协作落地
 
@@ -90,9 +90,9 @@
 - [x] 完整定义第一轮只维护 Markdown。
 - [x] 明确第一轮不等于 Phase 0 已开始。
 - [x] 提供可直接复制的文档维护 Prompt。
-- [ ] 实际执行第一轮 Prompt 时只审核、合并和补缺现有 Markdown。
-- [ ] 不创建 `.uproject`、Source、Config、Content 或构建目录。
-- [ ] 不运行 shell、构建、Editor、插件操作或 Git。
+- [x] 实际执行第一轮 Prompt 时只审核、合并和补缺现有 Markdown。
+- [x] 不创建 `.uproject`、Source、Config、Content 或构建目录。
+- [x] 不运行 shell、构建、Editor、插件操作或 Git。
 
 ## 第一周门禁
 
@@ -125,9 +125,9 @@
 
 ## Phase 0：项目初始化与规范落地
 
-- [ ] 使用 UE5.6 Blank C++ 模板创建 `HSR`，关闭 Starter Content。
-- [ ] 创建单 `HSR` Runtime 模块。
-- [x] 验证 Visual Studio Community 2026、Windows SDK、UBT/UHT 和实际 C++ 标准。
+- [x] 使用 UE5.6 Blank C++ 模板创建 `HSR`，关闭 Starter Content。
+- [x] 创建单 `HSR` Runtime 模块。
+- [ ] 验证 Visual Studio Community 2026、Windows SDK、UBT/UHT 和实际 C++ 标准。
 - [ ] 确认 Enhanced Input、GameplayAbilities、GameplayTags、GameplayTasks。
 - [ ] 建立根 Gameplay Tags 和按需目录。
 - [ ] 创建并设置 `Map_ProjectSetup`。

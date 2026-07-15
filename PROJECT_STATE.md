@@ -12,14 +12,14 @@
 
 - 活动任务卡：`tasks/active-task.md`。
 - 当前任务：`TASK-P0-002` — 验证工具链和首次 Development Editor 构建。
-- 当前状态：低级执行者已完成执行并提交 `tasks/execution-result.md`，等待高级审查者审批。
+- 当前状态：低级执行者已完成执行；Pauli 审查结论为 `PASS WITH FOLLOW-UP`，任务已归档。
 - 最近完成任务：`TASK-P0-001` — 创建 UE5.6 Blank C++ 工程基线并采集首轮证据，结论为 `PASS WITH FOLLOW-UP`。
 
 ## 当前阻塞点
 
 - 文件化上下文机制本身没有阻塞。
 - 尚无 Development Editor 构建与空白 PIE 的真实证据，因此 Phase 0 保持 `Not verified`，不得宣布通过。
-- `TASK-P0-002` 的执行结果已存在，但尚未完成独立审批、归档和角色提交；不得开始 `TASK-P0-003`。
+- `TASK-P0-002` 已完成独立审批、归档和角色审查提交；不得由本轮自动创建或开始 `TASK-P0-003`。
 
 ## 已完成事项
 
@@ -29,7 +29,7 @@
 - 已将“高级模型规划、低级模型执行、审查模型验收、结果回传”的职责写入项目文档。
 - 已建立 Phase 0 七个串行任务的详细执行计划，并把 Prompt Planner、Prompt Reviewer、Architect、Safety Reviewer 的协调人格与低级模型二次确认门禁写入长期真源。
 - `TASK-P0-001` 已通过审查：工程位于仓库根目录，无 `HSR/HSR/` 嵌套；`.uproject` 关联 UE5.6，且只有一个 `HSR` Runtime 模块与最小模块入口。
-- `TASK-P0-002` 已由低级执行者完成：UBT 入口与 `HSREditor Development Win64` 目标退出码为 0，但 Target up-to-date，实际 C++ 编译尚未触发；当前等待审查者审批。
+- `TASK-P0-002` 已由 Pauli 审查为 `PASS WITH FOLLOW-UP`：工具链/目标入口证据成立，但实际 C++ 编译、插件、Tags、地图、Editor 重开和 PIE 仍未验证。
 
 ## 未完成事项
 
@@ -63,8 +63,8 @@
 
 ## 下一个推荐任务
 
-- **唯一推荐任务：** 由高级审查者审批 `TASK-P0-002` 的执行结果；审批前不得创建或开始 `TASK-P0-003`。
-- 审批通过后，先完成低级执行者、高级协调者和审查者各自的角色提交与任务归档，再创建 `TASK-P0-003`。
+- **唯一推荐任务：** 由高级协调者根据真实证据另行规划下一张 Phase 0 活动卡；本轮不创建或开始 `TASK-P0-003`。
+- P002 已由 Pauli 归档；其 up-to-date 结果不能替代实际 C++ 编译证据。
 - 本推荐不会自动启动任务，也不包含 Character、Controller、GAS、Blueprint、UMG 或 Gameplay。
 
 ## 新模型接入时必须读取的文件
@@ -95,7 +95,7 @@
 ## 2026-07-16 协调更新
 
 - 根据 `TASK-P0-001` 的 `PASS WITH FOLLOW-UP`，已创建唯一活动任务 `TASK-P0-002`。
-- `TASK-P0-002` 只验证 `HSREditor Development Win64` 首次构建；尚未获得用户执行确认，不得启动构建。
+- `TASK-P0-002` 只验证 `HSREditor Development Win64` 首次构建；已获得确认并经 Pauli 审查为 `PASS WITH FOLLOW-UP`。
 - 构建失败时仅记录第一处真实错误；不得修改 SDK、Target、Build.cs、源文件或缓存。
 
 当文件内容不一致时，按以下顺序处理：用户当前明确要求 → `.agents/agents.md` 长期规则 → `tasks/active-task.md` 本轮契约 → `PROJECT_STATE.md` 快照 → 专项设计文档 → `todo_plan.md` → `worklog.md`。发现冲突时不得猜测，应由高级模型根据证据修正文件。
