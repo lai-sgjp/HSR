@@ -6,6 +6,8 @@
 
 完整路线见 [Phase 0–20 路线图](phase-roadmap-0-20.md)。
 
+Phase 0 的七个串行任务、四角色规划审查和总门禁见 [Phase 0 详细执行计划](phase-0-execution-plan.md)。
+
 ## 阶段目标
 
 - 使用 Unreal Engine 5.6 Blank C++ 模板创建 `HSR`。

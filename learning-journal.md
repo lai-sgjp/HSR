@@ -1,4 +1,4 @@
-# HSR Learning Journal
+﻿# HSR Learning Journal
 
 ## 使用方式
 
@@ -279,3 +279,93 @@ HSR 的实际顺序为：
 **多模型 AI 编码工作流为什么需要 repository-native context，而不是只依赖聊天摘要？**
 
 回答要点：聊天记忆与模型供应方和会话绑定，容易丢失且不可审查；仓库文件可以形成稳定的状态快照、任务契约、证据链和历史归档；角色按最小必要上下文读取，既降低输入成本，也约束权限；通过独立审查和真实验证避免把模型自述当成完成证据。
+
+## 2026-07-16｜UE5 Project Browser 非空目录阻断与手动骨架文件创建
+
+### 概念本质
+
+UE5 Project Browser 要求在空目录或新目录中创建项目。如果仓库根目录已经有文档、Agent 配置和 Git 数据，Project Browser 会拒绝创建，提示"Project cannot be saved in a folder with existing files"。这不是错误，而是 UE 防止意外的保护机制。
+
+### HSR 中的映射
+
+仓库根目录 `E:\work\unreal_projects\HSR\` 在工程创建前已存在 `.agents/`、`docs/`、`tasks/`、`.git/` 和多个 Markdown 文件。Project Browser 拒绝使用该目录。方案 A 绕过：手动创建 `HSR.uproject` + `Source/` 下的 Target/Build.cs/模块入口（共 6 个文件），然后右键 `.uproject` → Generate Visual Studio Project Files，结果与 Browser 创建完全等效。
+
+### 关键要点
+
+- `.uproject` 的 `EngineAssociation` 字段决定引擎版本，需与本地安装的 UE 版本精确匹配（如 "5.6"）。
+- `BuildSettingsVersion.V5` 和 `EngineIncludeOrderVersion.Latest` 随 UE5.6 默认版本。
+- Generate VS Project Files 会调用 UBT 生成 `.sln`、`Intermediate/` 和相关文件，等同于 Project Browser 的 Create 行为。
+- UE 首次打开 `.uproject` 时，如果模块入口已存在且 `.Build.cs` 正确，不会自动触发 C++ 编译（仅加载反射数据）。
+- `DefaultEditor.ini` 和 `DefaultGame.ini` 只有通过 Editor 修改了 Editor 或 Game 专属设置后才会被 UE 写入。
+
+### 练习题
+
+简述当 UE5 Project Browser 因非空目录拒绝创建时，有哪些可行的绕过方式？每种方式的优缺点和风险是什么？
+
+参考要点：方案 A（手动骨架 + Generate VS Project Files）——零嵌套风险，结果等效，适合有文档/配置的仓库；方案 B（临时目录 + 搬运）——需手动搬运，存在遗漏和路径硬编码风险；方案 C（接受嵌套路径或改名）——产生 `Project/Project/` 嵌套或项目名不一致，需后续处理。
+
+### 面试题
+
+**你在一个已有大量文档和 Agent 配置的仓库中创建 UE 工程时遇到 Project Browser 拒绝，是如何处理的？**
+
+回答要点：说明 Project Browser 的保护机制；解释为什么不能直接改路径或删除仓库内容；描述手动骨架文件方法的核心原理（`.uproject` + Target + Build.cs + 模块入口 = 合法 UE 工程）；强调 Generate VS Project Files 后的结果与 Browser 等效；说明这样避免了嵌套目录和文件搬运风险。
+
+## 2026-07-16｜AI 协作中的角色锁定与教师角色
+
+### 概念本质
+
+角色锁定把“谁能决定什么、谁能修改什么”写成可审查的任务契约。低级模型的价值是稳定执行明确的小任务；它若擅自切换为规划、架构、审查或教学角色，就会把尚未授权的判断、文件和目标带入本轮，破坏范围与证据边界。
+
+### 为什么权限边界重要
+
+- 任务目标、文件允许清单、Phase 与验收标准都属于用户授权的一部分，不能由执行模型自行改写。
+- “为了安全”“自我反思”或“更好完成任务”可以触发暂停和提问，不能成为自行扩权的理由。
+- 正确的升级路径是：停止 → 说明超出权限的原因 → 指明所需角色与授权 → 等待用户决定；不是在同一轮偷偷兼任该角色。
+
+### Teacher 如何帮助 HSR 学习
+
+Teacher 是高级模型的教学角色。它基于 worklog、learning journal、真实 diff 与编译/PIE/Debug 证据，把 UE5.6 C++、GAS、Gameplay Tags、Enhanced Input、SaveGame、DataAsset、UI 与 TurnSystem 的工程实践解释为“直觉类比 → 真实机制 → 项目例子 → 常见错误 → Debug → 面试表达”。它不替用户完成练习，也不把未验证结论包装成事实。
+
+### 学习沉淀与面试检验
+
+- `learning-journal.md` 保存可复习的概念、项目映射、误区、验证和练习，证明学习过程而非只保留 AI 产物。
+- `docs/interview-notes.md` 将真实取舍、失败路径和证据整理为可表达的工程经验。
+- 面试题可反向检验学习质量：若不能解释角色边界、验证证据和 UE/GAS 原理，就说明仍需复习而非仅会调用 AI。
+
+### 练习题
+
+某低级模型发现任务卡未列出一个“看起来相关”的文件，并认为自己可以兼任 Architect 后修改它。请写出它应当输出的四项停止报告内容，并解释为什么不能直接修改。
+
+参考要点：说明超出 `Implementation Agent` 权限的原因；指定需要 Architect 或高级模型；说明需要用户授权的文件范围或角色切换；承诺授权前不修改。文件是否相关是架构/范围判断，不能覆盖任务卡的允许清单。
+
+### 面试题
+
+**你如何避免 AI 辅助 UE 项目沦为“会调用 AI、但不能解释工程决定”？**
+
+回答要点：以角色锁定保证规划、实现、审查和教学不混淆；用任务卡限制文件和验收；把真实 diff、编译/PIE/Debug 证据沉淀到工作日志；由 Teacher 将实践解释为 UE/GAS 机制并通过复述、练习和面试题检验理解；未验证内容明确标注。
+
+## 2026-07-16｜UBT "Target is up to date" 与实际 C++ 编译的区别
+
+### 概念本质
+
+UBT 在构建时会比对源文件时间戳与中间产物。如果没有任何源文件发生变化，UBT 直接跳过 cl.exe 编译，输出 "Target is up to date"。这不代表编译失败或工具链不可用，而是表示增量构建系统正常工作。
+
+### HSR 中的映射
+
+TASK-P0-002 构建结果为 12 成功 0 失败，但 UBT 判定 "Target is up to date"——因为自 Generate VS Project Files 后 `Source/` 下的 `.cpp`/`.h` 未发生任何修改。要触发实际 C++ 编译，需要：
+1. 修改一个 `.cpp` 或 `.h` 文件并保存
+2. 或修改 `.Build.cs` 触发模块重建
+3. 或清理 `Intermediate/` 强制全量编译
+
+### 关键要点
+
+- UBT 输出 "Target is up to date" 是正常行为，不是错误。
+- 构建成功（退出码 0）证明 UBT 管道、.NET SDK、引擎路径、项目配置均正确。
+- NuGet 还原失败/警告出现在 AutomationTool 引擎工具项目时，属于 UE 引擎自带的工具依赖问题，不阻塞 HSR 项目编译。
+- "构建成功"和"实际 C++ 编译执行过"是两回事，报告时必须区分。
+
+### 练习题
+
+如何确认 UBT 确实能成功地编译 HSR 的 C++ 代码？至少列出三种方法。
+
+参考要点：(1) 在 `HSR.cpp` 中添加一个无关紧要的注释或空行再构建；(2) 修改 `HSR.Build.cs` 添加一个空依赖再构建；(3) 删除 `Intermediate/Build/Win64` 目录再构建（全量）。

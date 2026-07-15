@@ -1,4 +1,4 @@
-# HSR Worklog
+﻿# HSR Worklog
 
 ## 2026-07-15｜规则迁移与项目文档基线
 
@@ -423,3 +423,161 @@ Stage 7 在 Stage 6 前执行，因为项目 Phase 8 弱点击破早于 Phase 9 
 - 下一任务仅建议审查并授权 `TASK-P0-001`，不自动执行。
 - 主要风险是任务卡过期或与实际状态冲突；每次模型切换前后由高级模型按证据更新 `PROJECT_STATE.md`。
 - 另一个风险是低级模型需要范围外信息；正确处理是停止并让高级模型补全任务卡，而不是让低级模型自行扩读和扩权。
+## 2026-07-16｜Phase 0 全步骤规划与低级模型 Prompt 门禁
+
+### 用户目标与范围
+
+- 由高级模型协调者模拟 Prompt Planner、Prompt Reviewer、Architect、Safety Reviewer，完成 Phase 0 每一步规划。
+- 生成低级模型可直接读取的最终 Prompt，并强制低级模型执行前复述计划、等待用户单独确认。
+- 本轮只读取上下文和维护 Markdown；不创建 UE 工程，不修改 C++、Config、Content、插件或资产，不执行构建、Editor、PIE 或 Git。
+
+### 规划结论
+
+- Phase 0 仍处于准备阶段，门禁为 `Not verified`；没有 `.uproject`、工具链构建、Editor 或 PIE 真实证据。
+- 将 Phase 0 拆为七个串行任务：工程基线、工具链构建、插件/模块依赖、Gameplay Tags、默认地图、运行门禁、文档归档。
+- 每次只允许一张活动卡；上一任务审查并归档后，才可根据真实证据生成下一任务。
+- 高级模型四角色人格以 `docs/model-switch-prompts.md` 为可复用真源；任务六段结构以 `tasks/task-template.md` 为结构真源，agents 只保存摘要链接。
+- 低级模型确认门禁改为两步：先复述并停止，再由用户另发当前任务编号的明确确认；旧聊天授权和任务卡存在不算确认。
+
+### 文档修改
+
+- 新增 `docs/phase-0-execution-plan.md`，保存七个任务、角色审查、统一执行流和 Phase 0 总门禁。
+- 重写 `tasks/active-task.md`，形成 `TASK-P0-001` 可直接交付的只读协调/核对 Prompt。
+- 更新 `tasks/task-template.md`、`docs/low-level-model-task-templates.md`、`docs/model-switch-prompts.md` 和 `.agents/agents.md`，固化六段规划审查与执行前二次确认。
+- 更新 `docs/phase-0-project-setup.md` 与 `PROJECT_STATE.md` 的入口和当前状态。
+
+### 验证与未验证
+
+- 已检查当前 Phase 路线、活动卡、低级模型模板、模型切换 Prompt 和最近三条 worklog 的一致性。
+- 本轮没有实施 Phase 0，没有创建或修改 `.uproject`、Source、Config、Content、Plugins 或派生构建目录。
+- 未运行 UBT、UHT、编译、Editor、PIE、自动化测试或 Git。
+- 唯一下一步是低级模型读取 `tasks/active-task.md` 并复述；用户确认前不得执行。
+
+## 2026-07-16｜TASK-P0-001：创建 UE5.6 Blank C++ 工程基线
+
+### Phase 状态
+
+- Phase 0 → 准备阶段，门禁 `Not verified` → **工程已创建，工具链/构建/PIE 均未验证**
+
+### 用户目标
+
+- 在 `E:\work\unreal_projects\HSR\` 仓库根目录创建 UE5.6 Blank C++ 项目。
+- 只创建工程并确认最小持久文件，不执行构建、PIE 或 Git。
+
+### 执行过程
+
+1. **复述与确认：** 低级模型按 CC-SWITCH 规则复述 TASK-P0-001 计划，用户单独发送"确认执行 TASK-P0-001"授权。
+2. **只读预检：** 确认仓库根目录没有 `HSR.uproject`、`Source/`、`Config/` 等会被覆盖的持久文件。`Intermediate/` 为历史派生产物，非阻断。
+3. **阻断触发：** Project Browser 因非空目录（`.agents/`、`docs/`、`tasks/`、`.git/`）拒绝创建，提示"Project cannot be saved in a folder with existing files"。
+4. **方案 A：** 用户选择方案 A（手动创建骨架文件），写入 `HSR.uproject`、`Source/` 下的 Target/Build.cs/模块入口共 6 个文件。
+5. **Generate VS Project Files：** 用户右键 `.uproject` → Generate Visual Studio Project Files，UBT 生成 `HSR.sln`。
+6. **Editor 验证：** 双击 `.uproject` 打开 Editor 成功，未触发编译，无报错。
+7. **只读核对：** 逐项检查持久文件存在性、版本关联、模块数量、嵌套风险。
+
+### 实际修改
+
+- **用户手动创建：** `HSR.uproject`、`Source/HSR.Target.cs`、`Source/HSREditor.Target.cs`、`Source/HSR/HSR.Build.cs`、`Source/HSR/HSR.h`、`Source/HSR/HSR.cpp`
+- **低级模型修改：** 无（只读协调）
+- **UE 自动生成：** `HSR.sln`、`Config/DefaultEngine.ini`、`Config/DefaultInput.ini`、工具派生产物目录
+
+### 关键决策
+
+- Project Browser 非空目录阻断时，未采用嵌套目录或临时目录，而是手动创建最小骨架文件 + Generate VS Project Files，结果与 Browser 创建等效。
+- 仅包含单 `HSR` Runtime 模块，未引入 Gameplay 类。
+- UE 未自动生成 `DefaultEditor.ini` 与 `DefaultGame.ini`，属于首次无 Editor/Game 配置变更时的正常行为。
+
+### 验证状态
+
+- ✅ 工程文件与 Target 存在，路径无嵌套
+- ✅ `.uproject` 引擎关联 5.6，单 Runtime 模块
+- ❌ Development Editor 构建未执行
+- ❌ PIE 未执行
+- ◯ `DefaultEditor.ini` / `DefaultGame.ini` 未触发写入（正常）
+
+### 下一步
+
+下一任务：`TASK-P0-002` — 验证工具链和首次 Development Editor 构建。
+
+## 2026-07-16｜AI 协作角色锁定与 Teacher 角色规则
+
+### 用户目标与问题
+
+上轮低级模型曾发生擅自角色切换和扩权风险：把执行任务扩展为高级规划、审查或架构职责。本轮只更新 Markdown 规则，建立禁止未经授权角色切换的硬边界，并新增 Teacher 高级模型角色。
+
+### 本轮决策
+
+- 新增 `Role Lock / 角色锁定`：模型只能承担当前 Prompt 或活动任务卡明确指定的角色；不得借自我反思、安全或提高完成质量之名扩权。
+- 低级模型仅能担任 `Implementation Agent`，不得转为高级模型、Planner、Reviewer、Architect、Teacher 或其他更高权限角色。
+- 角色切换仅可由用户明确指令或活动任务卡明确授权触发，且必须在输出中说明依据与授权来源；未经授权的切换视为任务失败。
+- 需要高阶能力、风险判断、歧义澄清或范围外文件时，模型必须停止，说明所需角色和授权，获得授权前不修改文件。
+- 新增仅由高级模型承担的 `Teacher / 教师`：用于教学、源码机制理解、工程复盘、面试沉淀、练习与 learning journal 整理；不执行低级任务，不擅自修改 C++，不伪造学习或验证事实。
+
+### 实际文档修改
+
+- 为 agents、低级执行指南、Loop Engineering、模型切换 Prompt、任务模板、活动任务卡及 A/B/C 低级模板加入 Role Lock。
+- 新增 `docs/teacher-role-guide.md`，规定 Teacher 职责、边界、教学风格、输出结构及与 Learning Reviewer 的分工。
+- 在 learning journal、面试记录和作品集记录中沉淀本次协作治理原则。
+
+### 验证与边界
+
+- 仅修改 Markdown 文档；未修改 C++、Config 或 UE 资源，未执行 Git 操作。
+- 本轮为规则文档更新，不产生新的编译、PIE 或 Debug 验证结论。
+
+## 2026-07-16｜TASK-P0-002：验证工具链和首次 Development Editor 构建
+
+### Phase 状态
+
+- Phase 0 → 准备阶段，门禁 `Not verified` → **工具链构建验证通过，实际 C++ 编译未触发，插件/地图/PIE 未验证**
+
+### 用户目标
+
+- 执行一次 `HSREditor Development Win64` 构建并记录工具链信息。
+- 不修改文件，不修复错误，不进入插件/地图/PIE。
+
+### 执行过程
+
+1. 低级模型复述 TASK-P0-002 计划，用户确认执行。
+2. 预检通过：`HSR.uproject`、`HSR.sln`、Target/Build.cs/模块入口均存在。
+3. 用户通过 VS2026 执行 Build Solution：12 项目全部成功，0 失败。
+4. UBT 判定 "Target is up to date"（源文件无变更，未触发 cl.exe 编译）。
+5. NuGet 还原失败警告出现于 AutomationTool 引擎工具项目，非 HSR 项目错误，可忽略。
+6. 只读核对结果后写入 `tasks/execution-result.md`。
+
+### 验证状态
+
+- ✅ UBT 管道调用成功（dotnet 8.0.300 → UnrealBuildTool.dll → HSREditor）
+- ✅ UE 5.6 引擎路径已确认：`E:\programs\Epic Games\UE_5.6`
+- ✅ 退出码 0，无构建错误
+- ◯ 实际 C++ 编译未触发（Target up to date，需有源文件变更后才会执行 cl.exe）
+- ◯ `DefaultEditor.ini` / `DefaultGame.ini` 仍未写入（无 Editor/Game 设置变更）
+
+### 下一步
+
+下一任务：`TASK-P0-003` — 配置并验证 Enhanced Input、GameplayAbilities、GameplayTags、GameplayTasks 插件与模块依赖。
+
+## 2026-07-16｜TASK-P0-002 待审批与角色 Git 交付规则
+
+### 用户状态更新
+
+- `TASK-P0-002` 已由低级执行者完成，当前等待高级审查者审批。
+- 当前不得开始 `TASK-P0-003`，也不得把 Phase 0 标记为通过。
+
+### 新增长期规则
+
+- 每个角色完成自己本轮任务后，必须提交该角色实际产物。
+- commit message 固定为：`角色+人格+当前任务与阶段+简短告诉自己做了什么`。
+- 提交前必须检查 status、diff、任务允许范围和派生产物；不得由一个角色冒充另一个角色提交。
+- Phase 的全部子任务完成、审查、归档且角色提交齐全后，由高级协调者创建阶段收尾 commit 并推送远端。
+- Phase 中途不 push，不强制 push；提交和推送都要记录 hash、远端、分支和结果。
+
+### 本轮状态同步
+
+- `PROJECT_STATE.md` 与 `tasks/active-task.md` 已更新为“低级执行完成，等待审批”。
+- `tasks/execution-result.md` 已补充审批与 Git 待办状态。
+- agents、任务/审查模板、模型切换 Prompt、Loop Engineering、低级模型指南和阶段执行流程已加入角色 commit 与 Phase push 规则。
+
+### Git 状态与未执行项
+
+- 当前工作树包含多个前序角色和 UE 工程创建留下的混合未提交改动，无法把它们安全归属于本轮单一人格。
+- 本轮未执行 commit 或 push，避免把其他角色产物错误提交到当前人格名下。
+- 下一步由高级审查者先审批 `TASK-P0-002`，再根据实际 diff 分离低级执行者、审查者和协调者的角色提交。

@@ -9,6 +9,8 @@
 
 ## 审查输入
 
+> 必须读取 `tasks/execution-result.md` 作为低级模型执行报告，并将其与活动任务卡、实际改动、日志、截图或用户回传交叉核对。该报告本身不能替代独立验证证据。
+
 - `tasks/active-task.md`
 - 任务卡允许范围内的实际改动文件
 - 编译、测试、PIE、Editor、日志或截图证据
@@ -60,7 +62,18 @@
 
 结论说明：【简要说明】
 
+## Git 交付审查
+
+- [ ] 执行者、审查者和协调者均使用自己的角色/人格提交，没有冒名提交。
+- [ ] commit message 符合 `角色+人格+当前任务与阶段+简短告诉自己做了什么`。
+- [ ] commit 只包含任务允许范围和对应审查/状态产物。
+- [ ] 没有提交 `Binaries/`、`Intermediate/`、`Saved/`、`.vs/`、DerivedDataCache 或未经授权资源。
+- [ ] Phase 未收尾前没有 push；Phase 完成后由协调者记录阶段收尾 commit、远端、分支和 push 结果。
+- [ ] commit hash 或 push 错误已记录。
+
 ## 归档与下一步
+
+> 当结论为 `PASS` 或 `PASS WITH FOLLOW-UP` 时，审查模型必须先同步 `PROJECT_STATE.md`，再将当前 `tasks/active-task.md` 与同任务编号的 `tasks/execution-result.md` 移入 `tasks/archive/`；仅在此后才能由高级模型创建下一张活动卡。低级模型不得执行这些操作。
 
 - 活动卡归档路径：`tasks/archive/【TASK-编号】-【slug】.md`
 - 项目快照是否已更新：【是/否】

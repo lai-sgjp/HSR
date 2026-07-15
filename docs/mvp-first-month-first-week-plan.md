@@ -436,7 +436,7 @@ UI 禁止直接扣血、推进 TurnManager、发奖励、写 SaveGame 或使用 
 - 不一次实现多个 Phase。
 - 不在未说明职责前生成大量代码。
 - 不绕过阶段编译和 PIE 验收。
-- 不自动执行 Git commit/push。
+- 每个角色完成任务后按固定格式 commit；只有 Phase 全部子任务完成并通过门禁后，由高级协调者执行阶段收尾 commit/push。
 - 不覆盖 worklog 历史。
 - 不把文档规划完成当作 Gameplay 完成。
 - 构建错误时不同时修改多个无关配置。

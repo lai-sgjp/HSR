@@ -10,6 +10,12 @@
 - B：1–5 个文件的小型 C++ 功能；
 - C：有明确现象、错误证据和复现路径的 Debug。
 
+## No Unauthorized Role Switching / 禁止未经授权的角色切换
+
+低级模型当前且仅能承担 `Implementation Agent / 低级执行模型`。未经用户明确授权或 `tasks/active-task.md` 明确授权，不得切换为高级模型、Planner、Reviewer、Architect、Teacher 或任何权限、职责更大的角色；不得借“安全”“自我反思”或“更好完成任务”扩大职责、重写目标、扩大文件范围、改变 Phase 或验收标准。
+
+发现风险、歧义、上下文缺失、模型不匹配或需要高阶角色时，必须停止并报告：超出权限的原因、所需角色、需要用户授予的权限，以及获得授权前不会修改文件。若获授权切换，必须在输出中声明触发依据和授权来源；未经授权的切换视为任务失败。
+
 ## 交付低级模型前
 
 1. 由 Prompt Planner 说明目标和成功标准；
@@ -42,15 +48,18 @@
 ## 固定禁止项
 
 - 不删除文件、不覆盖历史、不做无关重构；
-- 不执行 `git reset`、`git clean`，不自动 commit/push；
+- 不执行 `git reset`、`git clean`；任务完成后必须按活动卡中的角色提交规则 commit，但不得在 Phase 收尾前 push；
 - 不批量修改 Config，不导入大量资源；
 - 不把核心逻辑写入 Blueprint、Widget 或一个巨型 Character；
 - 不保存 Actor、ASC、Widget、Ability 实例或 Active GE Handle 到 SaveGame；
 - 不以删除缓存、关闭警告或吞掉错误伪装修复；
 - 不编造 UE5.6 API。
 - 不自行更新 `PROJECT_STATE.md`、agents、todo 或 worklog；除非这些文件被活动任务卡逐项列入允许修改清单。
+- 不擅自切换角色、人格、权限或职责范围；不充当 Teacher 或任何审查/规划角色。
 
 ## 完成后的强制报告
+
+低级模型不得修改 `tasks/active-task.md`、项目快照、worklog、todo 或学习记录。完成、停止、失败或需要扩权时，只能将执行结果写入 `tasks/execution-result.md`；高级模型和审查模型随后根据该报告、实际改动和独立证据处理状态同步与归档。
 
 报告必须分开写：
 
@@ -63,3 +72,7 @@
 7. 只建议一个相邻小任务。
 
 “代码写完”不等于“功能完成”；“编译通过”也不等于“PIE 和失败路径通过”。
+
+## Git 交付
+
+低级模型完成任务后，先把事实写入 `tasks/execution-result.md`，再检查允许文件和工作树，使用固定格式提交：`低级执行模型+Implementation Agent+任务编号/Phase+简短说明`。低级模型不得 push；Phase 收尾 push 由高级协调者执行。

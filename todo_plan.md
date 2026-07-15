@@ -1,4 +1,4 @@
-# HSR Todo Plan
+﻿# HSR Todo Plan
 
 > 当前状态：Phase 0–20 路线规划已完成，尚未创建 UE 工程或开始 Gameplay 实现。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
 
@@ -127,7 +127,7 @@
 
 - [ ] 使用 UE5.6 Blank C++ 模板创建 `HSR`，关闭 Starter Content。
 - [ ] 创建单 `HSR` Runtime 模块。
-- [ ] 验证 Visual Studio Community 2026、Windows SDK、UBT/UHT 和实际 C++ 标准。
+- [x] 验证 Visual Studio Community 2026、Windows SDK、UBT/UHT 和实际 C++ 标准。
 - [ ] 确认 Enhanced Input、GameplayAbilities、GameplayTags、GameplayTasks。
 - [ ] 建立根 Gameplay Tags 和按需目录。
 - [ ] 创建并设置 `Map_ProjectSetup`。

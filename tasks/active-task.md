@@ -1,91 +1,67 @@
-# Active Task
+# Active Task — TASK-P0-002
 
-> 状态：待用户明确授权  
-> 注意：任务卡存在不代表已经获得执行授权。任何模型不得自动开始本任务。
+> 状态：低级执行者已完成执行，等待高级审查者审批。
+> 本卡当前不允许重复构建；审查者必须先核对 `tasks/execution-result.md` 与真实证据。
 
-## 任务编号
+## Role Lock
 
-`TASK-P0-001`
-
-## 任务名称
-
-创建 UE5.6 Blank C++ 工程基线并采集首轮证据
-
-## 当前 Phase
-
-Phase 0 准备阶段；Phase 0 尚未开始，门禁状态为 `Not verified`。
+低级模型只能承担 `Implementation Agent / 低级执行模型`。不得切换为 Planner、Reviewer、Architect、Teacher 或其他更高权限角色；发现错误、歧义或需要扩大范围时必须停止并报告。
 
 ## 任务目标
 
-在用户明确授权后，只创建 HSR 的 UE5.6 Blank C++ 工程基线，并取得“工程已生成、模块可被识别”的真实证据。不得在同一任务中实现 Character、Controller、GAS、战斗、存档或 UI。
+只验证 `HSREditor Development Win64` 的首次构建链路，并记录真实构建证据；不修复尚未诊断的问题，不推进插件、Gameplay Tags、地图、PIE 或任何 Gameplay 功能。
+
+## 前置与审查结论
+
+- `TASK-P0-001` 已归档，审查结论为 `PASS WITH FOLLOW-UP`。
+- Phase 0 仍为 `Not verified`；本任务只处理工具链构建证据。
+- Prompt Planner、Prompt Reviewer、Architect、Safety Reviewer 均确认单一目标、无功能改动、失败即停止。
 
 ## 执行模型
 
-- 高级模型：复核边界、指导步骤、整理用户回传证据并更新文档。
-- 用户：执行 UE Project Browser、IDE 和 UE Editor 中的手动操作。
-- 低级模型：**本卡未指定低级模型执行，读取后必须停止并报告“执行模型不匹配且尚未授权”。**
-
-## 执行前必须读取的文件
-
-- 高级模型：`PROJECT_STATE.md`、`.agents/agents.md`、本文件、`docs/phase-0-project-setup.md`、`todo_plan.md`、`worklog.md` 最新记录。
-- 用户：本文件中的“UE Editor 手动操作”和“验收标准”。
-- 低级模型：只读取本文件；不得自行补读其他上下文。
+- 高级模型维护边界、接收证据并在审查后更新状态。
+- 用户在 IDE/UE 环境中发起构建并回传命令、日志、退出码和第一处错误（如有）。
+- 低级模型仅在用户确认后执行本卡允许的只读核对，并填写执行报告。
 
 ## 允许修改文件
 
-当前未授权，**本轮允许修改文件为空**。
+- `tasks/execution-result.md`（仅执行后填写真实报告；不得修改其他文件）
 
-用户未来明确授权后，高级模型必须先把实际允许创建/修改的精确路径写入本节；未列出的文件仍然禁止修改。不得把本段示例文字视为授权。
+## 禁止修改
 
-## 禁止修改内容
+- 禁止修改 `HSR.uproject`、`Source/`、`Config/`、`Plugins/`、`Content/`、Target、Build.cs、SDK 或缓存。
+- 禁止清理、删除、覆盖文件和无关 Git 操作；只允许按本卡“Git 交付要求”完成角色 commit，当前禁止 push。
+- 禁止创建 Character、Controller、GAS、Gameplay Tags、Blueprint、地图、UI、PIE 流程或其他 Phase 0 子任务。
 
-- 在用户授权前禁止创建或修改 `.uproject`、`Source/`、`Config/`、`Content/`、`Plugins/`、Blueprint 或资产。
-- 禁止实现 Character、Controller、Enhanced Input Gameplay、GAS、TurnSystem、Battle、SaveGame、UMG 或下一 Phase 内容。
-- 禁止删除、覆盖历史、批量移动、导入第三方资源或清理缓存。
-- 禁止执行 `git reset`、`git clean`、add、commit 或 push。
+## 实施步骤
 
-## 实现步骤
+1. 低级执行者已完成用户确认后的只读核对和构建证据采集。
+2. 审查者核对 `tasks/execution-result.md`、真实构建日志、退出码和确认链。
+3. 审查者给出 `PASS`、`PASS WITH FOLLOW-UP`、`REVISE` 或 `BLOCKED`。
+4. 审批通过后，按 Git 交付规则提交角色产物，归档本卡，再由高级模型生成下一张活动卡。
 
-1. 等待用户明确授权；未授权时立即停止。
-2. 高级模型核对 UE5.6 安装、项目位置、项目名 `HSR`、Blank、C++、Desktop/Console、Maximum Quality、Starter Content 关闭等选项。
-3. 把生成器预计创建的精确文件路径写入“允许修改文件”，再次确认不会覆盖现有文件。
-4. 用户在 UE5.6 Project Browser 中创建工程。
-5. 高级模型根据实际生成结果核对 `.uproject`、Target、Module 和 Build.cs；不追加 Gameplay 代码。
-6. 用户回传工程创建结果、首个构建/启动结果和第一处真实错误（如有）。
-7. 只有取得真实证据后，才更新 `PROJECT_STATE.md`、`worklog.md` 和对应 todo；未验证项保持未完成。
+## UE/Editor 操作
 
-## UE Editor 手动操作
-
-1. 启动 Unreal Engine 5.6 Project Browser。
-2. 选择 Games → Blank → C++。
-3. 目标平台选择 Desktop/Console，质量选择 Maximum Quality，关闭 Starter Content。
-4. 项目名填写 `HSR`，路径确认在当前仓库根目录且不会生成嵌套的第二个 `HSR/`。
-5. 点击 Create 前再次核对“允许修改文件”已经由高级模型补齐且用户已授权。
-6. 创建后记录 Editor 是否成功打开、模块是否加载；如执行构建或空白 PIE，保留日志/截图并区分“已创建”“已构建”“已 PIE”。
+本任务不要求 Editor 重开、地图配置或 PIE；用户只需执行一次 Development Editor 构建并回传证据。
 
 ## 验收标准
 
-- 用户已明确授权，且实际文件没有超出更新后的允许清单。
-- UE5.6 成功生成 `HSR.uproject` 和最小 C++ 模块文件，项目路径没有错误嵌套。
-- 没有新增 Gameplay 类、Blueprint、GAS、战斗、存档、UMG 或第三方资源。
-- 实际创建、构建、Editor、PIE 状态分别记录；未执行的验证明确标为未验证。
-- 出错时保留第一处真实错误，不使用删除缓存或批量改配置掩盖问题。
+- [ ] 用户已单独确认执行 `TASK-P0-002`。
+- [ ] 目标明确为 `HSREditor Development Win64`，无功能代码改动。
+- [ ] 真实构建命令、工具链版本、退出码和日志证据已记录。
+- [ ] 成功或第一处真实错误已明确；未验证内容保持未验证。
+- [ ] 未执行清理、删除、覆盖、Git 或范围外修改。
 
-## 审查清单
+## 当前执行结果
 
-- [ ] 用户授权是否明确且晚于本任务卡审查？
-- [ ] 允许文件是否为精确路径，且实际改动没有越界？
-- [ ] 是否仍只处理 Phase 0 工程基线？
-- [ ] 是否没有 Character、Controller、GAS、Blueprint、Config 批量修改或第三方资产？
-- [ ] `.uproject`、Target、Module、Build.cs 是否保持最小？
-- [ ] 创建、构建、Editor 和 PIE 证据是否分开记录？
-- [ ] 未验证内容是否没有被标记为完成？
-- [ ] 是否没有执行任何 Git 操作？
+- 低级执行者已完成；结果见 `tasks/execution-result.md`。
+- 当前审批状态：等待高级审查者独立核验。
+- 当前未完成：角色 commit、审查结论、任务卡归档和 `TASK-P0-003` 创建。
 
-## 执行后必须更新的文件
+## Git 交付要求
 
-- `PROJECT_STATE.md`：更新当前代码状态、阻塞点、已完成/未完成和下一任务。
-- `worklog.md`：记录用户授权、实际生成文件、日志、Editor 操作与验证证据。
-- `todo_plan.md`：只勾选已有真实证据的 Phase 0 子项。
-- `learning-journal.md`：仅在产生可复用的 UE 工程或工具链知识时更新。
-- `tasks/active-task.md`：补齐结果后移动到 `tasks/archive/`，再由高级模型创建下一张活动卡。
+- 低级执行者任务结果提交格式：`低级执行模型+Implementation Agent+TASK-P0-002/Phase 0+记录工具链构建证据`
+- 审查者审批结果提交格式：`高级模型+审查者+TASK-P0-002/Phase 0+完成构建证据独立审批`
+- 协调者状态归档提交格式：`高级模型+协调者+TASK-P0-002/Phase 0+同步状态并归档任务`
+- 每个角色提交前必须检查 diff、排除 `Binaries/`、`Intermediate/`、`Saved/`、`.vs/` 和其他派生产物，记录 commit hash。
+- Phase 0 全部子任务完成并通过最终门禁后，另行创建阶段收尾 commit 并推送远端；当前不得 push。
