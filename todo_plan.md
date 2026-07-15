@@ -26,6 +26,8 @@
 - [x] 创建 `docs/phase-execution-workflow.md`，记录 Phase 0–20 通用处理流程和“下一步”判断模板。
 - [x] 创建项目级可选 Skill `phase-next-steps`，提供阶段门禁和相邻任务建议。
 - [x] 创建协作参考：Loop Engineering、UE Editor 边界、低级模型、作品集和面试文档。
+- [x] 建立 CC-SWITCH 文件化上下文机制：`PROJECT_STATE.md`、单一活动任务卡、任务/审查模板、归档目录和模型切换 Prompt。
+- [x] 明确高级模型维护全局快照、低级模型只以 `tasks/active-task.md` 为上下文入口、审查模型独立核验证据。
 
 ## 低级模型任务门禁
 
@@ -33,7 +35,8 @@
 - [ ] 替换模板中的全部 `【占位符】`。
 - [ ] `【允许修改的文件】` 使用明确路径，未列入的文件视为禁止修改。
 - [ ] 确认任务只包含一个可以独立验收的小目标。
-- [ ] 执行前读取 agents、todo、worklog、对应 Phase 和专项设计文档。
+- [ ] 高级模型在交付前读取 agents、todo、worklog、对应 Phase 和专项设计文档，并把必要上下文写入 `tasks/active-task.md`。
+- [ ] 低级模型只以 `tasks/active-task.md` 为上下文入口，只接触任务卡明确列出的目标文件。
 - [ ] 发现需要扩大文件或功能范围时停止并请求授权。
 - [ ] 最终按真实结果区分已完成、已验证、未验证和 Editor 手动操作。
 

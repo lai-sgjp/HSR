@@ -19,16 +19,19 @@
 5. 涉及 C++ 时完成 Architect/Code Reviewer 的最小职责审查；
 6. 涉及删除、覆盖、Git、第三方资源或批量修改时完成 Safety Reviewer 审查。
 
-## 执行模型必须先读
+## 唯一上下文入口
 
-- `.agents/agents.md`；
-- `todo_plan.md`；
-- `worklog.md`；
-- 当前 Phase 文档；
-- 按任务读取 `docs/gas-notes.md`、`docs/battle-system-design.md`、`docs/data-asset-guidelines.md`、`docs/ui-guidelines.md`、`docs/save-system-design.md` 和 MVP 文档。
+低级模型启动后只读取 `tasks/active-task.md`，并立即按卡片执行或停止：
+
+- 不自行读取 `PROJECT_STATE.md`、`.agents/agents.md`、`todo_plan.md`、`worklog.md`、Phase 文档或专项设计文档来补充隐含上下文。
+- 高级模型必须在交付前把必要规则、数据流、证据、允许文件和禁止事项完整写入活动任务卡。
+- 实现过程中只能读取和修改活动任务卡明确列出的目标文件；读取目标文件是实施需要，不代表可以把其他全局文档引入上下文。
+- 卡片有占位符、授权不明确、执行模型不匹配、必须读取/修改清单外文件或缺少 UE5.6 证据时，低级模型必须停止并请求高级模型重写任务卡。
+- 任务卡与聊天冲突时不得自行选择；停止并由高级模型根据用户当前要求修正文件。
 
 ## 执行模型必须先说
 
+- 任务编号、执行模型是否匹配以及是否已有用户授权；
 - 本轮目标和完成标准；
 - 将创建/修改的明确文件及其职责；
 - 不修改的文件、系统和下一 Phase；
@@ -45,6 +48,7 @@
 - 不保存 Actor、ASC、Widget、Ability 实例或 Active GE Handle 到 SaveGame；
 - 不以删除缓存、关闭警告或吞掉错误伪装修复；
 - 不编造 UE5.6 API。
+- 不自行更新 `PROJECT_STATE.md`、agents、todo 或 worklog；除非这些文件被活动任务卡逐项列入允许修改清单。
 
 ## 完成后的强制报告
 

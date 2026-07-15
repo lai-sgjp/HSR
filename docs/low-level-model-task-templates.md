@@ -1,6 +1,6 @@
 # HSR 低级模型执行任务模板
 
-> 本文件是低级模型执行任务 Prompt 的唯一详细真源。复制模板后必须替换全部 `【占位符】`，并把允许修改范围收敛为明确文件路径。
+> 本文件是高级模型生成低级模型任务卡时的详细素材真源。高级模型完成全局上下文读取与模板填充后，必须把最终契约写入 `tasks/active-task.md`；低级模型只读取活动任务卡，不直接读取本模板或全局文档。
 
 ## 使用方法
 
@@ -50,24 +50,9 @@
 
 ## 2. 上下文读取要求
 
-修改前必须使用只读文件能力依次读取：
+低级模型只读取 `tasks/active-task.md` 作为上下文入口。高级模型必须在生成活动任务卡前读取 agents、todo、worklog、README、learning journal、当前 Phase 和相关专项文档，并把本任务必需的规则、事实和证据写入卡片。
 
-1. `.agents/agents.md`
-2. `todo_plan.md`
-3. `worklog.md`
-4. `README.md`
-5. `learning-journal.md`
-
-按任务内容继续读取：
-
-- GAS：`docs/gas-notes.md`、`docs/gas-learning-roadmap.md`
-- 战斗：`docs/battle-system-design.md`
-- DataAsset：`docs/data-asset-guidelines.md`
-- UI：`docs/ui-guidelines.md`
-- Phase：`docs/phase-roadmap-0-20.md` 和对应 phase 文档
-- MVP/早期范围：`docs/mvp-first-month-first-week-plan.md`
-
-禁止只根据用户最后一条消息写文档而忽略现有项目记忆。
+执行时只可读取和修改【允许修改的文件】中列出的 Markdown，以便保留现有内容并完成最小编辑。不得自行读取其他全局文档补充隐含需求；信息不足时停止并请求高级模型补全活动任务卡。
 
 如果【额外限制】禁止运行命令，则不得调用 shell、PowerShell、cmd、Git、构建工具或 Editor。若环境没有非终端文件读取能力，停止并说明限制，不得绕过。
 
@@ -109,7 +94,7 @@
 
 ## 5. 执行步骤
 
-1. 读取要求的上下文。
+1. 读取 `tasks/active-task.md`，确认执行模型、授权、允许文件和验收标准；随后只读取允许修改清单中的目标 Markdown。
 2. 对比【预期结果】与当前文档。
 3. 列出已有内容、缺失内容、冲突描述和必须保留的历史。
 4. 说明修改文件和非修改范围。
@@ -146,7 +131,7 @@
 - DataAsset、Runtime、SaveGame 边界。
 - 当前推迟的高级 GAS 内容。
 
-必须先读取 GAS 学习路线，不得自行创造冲突阶段。
+高级模型生成活动任务卡前必须读取 GAS 学习路线，并把与本任务有关的阶段限制写入卡片；低级模型不得自行创造冲突阶段。
 
 ## 8. GC 检查
 
@@ -265,24 +250,11 @@
 
 ## 2. 上下文读取要求
 
-开始前必须读取：
+低级模型只读取 `tasks/active-task.md` 作为上下文入口，并确认执行模型匹配、用户已授权、卡片无占位符且允许文件为精确路径。
 
-1. `.agents/agents.md`
-2. `todo_plan.md`
-3. `worklog.md`
-4. 与【目标 Phase】对应的 phase 文档
-5. 当前准备修改的所有 `.h/.cpp`
+实现时只读取和修改【允许修改的文件】列出的目标 `.h/.cpp` 及卡片明确列出的必要 Build/Config 文件。高级模型必须在生成活动任务卡前读取 agents、todo、worklog、Phase、专项设计和实际工程证据，并把必要规则、数据流、API 证据与资产命名写入卡片。
 
-条件读取：
-
-- GAS：`docs/gas-notes.md`、`docs/gas-learning-roadmap.md`
-- 战斗：`docs/battle-system-design.md`
-- DataAsset：`docs/data-asset-guidelines.md`
-- UI：`docs/ui-guidelines.md`
-- SaveGame：`docs/save-system-design.md`
-- MVP/早期任务：`docs/mvp-first-month-first-week-plan.md`
-
-同时检查当前实际实现、`Build.cs`、相关 Config 和资产命名。能够从仓库发现的事实不得询问用户。
+若判断任务必须读取或修改清单外文件，立即停止并请求高级模型补卡和用户扩权；不得自行搜索全仓库扩大上下文。
 
 ## 3. 修改范围
 
@@ -585,23 +557,11 @@
 
 ## 2. 上下文读取要求
 
-必须读取：
+低级模型只读取 `tasks/active-task.md` 作为上下文入口。活动任务卡必须内嵌完整错误输出、稳定复现步骤、第一处真实错误、根因假设、允许文件和原路径复验要求。
 
-1. `.agents/agents.md`
-2. `todo_plan.md`
-3. `worklog.md`
-4. 相关源文件和 Build/Config
-5. 用户提供的完整错误输出
+诊断与修复时只读取【允许修改的文件】以及卡片明确列为只读证据的源文件、Target/Build/Config 或日志。高级模型必须在生成任务卡前完成 agents、todo、worklog、Phase 和专项设计读取，并把必要结论写入卡片。
 
-条件读取：
-
-- Build/UHT：对应 `Target.cs`、`Build.cs`、`.uproject` 和反射头文件。
-- GAS：`docs/gas-notes.md`、`docs/gas-learning-roadmap.md`。
-- 战斗：`docs/battle-system-design.md`。
-- DataAsset：`docs/data-asset-guidelines.md`。
-- UI：`docs/ui-guidelines.md`。
-- SaveGame：`docs/save-system-design.md`。
-- Phase：对应 phase 文档。
+证据不完整或需要读取/修改清单外文件时立即停止，请求高级模型补卡或用户扩权。
 
 不要只看最后一行错误。优先找第一处导致后续连锁错误的真实错误。
 

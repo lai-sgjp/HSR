@@ -372,3 +372,54 @@ Stage 7 在 Stage 6 前执行，因为项目 Phase 8 弱点击破早于 Phase 9 
 - 已配置远程 `https://github.com/lai-sgjp/HSR.git`；远程检查未发现已有分支。
 - 已使用非强制方式成功推送 `main` 并建立 `origin/main` 跟踪关系。
 - 下一实施任务仍是 Phase 0 的工程基线检查；本轮没有开始 UE Gameplay。
+
+## 2026-07-16｜CC-SWITCH 多模型文件化上下文机制
+
+### 用户目标与范围
+
+- 解决通过 CC-SWITCH 切换高级、低级和审查模型时聊天上下文不继承的问题。
+- 将项目状态、活动任务、审查规则和模型启动 Prompt 固化在仓库文件中。
+- 本轮只允许修改 Markdown；不修改 C++、Blueprint、Config，不执行构建、Editor、PIE 或 Git。
+
+### 检查证据
+
+- 当前项目仍处于 Phase 0 准备/未验证状态。
+- 仓库没有 `.uproject`、`Source/`、`Config/`、`Content/` 或 Gameplay C++；根目录仅有文档、`.agents`、`.gitignore` 和 `Intermediate/`。
+- Phase 0 的 UBT/UHT、Development Editor、Editor 启动与空白 PIE 均没有真实证据。
+
+### 设计决策
+
+- 不再把聊天上下文作为主要记忆；跨模型交接使用 `PROJECT_STATE.md` 与任务文件流。
+- `PROJECT_STATE.md` 保存全局快照，`tasks/active-task.md` 是唯一活动任务契约，归档任务卡保存历史。
+- 高级模型读取全局文档并生成自包含任务卡；低级模型只以活动任务卡作为上下文入口，只接触卡片明确授权的目标文件。
+- 审查模型依据任务卡、实际改动和真实验证证据独立给出结论，不只采信执行模型总结。
+- 模型切换不扩大授权；任务卡存在也不等于已获得用户执行授权。
+- Loop Engineering 改为文件流：快照 → 活动卡 → 实现/证据 → 审查 → 归档 → 快照更新。
+
+### 实际文档修改
+
+- 创建 `PROJECT_STATE.md`。
+- 创建 `tasks/active-task.md`、`tasks/task-template.md`、`tasks/review-template.md` 和 `tasks/archive/README.md`。
+- 创建 `docs/model-switch-prompts.md`，包含六类模型切换 Prompt。
+- 更新 `.agents/agents.md`、`docs/loop-engineering-workflow.md` 和 `docs/low-model-execution-guide.md`。
+- 更新 `docs/low-level-model-task-templates.md`，消除旧模板要求低级模型自行读取全局文档的冲突。
+- 更新 `todo_plan.md`、`learning-journal.md` 和本 worklog。
+
+### 验证与未验证
+
+- 已检查 PROJECT_STATE 的十项必需内容、active task 的十三项必需内容和模型 Prompt 的六个必需场景。
+- 已确认低级模型规则不再要求自行读取 agents、todo、worklog 或 Phase 文档，而由高级模型把必要上下文写入活动任务卡。
+- `tasks/active-task.md` 指向唯一相邻任务 `TASK-P0-001`，但明确标记为待用户授权，不会自动启动 Phase 0。
+- 本轮没有创建或修改 UE 工程、C++、Blueprint、Config、Content、Plugins 或资产。
+- 本轮没有运行构建、Editor、PIE、自动化测试或 Git；所有 Gameplay Phase 和 GAS Stage 仍未执行。
+
+### UE Editor 手动操作
+
+- 本轮无 UE Editor 操作。
+- 后续只有在用户明确授权 `TASK-P0-001` 后，才由用户创建 UE5.6 Blank C++ 工程并回传证据。
+
+### 后续待办与风险
+
+- 下一任务仅建议审查并授权 `TASK-P0-001`，不自动执行。
+- 主要风险是任务卡过期或与实际状态冲突；每次模型切换前后由高级模型按证据更新 `PROJECT_STATE.md`。
+- 另一个风险是低级模型需要范围外信息；正确处理是停止并让高级模型补全任务卡，而不是让低级模型自行扩读和扩权。
