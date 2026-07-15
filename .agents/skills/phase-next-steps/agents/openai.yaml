@@ -1,0 +1,4 @@
+interface:
+  display_name: "HSR Phase Next Steps"
+  short_description: "Optional phase gate and next-step guidance"
+  default_prompt: "Use $phase-next-steps to identify the next HSR phase task and its validation gates."

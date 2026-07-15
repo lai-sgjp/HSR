@@ -1,0 +1,227 @@
+# HSR Learning Journal
+
+## 使用方式
+
+本文件沉淀可复习的 UE5.6 C++、GAS、回合制架构、数据驱动、UI 和存档知识。它不替代 `worklog.md`：
+
+- `worklog.md` 记录协作过程、工程证据和项目决策。
+- `learning-journal.md` 记录可以脱离当前任务复习和面试表达的知识。
+
+每条学习记录建议包含：
+
+1. 日期与主题。
+2. 概念本质。
+3. 在 HSR 中的职责和代码映射。
+4. 端到端数据流。
+5. 常见误区或踩坑。
+6. 验证方法。
+7. 一道练习题。
+8. 一道面试题及回答要点。
+
+## 2026-07-15｜GAS 与回合系统的职责边界
+
+### 概念本质
+
+GAS 适合表达角色拥有的能力、属性、效果和标签；它不应独自承担整个回合战斗状态机。
+
+### HSR 中的映射
+
+- GAS：基础攻击能否激活、对目标应用何种 Effect、属性如何变化。
+- TurnSystem：当前行动者、行动顺序、输入等待、行动解析、胜负和回合边界。
+
+### 关键误区
+
+- GameplayEffect 的秒数持续时间不天然等于回合数。
+- 动画或 GameplayCue 完成不能成为战斗规则唯一真源。
+- 不应为了未来联机，第一天就引入 PlayerState ASC 和完整预测复制。
+
+### 验证思路
+
+基础攻击应能在不依赖正式动画和 VFX 的情况下改变目标 HP，并由 TurnSystem 明确推进到下一个行动者。
+
+### 练习题
+
+画出“玩家选择基础攻击 → Ability 激活 → Effect 应用 → HP Delegate → UI 更新 → TurnSystem 推进”的数据流。
+
+### 面试题
+
+**为什么不把回合状态机全部写进 GameplayAbility？**
+
+回答要点：Ability 表达一次可激活行动；战斗阶段、行动者所有权、等待输入、结算和胜负属于更高层流程。分离可以避免单个 Ability 掌握全局状态，也便于测试和扩展不同技能。
+
+## 2026-07-15｜Blank 模板与独立 Battle Map 的生命周期边界
+
+### 概念本质
+
+- Blank C++ 模板让 Phase 1 从零建立 Character、Controller、Enhanced Input 和 Camera，便于理解职责，而不是继承模板黑盒。
+- `OpenLevel` 会销毁当前 World 中的探索 Actor、ASC、Widget 和 Runtime Effect；独立 Battle Map 不能沿用探索 Actor 指针。
+
+### HSR 中的映射
+
+- `UHSRBattleTransitionSubsystem` 只保存稳定 ID、探索地图、返回 Transform、Encounter 配置和 BattleResult。
+- Battle Map 根据 DataAsset、Profile Runtime 和 SaveGame 重建 Battle Character 与 ASC。
+- 返回探索地图后同样重建探索 Character，并消费一次 BattleResult。
+
+### 常见误区
+
+- GameInstanceSubsystem 生命周期跨地图，不代表可以安全保存旧 World 的 Actor 指针。
+- SaveGame 不能保存 Active GameplayEffect Handle。
+- 独立 Battle Map 的生命周期成本应在 Phase 4/5 就验证，而不是拖到后期。
+
+### 练习题
+
+画出 `EncounterRequest → OpenLevel → Battle Actor 重建 → BattleResult → OpenLevel → Return Transform` 数据流，并标出哪些对象在每次旅行时被销毁。
+
+## 2026-07-15｜MVP、第一月成果和垂直切片的区别
+
+### 概念本质
+
+- **第一月成果**用于建立可靠技术基础，不要求可玩战斗。
+- **MVP**是最小可玩产品，需要形成探索、战斗、奖励、返回和最小 Save 闭环。
+- **垂直切片**用于展示接近最终质量的多系统组合，范围和表现要求高于 MVP。
+
+### HSR 的范围选择
+
+- 第一月只到 Phase 3 单对象交互。
+- MVP 使用 1v1、静止 Encounter、基础攻击、固定奖励和单槽位最小 Save。
+- Phase 20 才提供三角色、Boss、任务、成长、装备、状态和完整展示流程。
+
+### 为什么主动缩小
+
+- 1v1 能验证 TurnSystem，而不引入队伍切换复杂度。
+- 静止 Encounter 能验证跨地图 Context，而不先解决 AI。
+- 基础攻击能验证 GAS，而不先解决 Cost、Target 和复杂 Formula。
+- 固定奖励能验证幂等事务，而不先建立完整 Inventory/Drop。
+- 最小 Save 能验证数据边界，而不先保存所有系统。
+
+### Scope Control 的学习价值
+
+工程能力不仅是实现功能，还包括识别最小验证路径、控制依赖数量、定义完成标准，并拒绝不服务当前风险验证的功能。
+
+### 练习题
+
+需求新增“装备随机副词条”时，判断它属于第一月、MVP 还是垂直切片，并说明推迟它不会阻止验证哪些核心风险。
+
+### 作品集面试题
+
+**为什么你的 MVP 没有战技、击破和装备，却仍能证明回合制/GAS 架构成立？**
+
+回答要点：MVP 已覆盖输入到 Command、跨地图 Context、ASC 重建、Ability/Effect、Attribute Delegate、Turn 状态机、幂等奖励和 Save 分层；复杂系统是在这些稳定边界上的扩展，而不是验证基础架构所必需。
+
+## 2026-07-15｜按项目风险学习 GAS，而不是按概念表学习
+
+### 核心认识
+
+GAS 概念之间存在依赖。学习顺序应服务于项目当前风险：先验证 ASC 和 Attribute，再验证 GE，然后才是 Ability、Tags、复杂公式、击破、状态、UI、装备和网络。
+
+HSR 的实际顺序为：
+
+`边界 → ASC/Attribute → GE → Ability → Tags → Damage Execution → Break → Status → UI → Equipment → Networking`
+
+### 关键原因
+
+- 没有正确 Actor Info，后续 Ability 和 Effect 报错都难定位。
+- 没有独立验证 GE，Ability 失败时无法判断是激活还是属性问题。
+- 没有稳定简单伤害，不应引入 ExecutionCalculation。
+- 没有 Break Debuff 真实用例，不应先设计通用状态框架。
+- 单机规则未稳定，不应学习预测和复制实现。
+
+### GAS 与 TurnSystem 的时间边界
+
+- GAS Duration/Periodic 使用世界秒数。
+- HSR 的持续回合、行动条、共享战技点和 Turn Delay 属于 TurnSystem/Runtime。
+- Infinite GE 只承担回合状态的 Modifier/Tag 表现，由 Runtime Status 保存剩余回合和 Handle。
+
+### 练习题
+
+为“持续 2 回合的中毒”画出 StatusDefinition、Runtime Status、Infinite GE、TurnStarted、Instant Damage GE 和 UI Delegate 的数据流，并解释为什么不能使用 `Duration=2.0`。
+
+### 面试题
+
+**你为什么没有在项目早期使用 ExecutionCalculation、PlayerState ASC 和 Mixed Replication Mode？**
+
+回答要点：它们分别服务于复杂多属性公式、跨 Pawn 的网络玩家状态和 Owner 客户端复制。早期单机最小闭环不具备这些真实需求，先使用简单 GE 和 Character ASC 可以降低变量数量，同时通过 Command、稳定 ID 和集中 Actor Info 初始化保留迁移点。
+
+## 2026-07-15｜任务契约、范围控制与证据驱动 Debug
+
+### 概念本质
+
+低级模型执行模板不是一份“建议清单”，而是一份任务契约。它在执行前明确输入、允许写入范围、禁止事项、完成标准和验证责任，使模型不能依靠模糊的“相关文件”自行扩展任务。
+
+### HSR 中的三类契约
+
+- 纯文档任务：只改变项目记忆和规划，不把文档完成误标为 Gameplay 完成。
+- 小型 C++ 功能：只实现一个可独立编译和验收的数据流，通常限制为 1–5 个明确文件。
+- Debug/修复：先收集完整证据并找到第一处真实错误，再修复根因，不把后续连锁错误或症状当成根因。
+
+### 为什么文件允许清单是硬边界
+
+- 文件范围是任务范围最容易验证的代理指标。
+- 明确路径可以阻止无关重构、批量 Config 修改和跨 Phase 实现。
+- 如果真正修复必须修改清单外文件，正确行为是停止并请求授权，而不是悄悄扩权。
+- “未列入即禁止”能避免遗漏的敏感文件被默认视为可写。
+
+### 证据驱动 Debug
+
+推荐顺序为：
+
+`完整错误与复现 → 第一处真实错误 → 1–3 个根因假设 → 排除错误假设 → 最小修复 → 原路径复验`
+
+第一处真实错误通常会产生大量后续 UHT、C++、Link 或 Blueprint 连锁错误。只处理最后一行、删除缓存或同时尝试多个修改，会破坏因果证据并增加新的变量。
+
+### 与完成状态的关系
+
+- “已修改”不等于“已编译”。
+- “已编译”不等于“PIE 主路径通过”。
+- “正常路径通过”不等于失败路径、重复调用和生命周期安全已经验证。
+- 无法执行的验证必须明确列为未验证，不能使用“应该可以”代替证据。
+
+### 常见误区
+
+- 把模板中的占位符留空，导致执行模型自行假设范围。
+- 在允许文件中写“相关文件”，使硬边界失效。
+- 一个任务同时包含功能、重构、资源导入和 Debug。
+- 因为修复了一个 Bug 就顺手更新 agents，造成长期规则被短期噪声污染。
+- 把 worklog 当 todo，或把规划完成状态当成工程完成状态。
+
+### 练习题
+
+一个“新增基础攻击 Ability，并顺便重构 AttributeSet、制作技能 UI、导入动画、修复旧编译警告”的任务为什么不能直接套用模板 B？请将它拆成至少四个独立任务，并为每个任务给出明确的允许文件范围和验收证据。
+
+### 面试题
+
+**你如何约束 AI 编码代理在大型 UE 项目中避免范围漂移和无证据修复？**
+
+回答要点：使用明确任务契约和文件允许清单；每轮单一目标；先读取长期规则和阶段文档；按反射、GC、GAS、Tick、UI、Save/Data 做专项门禁；Debug 从第一处真实错误建立证据链；编译、PIE 和未验证状态分开汇报；扩大范围必须重新授权。
+
+## 2026-07-16｜阶段 Skill、Loop Engineering 与 Editor 协作
+
+### 概念本质
+
+阶段 Skill 的价值不是替代开发者做决定，而是把“下一步应该做什么”变成基于证据的可选建议。它必须知道当前 Phase、前置门禁、最后一次验证和未解决风险，然后只推荐一个相邻小任务。
+
+### HSR 中的映射
+
+- `phase-next-steps`：识别当前阶段、检查门禁、给出下一步和验证清单；
+- `phase-execution-workflow.md`：维护 Phase 0–20 的通用循环和阶段矩阵；
+- Loop Engineering：将规划、Prompt 审查、架构、实现、代码审查、学习复盘和安全审查分成可选角色；
+- UE Editor 协作：Codex 修改可审查 C++/Markdown，用户完成需要视觉确认和资产绑定的 Editor 工作。
+
+### 为什么 Skill 必须是可选的
+
+- 用户当前回合的明确要求优先于默认工作流；
+- 不同任务需要不同深度的审查，强制完整闭环会增加噪声；
+- 阶段建议不能自动修改文件、启动工程或把计划标记为完成；
+- 可选机制更适合学习项目：用户可以比较建议、理解取舍并主动授权。
+
+### 练习题
+
+如果 Phase 2 的 ASC 初始化尚未有编译或 PIE 证据，而用户询问“下一步做完整技能系统可以吗？”，阶段 Skill 应该如何回答？
+
+参考要点：状态应为 Not verified 或 Blocked；先补齐 ASC/AttributeSet/Actor Info/Delegate 的最小验证，再推荐 Phase 3 或 Phase 6 的任务；不能因为路线图存在就跳过门禁。
+
+### 面试题
+
+**如何设计一个不会擅自推进项目的 AI 阶段助手？**
+
+回答要点：使用只读证据确定阶段；将规划、实施和验证分开；每次只推荐一个相邻小任务；列出 Codex 与用户 Editor 职责；明确允许文件和非目标；将“Ready、Blocked、Not verified、Optional”分开；不自动写代码、改配置或提交 Git。

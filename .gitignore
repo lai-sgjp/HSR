@@ -1,0 +1,23 @@
+# Unreal Engine generated output
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+.vs/
+
+# IDE and local user files
+.idea/
+.vscode/
+*.suo
+*.user
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Local-only experimental assets
+Content/ModResources/
