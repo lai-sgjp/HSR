@@ -366,7 +366,9 @@ Stage 7 在 Stage 6 前执行，因为项目 Phase 8 弱点击破早于 Phase 9 
 
 ### 后续待办
 
-- 使用 skill-creator validator 验证 Skill 元数据和目录结构。
-- 创建适用于 UE 的 `.gitignore`，再初始化本地仓库。
-- 只提交本轮 Markdown、`.agents` Skill 和忽略规则，不提交 `Intermediate`。
-- 配置并核对远程 `https://github.com/lai-sgjp/HSR.git`，在非强制模式下推送。
+- 已使用 skill-creator validator 验证 Skill 元数据和目录结构，结果为 `Skill is valid!`。
+- 已创建适用于 UE 的 `.gitignore`；`Intermediate` 被明确忽略且未进入提交。
+- 已初始化本地 `main` 仓库并创建根提交 `468c378`：`docs: add HSR collaboration workflow and phase skill`。
+- 已配置远程 `https://github.com/lai-sgjp/HSR.git`；远程检查未发现已有分支。
+- 已使用非强制方式成功推送 `main` 并建立 `origin/main` 跟踪关系。
+- 下一实施任务仍是 Phase 0 的工程基线检查；本轮没有开始 UE Gameplay。
