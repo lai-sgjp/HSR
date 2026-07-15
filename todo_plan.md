@@ -128,7 +128,7 @@
 - [x] 使用 UE5.6 Blank C++ 模板创建 `HSR`，关闭 Starter Content。
 - [x] 创建单 `HSR` Runtime 模块。
 - [ ] 验证 Visual Studio Community 2026、Windows SDK、UBT/UHT 和实际 C++ 标准。
-- [ ] 确认 Enhanced Input、GameplayAbilities、GameplayTags、GameplayTasks。
+- [x] 确认 Enhanced Input、GameplayAbilities、GameplayTags、GameplayTasks。
 - [ ] 建立根 Gameplay Tags 和按需目录。
 - [ ] 创建并设置 `Map_ProjectSetup`。
 - [ ] 构建 Development Editor、打开 Editor、执行空白 PIE。

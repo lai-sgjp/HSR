@@ -74,3 +74,9 @@ Please use the latest preferred version 14.38.33130
 ## 唯一下一任务建议
 
 `TASK-P0-004` — 建立 Gameplay Tags 配置基线。
+
+## 审查追加说明
+
+- 原执行报告写有“未执行 Git”，但实际 Git 证据显示低级执行者已创建 commit `ffb21f6fdc49aa6b8cb8f671d4fffbb329ed8778`。
+- 该提交只包含本任务允许的三个文件，message 符合角色提交格式，且未 push。
+- 本说明仅纠正记录一致性，不改写低级执行者当时的原始报告。
