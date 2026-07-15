@@ -11,15 +11,15 @@
 ## 当前任务
 
 - 活动任务卡：`tasks/active-task.md`。
-- 当前任务：`TASK-P0-002` — 验证工具链和首次 Development Editor 构建。
-- 当前状态：低级执行者已完成执行；Pauli 审查结论为 `PASS WITH FOLLOW-UP`，任务已归档。
-- 最近完成任务：`TASK-P0-001` — 创建 UE5.6 Blank C++ 工程基线并采集首轮证据，结论为 `PASS WITH FOLLOW-UP`。
+- 当前任务：`TASK-P0-003` — 配置并验证 Enhanced Input 与 GAS 基础插件/模块依赖。
+- 当前状态：协调者规划完成，等待低级执行模型复述后由用户单独确认；尚未实施。
+- 最近完成任务：`TASK-P0-002` — 验证工具链和首次 Development Editor 构建，Pauli 审查结论为 `PASS WITH FOLLOW-UP`。
 
 ## 当前阻塞点
 
 - 文件化上下文机制本身没有阻塞。
 - 尚无 Development Editor 构建与空白 PIE 的真实证据，因此 Phase 0 保持 `Not verified`，不得宣布通过。
-- `TASK-P0-002` 已完成独立审批、归档和角色审查提交；不得由本轮自动创建或开始 `TASK-P0-003`。
+- `TASK-P0-003` 尚未获得复述后的用户单独确认；确认前不得修改 `.uproject`、Build.cs 或运行构建/Editor。
 
 ## 已完成事项
 
@@ -35,7 +35,7 @@
 
 - 未验证 Visual Studio Community 2026 与 UE5.6 的 UBT/UHT、Development Editor 构建兼容性。
 - 已报告完成首次 Editor 打开，但未完成 Editor 重开或空白 PIE；尚未产生任何 Gameplay、GAS、Blueprint 或资产验证。
-- 尚未完成 `TASK-P0-002` 的独立审查、角色 commit 和任务归档。
+- 未配置或验证 Enhanced Input、GameplayAbilities、GameplayTags、GameplayTasks 的插件声明与模块依赖。
 
 ## 当前代码状态
 
@@ -63,8 +63,8 @@
 
 ## 下一个推荐任务
 
-- **唯一推荐任务：** 由高级协调者根据真实证据另行规划下一张 Phase 0 活动卡；本轮不创建或开始 `TASK-P0-003`。
-- P002 已由 Pauli 归档；其 up-to-date 结果不能替代实际 C++ 编译证据。
+- **唯一推荐任务：** 低级执行模型读取 `tasks/active-task.md`，复述 `TASK-P0-003` 后停止，等待用户单独确认。
+- P003 只处理 `EnhancedInput`、`GameplayAbilities` 插件声明和 `EnhancedInput`、`GameplayAbilities`、`GameplayTags`、`GameplayTasks` 模块依赖，不进入 Tags 内容、地图或 PIE。
 - 本推荐不会自动启动任务，也不包含 Character、Controller、GAS、Blueprint、UMG 或 Gameplay。
 
 ## 新模型接入时必须读取的文件
@@ -94,8 +94,8 @@
 
 ## 2026-07-16 协调更新
 
-- 根据 `TASK-P0-001` 的 `PASS WITH FOLLOW-UP`，已创建唯一活动任务 `TASK-P0-002`。
-- `TASK-P0-002` 只验证 `HSREditor Development Win64` 首次构建；已获得确认并经 Pauli 审查为 `PASS WITH FOLLOW-UP`。
-- 构建失败时仅记录第一处真实错误；不得修改 SDK、Target、Build.cs、源文件或缓存。
+- `TASK-P0-002` 已经 Pauli 审查、归档并完成审查者角色提交。
+- 已创建唯一活动任务 `TASK-P0-003`，只处理基础插件声明、模块依赖与对应构建/加载证据。
+- P003 未经低级模型复述和用户单独确认不得执行；P002 的 up-to-date 结果不得复用为 P003 构建证据。
 
 当文件内容不一致时，按以下顺序处理：用户当前明确要求 → `.agents/agents.md` 长期规则 → `tasks/active-task.md` 本轮契约 → `PROJECT_STATE.md` 快照 → 专项设计文档 → `todo_plan.md` → `worklog.md`。发现冲突时不得猜测，应由高级模型根据证据修正文件。

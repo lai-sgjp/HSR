@@ -602,3 +602,29 @@ Stage 7 在 Stage 6 前执行，因为项目 Phase 8 弱点击破早于 Phase 9 
 ### 未验证
 
 - 实际 C++ 编译和链接、插件/模块依赖、Gameplay Tags、`Map_ProjectSetup`、Editor 重开、空白 PIE 和 Phase 0 最终门禁。
+
+## 2026-07-16｜Planck：TASK-P0-003 协调规划
+
+### 当前状态
+
+- Phase 0 保持 `Not verified`；P001、P002 已归档，P002 为 `PASS WITH FOLLOW-UP`。
+- 用户授权协调者进入下一项工作，解释为 Phase 0 相邻子任务 P003，不进入 Phase 1。
+
+### 四角色规划结论
+
+- Prompt Planner：P003 只处理基础插件声明、模块依赖和相应验证。
+- Prompt Reviewer：P002 的 up-to-date 结果不能作为 P003 的构建证据。
+- Architect：`.uproject` 启用 `EnhancedInput`、`GameplayAbilities` 插件；Build.cs 声明 `EnhancedInput`、`GameplayAbilities`、`GameplayTags`、`GameplayTasks` 模块依赖。
+- Safety Reviewer：禁止 Config、Tags 内容、地图、PIE、Gameplay 类、其他 Source、清缓存和 push。
+
+### 实际文档修改
+
+- 修正 `PROJECT_STATE.md` 中 P002 未完成、不得创建 P003 等陈旧描述。
+- 创建唯一活动卡 `tasks/active-task.md`，编号 `TASK-P0-003`。
+- 活动卡要求低级执行模型先复述并等待用户单独确认，确认前零工具调用。
+
+### 未实施内容
+
+- 本轮未修改 `HSR.uproject`、Build.cs、Config、Source 实现或资产。
+- 未运行构建、Editor、PIE 或 P003 实施。
+- 下一步仅为低级模型读取活动卡并复述，不自动执行。
