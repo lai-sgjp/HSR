@@ -874,3 +874,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 已将 P1-001 活动卡和执行报告归档到 `tasks/archive/`，只勾选 todo 中真实完成的 P1-001 子进度，Phase 1 总项保持未完成。
 - 未验证项继续保留：Editor 类可见性、输入、Possession、移动、HUD、动画、PIE 和 Phase 1 总门禁。
 - 本次不修改 Gameplay 源码、不构建、不启动 Editor/PIE、不 push。归档提交成功后才允许创建 P1-002。
+
+## 2026-07-16｜Coordinator：规划 TASK-P1-002
+
+- P1-001 已以 Coordinator commit `02c150f669cf851afb37509d1b78f28176f79285` 完成归档后，才创建唯一活动任务 P1-002。
+- 唯一目标：建立最小 PlayerController、`EHSRPlayerControlMode`、幂等 `SetControlMode`，覆盖 BeginPlay、空/错误 Pawn、OnPossess/OnUnPossess 和重新 Possess 的安全边界。
+- 唯一允许实施文件为 `Source/HSR/Player/HSRPlayerController.h/.cpp` 与 `tasks/execution-result.md`；Build.cs 不在修改清单，现有 EnhancedInput 依赖不构成提前实施依据。
+- IA/IMC 资产、Mapping Context 实际管理、输入 Action 绑定全部推迟至 P1-003；Battle 仅保留枚举边界。
+- 当前交接为 Coordinator → Implementation Agent。执行者首次只能读取活动卡，完整复述并精确以 `等待用户确认执行 TASK-P1-002。` 结束；用户再次确认前零工具调用。
+- 本轮未实施源码、构建、Editor/PIE 或 push；规划提交不得混入 P1-001 实现或派生产物。

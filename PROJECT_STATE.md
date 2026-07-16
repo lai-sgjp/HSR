@@ -5,22 +5,22 @@
 
 ## 当前 Phase
 
-- **Phase 1 已正式进入；P1-001 已由用户人工验收，当前等待协调归档提交完成后规划 P1-002**。
+- **Phase 1 已正式进入；P1-001 已归档，当前活动任务为 P1-002 协调规划完成、等待首次只读复述**。
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 已有 Character/Camera 骨架及 UHT、编译、链接成功证据；Editor 类可见性、输入、Possession、移动和 PIE 尚未验证。
 
 ## 当前任务
 
-- 当前无活动任务卡；`TASK-P1-001` 正在由 Coordinator 完成归档提交。
-- P1-001 Implementation Agent commit：`14b3cc96592f65dd5a0db8c1ef2ffd3987345c32`。
-- 用户亲自审查并明确确认没有问题，同时要求跳过额外独立 Reviewer；不存在 Reviewer 产物或 commit。
+- 活动任务卡：`tasks/active-task.md`，编号 `TASK-P1-002`。
+- 当前任务只允许未来 Implementation Agent 修改 `Source/HSR/Player/HSRPlayerController.h/.cpp` 与 `tasks/execution-result.md`。
+- 当前只完成 Coordinator 规划；执行者首次只能读取活动卡并复述，用户再次明确确认前零工具调用。
 - 最近完成任务：`TASK-P0-007` — Phase 0 阶段审查、文档归档与门禁判定；执行结果 commit `41446f2b771b99eb011a496ac37a26d94214fdb1`。
 
 ## 当前阻塞点
 
 - 文件化上下文机制本身没有阻塞。
 - Phase 0 当前没有阻断项；C++20 证据来源为用户运行 `_MSVC_LANG` 检查并明确回传结果。
-- P1-001 没有技术阻塞；P1-002 必须等待本次 Coordinator 归档 commit 成功后再创建。
+- P1-002 没有技术阻塞；当前仅受首次复述与用户再次确认流程门禁约束。
 - MSVC 14.51.36248 不是 UE5.6 preferred 版本；当前构建成功，作为非阻断兼容性风险继续保留。
 
 ## 已完成事项
@@ -70,8 +70,16 @@
 
 ## 下一个推荐任务
 
-- **唯一下一步：** 完成 P1-001 Coordinator 归档提交；成功后创建 P1-002 活动任务卡。
-- P1-002 首次执行者仍须只读复述并等待用户另行确认，确认前不得实施。
+- **唯一下一步：** Implementation Agent 首次只读 `tasks/active-task.md`，完整复述并以“等待用户确认执行 TASK-P1-002。”结束。
+- 用户在该复述后再次明确确认前，不得读取其他文件、创建 Controller、构建、启动 Editor/PIE 或执行 Git。
+
+## 2026-07-16 P1-002 Coordinator 规划更新
+
+- P1-001 Coordinator 归档 commit：`02c150f669cf851afb37509d1b78f28176f79285`。
+- P1-002 唯一目标为 PlayerController、`EHSRPlayerControlMode`、幂等 `SetControlMode` 与 BeginPlay/OnPossess/OnUnPossess 安全边界。
+- 允许修改范围严格为两个 PlayerController 源文件和执行报告；Build.cs 只读且已有依赖，不得修改。
+- 本任务不创建 IA/IMC，不实际管理 Mapping Context，不实现输入 Action、GameMode、HUD、GAS 或战斗。
+- 本轮协调只创建任务契约与交接记录；未实施源码、构建、Editor/PIE 或 push。
 
 ## 2026-07-16 P1-001 用户验收与协调归档更新
 
