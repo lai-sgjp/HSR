@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-- 当前唯一活动任务为 `TASK-P1-005：动画资产接入与 Phase 1 最终回归`；Reviewer `b741391` 结论为 `REVISE`，当前为同一卡 Coordinator → 用户补证，不创建新卡。
+- 当前唯一活动任务为 `TASK-P1-005：动画资产接入与 Phase 1 最终回归`；历史 Reviewer `b741391` 结论为 `REVISE`，用户现已补证并作出许可证 owner acceptance，当前为同一卡 Coordinator → Reviewer 最终聚焦复审，不创建新卡。
 - P1-005 同一卡串行交接为：A 资产需求清单 → B 用户候选与授权证据 → C 只读兼容性/许可证评估及最终 manifest → D 用户 Editor 导入、AnimBP、绑定与资产 commit → E 最终回归 → F 验收/Coordinator 归档。段间只更新状态/交接表并按真实人格独立 commit。
 - Mixamo/Kachujin 资产已在用户 commits `a539b6d`、`abca679` 中进入 Git；实际 manifest、BP 路径移动和 GameMode 引用修改未事前批准，等待用户 Editor 重开引用验证后由 Coordinator 事后追认，不得假装尚未提交。
 - P1-004 已验证 GameMode/灰盒地图/HUD、Spawn/Possess、Move/Look/Jump、无副作用 Interact、UIOnly 往返、同会话 Re-Possess 与 Context/Binding/HUD 去重。
@@ -26,9 +26,9 @@
 - MSVC 14.51.36248 不是 UE5.6 preferred 版本；当前构建成功，作为非阻断兼容性风险继续保留。
 - 用户已事后追认 `074e5fc` 对原只读 Character/PlayerController 的扩权修改；该记录不是补造事前授权。首次 `REVISE` 的其余项目已由 A2、IMC 归属确认和用户专项 PIE 闭环。
 - `Content/Input/IMC_Exploration.uasset` 已确认由用户根据执行者说明在 UE Editor 中创建/修改，作为 Enhanced Input 必要配置，Editor 重开后保持；主 Agent 经授权代办的独立资产 commit `a091700082f30ed70e3fba990e363dd7af102a6a` 只含该文件。此归属阻断已解除，但不构成 Reviewer 独立验证。
-- P1-005 阻断：`0c85794` 对 Mixamo 公开 Git 再分发权的结论缺官方证据；需用户提供 Adobe/Mixamo 官方许可/FAQ、来源与下载凭证，并说明仓库公开性和未来发布计划。
-- P1-005 仍缺 30/60（或 30/120）FPS、同会话 Re-Possess、无 Mesh/AnimClass 失败路径、可核对 Development Editor 构建与 Output Log 证据。
-- `Config/DefaultEditor.ini` 是未跟踪本地预览配置，本轮保持不改不提交；归档前由用户决定保留本地或另行授权处理。
+- P1-005 许可证状态为 `OWNER ACCEPTED`：证据为用户提供的第三方指南 URL/截图，不冒充 Adobe 官方原文；用户确认仓库 public 且保留资产历史，并接受已整合资产的公开发布风险。该项不再阻断。
+- 用户已回传 Editor 重开引用、帧率、同会话 Re-Possess、无 Mesh/AnimClass、Development Editor 构建与 Output Log 均无问题；这些是用户证据，完整命令/日志细节未提供且不得补造。当前只待 Reviewer 最终聚焦复审。
+- `Config/DefaultEditor.ini` 是本地 AssetViewer/Editor 预览配置，不提交、不删除，并由 `.gitignore` 精确忽略。
 
 ## 已完成事项
 

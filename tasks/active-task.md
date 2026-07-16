@@ -1,57 +1,49 @@
 # TASK-P1-005：动画资产接入与 Phase 1 最终回归
 
-## 单卡规则与当前结论
+## 当前结论与交接
 
-本文件仍是 P1-005 唯一任务卡。Reviewer `b741391` 结论为 `REVISE`；补证与追认继续在本卡完成，不创建分段新卡，不进入 P1-006，不 push。
+本文件仍是 P1-005 唯一任务卡。Reviewer `b741391` 的 `REVISE` 历史结论保留；用户现已补充验收结果，并以项目所有者身份接受 Mixamo/Kachujin 用于 public 仓库的许可风险。许可证门禁改为 `OWNER ACCEPTED`，不再阻断本任务。
 
-当前交接：`Coordinator → 用户`。
+当前交接：`Coordinator → Reviewer 最终聚焦复审`。不新建分段任务卡，不进入 P1-006，不 push。
 
-## A～F 真实状态
+## A～F 状态
 
-| Segment | 状态 | 真实证据/缺口 |
+| Segment | 状态 | 真实证据 |
 |---|---|---|
 | A 资产需求清单 | `完成` | Implementation `649e125` |
-| B 用户候选回传 | `候选已收到 / 许可证证据不足` | 缺官方许可/FAQ、来源与下载凭证 |
-| C 兼容性与许可证评估 | `REVISE` | `0c85794` 存在许可证过度结论；公开 Git 再分发权未验证 |
-| D Editor 导入与 AnimBP | `已发生 / 待追认与引用验证` | `a539b6d`、`abca679`；manifest、路径移动和 GameMode 修改未事前批准 |
-| E 最终回归 | `部分用户报告通过 / 待补证` | 缺 FPS、同会话 Re-Possess、无 Mesh/AnimClass、正式构建证据 |
-| F 验收与归档 | `REVISE` | `3d94b74` 仅为汇总草稿；Reviewer `b741391` 未放行 |
+| B 用户候选回传 | `完成 / OWNER ACCEPTED` | Mixamo/Kachujin；第三方指南 URL 与用户截图；仓库为 public 且会保留资产历史 |
+| C 兼容性与许可证评估 | `待最终聚焦复审` | Implementation `0c85794`；其技术评估保留，许可结论由 owner acceptance 接管 |
+| D Editor 导入与 AnimBP | `用户验证通过 / 待最终聚焦复审` | 用户资产 commits `a539b6d`、`abca679`；Editor 重开后引用、Spawn/Possess 正常 |
+| E 最终回归 | `用户验证通过 / 待最终聚焦复审` | 帧率、Re-Possess、空 Mesh/AnimClass、构建与 Output Log 均由用户确认无问题 |
+| F 验收与归档 | `待最终聚焦复审` | `3d94b74` 仍仅是 Implementation 汇总；等待 Reviewer 新结论 |
 
-## Reviewer REVISE 补证段（不新建任务卡）
+## 资产与路径事实
 
-### 用户需回传许可证与仓库信息
-
-- Adobe/Mixamo 官方许可证或 FAQ 原文、截图，或来源 URL 信息。
-- 下载账户/下载凭证；敏感字段可遮挡。
-- 当前仓库是 private 还是 public。
-- 是否计划公开仓库并保留这些原始或可提取 `.uasset` 的 Git 历史。
-
-成品使用许可不得自动推导公开 Git 再分发权。若不能证明公开再分发，可选但本卡不擅自执行：保持资产/历史仅私有；经用户另行授权用安全 Git 策略移出公开历史；替换为明确允许再分发的资产。
-
-### Coordinator 待追认 manifest
-
-资产已经进入 `a539b6d` / `abca679`，不得写成尚未提交：
-
-- 删除：`Content/Blueprints/Character/BP_HSRExplorationCharacter.uasset`
-- 新增 BP：`Content/Blueprints/Character/Player/BP_HSRExplorationCharacter.uasset`
+- 删除旧 BP：`Content/Blueprints/Character/BP_HSRExplorationCharacter.uasset`
+- 新 BP：`Content/Blueprints/Character/Player/BP_HSRExplorationCharacter.uasset`
 - 修改：`Content/Blueprints/Framework/BP_HSRGameMode.uasset`
 - 角色：`Content/Characters/Player/AS_Kachujin_G_Rosales_Anim.uasset`、`PA_Kachujin_G_Rosales_PhysicsAsset.uasset`、`SKM_Kachujin_G_Rosales.uasset`、`SK_Kachujin_G_Rosales_Skeleton.uasset`
 - 动画：`Content/Characters/Player/Anim/ABP_HSRExploration.uasset`、`Breathing_Idle.uasset`、`Jogging.uasset`、`Jump_Up.uasset`、`Jump_Loop.uasset`、`Jump_Down.uasset`
 - 材质：`Content/Characters/Player/Material/kachujin_MAT.uasset`、`kachujin_MAT_.uasset`
 - 贴图：`Content/Characters/Player/Texture/Kachujin_diffuse.uasset`、`Kachujin_diffuse_body.uasset`、`Kachujin_normal.uasset`、`Kachujin_specular.uasset`
 
-用户重开 Editor 后必须确认：GameMode Default Pawn 指向新 BP；新 BP 的 Mesh/AnimBP 有效；地图 Spawn/Possess/动画正常；旧路径无缺失引用，redirector 状态明确。之后 Coordinator 才能事后追认。
+用户确认 Editor 重开后 GameMode Default Pawn 指向移动后的角色 BP，Mesh、Skeleton、AnimBP 引用有效，地图正常 Spawn/Possess，未发现旧路径或 Redirector 导致的引用问题。Coordinator 据此事后追认实际 manifest；该证据不冒充 Reviewer 独立运行。
 
-### 补测与构建清单
+## 用户回传的最终回归证据
 
-1. 30/60 FPS（或 30/120）下移动、跳跃和动画一致。
-2. 同一 PIE `UnPossess → Re-Possess` 后输入/动画恢复，Action 单次触发，Pawn/Context/Binding/HUD 不重复。
-3. 临时清空 Mesh/AnimClass 后 Gameplay 仍工作；随后恢复且不提交临时改动。
-4. 最终 Development Editor 构建：完整命令、target/config/platform、时间、退出码、UHT/Compile/Link 或 up-to-date 状态、日志位置/摘要。
-5. Output Log 的 Error、Ensure、Accessed None、Skeleton/Animation/Binding 警告结果。
+- 30/60 FPS（用户以“正常”确认）下移动、镜头、跳跃和动画正常。
+- 同一 PIE 会话 UnPossess/Re-Possess 后输入单次触发，Pawn、Context、Binding、HUD 不重复。
+- 临时清空 Mesh/AnimClass 后 Gameplay 仍可移动，恢复引用后正常。
+- 最终 Development Editor 构建无问题；用户未提供可持久记录的完整命令、时间或日志路径，因此不得补造细节。
+- Output Log 无问题；不得补造具体日志行或独立核验声明。
 
-## 边界与下一交接
+## 许可证与 Config 决策
 
-- `Config/DefaultEditor.ini` 保持未跟踪，不改、不暂存、不提交；归档前用户决定保留本地或另行授权处理。
-- P1-005 与 todo 保持未完成；禁止源码、资产、Config 修改及 push。
-- 用户一次性回传上述证据后，Coordinator 核对并决定是否交 Reviewer 复审。
+- 持久记录：`docs/asset-licenses/mixamo-kachujin.md`。
+- 证据来自用户提供的第三方指南 URL/截图，不冒充 Adobe 官方原文；Adobe 官方页面本轮未独立取得。
+- 用户作为项目所有者确认仓库为 public、会保留资产历史，并接受“资产已整合进 HSR 项目、非 standalone 分发”的发布风险。许可证不再阻断 P1-005。
+- `Config/DefaultEditor.ini` 是本地 AssetViewer/Editor 预览配置，不提交、不删除；通过 `.gitignore` 精确忽略 `/Config/DefaultEditor.ini`。
+
+## Reviewer 聚焦范围
+
+Reviewer 只需复核：上述 owner acceptance 是否如实记录、用户验证证据是否未被夸大、真实 commits/manifest 是否保持、Config 是否未提交，以及 P1-005 是否可以放行。不得重新把已由项目所有者接受的许可风险作为阻断项。

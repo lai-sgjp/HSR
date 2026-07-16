@@ -21,3 +21,6 @@ Saved/
 
 # Local-only experimental assets
 Content/ModResources/
+
+# Local AssetViewer / Editor preview state
+/Config/DefaultEditor.ini

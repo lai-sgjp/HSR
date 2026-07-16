@@ -143,7 +143,7 @@
 - [x] P1-003A：完成 Enhanced Input C++ 接口、Action 绑定入口与 Mapping Context 生命周期；构建通过并由用户人工验收。
 - [x] P1-003B：创建 Move、Look、Jump、Interact Input Actions 与 Exploration Context；用户确认 Value Type、IMC 配置及 Editor 重开持久性，五资产 commit 为 `7c71ae825fb840ace6d76fc6232883b807d395d1`。（Blueprint 引用绑定与完整 PIE 仍未验证。）
 - [x] P1-004：完成 GameMode、派生 BP、灰盒地图、探索 HUD 与可玩闭环；A2 移除手工 PushInputComponent 和高频日志；用户验证 UIOnly 往返、同会话 Re-Possess、Context/Binding/HUD 去重；最终 Reviewer `6b19d179562f03c8cc50b94456d3a943478855c0` 为 `PASS`。
-- [ ] P1-005：建立基础 AnimBP 参数并完成动画、连续 PIE、帧率和剩余失败路径最终回归。
+- [ ] P1-005：基础 AnimBP、动画与最终回归已有实现和用户证据；许可证由项目所有者接受，当前等待 Reviewer 最终聚焦复审后归档。
 - [ ] P1-006：工程归档、Teacher 技术/源码学习提交与 Coordinator Phase 1 最终收尾。
 
 ## Phase 2：GAS 基础接入

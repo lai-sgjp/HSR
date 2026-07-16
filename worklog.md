@@ -1014,3 +1014,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 成品游戏使用权不自动等于公开 Git 原始/可提取资产再分发权。若不能证明公开再分发，只提出保持私有、经授权安全移除公开历史、或更换可再分发资产等选项，不擅自执行。
 - `Config/DefaultEditor.ini` 保持未跟踪，不修改、不暂存、不提交；归档前由用户决定保留本地或另行明确授权处理。
 - 本轮只维护 Coordinator 文档，不修改源码、资产、Config，不构建、不运行 Editor/PIE、不 push。
+
+## 2026-07-17｜Coordinator：接收 Owner Acceptance 与 P1-005 最终补证
+
+- 用户提供第三方 Mixamo 许可指南 URL `https://www.licenseorg.com/guide/3d-assets/mixamo` 与截图。截图显示 Personal、Commercial、Clients、Edit 允许，Attribution 不要求，并警告角色/动画不可作为 standalone assets 再分发、必须 incorporated into a project。
+- 上述证据仅按用户提供的第三方指南记录，不冒充 Adobe 官方许可原文；Adobe 官方页面本轮访问超时/未独立取得。用户确认 HSR 仓库为 public、会保留相关 `.uasset` 历史，并以项目所有者身份接受资产已整合进项目后的公开发布风险。许可证状态改为 `OWNER ACCEPTED`，不再阻断本任务。
+- 用户确认 Editor 重开后 GameMode Default Pawn、新角色 BP、Mesh、Skeleton、AnimBP 引用与地图 Spawn/Possess 正常；Coordinator 据此事后追认 `a539b6d` / `abca679` 的实际 manifest 与路径移动。
+- 用户回传帧率测试、同会话 Re-Possess 去重、空 Mesh/AnimClass 失败路径、最终 Development Editor 构建和 Output Log 均无问题。只记录为用户证据；未提供的完整命令、时间、日志路径和日志行不补造。
+- 用户选择不提交 `Config/DefaultEditor.ini`。该文件是本地 AssetViewer/Editor 预览配置，保持本地且不删除；`.gitignore` 新增精确规则 `/Config/DefaultEditor.ini`。
+- A～F 状态推进为等待 Reviewer 最终聚焦复审；当前交接为 Coordinator → Reviewer。未修改源码、资产或 Config 文件，未构建、未运行 Editor/PIE、未 push。
