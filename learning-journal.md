@@ -441,3 +441,11 @@ Phase 0 运行门禁中，哪些检查项必须有用户手动参与，哪些可
 - `BeginPlay` 不应假设 Pawn 已存在；`OnPossess`/`OnUnPossess` 必须正确调用 `Super`，并对空 Pawn、错误 Pawn 类型与重复生命周期安全。
 - 输入模式（GameOnly/UIOnly）与 Enhanced Input Mapping Context 是两层不同机制；P1-002 只建立前者和生命周期边界，后者必须在 P1-003 由 Controller 单一管理。
 - UHT、编译与链接成功不等于真实 Possession 或重新 Possess 行为已通过；这些仍需后续 Editor/PIE 证据。
+
+## 2026-07-16｜P1-003A Enhanced Input C++ 边界
+
+- Pawn 行为绑定集中在 Character 的 `SetupPlayerInputComponent`；Mapping Context 生命周期集中在本地 PlayerController，避免双重绑定和多所有者管理。
+- Move 的二维输入通过 Controller Yaw 转换为世界 Forward/Right；Look 传给 Controller Yaw/Pitch；Jump 用 Started/Completed 配对，Interact 仅是无副作用占位。
+- Context 添加/移除必须对称、幂等，并覆盖无 LocalPlayer、无 Subsystem、无 IMC、错误 Pawn、UnPossess 与重新 Possess 路径。
+- 独立的“模式是否已应用”状态解决了默认枚举值为 Exploration 时首次 `SetControlMode` 被错误幂等短路的问题。
+- C++ 构建通过只证明接口与静态生命周期边界成立；五个输入资产、引用绑定、Editor 重开和 PIE 行为仍需 P1-003B/P1-004 的真实证据。

@@ -140,7 +140,7 @@
 - [ ] 从 Blank 项目创建 CharacterBase、ExplorationCharacter、PlayerController、GameMode 和 HUD。
 - [x] P1-001：完成 CharacterBase、ExplorationCharacter、CameraBoom、FollowCamera 与 CharacterMovement 基础配置；UHT/编译/链接通过，用户人工验收通过并明确跳过独立 Reviewer。（不代表移动、输入、PIE 或 Phase 1 总项完成。）
 - [x] P1-002：完成 PlayerController、ControlMode 幂等入口与 Possession 安全边界；UHT/编译/链接通过，用户人工验收通过并明确跳过独立 Reviewer。（Editor/PIE Possession 与输入集成仍未验证。）
-- [ ] 创建 Move、Look、Jump、Interact Input Actions 和 Exploration Context。
+- [ ] 创建 Move、Look、Jump、Interact Input Actions 和 Exploration Context。（P1-003A C++ 接口已完成并由用户人工验收；五资产、Editor 重开与 PIE 尚未验证。）
 - [ ] 建立基础 AnimBP 参数和占位探索 HUD。
 - [ ] 验证 ControlMode、Possession、Mapping Context 和无自定义 Tick。
 
