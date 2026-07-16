@@ -6,19 +6,19 @@
 ## 当前 Phase
 
 - **Phase 0 准备阶段（Not verified）**。
-- UE5.6 Blank C++ 工程基线已创建并经审查通过；P003 已取得实际 C++ 编译/链接及基础插件/模块加载证据。实际 C++ 标准、Gameplay Tags 配置、默认地图、Editor 重开与 PIE 仍未验证。
+- UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags 配置和 `Map_ProjectSetup` 默认地图均已取得审查证据。实际 C++ 标准与 Phase 0 的 Development Editor/Editor 重开/空白 PIE 总门禁仍未验证。
 
 ## 当前任务
 
-- 活动任务卡：`TASK-P0-005`，只处理 `Map_ProjectSetup` 与两个默认地图设置。
-- 当前任务：P005 已完成协调规划，尚未实施；P004 已完成执行与独立审查。
-- 当前状态：`TASK-P0-004` 判定为 `PASS WITH FOLLOW-UP`；Gameplay Tags 配置和重开持久性已验证，按需目录、地图、工具链/C++ 标准和 PIE 仍未完成。
-- 最近完成任务：`TASK-P0-004` — 建立并验证 Gameplay Tags 配置基线。
+- 活动任务卡：无；`TASK-P0-005` 已审查并归档，尚未创建 P006。
+- 当前任务：等待高级协调者规划 `TASK-P0-006`，不得自动执行。
+- 当前状态：`TASK-P0-005` 判定为 `PASS WITH FOLLOW-UP`；地图资产、两个默认地图设置及 Editor 重开持久性已验证。
+- 最近完成任务：`TASK-P0-005` — 创建并设置 `Map_ProjectSetup`。
 
 ## 当前阻塞点
 
 - 文件化上下文机制本身没有阻塞。
-- 尚无实际 C++ 标准、Gameplay Tags 配置、默认地图、Editor 重开与空白 PIE 的完整证据，因此 Phase 0 保持 `Not verified`，不得宣布通过。
+- 尚无实际 C++ 标准与 Phase 0 的 Development Editor/Editor 重开/空白 PIE 总门禁完整证据，因此 Phase 0 保持 `Not verified`，不得宣布通过。
 - MSVC 14.51.36248 不是 UE5.6 preferred 版本；当前构建成功，作为非阻断兼容性风险继续保留。
 
 ## 已完成事项
@@ -31,18 +31,20 @@
 - `TASK-P0-001` 已通过审查：工程位于仓库根目录，无 `HSR/HSR/` 嵌套；`.uproject` 关联 UE5.6，且只有一个 `HSR` Runtime 模块与最小模块入口。
 - `TASK-P0-002` 已由 Pauli 审查为 `PASS WITH FOLLOW-UP`：工具链/目标入口证据成立，但实际 C++ 编译、插件、Tags、地图、Editor 重开和 PIE 仍未验证。
 - `TASK-P0-003` 已由高级模型审查者审查为 `PASS WITH FOLLOW-UP`：`.uproject` 保持单 `HSR` Runtime 模块并启用 Enhanced Input、GameplayAbilities；Build.cs 增加四个目标模块依赖；实际编译、生成代码、lib/dll 链接与 Editor 插件加载均有证据。
+- `TASK-P0-004` 已由高级模型审查者审查为 `PASS WITH FOLLOW-UP`：八个根 Gameplay Tags 可查询且 Editor 重开后仍存在。
+- `TASK-P0-005` 已由高级模型审查者审查为 `PASS WITH FOLLOW-UP`：地图最终精确位于 `Content/Maps/Map_ProjectSetup.umap`，两个默认地图键指向该资产，Editor 重开后自动打开且设置保持。
 
 ## 未完成事项
 
 - 未验证 Visual Studio Community 2026 与 UE5.6 的 UBT/UHT、Development Editor 构建兼容性。
 - 已报告完成首次 Editor 打开，但未完成 Editor 重开或空白 PIE；尚未产生任何 Gameplay、GAS、Blueprint 或资产验证。
-- Gameplay Tags 配置已完成；按需目录、`Map_ProjectSetup`、Editor 重开、空白 PIE 和 Phase 0 最终归档尚未完成。
+- Gameplay Tags、按需 `Content/Maps` 目录和 `Map_ProjectSetup` 已完成；Phase 0 运行门禁、实际 C++ 标准和最终归档尚未完成。
 
 ## 当前代码状态
 
 - 已存在 `HSR.uproject`、`Source/HSR.Target.cs`、`Source/HSREditor.Target.cs`、`Source/HSR/HSR.Build.cs`、`Source/HSR/HSR.h`、`Source/HSR/HSR.cpp`、`Config/DefaultEngine.ini` 和 `Config/DefaultInput.ini`。
 - `HSR.sln` 与 `.vs/`、`Binaries/`、`Intermediate/`、`Saved/`、`DerivedDataCache/` 为工具/Editor 产物，不作为构建、PIE 或 Gameplay 通过证据。
-- 当前已完成工程基线及 P003 插件/模块依赖；所有 Gameplay Phase 与 GAS Stage 仍未实施。
+- 当前已完成工程基线、P003 插件/模块依赖、P004 Tags 和 P005 默认地图；所有 Gameplay Phase 与 GAS Stage 仍未实施。
 
 ## 当前设计决策
 
@@ -64,8 +66,8 @@
 
 ## 下一个推荐任务
 
-- **唯一推荐任务：** 低级模型读取 `tasks/active-task.md`、复述 P005 并等待用户单独确认；确认后才可创建并设置 `Map_ProjectSetup`。
-- P004 仅完成 Gameplay Tags 配置基线；仍不得越过地图和 PIE 门禁进入 Phase 1。
+- **唯一推荐任务：** 由高级协调者规划 `TASK-P0-006` Phase 0 运行门禁；本轮审查者不得创建或执行 P006。
+- P005 已归档；仍不得越过 Development Editor、Editor 重开和空白 PIE 门禁进入 Phase 1。
 
 ## 新模型接入时必须读取的文件
 
@@ -123,3 +125,10 @@
 - P005 只完成规划；尚未创建地图、修改 Config、启动 Editor、运行构建/PIE 或创建 P006。
 - 低级模型必须先复述并以 `等待用户确认执行 TASK-P0-005。` 结束；确认前零工具调用。
 - P005 实施 checkpoint 未勾选；额外持久文件或 Config 键必须停止并申请扩权。
+
+## 2026-07-16 P005 审查更新
+
+- `TASK-P0-005` 已独立审查为 `PASS WITH FOLLOW-UP` 并归档；执行者 commit 为 `ebd26e67c44eb70828cbb44d782e850a11464d83`。
+- 地图最终精确位于 `Content/Maps/Map_ProjectSetup.umap`；提交树无 `Content/Map` 旧资产或重定向器。
+- 两个默认地图设置均指向 `/Game/Maps/Map_ProjectSetup.Map_ProjectSetup`，用户确认 Editor 重开后自动打开且设置保持。
+- 当前没有活动任务；P006 尚未创建或执行，Phase 0 保持 `Not verified`。

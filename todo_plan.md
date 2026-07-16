@@ -129,8 +129,8 @@
 - [x] 创建单 `HSR` Runtime 模块。
 - [ ] 验证 Visual Studio Community 2026、Windows SDK、UBT/UHT 和实际 C++ 标准。
 - [x] 确认 Enhanced Input、GameplayAbilities、GameplayTags、GameplayTasks。
-- [ ] 建立根 Gameplay Tags 和按需目录。（Gameplay Tags 八个根已完成；按需目录尚未建立。）
-- [ ] 创建并设置 `Map_ProjectSetup`。
+- [x] 建立根 Gameplay Tags 和按需目录。（八个根 Tags 与按需 `Content/Maps` 目录均已有文件和 Editor 证据。）
+- [x] 创建并设置 `Map_ProjectSetup`。
 - [ ] 构建 Development Editor、打开 Editor、执行空白 PIE。
 - [ ] 更新 Phase 0、README、worklog、learning journal 和本计划。
 - [ ] 不创建 Gameplay 类或资源。

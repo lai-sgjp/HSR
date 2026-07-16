@@ -693,3 +693,13 @@ Stage 7 在 Stage 6 前执行，因为项目 Phase 8 弱点击破早于 Phase 9 
 - Architect：只使用单一地图资产和 `GameMapsSettings` 的两个键，不创建 World Partition、GameMode、Blueprint 或玩法资产。
 - Safety Reviewer：允许路径仅为 `Content/Maps/Map_ProjectSetup.umap`、`Config/DefaultEngine.ini`、`tasks/execution-result.md`；额外持久文件或 Config 键必须停止申请扩权。
 - 已创建唯一活动卡 `tasks/active-task.md`；未创建地图、未修改 Config、未启动 Editor、未运行构建/PIE、未创建 P006，未勾选 P005 checkpoint。
+
+## 2026-07-16｜高级模型审查者：TASK-P0-005 独立审查
+
+- 结论：`PASS WITH FOLLOW-UP`；follow-up 仅为 P006 尚未执行，P005 无返工项。
+- 用户确认已检查执行结果无问题；执行者 commit `ebd26e67c44eb70828cbb44d782e850a11464d83` 只包含三个允许路径，审查前工作树干净。
+- 地图曾从单数 `Content/Map` 迁移到复数 `Content/Maps`；commit 树及当前 Content 树均无旧路径资产或重定向器，最终资产精确位于 `Content/Maps/Map_ProjectSetup.umap`。
+- `DefaultEngine.ini` 保留 Android File Server 设置，只增加 `GameMapsSettings` 的两个目标键，均指向 `/Game/Maps/Map_ProjectSetup.Map_ProjectSetup`。
+- 用户证据确认关闭重开后自动打开目标地图、两个设置仍正确、PIE 未运行且无第一处错误。
+- 已勾选根 Gameplay Tags 与按需目录、`Map_ProjectSetup` 两项；未勾选 P006 Build/Editor/PIE 总门禁或最终归档。
+- 已归档 P005 活动卡和执行结果并创建独立审查报告；未创建或执行 P006，Phase 0 保持 `Not verified`。
