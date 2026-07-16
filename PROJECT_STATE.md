@@ -5,22 +5,22 @@
 
 ## 当前 Phase
 
-- **Phase 1 已正式进入；P1-001、P1-002、P1-003A 已归档，TASK-P1-003B 已规划并交接给用户 Editor 执行者**。
+- **Phase 1 已正式进入；P1-001、P1-002、P1-003A 与 P1-003B 已归档；当前无活动任务**。
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 已有 Character/Camera 骨架及 UHT、编译、链接成功证据；Editor 类可见性、输入、Possession、移动和 PIE 尚未验证。
 
 ## 当前任务
 
-- P1-003A Implementation commit `490440f280f82dbffd84976bad1dd2a92ee1f39d` 已由用户人工验收；独立 Reviewer 按用户决定跳过，未伪造 Reviewer 产物。
-- 活动任务卡为 `tasks/active-task.md`；P1-003B 只能由用户 Editor 人格创建和验证五个 IA/IMC 资产。
-- 已存在的两个未跟踪 Blueprint 属于用户提前创建的 P1-004 候选，不得纳入 P1-003B。
-- 最近完成任务：`TASK-P0-007` — Phase 0 阶段审查、文档归档与门禁判定；执行结果 commit `41446f2b771b99eb011a496ac37a26d94214fdb1`。
+- P1-003B 的五资产 commit 为 `7c71ae825fb840ace6d76fc6232883b807d395d1`；用户确认配置满足任务卡并在 Editor 重开后保持，且明确验收通过、跳过独立 Reviewer。
+- Git 提交由用户授权主 Agent 代办；commit 仅含五个 Input 资产。两个未跟踪 Blueprint 仍属用户提前创建的 P1-004 候选，未纳入。
+- 当前无 `tasks/active-task.md`；P1-004 尚未规划或创建。
+- 最近完成任务：`TASK-P1-003B` — 五个 Enhanced Input 资产创建与持久性确认；资产 commit `7c71ae825fb840ace6d76fc6232883b807d395d1`，Coordinator 归档 commit 待本轮提交后记录。
 
 ## 当前阻塞点
 
 - 文件化上下文机制本身没有阻塞。
 - Phase 0 当前没有阻断项；C++20 证据来源为用户运行 `_MSVC_LANG` 检查并明确回传结果。
-- P1-003B 没有已知技术阻塞；需用户在 Editor 核对五个资产并提供重开证据与仅含五资产的 commit。
+- P1-003B 没有遗留阻塞；Blueprint 引用绑定与完整 PIE 输入行为仍待后续任务验证。
 - MSVC 14.51.36248 不是 UE5.6 preferred 版本；当前构建成功，作为非阻断兼容性风险继续保留。
 
 ## 已完成事项
@@ -42,7 +42,7 @@
 - Editor 重开、默认地图、插件、八个根 Tags 和空白 PIE 已由用户确认；P006 按用户明确决定跳过独立审查。
 - P007 已完成最终归档，C++20 已确认。
 - P1-001 已创建四个 Character 源文件，UHT、真实编译与 Link 已验证；Editor 类可见性与 PIE 均未验证。
-- Phase 1 的 Character/Camera 骨架与 PlayerController/ControlMode C++ 边界已完成并经用户人工验收；Enhanced Input、GameMode/灰盒地图、HUD、AnimBP、专项 PIE 与阶段归档尚未完成。
+- Phase 1 的 Character/Camera、PlayerController/ControlMode、Enhanced Input C++ 边界及五个输入资产已完成并归档；GameMode/灰盒地图、Blueprint 引用绑定、HUD、AnimBP、专项 PIE 与阶段归档尚未完成。
 
 ## 当前代码状态
 
@@ -70,7 +70,7 @@
 
 ## 下一个推荐任务
 
-- **唯一下一步：** 用户按 P1-003B 活动卡核对五资产、重开 Editor 验证、填写证据，并只提交五个 Input 资产后回传完整 hash。
+- **唯一下一步建议：** 由 Coordinator 另起一轮规划 P1-004；本轮不自动创建下一任务。
 
 ## 2026-07-16 P1-003 Coordinator 规划更新
 

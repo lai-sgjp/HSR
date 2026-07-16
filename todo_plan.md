@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0 门禁已通过；Phase 1 已开始，P1-001 与 P1-002 已完成 C++ 骨架并经用户人工验收。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
+> 当前状态：Phase 0 门禁已通过；Phase 1 已开始，P1-001、P1-002、P1-003A 与 P1-003B 已归档。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
 
 ## 已完成的规划工作
 
@@ -140,7 +140,8 @@
 - [ ] 从 Blank 项目创建 CharacterBase、ExplorationCharacter、PlayerController、GameMode 和 HUD。
 - [x] P1-001：完成 CharacterBase、ExplorationCharacter、CameraBoom、FollowCamera 与 CharacterMovement 基础配置；UHT/编译/链接通过，用户人工验收通过并明确跳过独立 Reviewer。（不代表移动、输入、PIE 或 Phase 1 总项完成。）
 - [x] P1-002：完成 PlayerController、ControlMode 幂等入口与 Possession 安全边界；UHT/编译/链接通过，用户人工验收通过并明确跳过独立 Reviewer。（Editor/PIE Possession 与输入集成仍未验证。）
-- [ ] 创建 Move、Look、Jump、Interact Input Actions 和 Exploration Context。（P1-003A C++ 接口已完成并由用户人工验收；五资产、Editor 重开与 PIE 尚未验证。）
+- [x] P1-003A：完成 Enhanced Input C++ 接口、Action 绑定入口与 Mapping Context 生命周期；构建通过并由用户人工验收。
+- [x] P1-003B：创建 Move、Look、Jump、Interact Input Actions 与 Exploration Context；用户确认 Value Type、IMC 配置及 Editor 重开持久性，五资产 commit 为 `7c71ae825fb840ace6d76fc6232883b807d395d1`。（Blueprint 引用绑定与完整 PIE 仍未验证。）
 - [ ] 建立基础 AnimBP 参数和占位探索 HUD。
 - [ ] 验证 ControlMode、Possession、Mapping Context 和无自定义 Tick。
 

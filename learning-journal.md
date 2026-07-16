@@ -449,3 +449,11 @@ Phase 0 运行门禁中，哪些检查项必须有用户手动参与，哪些可
 - Context 添加/移除必须对称、幂等，并覆盖无 LocalPlayer、无 Subsystem、无 IMC、错误 Pawn、UnPossess 与重新 Possess 路径。
 - 独立的“模式是否已应用”状态解决了默认枚举值为 Exploration 时首次 `SetControlMode` 被错误幂等短路的问题。
 - C++ 构建通过只证明接口与静态生命周期边界成立；五个输入资产、引用绑定、Editor 重开和 PIE 行为仍需 P1-003B/P1-004 的真实证据。
+
+## 2026-07-16｜P1-003B Input Action 与 Mapping Context 资产边界
+
+- Input Action 定义“输入语义和值类型”，Input Mapping Context 定义“设备按键如何产生该语义”；Move/Look 使用 Axis2D，Jump/Interact 使用 Digital。
+- WASD 的四个一维按键通过 Negate/Swizzle Modifier 合成为二维 Move；Mouse XY 直接提供二维 Look；Space 与 E 分别映射 Jump、Interact。
+- 用户确认 Editor 重开后资产配置保持，证明资产序列化持久性；Coordinator 未独立解析二进制，因此证据来源必须明确标注为用户回传。
+- 资产存在与配置持久不等于 Gameplay 闭环已通过。Blueprint 引用、Possession、Mapping Context 去重以及 Move/Look/Jump/Interact 的完整 PIE 行为仍需后续真实验证。
+- Git 提交可以由用户授权代办，但提交范围和产物作者必须分开记录：本次 commit 只有五个 Input 资产，两个 Blueprint 被明确排除。

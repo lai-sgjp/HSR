@@ -916,3 +916,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 两个未跟踪 Blueprint 明确视为用户提前创建的 P1-004 候选；本卡禁止修改、暂存或提交，输入引用绑定和完整 PIE 推迟到 P1-004。
 - 已创建空白用户证据模板；Coordinator 未修改资产、未启动 Editor、未冒充资产作者、未 push。
 - 正式交接：Coordinator → 用户 / UE Editor 执行者。接收条件为完整 Editor 证据及仅含五资产的用户 commit hash。
+
+## 2026-07-16｜Coordinator：归档 TASK-P1-003B
+
+- 用户明确说明 P1-003B 已在 P1-003A 期间提前完成，并确认 Value Type、IMC Mapping/Modifiers 符合活动卡，Editor 重开后配置保持；这些属于用户回传证据，Coordinator 未独立读取二进制或启动 Editor/PIE。
+- 用户授权主 Agent 代办 Git。资产 commit `7c71ae825fb840ace6d76fc6232883b807d395d1` 精确包含四个 IA 和一个 `IMC_Exploration`，没有 C++、Config、地图、文档或派生产物。
+- 两个未跟踪 Blueprint 仍保留为 P1-004 候选，未暂存、未提交、未修改。
+- 用户已人工验收并明确无需额外检查；据实跳过独立 Reviewer，不创建或暗示 Reviewer 产物/commit。
+- Blueprint 输入引用绑定、完整 PIE、Move/Look/Jump/Interact、Possession、重新 Possess 与 Context 去重仍未验证。
+- 本轮只归档活动卡和结果、同步项目文档并创建 Coordinator commit；不修改资产、不启动 Editor/PIE、不创建 P1-004、不 push。
