@@ -5,15 +5,14 @@
 
 ## 当前 Phase
 
-- **Phase 1 进行中；P1-001～P1-004 已归档，P1-004 最终 Reviewer commit `6b19d179562f03c8cc50b94456d3a943478855c0` 为 `PASS`；Phase 1 尚未完成**。
+- **Phase 1 进行中；P1-001～P1-005 已归档；当前只剩 P1-006 Teacher 学习与阶段收尾，Phase 1 尚未完成**。
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
 ## 当前任务
 
-- 当前唯一活动任务为 `TASK-P1-005：动画资产接入与 Phase 1 最终回归`；历史 Reviewer `b741391` 结论为 `REVISE`，用户现已补证并作出许可证 owner acceptance，当前为同一卡 Coordinator → Reviewer 最终聚焦复审，不创建新卡。
-- P1-005 同一卡串行交接为：A 资产需求清单 → B 用户候选与授权证据 → C 只读兼容性/许可证评估及最终 manifest → D 用户 Editor 导入、AnimBP、绑定与资产 commit → E 最终回归 → F 验收/Coordinator 归档。段间只更新状态/交接表并按真实人格独立 commit。
-- Mixamo/Kachujin 资产已在用户 commits `a539b6d`、`abca679` 中进入 Git；实际 manifest、BP 路径移动和 GameMode 引用修改未事前批准，等待用户 Editor 重开引用验证后由 Coordinator 事后追认，不得假装尚未提交。
+- `TASK-P1-005` 已由最终 Reviewer commit `af6b14898f589cd44fbd176488dcd5e82c309d4b` 判定 `PASS WITH FOLLOW-UP` 并归档；历史 `REVISE` 与最终复审均保留。
+- P1-005 A～F 真实链：Implementation `649e125`、`0c85794`、用户资产 `a539b6d994d638529754c0ce8da6b3b3432b4794` / `abca67921f31a6ddfc5dee468bdd7fb0cdb598d6`、Implementation 汇总 `3d94b74`、Coordinator 补证 `1e8e155db6d18339496f46d67662f88a5de3e009`、Reviewer `af6b14898f589cd44fbd176488dcd5e82c309d4b`。
 - P1-004 已验证 GameMode/灰盒地图/HUD、Spawn/Possess、Move/Look/Jump、无副作用 Interact、UIOnly 往返、同会话 Re-Possess 与 Context/Binding/HUD 去重。
 - 最近完成任务：`TASK-P1-004`；最终 Reviewer commit `6b19d179562f03c8cc50b94456d3a943478855c0` 为 `PASS`，本轮 Coordinator 负责最终归档。
 - P1-004 已实施 C++、Blueprint/地图/UI 资产并进行多轮构建与 PIE。输入故障根因为 `AHSRPlayerController` 禁用了 Actor Tick，导致 Enhanced Input 的每帧 Action 求值不运行；恢复 Tick 后用户确认功能解决。
@@ -27,7 +26,7 @@
 - 用户已事后追认 `074e5fc` 对原只读 Character/PlayerController 的扩权修改；该记录不是补造事前授权。首次 `REVISE` 的其余项目已由 A2、IMC 归属确认和用户专项 PIE 闭环。
 - `Content/Input/IMC_Exploration.uasset` 已确认由用户根据执行者说明在 UE Editor 中创建/修改，作为 Enhanced Input 必要配置，Editor 重开后保持；主 Agent 经授权代办的独立资产 commit `a091700082f30ed70e3fba990e363dd7af102a6a` 只含该文件。此归属阻断已解除，但不构成 Reviewer 独立验证。
 - P1-005 许可证状态为 `OWNER ACCEPTED`：证据为用户提供的第三方指南 URL/截图，不冒充 Adobe 官方原文；用户确认仓库 public 且保留资产历史，并接受已整合资产的公开发布风险。该项不再阻断。
-- 用户已回传 Editor 重开引用、帧率、同会话 Re-Possess、无 Mesh/AnimClass、Development Editor 构建与 Output Log 均无问题；这些是用户证据，完整命令/日志细节未提供且不得补造。当前只待 Reviewer 最终聚焦复审。
+- 用户已回传 Editor 重开引用、帧率、同会话 Re-Possess、无 Mesh/AnimClass、Development Editor 构建与 Output Log 均无问题；这些是用户证据，完整命令/日志细节未提供且不得补造。Reviewer 已据真实证据边界放行归档。
 - `Config/DefaultEditor.ini` 是本地 AssetViewer/Editor 预览配置，不提交、不删除，并由 `.gitignore` 精确忽略。
 
 ## 已完成事项
@@ -49,7 +48,7 @@
 - Editor 重开、默认地图、插件、八个根 Tags 和空白 PIE 已由用户确认；P006 按用户明确决定跳过独立审查。
 - P007 已完成最终归档，C++20 已确认。
 - P1-001 已创建四个 Character 源文件，UHT、真实编译与 Link 已验证；Editor 类可见性与 PIE 均未验证。
-- Phase 1 的 Character/Camera、PlayerController/ControlMode、Enhanced Input、GameMode/灰盒地图、Blueprint 引用、HUD 与 P1-004 专项 PIE 已完成并归档；AnimBP、P1-005 最终回归及 P1-006/Teacher 阶段收尾尚未完成。
+- Phase 1 的 Character/Camera、PlayerController/ControlMode、Enhanced Input、GameMode/灰盒地图、Blueprint 引用、HUD、AnimBP 与最终回归均已完成并归档；仅 P1-006 Teacher 学习与阶段收尾尚未完成。
 
 ## 当前代码状态
 
@@ -62,7 +61,7 @@
 - 后续 Phase 默认采用“最小连贯垂直切片”：每个任务只有一个可独立验收结果，但优先形成用户可见运行闭环，不再按类、单文件或单资产机械拆卡。
 - 每个 Phase 通常规划 2～5 个工程工作包加 1 个收尾工作包，按真实复杂度调整；同一工作包可以包含 C++、Editor 配置、PIE 和文档证据，但人格与资产作者仍独立交接、独立提交。
 - 只有不同作者/权限、危险 Git/Config、第三方资产、新模块、外部依赖、独立失败/回滚边界，或明显超出低级模型安全范围时拆分。
-- Phase 1 剩余结构为 P1-005 动画与最终回归、P1-006 阶段收尾。P1-001～P1-004 的历史事实与提交保持不变。
+- Phase 1 只剩 P1-006 阶段收尾。P1-001～P1-005 的历史事实与提交保持不变。
 
 - 模型切换后的主要记忆来自仓库文件，不依赖聊天历史。
 - `PROJECT_STATE.md` 保存项目快照；`tasks/active-task.md` 是唯一活动任务契约；`worklog.md` 保存真实证据；`todo_plan.md` 保存进度；`learning-journal.md` 保存可复用知识。
@@ -82,7 +81,7 @@
 
 ## 下一个推荐任务
 
-- **当前唯一下一步：** 用户按活动卡 Reviewer REVISE 补证段，一次性回传许可证/仓库信息、Editor 重开引用确认、FPS/Re-Possess/无 Mesh/AnimClass 测试、最终构建及 Output Log 证据；随后 Coordinator 决定是否交 Reviewer 复审。
+- **当前唯一下一步：** 创建并执行 `TASK-P1-006`，由 Coordinator 先核对工程 Gate，再直接交接 Teacher 完成 Phase 1 技术教学、源码复盘、练习与独立教学提交；不得提前进入 Phase 2。
 
 ## 2026-07-16 P1-003 Coordinator 规划更新
 

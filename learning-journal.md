@@ -480,3 +480,10 @@ Phase 0 运行门禁中，哪些检查项必须有用户手动参与，哪些可
 - 不应手工 Push Pawn InputComponent 来弥补生命周期问题；应依赖标准输入栈流程，并用同会话 UnPossess/Re-Possess 验证 Action 单次触发。
 - HUD 创建入口要幂等，Widget 使用正确 Owning Player，并对空类与创建失败安全返回；UIOnly 往返必须同时验证 Gameplay 输入、鼠标/焦点和恢复能力。
 - Reviewer 可以依据用户运行日志审查结论，但必须明确证据作者，不能写成 Reviewer 独立运行 Editor/PIE。
+
+## 2026-07-17｜P1-005 动画接入与证据边界
+
+- AnimBP 只消费 Velocity、Direction、IsFalling 等 Gameplay 状态用于表现；清空 Mesh/AnimClass 后角色仍可移动，是“动画不是规则真源”的关键失败路径证据。
+- 二进制 UE 资产无法仅靠文本 diff 证明内部配置，必须明确区分用户 Editor/PIE 回传、Git 路径事实与 Reviewer 独立核对范围。
+- 第三方资产要维护来源、用途、分发方式和 owner decision 台账。当前 Mixamo/Kachujin 风险为 `OWNER ACCEPTED`；未来正式发布、资产迁移或分发方式变化时复核官方条款，但不阻断 P1-005 归档。
+- `Config/DefaultEditor.ini` 属于本地 AssetViewer/Editor 预览状态，已精确加入 `.gitignore`，不应作为项目 Gameplay 配置提交。

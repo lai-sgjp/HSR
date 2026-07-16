@@ -34,4 +34,3 @@ Coordinator 可以：
 2. 保留用户证据与 Reviewer 独立证据的明确边界；
 3. 交接 P1-006 Teacher/Phase 1 收尾，不直接进入 Phase 2；
 4. 将“正式公开发布、资产迁移或分发方式变化时复核届时 Adobe/Mixamo 官方条款”保留为非阻断风险。
-

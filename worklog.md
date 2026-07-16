@@ -1023,3 +1023,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 用户回传帧率测试、同会话 Re-Possess 去重、空 Mesh/AnimClass 失败路径、最终 Development Editor 构建和 Output Log 均无问题。只记录为用户证据；未提供的完整命令、时间、日志路径和日志行不补造。
 - 用户选择不提交 `Config/DefaultEditor.ini`。该文件是本地 AssetViewer/Editor 预览配置，保持本地且不删除；`.gitignore` 新增精确规则 `/Config/DefaultEditor.ini`。
 - A～F 状态推进为等待 Reviewer 最终聚焦复审；当前交接为 Coordinator → Reviewer。未修改源码、资产或 Config 文件，未构建、未运行 Editor/PIE、未 push。
+
+## 2026-07-17｜Coordinator：归档 TASK-P1-005
+
+- 最终 Reviewer commit `af6b14898f589cd44fbd176488dcd5e82c309d4b` 结论为 `PASS WITH FOLLOW-UP`；历史初审 `b741391` 的 `REVISE` 保留，不覆盖审查链。
+- A～F 真实提交链为 Implementation `649e125`、`0c85794`，用户资产 `a539b6d994d638529754c0ce8da6b3b3432b4794` / `abca67921f31a6ddfc5dee468bdd7fb0cdb598d6`，Implementation 汇总 `3d94b74`，Coordinator 补证 `1e8e155db6d18339496f46d67662f88a5de3e009`，最终 Reviewer `af6b14898f589cd44fbd176488dcd5e82c309d4b`。
+- 用户证据覆盖 Editor 重开引用、Spawn/Possess、30/60 FPS、同会话 Re-Possess、空 Mesh/AnimClass、Development Editor 构建与 Output Log；未提供的命令和日志细节没有补造。
+- Mixamo/Kachujin 许可决策保持 `OWNER ACCEPTED`；仅在未来正式公开发布、资产迁移或改变分发方式时复核届时官方条款，属于非阻断 follow-up。
+- `Config/DefaultEditor.ini` 保持本地且由 `.gitignore` 精确忽略。活动卡、累计执行结果、初审和最终复审均归档到 `tasks/archive/`。
+- 本次不修改 C++/资产、不构建、不运行 Editor/PIE、不 push；下一步只允许创建 P1-006 完整收尾任务卡并交接 Teacher。

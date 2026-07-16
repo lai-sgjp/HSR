@@ -59,4 +59,3 @@
 - 不暂存或提交 `Config/DefaultEditor.ini`，不改动任何现有文档或 UE 资产。
 - P1-005 保持活动状态；不得创建 P1-006、不得进入 Teacher 收尾、不得 push。
 - Coordinator 接收后，应在原任务卡内创建一次受控补证/修订交接：先许可证与 manifest，再 Editor 引用/回归证据，最后由 Reviewer 或用户明确验收，随后才由 Coordinator 归档。
-

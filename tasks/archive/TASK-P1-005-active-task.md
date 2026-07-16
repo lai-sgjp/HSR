@@ -2,9 +2,9 @@
 
 ## 当前结论与交接
 
-本文件仍是 P1-005 唯一任务卡。Reviewer `b741391` 的 `REVISE` 历史结论保留；用户现已补充验收结果，并以项目所有者身份接受 Mixamo/Kachujin 用于 public 仓库的许可风险。许可证门禁改为 `OWNER ACCEPTED`，不再阻断本任务。
+本文件是 P1-005 已归档任务卡。Reviewer `b741391` 的 `REVISE` 历史结论保留；最终 Reviewer `af6b14898f589cd44fbd176488dcd5e82c309d4b` 为 `PASS WITH FOLLOW-UP`。许可证门禁为 `OWNER ACCEPTED`，不再阻断本任务。
 
-当前交接：`Coordinator → Reviewer 最终聚焦复审`。不新建分段任务卡，不进入 P1-006，不 push。
+最终交接：`Reviewer → Coordinator 归档 → P1-006 Teacher/Phase 1 收尾`。本任务未 push。
 
 ## A～F 状态
 
@@ -12,10 +12,10 @@
 |---|---|---|
 | A 资产需求清单 | `完成` | Implementation `649e125` |
 | B 用户候选回传 | `完成 / OWNER ACCEPTED` | Mixamo/Kachujin；第三方指南 URL 与用户截图；仓库为 public 且会保留资产历史 |
-| C 兼容性与许可证评估 | `待最终聚焦复审` | Implementation `0c85794`；其技术评估保留，许可结论由 owner acceptance 接管 |
-| D Editor 导入与 AnimBP | `用户验证通过 / 待最终聚焦复审` | 用户资产 commits `a539b6d`、`abca679`；Editor 重开后引用、Spawn/Possess 正常 |
-| E 最终回归 | `用户验证通过 / 待最终聚焦复审` | 帧率、Re-Possess、空 Mesh/AnimClass、构建与 Output Log 均由用户确认无问题 |
-| F 验收与归档 | `待最终聚焦复审` | `3d94b74` 仍仅是 Implementation 汇总；等待 Reviewer 新结论 |
+| C 兼容性与许可证评估 | `完成` | Implementation `0c85794`；其技术评估保留，许可结论由 owner acceptance 接管 |
+| D Editor 导入与 AnimBP | `完成（用户验证）` | 用户资产 commits `a539b6d`、`abca679`；Editor 重开后引用、Spawn/Possess 正常 |
+| E 最终回归 | `完成（用户验证）` | 帧率、Re-Possess、空 Mesh/AnimClass、构建与 Output Log 均由用户确认无问题 |
+| F 验收与归档 | `完成` | `3d94b74` 仅为 Implementation 汇总；最终 Reviewer `af6b14898f589cd44fbd176488dcd5e82c309d4b` 为 `PASS WITH FOLLOW-UP` |
 
 ## 资产与路径事实
 
