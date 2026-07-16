@@ -10,10 +10,10 @@
 
 ## 当前任务
 
-- 活动任务卡：无；`TASK-P0-005` 已审查并归档，尚未创建 P006。
-- 当前任务：等待高级协调者规划 `TASK-P0-006`，不得自动执行。
-- 当前状态：`TASK-P0-005` 判定为 `PASS WITH FOLLOW-UP`；地图资产、两个默认地图设置及 Editor 重开持久性已验证。
-- 最近完成任务：`TASK-P0-005` — 创建并设置 `Map_ProjectSetup`。
+- 活动任务卡：`tasks/active-task.md`，编号 `TASK-P0-006`。
+- 当前任务：只验证 Phase 0 的 Development Editor 构建、Editor 重开、默认地图/插件/Tags 和空白 PIE 运行门禁。
+- 当前状态：协调规划已完成，等待低级执行模型先复述并等待用户单独确认；P006 尚未执行。
+- 最近完成任务：`TASK-P0-005` — 创建并设置 `Map_ProjectSetup`，审查结论 `PASS WITH FOLLOW-UP`。
 
 ## 当前阻塞点
 
@@ -66,8 +66,8 @@
 
 ## 下一个推荐任务
 
-- **唯一推荐任务：** 由高级协调者规划 `TASK-P0-006` Phase 0 运行门禁；本轮审查者不得创建或执行 P006。
-- P005 已归档；仍不得越过 Development Editor、Editor 重开和空白 PIE 门禁进入 Phase 1。
+- **唯一推荐任务：** 低级执行模型只读取 `tasks/active-task.md`，复述 `TASK-P0-006` 并等待用户单独确认。
+- 确认前不得调用工具；P006 审查归档前不得创建 P007 或进入 Phase 1。
 
 ## 新模型接入时必须读取的文件
 
@@ -132,3 +132,10 @@
 - 地图最终精确位于 `Content/Maps/Map_ProjectSetup.umap`；提交树无 `Content/Map` 旧资产或重定向器。
 - 两个默认地图设置均指向 `/Game/Maps/Map_ProjectSetup.Map_ProjectSetup`，用户确认 Editor 重开后自动打开且设置保持。
 - 当前没有活动任务；P006 尚未创建或执行，Phase 0 保持 `Not verified`。
+
+## 2026-07-16 P006 协调规划更新
+
+- 已创建唯一活动任务 `TASK-P0-006`，只执行 Phase 0 的 Development Editor 构建、Editor 重开、默认地图/插件/Tags 核对和空白 PIE 运行门禁。
+- P006 唯一允许持久写入为 `tasks/execution-result.md`；Source、Config、Content、`.uproject`、地图和插件声明全部只读，派生产物不可提交。
+- 本轮只完成协调规划，未运行构建、Editor 或 PIE，未修改工程实现，未勾选运行门禁，也未创建 P007。
+- 低级模型必须先复述并以 `等待用户确认执行 TASK-P0-006。` 结束；确认前零工具调用。

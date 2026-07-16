@@ -703,3 +703,30 @@ Stage 7 在 Stage 6 前执行，因为项目 Phase 8 弱点击破早于 Phase 9 
 - 用户证据确认关闭重开后自动打开目标地图、两个设置仍正确、PIE 未运行且无第一处错误。
 - 已勾选根 Gameplay Tags 与按需目录、`Map_ProjectSetup` 两项；未勾选 P006 Build/Editor/PIE 总门禁或最终归档。
 - 已归档 P005 活动卡和执行结果并创建独立审查报告；未创建或执行 P006，Phase 0 保持 `Not verified`。
+
+## 2026-07-16｜高级模型协调者：TASK-P0-006 协调规划
+
+### 当前门禁
+
+- Phase 0 保持 `Not verified`；P005 已审查为 `PASS WITH FOLLOW-UP`，审查 commit 为 `dbf08cdf310b0dd68627aa498ad83ab322fbb5a0`。
+- P003 已有 HSR 模块实际编译、生成代码及 lib/dll 链接证据；P006 必须单独记录本轮实际编译/链接或 up-to-date，不能复用为同一轮结果。
+
+### 四角色规划结论
+
+- Prompt Planner：P006 只验证 Development Editor 构建、Editor 重开、默认地图、基础插件/Tags 和空白 PIE 运行门禁。
+- Prompt Reviewer：构建命令、Target、工具链、退出码、编译/链接状态、Editor/PIE 现象和第一处真实错误必须分别记录；实际 C++ 标准无证据时保持未验证。
+- Architect：现有 `.uproject`、Source、Config、Content 和地图全部只读；运行门禁只产生执行报告，不新增实现或资产。
+- Safety Reviewer：唯一允许持久修改为 `tasks/execution-result.md`；出现其他持久文件变化、需要修复或清缓存时立即停止。
+
+### 活动卡与执行边界
+
+- 已创建唯一活动卡 `tasks/active-task.md`，编号 `TASK-P0-006`。
+- 低级模型首次只读活动卡，完整复述后必须以 `等待用户确认执行 TASK-P0-006。` 结束；用户单独确认前零工具调用。
+- 用户在构建成功后手动重开 Editor，确认 `Map_ProjectSetup` 自动加载、Enhanced Input/GAS 和八个根 Tag 可用，启动一次空白 PIE 并正常停止，检查 Output Log 第一处 Error/Missing/Assert/Ensure。
+- 禁止 reset、clean、删除缓存、修改 SDK/Target/Build.cs、保存资产或设置、Gameplay、P007 和 push。
+
+### 本轮未执行
+
+- 未运行构建、Editor 或 PIE，未修改任何工程实现、Config 或资产。
+- 未勾选 Development Editor/Editor/PIE checkpoint，未创建 P007。
+- 协调者本轮只提交活动卡、项目快照和协调日志，不 push。
