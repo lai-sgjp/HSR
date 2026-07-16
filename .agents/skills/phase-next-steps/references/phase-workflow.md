@@ -5,10 +5,10 @@ This reference is an optional checklist for `$phase-next-steps`. The detailed pr
 ## Universal phase loop
 
 1. Read `agents.md`, `todo_plan.md`, `worklog.md`, `README.md`, the roadmap, and the current phase document.
-2. Define one phase-sized or smaller outcome; list exact allowed files and explicit non-goals.
+2. Define one independently verifiable, coherent vertical outcome; list exact allowed files and explicit non-goals.
 3. Describe ownership, data flow, Editor manual work, risks, and evidence before editing.
 4. Check UE reflection, GC, Tick, GAS, UI, DataAsset/Runtime/SaveGame, copyright, and future-networking boundaries as applicable.
-5. Make the smallest C++ or document change; keep Blueprint for configuration and presentation.
+5. Implement the smallest coherent vertical slice: tightly related C++, Blueprint configuration, Editor work, PIE, and evidence may share one work package while retaining separate author handoffs and commits.
 6. Tell the user exactly what to create or bind in UE Editor.
 7. Compile the relevant target, run the smallest automated or PIE path, and test one failure path.
 8. Update `worklog.md` with evidence, `todo_plan.md` only for real progress, and learning/design docs for reusable knowledge.
@@ -17,6 +17,8 @@ This reference is an optional checklist for `$phase-next-steps`. The detailed pr
 ## Decision rules
 
 - If prerequisites are missing, recommend the missing prerequisite rather than jumping ahead.
+- Default to 2–5 engineering work packages plus one closeout package per Phase, adjusted to real complexity rather than forced to a quota.
+- Do not split mechanically by class, file, or asset. Split for different authors/permissions, dangerous Git/Config, third-party assets, new modules, external dependencies, independent failure/rollback boundaries, or scope beyond a low-level model's safe capacity.
 - If the next task needs files outside the allowlist, stop and request authorization.
 - If an API or Editor behavior is uncertain, inspect UE5.6 evidence or ask for the error/configuration; do not invent an API.
 - If the task is optional polish, present it as optional and protect MVP and phase gates.

@@ -7,13 +7,15 @@ description: Optional HSR phase-gate guidance for deciding what to do next in th
 
 ## Overview
 
-Use this skill as an optional planning aid when HSR is moving between Phase 0-20. Identify the current phase from repository evidence, check its gate, recommend one adjacent small task, and state what the user must do in UE Editor or what Codex can change. Do not treat this skill as mandatory and do not override the user's current-turn scope.
+Use this skill as an optional planning aid when HSR is moving between Phase 0-20. Identify the current phase from repository evidence, check its gate, recommend one adjacent coherent vertical slice, and state what the user must do in UE Editor or what Codex can change. Do not treat this skill as mandatory and do not override the user's current-turn scope.
 
 ## Safety and scope
 
 Use these project-specific safety rules:
 - Read the HSR rules and current evidence before making a recommendation.
-- Keep the recommendation optional, adjacent to the current phase, and independently verifiable.
+- Keep the recommendation optional, adjacent to the current phase, independently verifiable, and centered on one user-visible outcome.
+- Prefer a coherent work package that can include tightly coupled C++, Editor configuration, PIE, and evidence. Do not split mechanically by class, file, or asset.
+- Split only for different authors or permissions, dangerous Git/Config, third-party assets, new modules, external dependencies, independent failure/rollback boundaries, or scope beyond a low-level model's safe capacity.
 - Separate Codex changes, user Editor actions, and user-provided evidence.
 - Never create code, assets, Config, or Git changes merely because this skill was invoked.
 - Stop and request authorization for deletion, broad refactoring, third-party assets, Git, or a new module.
@@ -22,7 +24,7 @@ Use these project-specific safety rules:
 
 1. Determine the current phase and the last verified milestone.
 2. Check prerequisites, unfinished risks, and documentation freshness.
-3. Select the smallest next task that advances the phase without entering the next phase.
+3. Select the smallest coherent vertical slice that advances the phase without entering the next phase.
 4. Separate responsibilities into Codex file work, user Editor work, and user verification.
 5. List exact files, assets, manual steps, and evidence required.
 6. State what is explicitly out of scope.
@@ -33,7 +35,7 @@ Use these project-specific safety rules:
 
 1. Current phase and evidence.
 2. Gate status: ready, blocked, or not yet verified.
-3. One recommended next task.
+3. One recommended coherent vertical slice with one independently verifiable outcome.
 4. Codex changes, if any, with exact paths.
 5. User Editor actions.
 6. Compile, PIE, automation, or manual evidence needed.

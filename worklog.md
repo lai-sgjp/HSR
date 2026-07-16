@@ -925,3 +925,14 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 用户已人工验收并明确无需额外检查；据实跳过独立 Reviewer，不创建或暗示 Reviewer 产物/commit。
 - Blueprint 输入引用绑定、完整 PIE、Move/Look/Jump/Interact、Possession、重新 Possess 与 Context 去重仍未验证。
 - 本轮只归档活动卡和结果、同步项目文档并创建 Coordinator commit；不修改资产、不启动 Editor/PIE、不创建 P1-004、不 push。
+
+## 2026-07-16｜Coordinator：收敛 Phase 1 工作包粒度
+
+- 用户反馈原 Phase 1 按 GameMode、HUD、AnimBP 和专项验证分别拆卡过细，交接成本正在拖慢项目推进，并明确授权维护 Phase 1 与后续 Phase 的工作包规则。
+- 保留 P1-001、P1-002、P1-003A、P1-003B 已完成与归档事实，不重写历史；将剩余计划收敛为 P1-004 探索可玩闭环、P1-005 动画与最终回归、P1-006 阶段收尾三个工作包。
+- P1-004 合并 GameMode、派生 Blueprint/灰盒地图、探索 HUD 与首次闭环直接相关验证，唯一结果为可 Move/Look/Jump、HUD 单实例且 UIOnly 可停止并恢复探索输入；AnimBP 明确排除。
+- P1-005 以合法可提交动画资源为前置，合并 AnimBP 与重新 Possess、连续 PIE、帧率、缺失配置等最终回归。
+- P1-006 统一管理阶段收尾，但内部仍强制 Coordinator 工程归档 commit → Teacher 技术/源码教学 commit → Coordinator 最终 commit/push，不能合并人格或提交。
+- 长期规则改为：任务仍只有一个独立验收结果，但默认选择产生用户可见运行结果的最小连贯垂直切片，不按类、文件或资产机械拆卡；每个 Phase 通常 2～5 个工程工作包加 1 个收尾工作包，按复杂度调整。
+- 只有不同作者/权限、危险 Git/Config、第三方资产、新模块、外部依赖、独立失败/回滚边界或明显超出低级模型安全范围时拆分；同一工作包内不同人格和资产作者仍独立交接、独立提交。
+- 本轮仅修改协调规划与规则文档；未创建 `tasks/active-task.md`，未实施 P1-004，未构建、未启动 Editor/PIE、未 push。两个未跟踪 Blueprint 为用户产物，未修改、未暂存、未提交。
