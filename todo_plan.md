@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0–20 路线规划已完成；Phase 0 工程与运行门禁已实施，实际 C++ 标准仍缺证，因此阶段为 `Not verified`。尚未开始 Gameplay 实现。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
+> 当前状态：Phase 0–20 路线规划已完成；Phase 0 工程、工具链、插件、Tags、地图、Editor 与 PIE 门禁全部通过，实际标准由用户确认是 C++20。Phase 1 尚未开始。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
 
 ## 已完成的规划工作
 
@@ -96,14 +96,14 @@
 
 ## 第一周门禁
 
-- [ ] 只实施 Phase 0，不创建 Character、Controller、ASC、AttributeSet、Blueprint 或 UMG。
-- [ ] Day 1–7 按文档审核、Blank 工程、工具链、插件/Tags、地图、回归、复盘推进。
-- [ ] Phase 0 Build、Editor 重开和空白 PIE 均有真实证据。
-- [ ] 第一周结束前不进入 Phase 1。
+- [x] 只实施 Phase 0，不创建 Character、Controller、ASC、AttributeSet、Blueprint 或 UMG。
+- [x] Day 1–7 按文档审核、Blank 工程、工具链、插件/Tags、地图、回归、复盘推进。
+- [x] Phase 0 Build、Editor 重开和空白 PIE 均有真实证据。
+- [x] 第一周结束前不进入 Phase 1。
 
 ## 第一月门禁
 
-- [ ] Week 1 只完成 Phase 0。
+- [x] Week 1 只完成 Phase 0。
 - [ ] Week 2 只完成 Phase 1 第三人称探索角色。
 - [ ] Week 3 只完成 Phase 2 最小 GAS 属性闭环。
 - [ ] Week 4 只完成 Phase 3 单一灰盒交互对象。
@@ -127,7 +127,7 @@
 
 - [x] 使用 UE5.6 Blank C++ 模板创建 `HSR`，关闭 Starter Content。
 - [x] 创建单 `HSR` Runtime 模块。
-- [ ] 验证 Visual Studio Community 2026、Windows SDK、UBT/UHT 和实际 C++ 标准。
+- [x] 验证 Visual Studio Community 2026、Windows SDK、UBT/UHT 和实际 C++ 标准。（实际构建工具链已记录；用户通过 `_MSVC_LANG` 确认 C++20。）
 - [x] 确认 Enhanced Input、GameplayAbilities、GameplayTags、GameplayTasks。
 - [x] 建立根 Gameplay Tags 和按需目录。（八个根 Tags 与按需 `Content/Maps` 目录均已有文件和 Editor 证据。）
 - [x] 创建并设置 `Map_ProjectSetup`。

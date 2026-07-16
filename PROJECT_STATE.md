@@ -5,20 +5,20 @@
 
 ## 当前 Phase
 
-- **Phase 0 收尾阶段（Not verified）**。
-- UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开和空白 PIE 已有真实证据。实际 C++ 标准仍未验证，Phase 0 不得宣布通过或进入 Phase 1。
+- **Phase 0 已完成（Ready）**。
+- UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开和空白 PIE 已有真实证据；用户通过 `_MSVC_LANG` 检查确认实际标准为 C++20，Phase 0 门禁全部通过。
 
 ## 当前任务
 
 - 活动任务卡：无；`TASK-P0-007` 已执行并归档。
-- 当前任务：无。Phase 0 最终门禁已判定为 `Not verified`，等待用户决定是否创建 C++ 标准补证任务。
-- 当前状态：P006 由用户验收并跳过独立审查；P007 已完成文档一致性核对、归档和门禁判定，未进入 Phase 1。
+- 当前任务：无。Phase 0 最终门禁已通过，等待用户授权高级协调者规划 Phase 1。
+- 当前状态：P006 由用户验收并跳过独立审查；P007 已完成归档；C++20 已由用户通过 `_MSVC_LANG` 人工确认。
 - 最近完成任务：`TASK-P0-007` — Phase 0 阶段审查、文档归档与门禁判定；执行结果 commit `41446f2b771b99eb011a496ac37a26d94214fdb1`。
 
 ## 当前阻塞点
 
 - 文件化上下文机制本身没有阻塞。
-- 实际 C++ 标准没有构建日志或编译命令证据；默认 BuildSettings 推断不能替代真实证据，因此 Phase 0 保持 `Not verified`。
+- Phase 0 当前没有阻断项；C++20 证据来源为用户运行 `_MSVC_LANG` 检查并明确回传结果。
 - MSVC 14.51.36248 不是 UE5.6 preferred 版本；当前构建成功，作为非阻断兼容性风险继续保留。
 
 ## 已完成事项
@@ -36,9 +36,9 @@
 
 ## 未完成事项
 
-- 工具链、实际编译/链接和 Development Editor 构建已有证据，但实际 C++ 标准仍未验证；构建日志中的 VS2022 工具链名称与规划中的 Visual Studio Community 2026 名称需在补证时统一说明。
+- 工具链、实际编译/链接、Development Editor 构建和 C++20 标准均已有证据；构建日志实际工具链为 VS2022 14.51/MSVC 14.51，文档中的 Community 2026 是用户 IDE 名称，两者继续分开记录。
 - Editor 重开、默认地图、插件、八个根 Tags 和空白 PIE 已由用户确认；P006 按用户明确决定跳过独立审查。
-- P007 已完成最终归档；实际 C++ 标准补证仍未完成，不得自动进入 Phase 1。
+- P007 已完成最终归档，C++20 已确认；Phase 1 尚未规划或实施。
 
 ## 当前代码状态
 
@@ -66,8 +66,8 @@
 
 ## 下一个推荐任务
 
-- **唯一推荐任务：** 如需完成 Phase 0，创建一个独立的实际 C++ 标准补证任务；在获得该证据前保持 `Not verified`。
-- 不得因为 P001-P007 已归档就自动进入 Phase 1；补证任务需要新的活动卡和用户确认。
+- **唯一推荐任务：** 由高级协调者规划 Phase 1 的第一个最小任务；不自动实施。
+- Phase 1 需要新的活动卡、低级模型复述和用户单独确认。
 
 ## 新模型接入时必须读取的文件
 
@@ -155,3 +155,9 @@
 - Phase 0 门禁判定：8/9 通过。实际 C++ 标准缺证，无法标记 Ready。
 - 所有文档（PROJECT_STATE、worklog、todo、learning journal、Phase 0 文档、README）已同步为真实状态。
 - Phase 0 保持 `Not verified`。下一相邻任务为实际 C++ 标准补证（独立最小补证任务），完成后可判定 Phase 0 总门禁并进入 Phase 1。
+
+## 2026-07-16 Phase 0 最终门禁更新
+
+- 用户通过 `_MSVC_LANG` 检查并明确确认实际 C++ 标准为 C++20。
+- Phase 0 唯一剩余证据缺口已补齐，最终状态更新为 `Ready`。
+- 当前无活动任务；Phase 1 尚未规划或实施，必须重新经过协调、任务卡、复述与确认流程。

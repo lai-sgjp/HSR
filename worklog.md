@@ -808,3 +808,11 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 修正 `PROJECT_STATE.md` 顶部陈旧状态：当前无活动任务，P007 已完成，Phase 0 保持 `Not verified`。
 - `todo_plan.md` 的真实工程执行证据项已勾选；实际 C++ 标准仍保持未完成。
 - 当前不创建补证任务、不进入 Phase 1、不 push；下一步需要用户明确决定是否规划 C++ 标准补证。
+
+## 2026-07-16｜Phase 0 最终通过与 C++20 证据
+
+- 用户使用 `_MSVC_LANG` 进行本地检查，并明确确认实际 C++ 标准为 C++20。
+- 该用户实测证据补齐 P007 唯一剩余门禁；Phase 0 从 `Not verified` 更新为 `Ready`。
+- 已同步 `PROJECT_STATE.md`、`todo_plan.md`、README、Phase 0 文档和 learning journal。
+- `check.cpp` 是用户本地临时检查文件，不作为项目实现提交；未擅自删除。
+- Phase 1 尚未规划或实施，仍需新的协调任务、活动卡、复述和用户确认。
