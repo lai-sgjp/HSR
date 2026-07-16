@@ -5,14 +5,14 @@
 
 ## 当前 Phase
 
-- **Phase 1 进行中；P1-001～P1-005 已归档；当前只剩 P1-006 Teacher 学习与阶段收尾，Phase 1 尚未完成**。
+- **Phase 1 已完成并判定为 `Ready`；P1-001～P1-006 全部归档。Phase 2 尚未开始。**
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
 ## 当前任务
 
-- 当前唯一活动任务为 `TASK-P1-006：Phase 1 教学与阶段收尾`；使用一张完整任务卡覆盖 Coordinator 工程 Gate、Teacher 接收/教学/练习/提交和 Coordinator 最终收尾，不拆分新卡。
-- 当前正式交接为 `Coordinator → Teacher`；Teacher 无需 Implementation Agent 复述，须直接读取本卡点名的源码、diff、commits、归档证据与学习文档。
+- 当前无活动任务。`TASK-P1-006` 已完成 Teacher 教学提交与 Coordinator 最终 Gate，并归档到 `tasks/archive/`。
+- Teacher commit 为 `70efd6f24f5d8532f74d0994c8c551d9353d6204`；教学、用户练习、掌握度和非阻断复习项均有真实记录。
 - `TASK-P1-005` 已由最终 Reviewer commit `af6b14898f589cd44fbd176488dcd5e82c309d4b` 判定 `PASS WITH FOLLOW-UP` 并归档；历史 `REVISE` 与最终复审均保留。
 - P1-005 A～F 真实链：Implementation `649e125`、`0c85794`、用户资产 `a539b6d994d638529754c0ce8da6b3b3432b4794` / `abca67921f31a6ddfc5dee468bdd7fb0cdb598d6`、Implementation 汇总 `3d94b74`、Coordinator 补证 `1e8e155db6d18339496f46d67662f88a5de3e009`、Reviewer `af6b14898f589cd44fbd176488dcd5e82c309d4b`。
 - P1-004 已验证 GameMode/灰盒地图/HUD、Spawn/Possess、Move/Look/Jump、无副作用 Interact、UIOnly 往返、同会话 Re-Possess 与 Context/Binding/HUD 去重。
@@ -50,7 +50,7 @@
 - Editor 重开、默认地图、插件、八个根 Tags 和空白 PIE 已由用户确认；P006 按用户明确决定跳过独立审查。
 - P007 已完成最终归档，C++20 已确认。
 - P1-001 已创建四个 Character 源文件，UHT、真实编译与 Link 已验证；Editor 类可见性与 PIE 均未验证。
-- Phase 1 的 Character/Camera、PlayerController/ControlMode、Enhanced Input、GameMode/灰盒地图、Blueprint 引用、HUD、AnimBP 与最终回归均已完成并归档；仅 P1-006 Teacher 学习与阶段收尾尚未完成。
+- Phase 1 的 Character/Camera、PlayerController/ControlMode、Enhanced Input、GameMode/灰盒地图、Blueprint 引用、HUD、AnimBP、最终回归与 Teacher 学习均已完成并归档。
 
 ## 当前代码状态
 
@@ -63,7 +63,7 @@
 - 后续 Phase 默认采用“最小连贯垂直切片”：每个任务只有一个可独立验收结果，但优先形成用户可见运行闭环，不再按类、单文件或单资产机械拆卡。
 - 每个 Phase 通常规划 2～5 个工程工作包加 1 个收尾工作包，按真实复杂度调整；同一工作包可以包含 C++、Editor 配置、PIE 和文档证据，但人格与资产作者仍独立交接、独立提交。
 - 只有不同作者/权限、危险 Git/Config、第三方资产、新模块、外部依赖、独立失败/回滚边界，或明显超出低级模型安全范围时拆分。
-- Phase 1 只剩 P1-006 阶段收尾。P1-001～P1-005 的历史事实与提交保持不变。
+- Phase 1 已收尾；后续 Phase 继续采用最小连贯垂直切片，但尚未创建 Phase 2 任务卡。
 
 - 模型切换后的主要记忆来自仓库文件，不依赖聊天历史。
 - `PROJECT_STATE.md` 保存项目快照；`tasks/active-task.md` 是唯一活动任务契约；`worklog.md` 保存真实证据；`todo_plan.md` 保存进度；`learning-journal.md` 保存可复用知识。
@@ -83,7 +83,7 @@
 
 ## 下一个推荐任务
 
-- **当前唯一下一步：** Teacher 按 `tasks/active-task.md` 接收 Phase 1 全部源码/diff/commits/build/PIE/学习证据，完成技术教学、源码复盘和用户练习后创建独立 Teacher commit；不得提前进入 Phase 2。
+- **当前唯一下一步：** 由用户明确授权后再规划 Phase 2；当前不自动开始 GAS 实施。
 
 ## 2026-07-16 P1-003 Coordinator 规划更新
 

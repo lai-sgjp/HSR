@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0 门禁已通过；Phase 1 已开始，P1-001、P1-002、P1-003A 与 P1-003B 已归档。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
+> 当前状态：Phase 0 与 Phase 1 门禁均已通过并判定为 `Ready`；Phase 2 尚未开始。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
 
 ## 已完成的规划工作
 
@@ -104,7 +104,7 @@
 ## 第一月门禁
 
 - [x] Week 1 只完成 Phase 0。
-- [ ] Week 2 只完成 Phase 1 第三人称探索角色。
+- [x] Week 2 只完成 Phase 1 第三人称探索角色。
 - [ ] Week 3 只完成 Phase 2 最小 GAS 属性闭环。
 - [ ] Week 4 只完成 Phase 3 单一灰盒交互对象。
 - [ ] 第一月不编写 Phase 4 Enemy/Encounter 代码，只允许形成接口草案。
@@ -137,14 +137,14 @@
 
 ## Phase 1：第三人称探索角色
 
-- [ ] 从 Blank 项目创建 CharacterBase、ExplorationCharacter、PlayerController、GameMode 和 HUD。
+- [x] 从 Blank 项目创建 CharacterBase、ExplorationCharacter、PlayerController、GameMode 和 HUD。
 - [x] P1-001：完成 CharacterBase、ExplorationCharacter、CameraBoom、FollowCamera 与 CharacterMovement 基础配置；UHT/编译/链接通过，用户人工验收通过并明确跳过独立 Reviewer。（不代表移动、输入、PIE 或 Phase 1 总项完成。）
 - [x] P1-002：完成 PlayerController、ControlMode 幂等入口与 Possession 安全边界；UHT/编译/链接通过，用户人工验收通过并明确跳过独立 Reviewer。（Editor/PIE Possession 与输入集成仍未验证。）
 - [x] P1-003A：完成 Enhanced Input C++ 接口、Action 绑定入口与 Mapping Context 生命周期；构建通过并由用户人工验收。
 - [x] P1-003B：创建 Move、Look、Jump、Interact Input Actions 与 Exploration Context；用户确认 Value Type、IMC 配置及 Editor 重开持久性，五资产 commit 为 `7c71ae825fb840ace6d76fc6232883b807d395d1`。（Blueprint 引用绑定与完整 PIE 仍未验证。）
 - [x] P1-004：完成 GameMode、派生 BP、灰盒地图、探索 HUD 与可玩闭环；A2 移除手工 PushInputComponent 和高频日志；用户验证 UIOnly 往返、同会话 Re-Possess、Context/Binding/HUD 去重；最终 Reviewer `6b19d179562f03c8cc50b94456d3a943478855c0` 为 `PASS`。
 - [x] P1-005：完成基础 AnimBP、角色/动画资产接入与最终回归；用户补齐 Editor/PIE/失败路径证据，最终 Reviewer `af6b14898f589cd44fbd176488dcd5e82c309d4b` 为 `PASS WITH FOLLOW-UP`。
-- [ ] P1-006：工程归档、Teacher 技术/源码学习提交与 Coordinator Phase 1 最终收尾。
+- [x] P1-006：工程归档、Teacher 技术/源码学习提交与 Coordinator Phase 1 最终收尾；Teacher commit `70efd6f24f5d8532f74d0994c8c551d9353d6204`，Phase 1 判定 `Ready`。
 
 ## Phase 2：GAS 基础接入
 

@@ -8,12 +8,12 @@
 
 ## 2. 当前状态与交接
 
-- 当前阶段：Phase 1 进行中，P1-001～P1-005 已归档。
+- 当前阶段：Phase 1 已完成并判定为 `Ready`，P1-001～P1-006 全部归档。
 - P1-005 最终 Reviewer：`af6b14898f589cd44fbd176488dcd5e82c309d4b`，结论 `PASS WITH FOLLOW-UP`。
-- 当前步骤：`G4 Teacher 教学提交`。
-- 当前交接：`Teacher → Coordinator（等待接收 Teacher commit）`。
+- 当前步骤：`G5 Coordinator 最终收尾完成`。
+- 当前交接：`Coordinator → Phase 1 归档完成`。
 - Teacher 无需 Implementation Agent 式首次复述，也不需要重新创建活动卡；收到本卡后直接核对接收条件并开展教学。
-- 当前不进入 Phase 2，不 push。
+- Phase 2 尚未开始；本卡完成收尾提交后按长期授权执行非强制 push。
 
 ## 3. 全流程状态表
 
@@ -23,8 +23,8 @@
 | G1 Teacher 接收 | Teacher | `完成` | 已读取任务卡、Phase 1 源码/历史证据与学习文档 |
 | G2 教学与源码复盘 | Teacher | `完成` | 已覆盖数据流、真源、幂等、输入 Tick、反射/GC 与 Widget 生命周期 |
 | G3 用户练习 | Teacher + 用户 | `完成` | 已记录两轮真实回答、纠正内容、掌握程度与后续深入项 |
-| G4 Teacher 教学提交 | Teacher | `进行中` | 更新授权教学文档并创建独立 Teacher commit，回传完整 hash |
-| G5 Phase 1 最终收尾 | Coordinator | `LOCKED` | 接收 Teacher hash，复核工程/学习/Git Gate，独立收尾 commit；满足授权后 push |
+| G4 Teacher 教学提交 | Teacher | `完成` | commit `70efd6f24f5d8532f74d0994c8c551d9353d6204` |
+| G5 Phase 1 最终收尾 | Coordinator | `完成` | 工程/学习/Git Gate 通过，Phase 1 判定 `Ready`；独立收尾 commit 后 push |
 
 ## 4. G0：Coordinator 工程 Gate 交付
 
