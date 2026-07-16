@@ -76,3 +76,11 @@
 ## 唯一下一任务建议
 
 `TASK-P1-002` — PlayerController、ControlMode 与 Enhanced Input 映射上下文，不自动执行。
+
+## Coordinator 归档说明（2026-07-16）
+
+- Implementation Agent commit：`14b3cc96592f65dd5a0db8c1ef2ffd3987345c32`。
+- Git 核对确认该提交只包含四个获准 Character 源文件与本执行报告。
+- 用户已亲自审查并明确表示没有问题，同时明确要求跳过额外独立 Reviewer；本次归档如实记录为“用户人工验收，独立 Reviewer 已按用户决定跳过”。
+- 本任务不存在 Reviewer 产物或 Reviewer commit；不得将用户验收伪装成独立 Reviewer 结论。
+- 已验证：本轮 UHT、实际 C++ 编译、链接和退出码 0。未验证：Editor 类可见性、移动、输入、Possession、PIE、HUD、动画及 Phase 1 总门禁。

@@ -865,3 +865,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 
 - 本次只补交协调规则和日志，不宣称 Implementation Agent 已接收、用户已确认执行、源码实施已开始或任何构建/Editor/PIE 验证已发生。
 - `check.cpp` 与 `docs/phase-1-execution-plan.md` 仍不属于本次协调提交，不修改、不暂存、不提交；本次不 push。
+
+## 2026-07-16｜Coordinator：归档 TASK-P1-001
+
+- 核对 Implementation Agent 完整 commit `14b3cc96592f65dd5a0db8c1ef2ffd3987345c32`：实际只包含四个获准 Character 源文件与 `tasks/execution-result.md`。
+- 执行报告证明本轮 UHT、实际 C++ 编译、链接成功，退出码 0；首次 include 路径错误已在执行范围内修正。
+- 用户亲自审查并明确确认实现没有问题，同时明确要求不再进行额外独立 Reviewer；本次如实记录用户人工验收，未创建或伪造 Reviewer 产物/commit。
+- 已将 P1-001 活动卡和执行报告归档到 `tasks/archive/`，只勾选 todo 中真实完成的 P1-001 子进度，Phase 1 总项保持未完成。
+- 未验证项继续保留：Editor 类可见性、输入、Possession、移动、HUD、动画、PIE 和 Phase 1 总门禁。
+- 本次不修改 Gameplay 源码、不构建、不启动 Editor/PIE、不 push。归档提交成功后才允许创建 P1-002。

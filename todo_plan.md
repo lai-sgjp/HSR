@@ -138,7 +138,7 @@
 ## Phase 1：第三人称探索角色
 
 - [ ] 从 Blank 项目创建 CharacterBase、ExplorationCharacter、PlayerController、GameMode 和 HUD。
-- [ ] 完成 CameraBoom、FollowCamera、CharacterMovement。
+- [x] P1-001：完成 CharacterBase、ExplorationCharacter、CameraBoom、FollowCamera 与 CharacterMovement 基础配置；UHT/编译/链接通过，用户人工验收通过并明确跳过独立 Reviewer。（不代表移动、输入、PIE 或 Phase 1 总项完成。）
 - [ ] 创建 Move、Look、Jump、Interact Input Actions 和 Exploration Context。
 - [ ] 建立基础 AnimBP 参数和占位探索 HUD。
 - [ ] 验证 ControlMode、Possession、Mapping Context 和无自定义 Tick。

@@ -424,3 +424,12 @@ Phase 0 运行门禁中，哪些检查项必须有用户手动参与，哪些可
 - MSVC 下 `_MSVC_LANG` 用于报告当前编译采用的 C++ 语言标准值。
 - 用户通过本地检查确认结果对应 C++20，补齐 Phase 0 的实际标准证据。
 - `BuildSettingsVersion` 可以表达 UE 构建默认策略，但不应在缺少运行/编译证据时单独冒充实际标准；本次以用户实测结果完成门禁。
+
+## 2026-07-16｜P1-001 角色与相机骨架
+
+- `ACharacter` 已提供 Capsule、Mesh 和 CharacterMovement；探索派生类只需建立本阶段特有的 SpringArm/Camera 默认子对象与旋转策略，避免提前加入输入、Controller 或 GAS 职责。
+- 默认组件应在构造函数中用 `CreateDefaultSubobject` 创建，并用 `UPROPERTY` + `TObjectPtr` 保存反射/GC 可见引用；附件关系为 Root → CameraBoom → FollowCamera。
+- 第三人称旋转职责保持单一：Character 不直接消费 Controller pitch/yaw/roll，Movement 朝移动方向旋转，SpringArm 消费 Pawn Control Rotation，Camera 不重复消费。
+- 关闭自定义 Actor Tick 不影响 CharacterMovement 组件自身工作；本阶段不存在每帧轮询需求。
+- 同目录头文件使用局部 include 路径可避免模块 include 路径解析歧义。本轮首次构建暴露该问题，修正后 UHT、编译和链接通过。
+- 编译成功只证明类和组件骨架可构建；Editor 类可见性、输入、Possession、移动和 PIE 仍需后续真实证据。
