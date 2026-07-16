@@ -5,21 +5,22 @@
 
 ## 当前 Phase
 
-- **Phase 1 已正式进入；P1-001、P1-002 已归档，当前无活动任务**。
+- **Phase 1 已正式进入；P1-001、P1-002 已归档，当前活动任务为 TASK-P1-003（P1-003A C++ 接口）协调规划完成、等待首次只读复述**。
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 已有 Character/Camera 骨架及 UHT、编译、链接成功证据；Editor 类可见性、输入、Possession、移动和 PIE 尚未验证。
 
 ## 当前任务
 
-- 当前无 `tasks/active-task.md`；P1-002 活动卡与执行报告已归档。
-- P1-002 Implementation commit `7fef22f1afc400c9488ad36b1ae39a8c03435ec5` 已经用户人工验收；用户明确跳过独立 Reviewer，因此不存在 Reviewer 产物或 commit。
+- 活动任务卡：`tasks/active-task.md`，编号 `TASK-P1-003`；本卡只做 P1-003A C++ 输入接口和 Context 生命周期。
+- 未来 Implementation Agent 只可修改四个既有 Character/PlayerController 源文件与 `tasks/execution-result.md`；不得创建 `.uasset`。
+- P1-003B 将在 A 归档后单独创建；用户本人在 Editor 创建五个 IA/IMC 资产并提交用户资产 commit，其他人格不得冒充资产作者。
 - 最近完成任务：`TASK-P0-007` — Phase 0 阶段审查、文档归档与门禁判定；执行结果 commit `41446f2b771b99eb011a496ac37a26d94214fdb1`。
 
 ## 当前阻塞点
 
 - 文件化上下文机制本身没有阻塞。
 - Phase 0 当前没有阻断项；C++20 证据来源为用户运行 `_MSVC_LANG` 检查并明确回传结果。
-- P1-002 没有技术阻塞；Editor/PIE Possession 行为仍留待后续集成验证。
+- P1-003A 没有技术阻塞；当前仅受首次只读复述与用户再次确认门禁约束。
 - MSVC 14.51.36248 不是 UE5.6 preferred 版本；当前构建成功，作为非阻断兼容性风险继续保留。
 
 ## 已完成事项
@@ -69,7 +70,14 @@
 
 ## 下一个推荐任务
 
-- **唯一下一步：** Coordinator 依据 Phase 1 计划创建 P1-003 Enhanced Input 的最小活动任务；C++ 实施与用户 Editor 资产创建必须拆分为可独立归属、独立提交的串行工作。
+- **唯一下一步：** Implementation Agent 首次只读 `tasks/active-task.md`，完整复述并精确以“等待用户确认执行 TASK-P1-003。”结束；用户再次确认前零工具调用。
+
+## 2026-07-16 P1-003 Coordinator 规划更新
+
+- 为保持产物作者和 Git 归属真实，P1-003 被拆为串行的 A/B：当前 P1-003A 只实现 C++；后续 P1-003B 由用户在 Editor 创建五个 IA/IMC 资产并由用户本人提交资产 commit。
+- P1-003A 允许修改范围仅为 ExplorationCharacter、HSRPlayerController 的 h/cpp 与执行报告；Build.cs、Content、Config、Blueprint、GameMode、HUD、Anim、GAS 与交互系统均禁止修改。
+- Controller 是 Mapping Context 生命周期唯一管理者；Character 是 Pawn Action 唯一绑定者；Interact 只作无副作用占位。
+- 本轮只完成协调规划；未修改 Gameplay 源码、未构建、未启动 Editor/PIE、未创建资产、未 push。
 
 ## 2026-07-16 P1-002 Coordinator 规划更新
 

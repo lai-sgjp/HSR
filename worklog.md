@@ -891,3 +891,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 用户亲自审查并明确确认实现没有问题，同时明确要求无需额外独立 Reviewer；本次只记录用户人工验收，没有创建、暗示或冒充 Reviewer 产物/commit。
 - 已归档 P1-002 活动卡与执行报告，并只勾选 todo 中真实完成的 P1-002 C++ 子进度；Phase 1 总项、Editor/PIE Possession 与 Enhanced Input 均保持未完成或未验证。
 - 本次不修改 Gameplay 源码、不构建、不启动 Editor/PIE、不 push。归档提交成功后才允许规划 P1-003。
+
+## 2026-07-16｜Coordinator：规划 TASK-P1-003（P1-003A）
+
+- P1-002 已以 Coordinator 归档 commit 完成后，才创建唯一活动任务 `TASK-P1-003`。
+- 为避免 Implementation Agent 冒充用户/UE Editor 资产作者，将 Enhanced Input 工作串行拆为 A/B：当前 A 只建立 C++ Action 引用、绑定入口和 Context 生命周期；后续 B 才由用户创建、配置并提交五个 IA/IMC 资产。
+- 当前允许实施文件严格为 ExplorationCharacter、HSRPlayerController 的四个 h/cpp 与执行报告；用户 Editor 操作为无，Build.cs 只读且不得修改。
+- Controller 唯一管理 Context，Character 唯一绑定 Pawn Action；缺 IA/IMC、无 LocalPlayer/Subsystem、错误 Pawn、重复 Context 与重新 Possess 均列为安全路径；Interact 不产生 Gameplay 副作用；禁止 Tick。
+- 当前交接为 Coordinator → Implementation Agent。执行者首次只能读取活动卡并完整复述，精确以 `等待用户确认执行 TASK-P1-003。` 结束；用户再次确认前零工具调用。
+- 本轮未实施源码、构建、Editor/PIE、资产或 push。
