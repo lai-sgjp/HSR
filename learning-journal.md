@@ -472,3 +472,11 @@ Phase 0 运行门禁中，哪些检查项必须有用户手动参与，哪些可
 - 紧急调试中发生的越出任务卡范围修改，必须记录真实指令、作者、diff 与验证；后续用户追认可以补齐授权链，但不能改写为“事前已授权”。
 - Reviewer 的 `REVISE` 不会因一个授权问题得到追认而整体消失；输入栈、高频日志、构建和专项 PIE 等其余问题仍需逐项闭环。
 - 二进制资产的未提交修改不能靠普通文本 diff 推断作者或用途。协调者应保护现场并向实际操作者确认，之后再决定独立提交或恢复，不能静默混入文档/源码提交。
+
+## 2026-07-16｜P1-004 输入与生命周期闭环
+
+- Enhanced Input 的 Context、Action 和 Binding 全部存在，仍不代表回调会触发；PlayerController 的标准每帧输入处理链必须运行。Character 可以无自定义 Tick，但不能为了“无 Tick”规则关闭承担引擎输入职责的 PlayerController Tick。
+- Mapping Context 应沿 ControlMode 与 Possession 生命周期对称添加/移除，并用幂等状态防止同一生命周期重复添加；恢复 Exploration 或 Re-Possess 后的一次重新添加是正常行为，不等于叠加泄漏。
+- 不应手工 Push Pawn InputComponent 来弥补生命周期问题；应依赖标准输入栈流程，并用同会话 UnPossess/Re-Possess 验证 Action 单次触发。
+- HUD 创建入口要幂等，Widget 使用正确 Owning Player，并对空类与创建失败安全返回；UIOnly 往返必须同时验证 Gameplay 输入、鼠标/焦点和恢复能力。
+- Reviewer 可以依据用户运行日志审查结论，但必须明确证据作者，不能写成 Reviewer 独立运行 Editor/PIE。

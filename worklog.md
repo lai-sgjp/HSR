@@ -976,3 +976,13 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 据此解除 Reviewer 所列的 IMC 作者、用途、持久性和提交归属阻断；该结论来自用户证据与 Coordinator Git 核对，不写成 Reviewer 独立验证。
 - `TASK-P1-004-A2` 的正式交接与首次只读复述门禁保持不变；手工输入栈风险、高频日志、修订后正式构建、UIOnly 恢复和同会话 Re-Possess 等其余 `REVISE` 项仍未完成。
 - 本次只维护协调文档，不修改源码或资产，不构建、不启动 Editor/PIE、不 push。
+
+## 2026-07-16｜Coordinator：最终归档 TASK-P1-004
+
+- Reviewer 最终 commit `6b19d179562f03c8cc50b94456d3a943478855c0` 判定 `PASS`；Reviewer 核对用户 PIE 回传、附件日志、代码审查与 Git 事实，未独立运行 Editor、PIE 或构建。
+- 完整链为初审 `REVISE` → A2 Reviewer `PASS WITH FOLLOW-UP` → 用户补齐 UIOnly 往返与同会话 Re-Possess → 最终 Reviewer `PASS`。
+- A2 `cec07d661598c6f21587a913232403b1e6ce6a80` 已移除手工 PushInputComponent 与 Move/Look 高频日志；PlayerController Tick 和 Context 幂等生命周期保留，构建退出码 0。
+- 用户专项 PIE 确认 UIOnly 阻止输入且可恢复、Re-Possess 后 Action 单次触发、移动/镜头/HUD 不重复；附件日志无 Error、Ensure、Accessed None 或重复绑定警告。
+- 用户确认地图未提交修改仅为临时 Level Blueprint 测试并授权撤销；主 Agent 已恢复该地图，临时改动未提交。
+- 已恢复完整执行历史，并归档活动卡、完整执行报告、初审、A2 审查与最终审查。当前无活动任务；Phase 1 仍待 P1-005 与 P1-006/Teacher。
+- 本次只提交 Coordinator 文档/归档，不修改源码资产、不构建、不运行 Editor/PIE、不创建 P1-005、不 push。

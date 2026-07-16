@@ -59,4 +59,3 @@ Coordinator 归档前必须：
 3. 将本轮 Editor/PIE 结论明确标为“用户实际 PIE 回传证据”，不得写成 Reviewer 独立运行。
 4. 核对并处理当前被测试修改的 `Content/Maps/Map_Phase1_Exploration.umap`：用户先前说明临时 Level Blueprint 不应保存；Coordinator 必须向用户确认该改动是否仅为临时测试并按真实作者/意图处理，不能由 Reviewer 静默提交或丢弃。
 5. 更新任务状态、worklog、todo 与学习记录后，以 Coordinator 身份独立提交归档；本 Reviewer 不 push。
-

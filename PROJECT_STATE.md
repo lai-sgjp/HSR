@@ -5,26 +5,24 @@
 
 ## 当前 Phase
 
-- **Phase 1 已正式进入；P1-001、P1-002、P1-003A 与 P1-003B 已归档；P1-004 经 Reviewer commit `835d038` 判定 `REVISE`，当前等待受控修订 Segment A2 的首次复述与用户确认**。
+- **Phase 1 进行中；P1-001～P1-004 已归档，P1-004 最终 Reviewer commit `6b19d179562f03c8cc50b94456d3a943478855c0` 为 `PASS`；Phase 1 尚未完成**。
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
-- P1-001 已有 Character/Camera 骨架及 UHT、编译、链接成功证据；Editor 类可见性、输入、Possession、移动和 PIE 尚未验证。
+- P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
 ## 当前任务
 
-- P1-003B 的五资产 commit 为 `7c71ae825fb840ace6d76fc6232883b807d395d1`；用户确认配置满足任务卡并在 Editor 重开后保持，且明确验收通过、跳过独立 Reviewer。
-- Git 提交由用户授权主 Agent 代办；commit 仅含五个 Input 资产。两个未跟踪 Blueprint 仍属用户提前创建的 P1-004 候选，未纳入。
-- 当前唯一活动任务为 `TASK-P1-004：第三人称探索可玩闭环`；Move、Look、Jump、Interact 已恢复，IMC 归属与独立资产提交已解决；输入栈风险、高频日志、修订后正式构建、UIOnly 恢复和同会话 Re-Possess 仍待处理。
-- 用户已授权将 Phase 1 剩余计划收敛为三个工作包：P1-004 探索可玩闭环、P1-005 动画与最终回归、P1-006 阶段收尾；本轮只维护规划与长期拆卡规则。
-- 最近完成任务：`TASK-P1-003B` — 五个 Enhanced Input 资产创建与持久性确认；资产 commit `7c71ae825fb840ace6d76fc6232883b807d395d1`，Coordinator 归档 commit `d57d57a20c903d0ca9e9bfc7128318355bdf9378`。
+- 当前没有活动任务；`tasks/active-task.md` 已随 P1-004 归档。
+- P1-004 已验证 GameMode/灰盒地图/HUD、Spawn/Possess、Move/Look/Jump、无副作用 Interact、UIOnly 往返、同会话 Re-Possess 与 Context/Binding/HUD 去重。
+- 最近完成任务：`TASK-P1-004`；最终 Reviewer commit `6b19d179562f03c8cc50b94456d3a943478855c0` 为 `PASS`，本轮 Coordinator 负责最终归档。
 - P1-004 已实施 C++、Blueprint/地图/UI 资产并进行多轮构建与 PIE。输入故障根因为 `AHSRPlayerController` 禁用了 Actor Tick，导致 Enhanced Input 的每帧 Action 求值不运行；恢复 Tick 后用户确认功能解决。
 
 ## 当前阻塞点
 
 - 文件化上下文机制本身没有阻塞。
 - Phase 0 当前没有阻断项；C++20 证据来源为用户运行 `_MSVC_LANG` 检查并明确回传结果。
-- P1-003B 没有遗留阻塞；Blueprint 引用绑定与完整 PIE 输入行为仍待后续任务验证。
+- P1-003B 没有遗留阻塞；Blueprint 引用与完整 PIE 输入行为已在 P1-004 验证。
 - MSVC 14.51.36248 不是 UE5.6 preferred 版本；当前构建成功，作为非阻断兼容性风险继续保留。
-- 用户已事后追认 `074e5fc` 对原只读 Character/PlayerController 的扩权修改；该记录不是补造事前授权。Reviewer 的其余 `REVISE` 项仍有效。
+- 用户已事后追认 `074e5fc` 对原只读 Character/PlayerController 的扩权修改；该记录不是补造事前授权。首次 `REVISE` 的其余项目已由 A2、IMC 归属确认和用户专项 PIE 闭环。
 - `Content/Input/IMC_Exploration.uasset` 已确认由用户根据执行者说明在 UE Editor 中创建/修改，作为 Enhanced Input 必要配置，Editor 重开后保持；主 Agent 经授权代办的独立资产 commit `a091700082f30ed70e3fba990e363dd7af102a6a` 只含该文件。此归属阻断已解除，但不构成 Reviewer 独立验证。
 
 ## 已完成事项
@@ -46,20 +44,20 @@
 - Editor 重开、默认地图、插件、八个根 Tags 和空白 PIE 已由用户确认；P006 按用户明确决定跳过独立审查。
 - P007 已完成最终归档，C++20 已确认。
 - P1-001 已创建四个 Character 源文件，UHT、真实编译与 Link 已验证；Editor 类可见性与 PIE 均未验证。
-- Phase 1 的 Character/Camera、PlayerController/ControlMode、Enhanced Input C++ 边界及五个输入资产已完成并归档；GameMode/灰盒地图、Blueprint 引用绑定、HUD、AnimBP、专项 PIE 与阶段归档尚未完成。
+- Phase 1 的 Character/Camera、PlayerController/ControlMode、Enhanced Input、GameMode/灰盒地图、Blueprint 引用、HUD 与 P1-004 专项 PIE 已完成并归档；AnimBP、P1-005 最终回归及 P1-006/Teacher 阶段收尾尚未完成。
 
 ## 当前代码状态
 
 - 已存在 `HSR.uproject`、`Source/HSR.Target.cs`、`Source/HSREditor.Target.cs`、`Source/HSR/HSR.Build.cs`、`Source/HSR/HSR.h`、`Source/HSR/HSR.cpp`、`Config/DefaultEngine.ini` 和 `Config/DefaultInput.ini`。
 - `HSR.sln` 与 `.vs/`、`Binaries/`、`Intermediate/`、`Saved/`、`DerivedDataCache/` 为工具/Editor 产物，不作为构建、PIE 或 Gameplay 通过证据。
-- 当前已完成工程基线、P003 插件/模块依赖、P004 Tags 和 P005 默认地图；所有 Gameplay Phase 与 GAS Stage 仍未实施。
+- 当前已完成工程基线以及 Phase 1 的 P1-001～P1-004 Gameplay 可玩闭环；GAS Stage 尚未实施。
 
 ## 当前设计决策
 
 - 后续 Phase 默认采用“最小连贯垂直切片”：每个任务只有一个可独立验收结果，但优先形成用户可见运行闭环，不再按类、单文件或单资产机械拆卡。
 - 每个 Phase 通常规划 2～5 个工程工作包加 1 个收尾工作包，按真实复杂度调整；同一工作包可以包含 C++、Editor 配置、PIE 和文档证据，但人格与资产作者仍独立交接、独立提交。
 - 只有不同作者/权限、危险 Git/Config、第三方资产、新模块、外部依赖、独立失败/回滚边界，或明显超出低级模型安全范围时拆分。
-- Phase 1 剩余结构固定为 P1-004 探索可玩闭环（不含 AnimBP）、P1-005 动画与最终回归、P1-006 阶段收尾。P1-001～P1-003 的历史事实与提交保持不变。
+- Phase 1 剩余结构为 P1-005 动画与最终回归、P1-006 阶段收尾。P1-001～P1-004 的历史事实与提交保持不变。
 
 - 模型切换后的主要记忆来自仓库文件，不依赖聊天历史。
 - `PROJECT_STATE.md` 保存项目快照；`tasks/active-task.md` 是唯一活动任务契约；`worklog.md` 保存真实证据；`todo_plan.md` 保存进度；`learning-journal.md` 保存可复用知识。
@@ -79,7 +77,7 @@
 
 ## 下一个推荐任务
 
-- **唯一下一步：** Implementation Agent 首次只读活动任务卡，复述 Segment A2 并以 `等待用户确认执行 TASK-P1-004-A2。` 结束；用户再次确认前零工具调用。
+- **唯一下一步建议：** 由 Coordinator 规划 `TASK-P1-005：动画与最终回归`；当前尚未创建活动任务。
 
 ## 2026-07-16 P1-003 Coordinator 规划更新
 
