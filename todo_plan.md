@@ -54,7 +54,7 @@
 - [x] 记录 Loop Engineering 的可选角色闭环。
 - [x] 记录所有 Phase 的通用执行流程和下一步输出结构。
 - [x] 创建 `phase-next-steps` Skill 骨架、元数据和阶段矩阵引用。
-- [ ] 运行真实 HSR Phase 0 工程任务并取得编译/Editor/PIE 证据。
+- [x] 运行真实 HSR Phase 0 工程任务并取得编译/Editor/PIE 证据。（P001-P007 已执行并归档；实际 C++ 标准仍单独未验证。）
 - [x] 将本轮文档变更提交到本地 Git。
 - [x] 将本轮文档变更推送到远程仓库 `origin/main`。
 
