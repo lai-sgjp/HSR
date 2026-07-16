@@ -11,8 +11,8 @@
 
 ## 当前任务
 
-- 当前唯一活动任务为 `TASK-P1-005：动画资产接入与 Phase 1 最终回归`；目前仅授权 Segment A，由 Implementation Agent 先提供资产需求清单。
-- P1-005 保持一个垂直工作包，串行交接为：A 资产需求清单 → B 用户候选与授权证据 → C 只读兼容性评估/导入方案 → D 用户 Editor 导入、AnimBP、绑定与资产 commit → E 最终回归 → 验收/归档。
+- 当前唯一活动任务为 `TASK-P1-005：动画资产接入与 Phase 1 最终回归`；一张完整任务卡覆盖 A～F 并持续到归档，不再为各 Segment 新建任务卡或反复 CC-SWITCH。当前仅激活 Segment A，由 Implementation Agent 先提供资产需求清单。
+- P1-005 同一卡串行交接为：A 资产需求清单 → B 用户候选与授权证据 → C 只读兼容性/许可证评估及最终 manifest → D 用户 Editor 导入、AnimBP、绑定与资产 commit → E 最终回归 → F 验收/Coordinator 归档。段间只更新状态/交接表并按真实人格独立 commit。
 - 用户已选择使用自己已有且已授权的角色/动画资产，但候选文件、依赖和许可证尚未提供；在 Coordinator 根据真实候选精确授权前，禁止复制或导入到 `Content/`。
 - P1-004 已验证 GameMode/灰盒地图/HUD、Spawn/Possess、Move/Look/Jump、无副作用 Interact、UIOnly 往返、同会话 Re-Possess 与 Context/Binding/HUD 去重。
 - 最近完成任务：`TASK-P1-004`；最终 Reviewer commit `6b19d179562f03c8cc50b94456d3a943478855c0` 为 `PASS`，本轮 Coordinator 负责最终归档。

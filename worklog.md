@@ -995,3 +995,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 清单门禁覆盖 Humanoid Skeletal Mesh/Skeleton、最低与推荐动画、In-Place、Retarget/Reference Pose、骨骼主链、UE `.uasset`/FBX 依赖，以及来源、作者、商用/修改/再分发/展示/署名与凭证。
 - 候选资产回传阶段不得先复制进 `Content/`；仓库外候选只报告路径、文件清单、截图与元数据。真正导入前必须由 Coordinator 根据候选资产另行精确授权路径和依赖，不能把“用户已有资产”视为默认导入许可。
 - 本轮只创建活动卡、空白执行报告并同步项目快照/日志；未搜索、下载、导入、修改 Content/Source/Config，未实施 AnimBP，未构建、未启动 Editor/PIE、未 push。
+
+## 2026-07-16｜Coordinator：将 TASK-P1-005 扩充为单卡全流程工作包
+
+- 用户要求协调者一次列出整个子任务的详细任务卡；允许分步骤暂停/确认，但禁止为 A～F 重建任务卡或反复 CC-SWITCH。
+- 已将唯一活动卡扩充为自包含 A～F 契约：每段都有进入条件、角色锁、允许读写、退出产物、提交作者/message、失败路径与交接条件；同一卡持续到 P1-005 归档。
+- Segment C 必须产出逐文件兼容性/许可证矩阵和最终导入 manifest；只有 Coordinator 在同一卡状态表/累计报告记录批准后，D 的精确 Content 路径才激活，不需要创建新卡。
+- 执行报告改为 A～F 累计模板，后续人格只能追加真实证据，不得覆盖前段历史。用户 Segment B 若只有聊天证据无需 Git commit，由 Coordinator 据实记录。
+- 不同人格与资产作者仍保持独立交接/commit；Implementation Agent 不得冒充 Coordinator、Reviewer、Teacher 或用户。P1-005 归档后只交接 P1-006 Teacher/Phase 收尾，不直接 Phase 2。
+- 当前仍为 Segment A 首次只读复述门禁，结束句保持 `等待用户确认执行 TASK-P1-005-A。`。本轮未搜索、下载、导入、实现 AnimBP、构建、启动 Editor/PIE 或 push。
