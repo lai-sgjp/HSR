@@ -1,6 +1,6 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-07-16
+> 最后更新：2026-07-17
 > 作用：CC-SWITCH 切换模型后的快速恢复快照。高级模型负责维护；低级模型不得把本文件作为执行入口。
 
 ## 当前 Phase
@@ -11,9 +11,9 @@
 
 ## 当前任务
 
-- 当前唯一活动任务为 `TASK-P1-005：动画资产接入与 Phase 1 最终回归`；一张完整任务卡覆盖 A～F 并持续到归档，不再为各 Segment 新建任务卡或反复 CC-SWITCH。当前仅激活 Segment A，由 Implementation Agent 先提供资产需求清单。
+- 当前唯一活动任务为 `TASK-P1-005：动画资产接入与 Phase 1 最终回归`；Reviewer `b741391` 结论为 `REVISE`，当前为同一卡 Coordinator → 用户补证，不创建新卡。
 - P1-005 同一卡串行交接为：A 资产需求清单 → B 用户候选与授权证据 → C 只读兼容性/许可证评估及最终 manifest → D 用户 Editor 导入、AnimBP、绑定与资产 commit → E 最终回归 → F 验收/Coordinator 归档。段间只更新状态/交接表并按真实人格独立 commit。
-- 用户已选择使用自己已有且已授权的角色/动画资产，但候选文件、依赖和许可证尚未提供；在 Coordinator 根据真实候选精确授权前，禁止复制或导入到 `Content/`。
+- Mixamo/Kachujin 资产已在用户 commits `a539b6d`、`abca679` 中进入 Git；实际 manifest、BP 路径移动和 GameMode 引用修改未事前批准，等待用户 Editor 重开引用验证后由 Coordinator 事后追认，不得假装尚未提交。
 - P1-004 已验证 GameMode/灰盒地图/HUD、Spawn/Possess、Move/Look/Jump、无副作用 Interact、UIOnly 往返、同会话 Re-Possess 与 Context/Binding/HUD 去重。
 - 最近完成任务：`TASK-P1-004`；最终 Reviewer commit `6b19d179562f03c8cc50b94456d3a943478855c0` 为 `PASS`，本轮 Coordinator 负责最终归档。
 - P1-004 已实施 C++、Blueprint/地图/UI 资产并进行多轮构建与 PIE。输入故障根因为 `AHSRPlayerController` 禁用了 Actor Tick，导致 Enhanced Input 的每帧 Action 求值不运行；恢复 Tick 后用户确认功能解决。
@@ -26,6 +26,9 @@
 - MSVC 14.51.36248 不是 UE5.6 preferred 版本；当前构建成功，作为非阻断兼容性风险继续保留。
 - 用户已事后追认 `074e5fc` 对原只读 Character/PlayerController 的扩权修改；该记录不是补造事前授权。首次 `REVISE` 的其余项目已由 A2、IMC 归属确认和用户专项 PIE 闭环。
 - `Content/Input/IMC_Exploration.uasset` 已确认由用户根据执行者说明在 UE Editor 中创建/修改，作为 Enhanced Input 必要配置，Editor 重开后保持；主 Agent 经授权代办的独立资产 commit `a091700082f30ed70e3fba990e363dd7af102a6a` 只含该文件。此归属阻断已解除，但不构成 Reviewer 独立验证。
+- P1-005 阻断：`0c85794` 对 Mixamo 公开 Git 再分发权的结论缺官方证据；需用户提供 Adobe/Mixamo 官方许可/FAQ、来源与下载凭证，并说明仓库公开性和未来发布计划。
+- P1-005 仍缺 30/60（或 30/120）FPS、同会话 Re-Possess、无 Mesh/AnimClass 失败路径、可核对 Development Editor 构建与 Output Log 证据。
+- `Config/DefaultEditor.ini` 是未跟踪本地预览配置，本轮保持不改不提交；归档前由用户决定保留本地或另行授权处理。
 
 ## 已完成事项
 
@@ -79,7 +82,7 @@
 
 ## 下一个推荐任务
 
-- **当前唯一下一步：** Implementation Agent 首次只读 `tasks/active-task.md`，完整复述后精确以 `等待用户确认执行 TASK-P1-005-A。` 结束；用户再次确认后才可填写资产需求清单并创建 Implementation commit。
+- **当前唯一下一步：** 用户按活动卡 Reviewer REVISE 补证段，一次性回传许可证/仓库信息、Editor 重开引用确认、FPS/Re-Possess/无 Mesh/AnimClass 测试、最终构建及 Output Log 证据；随后 Coordinator 决定是否交 Reviewer 复审。
 
 ## 2026-07-16 P1-003 Coordinator 规划更新
 

@@ -1004,3 +1004,13 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 执行报告改为 A～F 累计模板，后续人格只能追加真实证据，不得覆盖前段历史。用户 Segment B 若只有聊天证据无需 Git commit，由 Coordinator 据实记录。
 - 不同人格与资产作者仍保持独立交接/commit；Implementation Agent 不得冒充 Coordinator、Reviewer、Teacher 或用户。P1-005 归档后只交接 P1-006 Teacher/Phase 收尾，不直接 Phase 2。
 - 当前仍为 Segment A 首次只读复述门禁，结束句保持 `等待用户确认执行 TASK-P1-005-A。`。本轮未搜索、下载、导入、实现 AnimBP、构建、启动 Editor/PIE 或 push。
+
+## 2026-07-17｜Coordinator：接管 TASK-P1-005 Reviewer REVISE
+
+- Reviewer commit `b741391` 独立结论为 `REVISE`；P1-005 保持同一活动任务卡，不创建新卡、不进入 P1-006/Teacher/Phase 2。
+- 恢复 A～F 真实状态：A `649e125` 完成；B 候选已收到但许可证据不足；C `0c85794` 的公开 Git 再分发结论未验证；D `a539b6d`/`abca679` 已发生但实际 manifest、路径移动和 GameMode 修改待事后追认；E 缺专项补测和正式构建证据；F 未验收。
+- `3d94b74` 仅是 Implementation 汇总草稿，不是用户验收、Reviewer 放行或 Coordinator 归档。
+- 当前交接 Coordinator → 用户：补 Adobe/Mixamo 官方许可/FAQ、下载凭证与仓库公开计划；确认 Editor 重开后的 GameMode→新 BP、Mesh/AnimBP 与旧路径引用；完成 FPS、同会话 Re-Possess、无 Mesh/AnimClass、构建和 Output Log 补证。
+- 成品游戏使用权不自动等于公开 Git 原始/可提取资产再分发权。若不能证明公开再分发，只提出保持私有、经授权安全移除公开历史、或更换可再分发资产等选项，不擅自执行。
+- `Config/DefaultEditor.ini` 保持未跟踪，不修改、不暂存、不提交；归档前由用户决定保留本地或另行明确授权处理。
+- 本轮只维护 Coordinator 文档，不修改源码、资产、Config，不构建、不运行 Editor/PIE、不 push。
