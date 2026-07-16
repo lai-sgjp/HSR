@@ -98,7 +98,7 @@
 - Reviewer commit `835d038` 结论为 `REVISE`；P1-004 尚未归档。
 - `074e5fc` 后的构建成功与输入恢复证据来源是当时 worklog 和用户回传，不是 Reviewer 独立运行；A2 仍须重新实际编译并独立提交证据。
 - 手工 `PushInputComponent` 风险与 Move/Look 高频日志待 Segment A2 处理。
-- 当前未提交 `Content/Input/IMC_Exploration.uasset` 的作者、用途、Editor 重开结果与提交决策待用户确认。
+- `Content/Input/IMC_Exploration.uasset` 的归属阻断已解除：用户确认该变更由其根据执行者说明在 UE Editor 中创建/修改，是 Enhanced Input 必要配置，且 Editor 重开后保持；主 Agent 经用户授权仅提交该资产，commit `a091700082f30ed70e3fba990e363dd7af102a6a` 只含该文件。此项不是 Reviewer 独立验证。
 - UIOnly 恢复和同一会话 UnPossess/Re-Possess 单次触发待用户专项 PIE 补证。
 - 动画、IK、正式 Mesh
 - GAS、ASC、AttributeSet、GameplayEffect

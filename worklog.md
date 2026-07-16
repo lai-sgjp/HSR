@@ -968,3 +968,11 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - A2 首次只读复述必须以 `等待用户确认执行 TASK-P1-004-A2。` 结束；用户再次确认前零工具调用。
 - A2 后仍需用户补 `UIOnly → Exploration` 恢复、同一会话 `UnPossess → Re-Possess` 后 Action 单次触发证据。
 - 当前未提交 `Content/Input/IMC_Exploration.uasset` 未纳入 Coordinator 文档提交；其作者、用途、Editor 重开结果和提交决策仍待用户确认。
+
+## 2026-07-16｜Coordinator：解除 P1-004 IMC 归属阻断
+
+- 用户明确确认当前 `Content/Input/IMC_Exploration.uasset` 变更由其根据执行者说明在 UE Editor 中创建/修改，是 Enhanced Input 所需的 Mapping Context 配置，并确认 Editor 重开后配置保持。
+- 主 Agent 经用户授权仅代办该资产的 Git 提交；完整 commit `a091700082f30ed70e3fba990e363dd7af102a6a` 只包含 `Content/Input/IMC_Exploration.uasset`。
+- 据此解除 Reviewer 所列的 IMC 作者、用途、持久性和提交归属阻断；该结论来自用户证据与 Coordinator Git 核对，不写成 Reviewer 独立验证。
+- `TASK-P1-004-A2` 的正式交接与首次只读复述门禁保持不变；手工输入栈风险、高频日志、修订后正式构建、UIOnly 恢复和同会话 Re-Possess 等其余 `REVISE` 项仍未完成。
+- 本次只维护协调文档，不修改源码或资产，不构建、不启动 Editor/PIE、不 push。

@@ -13,7 +13,7 @@
 
 - P1-003B 的五资产 commit 为 `7c71ae825fb840ace6d76fc6232883b807d395d1`；用户确认配置满足任务卡并在 Editor 重开后保持，且明确验收通过、跳过独立 Reviewer。
 - Git 提交由用户授权主 Agent 代办；commit 仅含五个 Input 资产。两个未跟踪 Blueprint 仍属用户提前创建的 P1-004 候选，未纳入。
-- 当前唯一活动任务为 `TASK-P1-004：第三人称探索可玩闭环`；Move、Look、Jump、Interact 已恢复，但输入栈风险、高频日志、修订后正式构建、UIOnly 恢复、同会话 Re-Possess 和 IMC 未提交变更归属仍待处理。
+- 当前唯一活动任务为 `TASK-P1-004：第三人称探索可玩闭环`；Move、Look、Jump、Interact 已恢复，IMC 归属与独立资产提交已解决；输入栈风险、高频日志、修订后正式构建、UIOnly 恢复和同会话 Re-Possess 仍待处理。
 - 用户已授权将 Phase 1 剩余计划收敛为三个工作包：P1-004 探索可玩闭环、P1-005 动画与最终回归、P1-006 阶段收尾；本轮只维护规划与长期拆卡规则。
 - 最近完成任务：`TASK-P1-003B` — 五个 Enhanced Input 资产创建与持久性确认；资产 commit `7c71ae825fb840ace6d76fc6232883b807d395d1`，Coordinator 归档 commit `d57d57a20c903d0ca9e9bfc7128318355bdf9378`。
 - P1-004 已实施 C++、Blueprint/地图/UI 资产并进行多轮构建与 PIE。输入故障根因为 `AHSRPlayerController` 禁用了 Actor Tick，导致 Enhanced Input 的每帧 Action 求值不运行；恢复 Tick 后用户确认功能解决。
@@ -25,7 +25,7 @@
 - P1-003B 没有遗留阻塞；Blueprint 引用绑定与完整 PIE 输入行为仍待后续任务验证。
 - MSVC 14.51.36248 不是 UE5.6 preferred 版本；当前构建成功，作为非阻断兼容性风险继续保留。
 - 用户已事后追认 `074e5fc` 对原只读 Character/PlayerController 的扩权修改；该记录不是补造事前授权。Reviewer 的其余 `REVISE` 项仍有效。
-- `Content/Input/IMC_Exploration.uasset` 存在未提交修改；作者、用途、Editor 重开结果与是否独立提交尚待用户确认，归档前必须解决。
+- `Content/Input/IMC_Exploration.uasset` 已确认由用户根据执行者说明在 UE Editor 中创建/修改，作为 Enhanced Input 必要配置，Editor 重开后保持；主 Agent 经授权代办的独立资产 commit `a091700082f30ed70e3fba990e363dd7af102a6a` 只含该文件。此归属阻断已解除，但不构成 Reviewer 独立验证。
 
 ## 已完成事项
 
