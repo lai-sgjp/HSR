@@ -851,3 +851,17 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 未创建 `Source/HSR/Character/` 下任何源文件。
 - 未运行 UHT/UBT、C++ 编译、Link、Editor、PIE 或 Gameplay 测试。
 - 未修改 todo、learning journal、README、Config、Content、`.uproject` 或工程实现；未 push。
+
+## 2026-07-16｜高级模型协调者：补齐 TASK-P1-001 角色交接规则
+
+### 漏项纠正
+
+- 用户指出上一轮协调产物遗漏了规则中要求的正式人格工作交接和逐角色 Git 提交约束；该指出成立。
+- 已在活动任务卡补充 `角色交接链 / 当前交接`，把当前交付明确为 Coordinator → Implementation Agent，并记录协调者提交 `ce37faaa27053afc4b64bfb34e717c79bde1ba89`、接收复述条件和用户再次确认前零工具调用门禁。
+- 已补齐 TASK-P1-001 强制链：Implementation Agent 完成并创建角色 commit 后交接 Reviewer；Reviewer 独立审查并创建角色 commit 后交接 Coordinator；Coordinator 完成归档并创建角色 commit 后，才能创建下一任务。
+- 已补齐 Phase 1 最终链：全部子任务通过后交接 Teacher；Teacher 必须基于源码、diff、编译/PIE 证据和 learning journal 完成技术点、源码机制、练习、复述与面试沉淀并提交 Teacher 产物；随后才由 Coordinator 创建 Phase 收尾 commit 并按规则处理 push。
+
+### 当前状态
+
+- 本次只补交协调规则和日志，不宣称 Implementation Agent 已接收、用户已确认执行、源码实施已开始或任何构建/Editor/PIE 验证已发生。
+- `check.cpp` 与 `docs/phase-1-execution-plan.md` 仍不属于本次协调提交，不修改、不暂存、不提交；本次不 push。
