@@ -28,6 +28,8 @@ AHSRExplorationCharacter::AHSRExplorationCharacter()
 void AHSRExplorationCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
+	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationCharacter::SetupPlayerInputComponent - Character=%s Controller=%s"),
+		*GetName(), GetController() ? *GetController()->GetName() : TEXT("None"));
 
 	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent);
 	if (!EnhancedInput)
@@ -56,11 +58,19 @@ void AHSRExplorationCharacter::SetupPlayerInputComponent(UInputComponent* Player
 	{
 		EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &AHSRExplorationCharacter::Interact);
 	}
+
+	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationCharacter::SetupPlayerInputComponent - Bound Move=%s Look=%s Jump=%s Interact=%s"),
+		MoveAction ? *MoveAction->GetPathName() : TEXT("None"),
+		LookAction ? *LookAction->GetPathName() : TEXT("None"),
+		JumpAction ? *JumpAction->GetPathName() : TEXT("None"),
+		InteractAction ? *InteractAction->GetPathName() : TEXT("None"));
 }
 
 void AHSRExplorationCharacter::Move(const FInputActionValue& Value)
 {
 	FVector2D MovementVector = Value.Get<FVector2D>();
+	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationCharacter::Move - Value=(%.3f, %.3f)"),
+		MovementVector.X, MovementVector.Y);
 
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC) return;
@@ -76,6 +86,8 @@ void AHSRExplorationCharacter::Move(const FInputActionValue& Value)
 void AHSRExplorationCharacter::Look(const FInputActionValue& Value)
 {
 	FVector2D LookAxis = Value.Get<FVector2D>();
+	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationCharacter::Look - Value=(%.3f, %.3f)"),
+		LookAxis.X, LookAxis.Y);
 
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC) return;
@@ -86,11 +98,13 @@ void AHSRExplorationCharacter::Look(const FInputActionValue& Value)
 
 void AHSRExplorationCharacter::HSJump()
 {
+	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationCharacter::HSJump - Started"));
 	Jump();
 }
 
 void AHSRExplorationCharacter::HSStopJumping()
 {
+	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationCharacter::HSStopJumping - Completed"));
 	StopJumping();
 }
 

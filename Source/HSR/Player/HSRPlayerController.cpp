@@ -1,19 +1,52 @@
 ﻿#include "HSRPlayerController.h"
 #include "../Character/HSRExplorationCharacter.h"
 #include "EnhancedInputSubsystems.h"
+#include "Components/InputComponent.h"
+#include "EnhancedInputComponent.h"
+#include "InputAction.h"
 #include "InputMappingContext.h"
 
 AHSRPlayerController::AHSRPlayerController()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	// PlayerController input, including Enhanced Input action evaluation, is
+	// processed through the controller's per-frame player-input tick.
+	PrimaryActorTick.bCanEverTick = true;
 	CurrentControlMode = EHSRPlayerControlMode::Exploration;
 	bControlModeApplied = false;
 	bExplorationContextAdded = false;
+	bInputSystemReady = false;
+}
+
+void AHSRPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+	bInputSystemReady = true;
+
+	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::SetupInputComponent - PlayerInput=%s InputComponent=%s"),
+		PlayerInput ? *PlayerInput->GetClass()->GetName() : TEXT("None"),
+		InputComponent ? *InputComponent->GetClass()->GetName() : TEXT("None"));
+
+	if (IsLocalPlayerController() && CurrentControlMode == EHSRPlayerControlMode::Exploration)
+	{
+		AddExplorationContext();
+	}
 }
 
 void AHSRPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// This value describes this controller instance, not Blueprint defaults. Reset
+	// it explicitly so stale serialized CDO data can never skip the first apply.
+	bControlModeApplied = false;
+
+	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::BeginPlay - Controller=%s Local=%s Pawn=%s"),
+		*GetName(),
+		IsLocalController() ? TEXT("true") : TEXT("false"),
+		GetPawn() ? *GetPawn()->GetName() : TEXT("None"));
+	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::BeginPlay - PlayerInput=%s InputComponent=%s"),
+		PlayerInput ? *PlayerInput->GetClass()->GetName() : TEXT("None"),
+		InputComponent ? *InputComponent->GetClass()->GetName() : TEXT("None"));
 	SetControlMode(EHSRPlayerControlMode::Exploration);
 }
 
@@ -33,11 +66,40 @@ void AHSRPlayerController::OnPossess(APawn* InPawn)
 		UE_LOG(LogTemp, Warning, TEXT("AHSRPlayerController::OnPossess - Possessed Pawn is not AHSRExplorationCharacter: %s"), *InPawn->GetName());
 	}
 
-	// Ensure context is added if in Exploration mode (LocalPlayer may not be ready in BeginPlay)
-	if (CurrentControlMode == EHSRPlayerControlMode::Exploration)
+	UInputComponent* PawnInputComponent = InPawn->InputComponent;
+	const UEnhancedInputComponent* PawnEnhancedInput = Cast<UEnhancedInputComponent>(PawnInputComponent);
+	if (PawnInputComponent && !IsInputComponentInStack(PawnInputComponent))
+	{
+		PushInputComponent(PawnInputComponent);
+	}
+	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::OnPossess - PawnInput=%s InInputStack=%s EnhancedBindings=%d BlockInput=%s"),
+		PawnInputComponent ? *PawnInputComponent->GetClass()->GetName() : TEXT("None"),
+		PawnInputComponent && IsInputComponentInStack(PawnInputComponent) ? TEXT("true") : TEXT("false"),
+		PawnEnhancedInput ? PawnEnhancedInput->GetActionEventBindings().Num() : 0,
+		PawnInputComponent && PawnInputComponent->bBlockInput ? TEXT("true") : TEXT("false"));
+
+	if (ExplorationChar && ExplorationMappingContext)
+	{
+		for (const UInputAction* BoundAction : { ExplorationChar->GetMoveAction(), ExplorationChar->GetLookAction(),
+			ExplorationChar->GetJumpAction(), ExplorationChar->GetInteractAction() })
+		{
+			const bool bFoundInContext = ExplorationMappingContext->GetMappings().ContainsByPredicate(
+				[BoundAction](const FEnhancedActionKeyMapping& Mapping) { return Mapping.Action == BoundAction; });
+			UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::OnPossess - BoundAction=%s FoundInContext=%s"),
+				BoundAction ? *BoundAction->GetPathName() : TEXT("None"),
+				bFoundInContext ? TEXT("true") : TEXT("false"));
+		}
+	}
+
+	// SetupInputComponent owns the initial add, matching the UE 5.6 templates.
+	// This path only restores the context for a later re-possession.
+	if (bInputSystemReady && CurrentControlMode == EHSRPlayerControlMode::Exploration)
 	{
 		AddExplorationContext();
 	}
+
+	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::OnPossess - Controller=%s Pawn=%s"),
+		*GetName(), *InPawn->GetName());
 }
 
 void AHSRPlayerController::OnUnPossess()
@@ -67,7 +129,10 @@ void AHSRPlayerController::SetControlMode(EHSRPlayerControlMode NewMode)
 	case EHSRPlayerControlMode::Exploration:
 		SetInputMode(FInputModeGameOnly());
 		bShowMouseCursor = false;
-		AddExplorationContext();
+		if (bInputSystemReady)
+		{
+			AddExplorationContext();
+		}
 		break;
 
 	case EHSRPlayerControlMode::UIOnly:
@@ -86,6 +151,8 @@ void AHSRPlayerController::SetControlMode(EHSRPlayerControlMode NewMode)
 	}
 
 	bControlModeApplied = true;
+	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::SetControlMode - Applied mode %d"),
+		static_cast<uint8>(CurrentControlMode));
 }
 
 void AHSRPlayerController::AddExplorationContext()
@@ -115,8 +182,22 @@ void AHSRPlayerController::AddExplorationContext()
 		return;
 	}
 
-	Subsystem->AddMappingContext(ExplorationMappingContext, 0);
+	FModifyContextOptions Options;
+	Options.bForceImmediately = true;
+	Subsystem->AddMappingContext(ExplorationMappingContext, 0, Options);
 	bExplorationContextAdded = true;
+	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::AddExplorationContext - Added %s"),
+		*ExplorationMappingContext->GetName());
+
+	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::AddExplorationContext - HasContext=%s"),
+		Subsystem->HasMappingContext(ExplorationMappingContext) ? TEXT("true") : TEXT("false"));
+
+	for (const FEnhancedActionKeyMapping& Mapping : ExplorationMappingContext->GetMappings())
+	{
+		UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::AddExplorationContext - Mapping Action=%s Key=%s"),
+			Mapping.Action ? *Mapping.Action->GetPathName() : TEXT("None"),
+			*Mapping.Key.ToString());
+	}
 }
 
 void AHSRPlayerController::RemoveExplorationContext()

@@ -33,17 +33,20 @@ public:
 	EHSRPlayerControlMode GetControlMode() const { return CurrentControlMode; }
 
 protected:
+	virtual void SetupInputComponent() override;
+
 	void AddExplorationContext();
 	void RemoveExplorationContext();
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> ExplorationMappingContext;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Control")
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "Control")
 	EHSRPlayerControlMode CurrentControlMode;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Control")
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "Control")
 	bool bControlModeApplied;
 
 	bool bExplorationContextAdded;
+	bool bInputSystemReady;
 };

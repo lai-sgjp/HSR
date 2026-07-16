@@ -17,6 +17,11 @@ public:
 	AHSRExplorationCharacter();
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+	const UInputAction* GetMoveAction() const { return MoveAction; }
+	const UInputAction* GetLookAction() const { return LookAction; }
+	const UInputAction* GetJumpAction() const { return JumpAction; }
+	const UInputAction* GetInteractAction() const { return InteractAction; }
+
 protected:
 	void Move(const struct FInputActionValue& Value);
 	void Look(const struct FInputActionValue& Value);
