@@ -40,3 +40,44 @@
 ### Segment A 交付
 
 Implementation Agent 已提供完整可操作清单。用户可按 Segment B 模板回传候选资产。
+
+## Segment C：兼容性与许可证评估
+
+### 候选 1 — Mixamo / Kachujin ✅ Accept
+
+| 文件 | 类型 | 用途 | 判定 |
+|---|---|---|---|
+| Kachujin_G_Rosales.uasset | SkeletalMesh | 角色网格 | **Accept** |
+| Kachujin_G_Rosales_Skeleton.uasset | Skeleton | 骨骼定义 | **Accept** |
+| Kachujin_G_Rosales_PhysicsAsset.uasset | PhysicsAsset | 物理碰撞 | **Accept** |
+| Breathing_Idle.uasset | Animation | Idle Loop，In-Place | **Accept** |
+| Jogging.uasset | Animation | 移动 Loop，In-Place | **Accept** |
+| Jump_Up.uasset | Animation | 跳起，In-Place | **Accept** |
+| Jump_Loop.uasset | Animation | 空中 Loop，In-Place | **Accept** |
+| Jump_Down.uasset | Animation | 落地，In-Place | **Accept** |
+| kachujin_MAT / _MAT_ | Material | 材质 | **Accept** |
+| Kachujin_diffuse / _body / _normal / _specular | Texture | 贴图 | **Accept** |
+
+**骨架：** Kachujin_G_Rosales_Skeleton（Mixamo 标准 Humanoid）
+**动画：** 全部 In-Place，无 Root Motion。Jump_Up → Jump_Loop → Jump_Down 三段完整
+**许可证：** Adobe Mixamo 标准许可 → 允许商用、修改、再分发、Git 提交 ✅
+**格式：** 已为 UE `.uasset`，无需重新导入 FBX
+
+### 候选 2 — 模之屋 / 星穹铁道 ⏸️ 缺许可证文本
+
+用户未提供使用规则文本，暂不评估。
+
+### 推荐方案及 Segment D 导入 Manifest
+
+**Accept Mixamo 候选为 Phase 1 灰盒角色资产。** 无需 Retarget，直接进入 Segment D 导入。
+
+| 当前路径 | 目标重命名 |
+|---|---|
+| Kachujin_G_Rosales.uasset | SK_HSRExploration.uasset |
+| Kachujin_G_Rosales_Skeleton.uasset | SKEL_HSRExploration.uasset |
+| Kachujin_G_Rosales_PhysicsAsset.uasset | PHYS_HSRExploration.uasset |
+| Anim/Breathing_Idle.uasset | A_HSR_Idle.uasset |
+| Anim/Jogging.uasset | A_HSR_Locomotion.uasset |
+| Anim/Jump_Up.uasset | A_HSR_JumpStart.uasset |
+| Anim/Jump_Loop.uasset | A_HSR_FallLoop.uasset |
+| Anim/Jump_Down.uasset | A_HSR_Land.uasset |
