@@ -5,7 +5,7 @@
 
 ## 当前 Phase
 
-- **Phase 1 已正式进入；P1-001、P1-002、P1-003A 与 P1-003B 已归档；P1-004 已完成协调规划并等待执行者首次只读复述**。
+- **Phase 1 已正式进入；P1-001、P1-002、P1-003A 与 P1-003B 已归档；P1-004 经 Reviewer commit `835d038` 判定 `REVISE`，当前等待受控修订 Segment A2 的首次复述与用户确认**。
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 已有 Character/Camera 骨架及 UHT、编译、链接成功证据；Editor 类可见性、输入、Possession、移动和 PIE 尚未验证。
 
@@ -13,10 +13,10 @@
 
 - P1-003B 的五资产 commit 为 `7c71ae825fb840ace6d76fc6232883b807d395d1`；用户确认配置满足任务卡并在 Editor 重开后保持，且明确验收通过、跳过独立 Reviewer。
 - Git 提交由用户授权主 Agent 代办；commit 仅含五个 Input 资产。两个未跟踪 Blueprint 仍属用户提前创建的 P1-004 候选，未纳入。
-- 当前唯一活动任务为 `TASK-P1-004：第三人称探索可玩闭环`；采用 A～E 分段交接，当前处于 Coordinator → Implementation Agent 首次只读复述门禁。
+- 当前唯一活动任务为 `TASK-P1-004：第三人称探索可玩闭环`；Move、Look、Jump、Interact 已恢复，但输入栈风险、高频日志、修订后正式构建、UIOnly 恢复、同会话 Re-Possess 和 IMC 未提交变更归属仍待处理。
 - 用户已授权将 Phase 1 剩余计划收敛为三个工作包：P1-004 探索可玩闭环、P1-005 动画与最终回归、P1-006 阶段收尾；本轮只维护规划与长期拆卡规则。
 - 最近完成任务：`TASK-P1-003B` — 五个 Enhanced Input 资产创建与持久性确认；资产 commit `7c71ae825fb840ace6d76fc6232883b807d395d1`，Coordinator 归档 commit `d57d57a20c903d0ca9e9bfc7128318355bdf9378`。
-- 当前 P1-004 只完成任务卡、证据模板、状态与日志；尚未实施 C++、资产、构建、Editor 或 PIE。
+- P1-004 已实施 C++、Blueprint/地图/UI 资产并进行多轮构建与 PIE。输入故障根因为 `AHSRPlayerController` 禁用了 Actor Tick，导致 Enhanced Input 的每帧 Action 求值不运行；恢复 Tick 后用户确认功能解决。
 
 ## 当前阻塞点
 
@@ -24,6 +24,8 @@
 - Phase 0 当前没有阻断项；C++20 证据来源为用户运行 `_MSVC_LANG` 检查并明确回传结果。
 - P1-003B 没有遗留阻塞；Blueprint 引用绑定与完整 PIE 输入行为仍待后续任务验证。
 - MSVC 14.51.36248 不是 UE5.6 preferred 版本；当前构建成功，作为非阻断兼容性风险继续保留。
+- 用户已事后追认 `074e5fc` 对原只读 Character/PlayerController 的扩权修改；该记录不是补造事前授权。Reviewer 的其余 `REVISE` 项仍有效。
+- `Content/Input/IMC_Exploration.uasset` 存在未提交修改；作者、用途、Editor 重开结果与是否独立提交尚待用户确认，归档前必须解决。
 
 ## 已完成事项
 
@@ -77,7 +79,7 @@
 
 ## 下一个推荐任务
 
-- **唯一下一步：** Implementation Agent 首次只读 `tasks/active-task.md`，完整复述并精确以 `等待用户确认执行 TASK-P1-004。` 结束；用户再次确认前不得调用工具。
+- **唯一下一步：** Implementation Agent 首次只读活动任务卡，复述 Segment A2 并以 `等待用户确认执行 TASK-P1-004-A2。` 结束；用户再次确认前零工具调用。
 
 ## 2026-07-16 P1-003 Coordinator 规划更新
 

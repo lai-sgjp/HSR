@@ -142,8 +142,11 @@
 - [x] P1-002：完成 PlayerController、ControlMode 幂等入口与 Possession 安全边界；UHT/编译/链接通过，用户人工验收通过并明确跳过独立 Reviewer。（Editor/PIE Possession 与输入集成仍未验证。）
 - [x] P1-003A：完成 Enhanced Input C++ 接口、Action 绑定入口与 Mapping Context 生命周期；构建通过并由用户人工验收。
 - [x] P1-003B：创建 Move、Look、Jump、Interact Input Actions 与 Exploration Context；用户确认 Value Type、IMC 配置及 Editor 重开持久性，五资产 commit 为 `7c71ae825fb840ace6d76fc6232883b807d395d1`。（Blueprint 引用绑定与完整 PIE 仍未验证。）
+- [x] P1-004 部分门禁：目标 Pawn 自动 Spawn/Possess，Move、Look、Jump、Interact 已在真实 PIE 中恢复；根因是 PlayerController Tick 被禁用，修复后用户确认通过。
+- [x] P1-004 Reviewer：commit `835d038` 结论为 `REVISE`；用户已事后追认 `074e5fc` 的 Character/PlayerController 扩权（不是事前授权）。
+- [ ] P1-004 Segment A2：处理手工 PushInputComponent 风险与高频 Move/Look 日志，保留 Tick/Context 幂等设计，完成真实 UHT/Compile/Link 与独立 Implementation commit。
 - [ ] 建立基础 AnimBP 参数和占位探索 HUD。
-- [ ] 验证 ControlMode、Possession、Mapping Context 和无自定义 Tick。
+- [ ] 完成 P1-004 剩余门禁：HUD 单实例、UIOnly→Exploration 恢复、同会话 UnPossess/Re-Possess 单次触发、失败路径、最终 Editor 重开复核及未提交 IMC 归属处理。
 
 ## Phase 2：GAS 基础接入
 

@@ -947,3 +947,24 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 发现 bug 时验证者只记录证据并交回 Coordinator，不在验证阶段顺手越权修复。用户若明确跳过 Reviewer，只记录用户人工验收，不伪造 Reviewer 产物。
 - 当前正式交接为 Coordinator → Implementation Agent 首次只读复述；复述必须以 `等待用户确认执行 TASK-P1-004。` 结束，用户再次确认前零工具调用。
 - 本轮未修改 Gameplay 源码、Build.cs、Content 或 Config，未构建、未启动 Editor/PIE、未 push；两个用户 Blueprint 未修改、未暂存、未提交。
+
+## 2026-07-16｜P1-004 Enhanced Input 输入故障定位与修复
+
+- 症状：PIE 正确加载 `BP_HSRGameMode_C`，但 WASD、鼠标、Space、F 均无功能响应，初始日志没有 Action 回调。
+- 逐层验证并排除：GameMode 默认类、Pawn 自动 Spawn、Controller Possess、LocalPlayer、EnhancedInputLocalPlayerSubsystem、IMC 注册、按键映射、Input Action Value Type、Character Action 引用、Pawn InputComponent 输入栈、五个 Enhanced Action Bindings 和 Blueprint CDO 幂等状态。
+- 对照 UE5.6 `TP_ThirdPerson` 模板与用户提供的 Blaster 项目，确认标准数据流为 Mapping Context 注册 + Character `SetupPlayerInputComponent` 绑定 + PlayerController 每帧处理 Player Input。
+- 决定性证据：原始 `InputKey` 能收到 W/F/Space/Mouse，但 `PostProcessInput` 完全不运行。代码审查发现 `AHSRPlayerController` 构造函数设置了 `PrimaryActorTick.bCanEverTick = false`。
+- 根因：关闭 PlayerController Tick 同时关闭了 `ProcessPlayerInput` 驱动的 Enhanced Input Action 每帧求值；因此 Context/Action/Binding 全部正确仍不会触发 Delegate。
+- 修复：恢复 PlayerController Tick；保留 Character 无自定义 Tick。同步将 ControlMode 运行时属性标记为 `Transient`，并把首次 IMC 注册放到 `SetupInputComponent`。
+- 验证：最终 `HSREditor Win64 Development` 构建成功，用户实际 PIE 确认输入功能已解决。
+- 未完成：P1-004 的 HUD 单实例、UIOnly 往返、连续 PIE 去重、失败路径和最终归档。
+
+## 2026-07-16｜P1-004 Reviewer REVISE 与 Coordinator 接管
+
+- Reviewer commit `835d038` 对当前交付给出 `REVISE`；原报告保持不改，作为独立审查证据。
+- 用户明确事后追认 commit `074e5fc` 对原只读 `HSRExplorationCharacter` 与 `HSRPlayerController` 的扩权。此前 worklog 已记录输入故障后用户让高级模型修复、PlayerController Tick 根因、修复后构建成功与用户 PIE 输入恢复；本条只补齐事后授权链，不倒填为事前授权。
+- Coordinator 核对 Git：`a9446a8` 实际只有 6 个 BP/Map/UI 资产；五个 Input 资产来自 `7c71ae8`，执行报告已纠正路径与归属。
+- 已在同一活动任务内创建受控修订 Segment A2，只允许 Character/PlayerController 四个源码文件与执行报告；目标是优先移除手工 `PushInputComponent`、清理高频 Move/Look 日志、保留 PlayerController Tick 和 Context 幂等，并补真实 UHT/Compile/Link 与独立 Implementation commit。
+- A2 首次只读复述必须以 `等待用户确认执行 TASK-P1-004-A2。` 结束；用户再次确认前零工具调用。
+- A2 后仍需用户补 `UIOnly → Exploration` 恢复、同一会话 `UnPossess → Re-Possess` 后 Action 单次触发证据。
+- 当前未提交 `Content/Input/IMC_Exploration.uasset` 未纳入 Coordinator 文档提交；其作者、用途、Editor 重开结果和提交决策仍待用户确认。

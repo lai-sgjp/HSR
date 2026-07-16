@@ -457,3 +457,18 @@ Phase 0 运行门禁中，哪些检查项必须有用户手动参与，哪些可
 - 用户确认 Editor 重开后资产配置保持，证明资产序列化持久性；Coordinator 未独立解析二进制，因此证据来源必须明确标注为用户回传。
 - 资产存在与配置持久不等于 Gameplay 闭环已通过。Blueprint 引用、Possession、Mapping Context 去重以及 Move/Look/Jump/Interact 的完整 PIE 行为仍需后续真实验证。
 - Git 提交可以由用户授权代办，但提交范围和产物作者必须分开记录：本次 commit 只有五个 Input 资产，两个 Blueprint 被明确排除。
+
+## 2026-07-16｜Enhanced Input 静默失效：不要关闭 PlayerController Tick
+
+- Enhanced Input 不只依赖原始按键事件。`InputKey` 负责接收设备事件，而 Input Action 的 Trigger/Modifier 求值与 Delegate 派发发生在 PlayerController 的每帧 Player Input 处理链中。
+- `APlayerController` 上的 `PrimaryActorTick.bCanEverTick = false` 会造成典型假象：原始 W/Mouse/Space/F 日志存在，Pawn 已 Possess，IMC `HasContext=true`，Action 与 Binding 也正确，但所有 `Triggered/Started/Completed` 回调沉默。
+- Character 的自定义 Actor Tick 可以关闭而不影响 CharacterMovement 组件；PlayerController Tick 则不能在使用标准输入处理链时随意关闭。优化 Tick 前必须先确认该 Actor 的引擎基类是否借 Tick 执行框架职责。
+- 推荐排查顺序：Spawn/Possess → LocalPlayer/EnhancedPlayerInput → IMC 与按键 → Character Action 对象身份 → Pawn EnhancedInputComponent 是否在输入栈及绑定数量 → `ProcessPlayerInput/PostProcessInput` 是否每帧运行。
+- `Transient` 适合标记 `CurrentControlMode`、`bControlModeApplied` 等运行时状态，可避免 Blueprint CDO 序列化污染；但必须区分“防御性生命周期修复”和“经证据确认的实际根因”。
+- Skeletal Mesh 缺失只影响可见性和动画，不会阻止 Capsule、CharacterMovement、Camera 或 Enhanced Input；标准 GameMode 会在 PlayerStart 自动 Spawn DefaultPawn，不需要手动把玩家 Character 拖入关卡。
+
+## 2026-07-16｜事后扩权与审查证据边界
+
+- 紧急调试中发生的越出任务卡范围修改，必须记录真实指令、作者、diff 与验证；后续用户追认可以补齐授权链，但不能改写为“事前已授权”。
+- Reviewer 的 `REVISE` 不会因一个授权问题得到追认而整体消失；输入栈、高频日志、构建和专项 PIE 等其余问题仍需逐项闭环。
+- 二进制资产的未提交修改不能靠普通文本 diff 推断作者或用途。协调者应保护现场并向实际操作者确认，之后再决定独立提交或恢复，不能静默混入文档/源码提交。

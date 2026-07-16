@@ -1,6 +1,13 @@
 # TASK-P1-004：第三人称探索可玩闭环
 
-> 状态：Coordinator 已规划，当前正式交接给 Implementation Agent 进行首次只读复述。用户再次明确确认前，执行者不得调用任何工具。
+> 状态：Reviewer commit `835d038` 结论为 `REVISE`；Coordinator 已接管并创建受控修订 Segment A2。用户确认 A2 前不得实施，任务尚未归档。
+
+## 事后扩权追认（2026-07-16）
+
+- 用户本轮明确追认 commit `074e5fc` 对原任务卡只读范围 `HSRExplorationCharacter` 与 `HSRPlayerController` 的修改。
+- 当时 `worklog.md` 已如实记录：输入故障出现后，用户让高级模型定位并修复；根因是 PlayerController Tick 被禁用；修复后 Development Editor 构建成功，且用户在 PIE 中确认输入恢复。
+- 本条是对既有修复的**事后扩权追认**，用于补齐授权链；不是补造、倒填或声称存在事前授权。
+- 追认只覆盖 commit `074e5fc` 已发生的四个源码文件修改，不自动放宽后续修订范围，也不代表 Reviewer 的其余风险已通过。
 
 ## 唯一目标
 
@@ -146,6 +153,48 @@ Coordinator 核对所有角色 commit、实际 diff、资产作者、构建/Edit
 
 ## 当前正式交接
 
-`Coordinator → Implementation Agent（首次只读复述）`
+`Coordinator → Implementation Agent（受控修订 Segment A2 首次只读复述）`
 
-正式接收条件：Implementation Agent 只读本卡，完整复述所有边界，并精确以 `等待用户确认执行 TASK-P1-004。` 结束。用户随后再次明确确认前，零工具调用。
+## Segment A2：受控修订
+
+### 唯一目标
+
+消除 Reviewer 对输入栈和高频诊断日志的风险，并为修订后的源码补齐正式构建证据；保留已经由用户 PIE 确认的 PlayerController Tick 根因修复与 Mapping Context 幂等设计。
+
+### 允许读取与修改
+
+- `Source/HSR/Character/HSRExplorationCharacter.h`
+- `Source/HSR/Character/HSRExplorationCharacter.cpp`
+- `Source/HSR/Player/HSRPlayerController.h`
+- `Source/HSR/Player/HSRPlayerController.cpp`
+- `tasks/execution-result.md`
+
+### 必须完成
+
+1. 优先移除 `OnPossess` 中手工 `PushInputComponent`；若认为标准流程确实不可替代，必须先停下并给出引擎层理由，同时提供同一会话重新 Possess 前后的输入栈去重证据要求，不得凭现状直接保留。
+2. 删除 Move/Look 等每次 Triggered 都输出的高频诊断日志，或改为默认关闭、明确受控的调试日志；不得污染正常 Output Log。
+3. 保留 PlayerController Tick 可用，以及现有 Mapping Context 添加/移除对称、幂等的设计。
+4. 运行真实 `HSREditor Win64 Development` 构建，报告 UHT、目标 `.cpp` Compile、Link 与退出码；up-to-date 不能冒充实际编译。
+5. 只提交上述允许文件，使用独立 Implementation Agent commit，并回传完整 hash、diff、构建证据与未验证项。
+
+### 严格禁止
+
+- 不得修改任何 `.uasset`、`HSR.Build.cs`、HUD、UserWidget、GameMode、Config、地图或 Blueprint。
+- 不得扩大到动画、GAS、交互系统或 Phase 2。
+- 当前未提交的 `Content/Input/IMC_Exploration.uasset` 必须保持原样且不得暂存。
+
+### 首次接收门禁
+
+Implementation Agent 第一次只允许读取本任务卡；不得读取源码、调用工具、构建或执行 Git。完整复述 A2 的目标、允许范围、必做项、禁止项、验证与提交边界后，必须精确以：
+
+`等待用户确认执行 TASK-P1-004-A2。`
+
+结束。用户随后再次明确确认前，零工具调用。
+
+### A2 后的 Segment C 补证
+
+- 用户需验证 `Exploration → UIOnly → Exploration`，明确确认恢复 Exploration 后输入正常。
+- 用户需在同一 PIE 会话执行 `UnPossess → Re-Possess`，确认每个 Action 单次触发、无重复输入栈/Binding/Context。
+- 未提交的 `IMC_Exploration.uasset` 的作者、修改用途、Editor 重开结果和是否需要独立资产 commit 仍待用户确认；该问题未解决前不得归档。
+
+已确认：目标 Pawn/Controller 正确 Spawn/Possess，Enhanced Input 的 Move、Look、Jump、Interact 在 `074e5fc` 后恢复。该证据不替代 A2 构建及上述专项 PIE 补证。
