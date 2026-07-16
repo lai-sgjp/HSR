@@ -816,3 +816,38 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 已同步 `PROJECT_STATE.md`、`todo_plan.md`、README、Phase 0 文档和 learning journal。
 - `check.cpp` 是用户本地临时检查文件，不作为项目实现提交；未擅自删除。
 - Phase 1 尚未规划或实施，仍需新的协调任务、活动卡、复述和用户确认。
+
+## 2026-07-16｜高级模型协调者：TASK-P1-001 协调规划
+
+### 当前门禁与授权
+
+- 用户明确授权高级协调者正式进入 `TASK-P1-001` 的协调规划阶段。
+- Phase 0 已通过全部门禁并处于 `Ready`；Phase 1 当前仅进入规划状态，没有 Character 实现、构建、Editor 或 PIE 新证据。
+- 同一时间只保留一张活动任务卡；P1-001 执行、审查和归档前不得创建 P1-002。
+
+### 四角色规划结论
+
+- Prompt Planner：唯一目标为建立 `AHSRCharacterBase` 与 `AHSRExplorationCharacter` 的最小可编译骨架和相机组件层次。
+- Prompt Reviewer：要求本轮真实触发 UHT、四个新源文件 C++ 编译和 Link；旧构建或 up-to-date 结果不能替代本轮证据。
+- Architect：CameraBoom/FollowCamera 由构造函数 `CreateDefaultSubobject` 创建；Character 朝移动方向旋转，SpringArm 消费 Control Rotation，Camera 不重复消费；本任务不接输入或 Controller。
+- Safety Reviewer：未来执行允许范围仅为四个 Character 源文件和 `tasks/execution-result.md`；Build.cs、Config、Content、资产、地图及其他系统禁止修改。
+
+### 协调产物与执行门禁
+
+- 已用完整自包含任务卡覆盖 `tasks/active-task.md`，并同步 `PROJECT_STATE.md` 当前 Phase、当前任务和唯一下一步。
+- 低级执行模型首次只能读取活动卡，必须完整复述任务编号、范围、步骤、Editor、验证和风险，并以 `等待用户确认执行 TASK-P1-001。` 结束。
+- 用户在复述后另行确认前，低级模型不得调用工具、创建源码、构建、启动 Editor 或执行 Git。
+- Editor 在本任务中仅为用户可选的类可见性只读检查；不得创建或保存 Blueprint、地图及其他资产，不运行 PIE。
+
+### 风险、非目标与证据边界
+
+- 任务卡明确检查 UCLASS/GENERATED_BODY/generated include、UPROPERTY/TObjectPtr、默认子对象构造生命周期、GC、关闭 Tick 和第三人称旋转职责。
+- 构建失败时只记录第一处真实错误并停止，不 clean、reset、删除缓存或越权修复。
+- 本任务不实现或宣称移动、Look/Jump、Enhanced Input、Controller、GameMode、HUD、AnimBP、GAS、交互、Encounter、Battle、Save 或 Phase 1 完成。
+- 工作树中既有用户 `check.cpp` 和主 Agent 创建但未提交的 `docs/phase-1-execution-plan.md` 均不属于本轮产物；协调者不修改、删除、暂存或提交它们。
+
+### 本轮未实施
+
+- 未创建 `Source/HSR/Character/` 下任何源文件。
+- 未运行 UHT/UBT、C++ 编译、Link、Editor、PIE 或 Gameplay 测试。
+- 未修改 todo、learning journal、README、Config、Content、`.uproject` 或工程实现；未 push。
