@@ -5,22 +5,21 @@
 
 ## 当前 Phase
 
-- **Phase 1 已正式进入；P1-001 已归档，当前活动任务为 P1-002 协调规划完成、等待首次只读复述**。
+- **Phase 1 已正式进入；P1-001、P1-002 已归档，当前无活动任务**。
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 已有 Character/Camera 骨架及 UHT、编译、链接成功证据；Editor 类可见性、输入、Possession、移动和 PIE 尚未验证。
 
 ## 当前任务
 
-- 活动任务卡：`tasks/active-task.md`，编号 `TASK-P1-002`。
-- 当前任务只允许未来 Implementation Agent 修改 `Source/HSR/Player/HSRPlayerController.h/.cpp` 与 `tasks/execution-result.md`。
-- 当前只完成 Coordinator 规划；执行者首次只能读取活动卡并复述，用户再次明确确认前零工具调用。
+- 当前无 `tasks/active-task.md`；P1-002 活动卡与执行报告已归档。
+- P1-002 Implementation commit `7fef22f1afc400c9488ad36b1ae39a8c03435ec5` 已经用户人工验收；用户明确跳过独立 Reviewer，因此不存在 Reviewer 产物或 commit。
 - 最近完成任务：`TASK-P0-007` — Phase 0 阶段审查、文档归档与门禁判定；执行结果 commit `41446f2b771b99eb011a496ac37a26d94214fdb1`。
 
 ## 当前阻塞点
 
 - 文件化上下文机制本身没有阻塞。
 - Phase 0 当前没有阻断项；C++20 证据来源为用户运行 `_MSVC_LANG` 检查并明确回传结果。
-- P1-002 没有技术阻塞；当前仅受首次复述与用户再次确认流程门禁约束。
+- P1-002 没有技术阻塞；Editor/PIE Possession 行为仍留待后续集成验证。
 - MSVC 14.51.36248 不是 UE5.6 preferred 版本；当前构建成功，作为非阻断兼容性风险继续保留。
 
 ## 已完成事项
@@ -42,7 +41,7 @@
 - Editor 重开、默认地图、插件、八个根 Tags 和空白 PIE 已由用户确认；P006 按用户明确决定跳过独立审查。
 - P007 已完成最终归档，C++20 已确认。
 - P1-001 已创建四个 Character 源文件，UHT、真实编译与 Link 已验证；Editor 类可见性与 PIE 均未验证。
-- Phase 1 的 Controller、Enhanced Input、GameMode/灰盒地图、HUD、AnimBP、专项 PIE 与阶段归档均未开始。
+- Phase 1 的 Character/Camera 骨架与 PlayerController/ControlMode C++ 边界已完成并经用户人工验收；Enhanced Input、GameMode/灰盒地图、HUD、AnimBP、专项 PIE 与阶段归档尚未完成。
 
 ## 当前代码状态
 
@@ -70,8 +69,7 @@
 
 ## 下一个推荐任务
 
-- **唯一下一步：** Implementation Agent 首次只读 `tasks/active-task.md`，完整复述并以“等待用户确认执行 TASK-P1-002。”结束。
-- 用户在该复述后再次明确确认前，不得读取其他文件、创建 Controller、构建、启动 Editor/PIE 或执行 Git。
+- **唯一下一步：** Coordinator 依据 Phase 1 计划创建 P1-003 Enhanced Input 的最小活动任务；C++ 实施与用户 Editor 资产创建必须拆分为可独立归属、独立提交的串行工作。
 
 ## 2026-07-16 P1-002 Coordinator 规划更新
 
@@ -86,6 +84,12 @@
 - Implementation Agent commit `14b3cc96592f65dd5a0db8c1ef2ffd3987345c32` 的实际范围严格为四个 Character 源文件和执行报告。
 - 用户人工验收通过并明确跳过额外独立 Reviewer；归档不创建、不暗示 Reviewer 产物或 commit。
 - P1-001 的 UHT、编译和链接退出码 0；Editor 类可见性、输入、Possession、移动、HUD、动画与 PIE 仍未验证。
+
+## 2026-07-16 P1-002 用户验收与协调归档更新
+
+- Implementation commit `7fef22f1afc400c9488ad36b1ae39a8c03435ec5` 的实际范围严格为 `Source/HSR/Player/HSRPlayerController.h/.cpp` 与 `tasks/execution-result.md`。
+- 用户人工验收通过并明确跳过独立 Reviewer；归档不创建、不暗示 Reviewer 产物或 commit。
+- 本轮有 UHT、两个目标源文件实际编译、链接及退出码 0 证据；Editor/PIE 中的真实 Possession、重新 Possess和控制模式集成行为尚未验证。
 
 ## 新模型接入时必须读取的文件
 

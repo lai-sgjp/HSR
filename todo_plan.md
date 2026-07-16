@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0–20 路线规划已完成；Phase 0 工程、工具链、插件、Tags、地图、Editor 与 PIE 门禁全部通过，实际标准由用户确认是 C++20。Phase 1 尚未开始。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
+> 当前状态：Phase 0 门禁已通过；Phase 1 已开始，P1-001 与 P1-002 已完成 C++ 骨架并经用户人工验收。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
 
 ## 已完成的规划工作
 
@@ -139,6 +139,7 @@
 
 - [ ] 从 Blank 项目创建 CharacterBase、ExplorationCharacter、PlayerController、GameMode 和 HUD。
 - [x] P1-001：完成 CharacterBase、ExplorationCharacter、CameraBoom、FollowCamera 与 CharacterMovement 基础配置；UHT/编译/链接通过，用户人工验收通过并明确跳过独立 Reviewer。（不代表移动、输入、PIE 或 Phase 1 总项完成。）
+- [x] P1-002：完成 PlayerController、ControlMode 幂等入口与 Possession 安全边界；UHT/编译/链接通过，用户人工验收通过并明确跳过独立 Reviewer。（Editor/PIE Possession 与输入集成仍未验证。）
 - [ ] 创建 Move、Look、Jump、Interact Input Actions 和 Exploration Context。
 - [ ] 建立基础 AnimBP 参数和占位探索 HUD。
 - [ ] 验证 ControlMode、Possession、Mapping Context 和无自定义 Tick。

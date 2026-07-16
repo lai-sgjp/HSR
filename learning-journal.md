@@ -433,3 +433,11 @@ Phase 0 运行门禁中，哪些检查项必须有用户手动参与，哪些可
 - 关闭自定义 Actor Tick 不影响 CharacterMovement 组件自身工作；本阶段不存在每帧轮询需求。
 - 同目录头文件使用局部 include 路径可避免模块 include 路径解析歧义。本轮首次构建暴露该问题，修正后 UHT、编译和链接通过。
 - 编译成功只证明类和组件骨架可构建；Editor 类可见性、输入、Possession、移动和 PIE 仍需后续真实证据。
+
+## 2026-07-16｜P1-002 Controller、ControlMode 与 Possession 边界
+
+- Controller 与 Character 是控制者和被控制身体的关系；Controller 不应缓存缺乏生命周期保护的旧 Pawn 裸指针。
+- `SetControlMode` 的幂等性意味着重复设置相同模式不重复产生输入模式、鼠标或未来 Mapping Context 副作用。
+- `BeginPlay` 不应假设 Pawn 已存在；`OnPossess`/`OnUnPossess` 必须正确调用 `Super`，并对空 Pawn、错误 Pawn 类型与重复生命周期安全。
+- 输入模式（GameOnly/UIOnly）与 Enhanced Input Mapping Context 是两层不同机制；P1-002 只建立前者和生命周期边界，后者必须在 P1-003 由 Controller 单一管理。
+- UHT、编译与链接成功不等于真实 Possession 或重新 Possess 行为已通过；这些仍需后续 Editor/PIE 证据。

@@ -883,3 +883,11 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - IA/IMC 资产、Mapping Context 实际管理、输入 Action 绑定全部推迟至 P1-003；Battle 仅保留枚举边界。
 - 当前交接为 Coordinator → Implementation Agent。执行者首次只能读取活动卡，完整复述并精确以 `等待用户确认执行 TASK-P1-002。` 结束；用户再次确认前零工具调用。
 - 本轮未实施源码、构建、Editor/PIE 或 push；规划提交不得混入 P1-001 实现或派生产物。
+
+## 2026-07-16｜Coordinator：归档 TASK-P1-002
+
+- 核对 Implementation Agent 完整 commit `7fef22f1afc400c9488ad36b1ae39a8c03435ec5`：实际只包含 `Source/HSR/Player/HSRPlayerController.h/.cpp` 与 `tasks/execution-result.md`。
+- 执行报告记录本轮 UHT、两个目标源文件实际编译、链接成功，退出码 0；未修改 Build.cs、Character、Config、Content 或 `.uproject`。
+- 用户亲自审查并明确确认实现没有问题，同时明确要求无需额外独立 Reviewer；本次只记录用户人工验收，没有创建、暗示或冒充 Reviewer 产物/commit。
+- 已归档 P1-002 活动卡与执行报告，并只勾选 todo 中真实完成的 P1-002 C++ 子进度；Phase 1 总项、Editor/PIE Possession 与 Enhanced Input 均保持未完成或未验证。
+- 本次不修改 Gameplay 源码、不构建、不启动 Editor/PIE、不 push。归档提交成功后才允许规划 P1-003。

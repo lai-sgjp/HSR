@@ -1,6 +1,6 @@
 # TASK-P1-002：PlayerController、Possession 与 ControlMode 安全边界
 
-> 状态：Coordinator 规划完成，等待 Implementation Agent 首次只读复述与用户再次明确确认。首次复述前，执行者只能读取本文件；用户确认前必须保持零工具调用。
+> 归档状态（Coordinator，2026-07-16）：Implementation commit `7fef22f1afc400c9488ad36b1ae39a8c03435ec5` 已经用户人工验收；用户明确跳过独立 Reviewer，因此不存在 Reviewer 产物或 commit。
 
 ## Role Lock / 角色锁定
 
