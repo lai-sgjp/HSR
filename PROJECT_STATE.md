@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-- 当前没有活动任务；`tasks/active-task.md` 已随 P1-004 归档。
+- 当前唯一活动任务为 `TASK-P1-005：动画资产接入与 Phase 1 最终回归`；目前仅授权 Segment A，由 Implementation Agent 先提供资产需求清单。
+- P1-005 保持一个垂直工作包，串行交接为：A 资产需求清单 → B 用户候选与授权证据 → C 只读兼容性评估/导入方案 → D 用户 Editor 导入、AnimBP、绑定与资产 commit → E 最终回归 → 验收/归档。
+- 用户已选择使用自己已有且已授权的角色/动画资产，但候选文件、依赖和许可证尚未提供；在 Coordinator 根据真实候选精确授权前，禁止复制或导入到 `Content/`。
 - P1-004 已验证 GameMode/灰盒地图/HUD、Spawn/Possess、Move/Look/Jump、无副作用 Interact、UIOnly 往返、同会话 Re-Possess 与 Context/Binding/HUD 去重。
 - 最近完成任务：`TASK-P1-004`；最终 Reviewer commit `6b19d179562f03c8cc50b94456d3a943478855c0` 为 `PASS`，本轮 Coordinator 负责最终归档。
 - P1-004 已实施 C++、Blueprint/地图/UI 资产并进行多轮构建与 PIE。输入故障根因为 `AHSRPlayerController` 禁用了 Actor Tick，导致 Enhanced Input 的每帧 Action 求值不运行；恢复 Tick 后用户确认功能解决。
@@ -77,7 +79,7 @@
 
 ## 下一个推荐任务
 
-- **唯一下一步建议：** 由 Coordinator 规划 `TASK-P1-005：动画与最终回归`；当前尚未创建活动任务。
+- **当前唯一下一步：** Implementation Agent 首次只读 `tasks/active-task.md`，完整复述后精确以 `等待用户确认执行 TASK-P1-005-A。` 结束；用户再次确认后才可填写资产需求清单并创建 Implementation commit。
 
 ## 2026-07-16 P1-003 Coordinator 规划更新
 

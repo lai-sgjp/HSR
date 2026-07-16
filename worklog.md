@@ -986,3 +986,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 用户确认地图未提交修改仅为临时 Level Blueprint 测试并授权撤销；主 Agent 已恢复该地图，临时改动未提交。
 - 已恢复完整执行历史，并归档活动卡、完整执行报告、初审、A2 审查与最终审查。当前无活动任务；Phase 1 仍待 P1-005 与 P1-006/Teacher。
 - 本次只提交 Coordinator 文档/归档，不修改源码资产、不构建、不运行 Editor/PIE、不创建 P1-005、不 push。
+
+## 2026-07-16｜Coordinator：规划并交接 TASK-P1-005
+
+- 用户选择使用自己已有且已授权的角色/动画资产，并要求在本阶段先由 Implementation Agent 明确说明需要寻找哪些资产。
+- 已创建唯一活动任务 `TASK-P1-005：动画资产接入与 Phase 1 最终回归`，保持一个垂直工作包，但按资产权限边界串行分为 A 需求清单、B 用户候选/授权证据、C 只读兼容性评估与导入方案、D 用户 Editor 导入/AnimBP/绑定与用户资产 commit、E 最终回归、验收与 Coordinator 归档。
+- 当前仅授权 Segment A。Implementation Agent 首次只能读取活动卡并复述，必须精确以 `等待用户确认执行 TASK-P1-005-A。` 结束；用户再次确认后才能把中文资产清单写入执行报告并创建独立 Implementation commit。
+- 清单门禁覆盖 Humanoid Skeletal Mesh/Skeleton、最低与推荐动画、In-Place、Retarget/Reference Pose、骨骼主链、UE `.uasset`/FBX 依赖，以及来源、作者、商用/修改/再分发/展示/署名与凭证。
+- 候选资产回传阶段不得先复制进 `Content/`；仓库外候选只报告路径、文件清单、截图与元数据。真正导入前必须由 Coordinator 根据候选资产另行精确授权路径和依赖，不能把“用户已有资产”视为默认导入许可。
+- 本轮只创建活动卡、空白执行报告并同步项目快照/日志；未搜索、下载、导入、修改 Content/Source/Config，未实施 AnimBP，未构建、未启动 Editor/PIE、未 push。
