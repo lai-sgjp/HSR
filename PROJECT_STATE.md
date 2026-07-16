@@ -5,20 +5,20 @@
 
 ## 当前 Phase
 
-- **Phase 0 准备阶段（Not verified）**。
-- UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags 配置和 `Map_ProjectSetup` 默认地图均已取得审查证据。实际 C++ 标准与 Phase 0 的 Development Editor/Editor 重开/空白 PIE 总门禁仍未验证。
+- **Phase 0 收尾阶段（Not verified）**。
+- UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开和空白 PIE 已有真实证据。实际 C++ 标准仍未验证，Phase 0 不得宣布通过或进入 Phase 1。
 
 ## 当前任务
 
-- 活动任务卡：`tasks/active-task.md`，编号 `TASK-P0-006`。
-- 当前任务：只验证 Phase 0 的 Development Editor 构建、Editor 重开、默认地图/插件/Tags 和空白 PIE 运行门禁。
-- 当前状态：协调规划已完成，等待低级执行模型先复述并等待用户单独确认；P006 尚未执行。
-- 最近完成任务：`TASK-P0-005` — 创建并设置 `Map_ProjectSetup`，审查结论 `PASS WITH FOLLOW-UP`。
+- 活动任务卡：`tasks/active-task.md`，编号 `TASK-P0-007`。
+- 当前任务：Phase 0 最终文档审查、归档与门禁判定。
+- 当前状态：P006 已由执行者完成并由用户亲自确认；用户明确跳过独立审查。P007 已规划，未进入 Phase 1。
+- 最近完成任务：`TASK-P0-006` — 构建入口、Editor 重开与空白 PIE 运行门禁；执行者 commit `f18269a8f056c110f2e6cf673271cbd2201e19d1`。
 
 ## 当前阻塞点
 
 - 文件化上下文机制本身没有阻塞。
-- 尚无实际 C++ 标准与 Phase 0 的 Development Editor/Editor 重开/空白 PIE 总门禁完整证据，因此 Phase 0 保持 `Not verified`，不得宣布通过。
+- 实际 C++ 标准没有构建日志或编译命令证据；默认 BuildSettings 推断不能替代真实证据，因此 Phase 0 保持 `Not verified`。
 - MSVC 14.51.36248 不是 UE5.6 preferred 版本；当前构建成功，作为非阻断兼容性风险继续保留。
 
 ## 已完成事项
@@ -36,9 +36,9 @@
 
 ## 未完成事项
 
-- 未验证 Visual Studio Community 2026 与 UE5.6 的 UBT/UHT、Development Editor 构建兼容性。
-- 已报告完成首次 Editor 打开，但未完成 Editor 重开或空白 PIE；尚未产生任何 Gameplay、GAS、Blueprint 或资产验证。
-- Gameplay Tags、按需 `Content/Maps` 目录和 `Map_ProjectSetup` 已完成；Phase 0 运行门禁、实际 C++ 标准和最终归档尚未完成。
+- 工具链、实际编译/链接和 Development Editor 构建已有证据，但实际 C++ 标准仍未验证；构建日志中的 VS2022 工具链名称与规划中的 Visual Studio Community 2026 名称需在补证时统一说明。
+- Editor 重开、默认地图、插件、八个根 Tags 和空白 PIE 已由用户确认；P006 按用户明确决定跳过独立审查。
+- Phase 0 最终归档正在 P007 处理；不得自动开始实际 C++ 标准补证或 Phase 1。
 
 ## 当前代码状态
 
@@ -66,8 +66,8 @@
 
 ## 下一个推荐任务
 
-- **唯一推荐任务：** 低级执行模型只读取 `tasks/active-task.md`，复述 `TASK-P0-006` 并等待用户单独确认。
-- 确认前不得调用工具；P006 审查归档前不得创建 P007 或进入 Phase 1。
+- **唯一推荐任务：** 完成 `TASK-P0-007` 文档一致性审查与阶段门禁判定。
+- P007 只能保持 Phase 0 `Not verified` 并记录实际 C++ 标准补证需求；不得自动开始补证任务或进入 Phase 1。
 
 ## 新模型接入时必须读取的文件
 
@@ -139,3 +139,11 @@
 - P006 唯一允许持久写入为 `tasks/execution-result.md`；Source、Config、Content、`.uproject`、地图和插件声明全部只读，派生产物不可提交。
 - 本轮只完成协调规划，未运行构建、Editor 或 PIE，未修改工程实现，未勾选运行门禁，也未创建 P007。
 - 低级模型必须先复述并以 `等待用户确认执行 TASK-P0-006。` 结束；确认前零工具调用。
+
+## 2026-07-16 P006 归档与 P007 协调更新
+
+- P006 执行者 commit 为 `f18269a8f056c110f2e6cf673271cbd2201e19d1`，只提交 `tasks/execution-result.md`；执行前后无工程持久文件越权证据。
+- 用户亲自确认 P006 没有问题，并明确要求跳过独立审查。归档只记录用户验收，不创建或暗示审查者结论。
+- P006 证明 UBT/Development Editor 入口退出码 0、Editor 重开、默认地图、基础插件、八个根 Tags 和空白 PIE 启停；本轮构建为 up-to-date。
+- 实际 C++ 标准仍未验证，Phase 0 保持 `Not verified`。
+- 已创建唯一活动任务 `TASK-P0-007`，只做文档一致性、归档和门禁判定；不得自动开始补证或 Phase 1。

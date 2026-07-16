@@ -730,3 +730,27 @@ Stage 7 在 Stage 6 前执行，因为项目 Phase 8 弱点击破早于 Phase 9 
 - 未运行构建、Editor 或 PIE，未修改任何工程实现、Config 或资产。
 - 未勾选 Development Editor/Editor/PIE checkpoint，未创建 P007。
 - 协调者本轮只提交活动卡、项目快照和协调日志，不 push。
+
+## 2026-07-16｜高级模型协调者：P006 归档与 TASK-P0-007 规划
+
+### P006 证据与用户决定
+
+- 执行者 commit：`f18269a8f056c110f2e6cf673271cbd2201e19d1`，提交范围只有 `tasks/execution-result.md`。
+- `HSREditor Development Win64` 经 UBT 返回退出码 0；本轮 Target 为 up-to-date，未触发新的 C++ 编译或链接。
+- P003 的历史证据已实际编译 `HSR.cpp`、生成代码并链接模块 lib/dll；该历史事实未被写成本轮编译。
+- 用户确认 Editor 重开后自动加载 `Map_ProjectSetup`，Enhanced Input、Gameplay Ability System 和八个根 Tags 可用，空白 PIE 可启动并正常停止，目标日志检查无 Error/Missing/Assert/Ensure。
+- 用户明确要求 P006 不再经过独立审查。协调归档只记录用户验收，不存在也不伪造 P006 审查者结论。
+
+### Todo 与阶段判定
+
+- 勾选 Development Editor、Editor 重开和空白 PIE checkpoint。
+- 根据截至 `f18269a` 的 Git 树勾选“无 Gameplay 类或资源”；唯一 Content 资产为 Phase 0 基线地图 `Map_ProjectSetup`。
+- README、Phase 0、worklog、learning journal 和 todo 已同步，可勾选文档 checkpoint。
+- “Visual Studio Community 2026、Windows SDK、UBT/UHT 和实际 C++ 标准”为组合 checkpoint；实际 C++ 标准无真实证据，保持未完成。
+- Phase 0 最终状态：`Not verified`。这不是外部阻断；剩余工作是后续独立的实际 C++ 标准补证与 P007 最终收尾。
+
+### P007 活动卡
+
+- 已创建 `tasks/active-task.md`，编号 `TASK-P0-007`，只允许文档一致性审查、归档和门禁判定。
+- P007 禁止修改 C++、Config、Content、`.uproject`，禁止构建、Editor、PIE、push、Phase 1 和自动开始补证任务。
+- 若低级模型参与，必须先复述并以 `等待用户确认执行 TASK-P0-007。` 结束；用户单独确认前零工具调用。

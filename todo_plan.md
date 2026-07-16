@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0–20 路线规划已完成，尚未创建 UE 工程或开始 Gameplay 实现。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
+> 当前状态：Phase 0–20 路线规划已完成；Phase 0 工程与运行门禁已实施，实际 C++ 标准仍缺证，因此阶段为 `Not verified`。尚未开始 Gameplay 实现。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
 
 ## 已完成的规划工作
 
@@ -131,9 +131,9 @@
 - [x] 确认 Enhanced Input、GameplayAbilities、GameplayTags、GameplayTasks。
 - [x] 建立根 Gameplay Tags 和按需目录。（八个根 Tags 与按需 `Content/Maps` 目录均已有文件和 Editor 证据。）
 - [x] 创建并设置 `Map_ProjectSetup`。
-- [ ] 构建 Development Editor、打开 Editor、执行空白 PIE。
-- [ ] 更新 Phase 0、README、worklog、learning journal 和本计划。
-- [ ] 不创建 Gameplay 类或资源。
+- [x] 构建 Development Editor、打开 Editor、执行空白 PIE。（P006：UBT 退出码 0，Editor 重开、默认地图与空白 PIE 启停均由用户确认；本轮构建为 up-to-date。）
+- [x] 更新 Phase 0、README、worklog、learning journal 和本计划。（P007 协调归档已同步真实证据与未验证项。）
+- [x] 不创建 Gameplay 类或资源。（截至 `f18269a` 的 Git 树仅有最小模块入口、Config 与 `Map_ProjectSetup` 基线资产，无 Gameplay 类、Blueprint、UI、输入资产或第三方资源。）
 
 ## Phase 1：第三人称探索角色
 

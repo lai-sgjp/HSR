@@ -1,8 +1,8 @@
 # Phase 0：项目初始化与规范落地
 
-> 当前状态：仅完成规划，尚未创建 `.uproject`、Source、Config、Content 或构建产物。
+> 当前状态：P001-P006 已执行并归档；工程、插件/模块、Tags、默认地图、Development Editor、Editor 重开和空白 PIE 均有证据。实际 C++ 标准仍未验证，因此 Phase 0 保持 `Not verified`，不得进入 Phase 1。
 
-第一轮文档维护不等于 Phase 0 已开始。只有用户明确授权创建 UE 工程后，才可以执行本文件的工程步骤。
+第一轮文档维护不等于 Phase 0 实施证据。当前工程步骤已经执行；后续状态只以归档任务、Git diff、构建和 Editor/PIE 证据为准。
 
 完整路线见 [Phase 0–20 路线图](phase-roadmap-0-20.md)。
 
@@ -70,6 +70,19 @@ Phase 0 只建立命名空间和配置入口，不创建 GameplayAbility 或 Gam
 - 空白 PIE 可运行。
 - 没有自定义游戏功能代码。
 - README、todo、worklog、learning journal 和本文件记录真实证据。
+
+## 2026-07-16 实际证据快照
+
+- P001：工程位于仓库根目录，只有一个 `HSR` Runtime 模块和最小模块入口。
+- P002：UBT/Target 入口可用，但该轮为 up-to-date。
+- P003：`HSR.cpp`、生成代码、模块 lib/dll 实际编译与链接成功；基础插件和四个模块依赖加载成功。
+- P004：八个根 Gameplay Tags 首次加载及 Editor 重开后均可查询。
+- P005：`Map_ProjectSetup` 已设为 Editor/Game 默认地图，重开后保持。
+- P006：`HSREditor Development Win64` 退出码 0，本轮为 up-to-date；Editor 重开、插件/Tags、空白 PIE 启动和正常停止均由用户确认，日志无目标错误。用户明确跳过 P006 独立审查，不存在审查者 PASS 结论。
+- Git 树截至 `f18269a` 仅包含最小模块入口、Phase 0 Config 和 `Map_ProjectSetup` 基线资产，无 Gameplay 类、Blueprint、UI、输入资产或第三方资源。
+- 未验证：实际 C++ 标准。`BuildSettingsVersion.V5` 的默认含义只能作为线索，不能替代真实编译日志或命令证据。
+
+因此 Phase 0 当前为 `Not verified`。P007 只完成文档与归档判定；后续需单独规划实际 C++ 标准补证，补证前不得进入 Phase 1。
 
 ## 风险
 
