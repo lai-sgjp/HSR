@@ -3,10 +3,10 @@
 ## 当前状态
 
 - G0 Coordinator 工程 Gate：`完成（依据 P1-001～P1-005 已归档证据）`。
-- G1 Teacher 接收：`READY`。
-- G2 教学与源码复盘：`LOCKED`。
-- G3 用户练习：`LOCKED`。
-- G4 Teacher commit：`LOCKED`。
+- G1 Teacher 接收：`完成`。
+- G2 教学与源码复盘：`完成`。
+- G3 用户练习：`完成`。
+- G4 Teacher commit：`进行中`。
 - G5 Coordinator Phase 1 收尾/push：`LOCKED`。
 
 ## Coordinator 交付事实
@@ -20,6 +20,16 @@
 ## Teacher 累计记录区
 
 Teacher 只可追加真实过程：阅读材料、讲解主题、用户原始回答摘要、纠正内容、掌握度、未掌握项、修改文件与完整 commit hash。
+
+### 2026-07-17｜G2-G3 教学与用户练习
+
+- 用户正确复述 Gameplay 真源是“游戏状态最终听谁的，其他系统不能复制后自行决定”，并正确区分 GameMode 负责关卡规则/默认类，不负责具体界面切换和 IMC 生命周期。
+- 用户对调用序列 `Exploration, Exploration, UIOnly, UIOnly, Exploration, Exploration` 给出的实际 Context 操作序列 `N,N,Y,N,Y,N` 正确；`bControlModeApplied` 序列为全 `true`，`bExplorationContextAdded` 为 `true,true,false,false,true,true`。补充的 `CurrentControlMode` 为 `Exploration, Exploration, UIOnly, UIOnly, Exploration, Exploration`。
+- 必须纠正：`bControlModeApplied` 表示控制模式对应的输入模式、鼠标和 Context 等副作用是否已经实际应用，不是“默认值保证程序正常”。它避免默认枚举已经是 Exploration 时，首次应用被错误地当成重复调用跳过。
+- 用户已理解 `UPROPERTY` 使引用进入 UE 反射/GC 等系统，`TObjectPtr` 是 UObject 指针包装，并指出它不能代替生命周期和所有权设计；用户也正确理解 `RemoveFromParent()` 后强引用仍会阻止 GC，因此应清空 Widget 引用。
+- 已补充序列化边界：适合写入资产/Blueprint CDO 的是设计期稳定默认配置、资源引用和可调参数；`CurrentControlMode`、Context-added flag、临时 Widget 实例和运行时 handles 应为 `Transient`。资产保存会把可序列化值写盘，影响下次加载和新实例默认；误存运行态会污染默认值或把 PIE 临时状态带入资产。玩家进度属于显式 SaveGame 数据流，不等同于资产/CDO 序列化。
+- 掌握评定：Gameplay 真源、职责边界、幂等序列、反射/GC 核心达到掌握；Enhanced Input Tick 故障定位接近可独立 Debug；AnimBP 内部节点、序列化细节和重复输入的完整证据排查顺序作为非阻断 follow-up。
+- 证据边界：Teacher 未独立运行 Build、Editor 或 PIE；工程运行结论沿用已归档证据和用户回传。
 
 ## Coordinator 最终记录区
 

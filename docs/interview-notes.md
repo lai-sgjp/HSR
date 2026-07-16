@@ -48,3 +48,13 @@
 - 你如何避免自己只会调用 AI 而不理解代码？
 
 回答这些问题时，必须引用实际任务卡、真实验证或明确标记的未验证项；不能用泛泛的“AI 已检查”代替证据。
+
+## Phase 1 可复述案例
+
+### 为什么 Enhanced Input 资产和绑定都正确，Action 回调仍可能完全沉默？
+
+HSR 的真实故障中，原始 `InputKey` 能收到 W，Pawn、Possession、LocalPlayer、IMC、IA 和 Binding 均正确，但 `PostProcessInput` 不运行。根因是关闭了 PlayerController Tick，切断了引擎每帧 Player Input 处理链。最小修复是恢复 Controller Tick；不应给 Character 增加轮询 Tick，也不应手工 `PushInputComponent`，后者可能在 Re-Possess 后造成重复入栈。
+
+### `Transient` 与资产默认值如何区分？
+
+设计期稳定配置和资源引用适合进入资产/Blueprint CDO；当前控制模式、Context 是否已添加、临时 Widget 实例等运行态适合 `Transient`。保存资产会影响下次加载和新实例默认，而玩家跨会话进度应走独立 SaveGame 数据流。该区分避免 PIE 临时状态污染设计默认值。

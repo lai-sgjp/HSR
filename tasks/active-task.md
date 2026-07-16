@@ -10,8 +10,8 @@
 
 - 当前阶段：Phase 1 进行中，P1-001～P1-005 已归档。
 - P1-005 最终 Reviewer：`af6b14898f589cd44fbd176488dcd5e82c309d4b`，结论 `PASS WITH FOLLOW-UP`。
-- 当前步骤：`G1 Teacher 接收`。
-- 当前交接：`Coordinator → Teacher`。
+- 当前步骤：`G4 Teacher 教学提交`。
+- 当前交接：`Teacher → Coordinator（等待接收 Teacher commit）`。
 - Teacher 无需 Implementation Agent 式首次复述，也不需要重新创建活动卡；收到本卡后直接核对接收条件并开展教学。
 - 当前不进入 Phase 2，不 push。
 
@@ -20,10 +20,10 @@
 | Gate | 角色 | 状态 | 退出条件 |
 |---|---|---|---|
 | G0 工程 Gate 汇总 | Coordinator | `完成（依据已归档证据）` | P1-001～P1-005、Build/Editor/PIE/失败路径和风险边界可追溯 |
-| G1 Teacher 接收 | Teacher | `READY` | 读取本卡、Phase 1 源码/diff/commits、归档证据和学习文档 |
-| G2 教学与源码复盘 | Teacher | `LOCKED` | 覆盖本卡全部技术主题，不修改工程实现 |
-| G3 用户练习 | Teacher + 用户 | `LOCKED` | 完成复述、预测题、源码阅读题、Debug 练习并记录真实结果 |
-| G4 Teacher 教学提交 | Teacher | `LOCKED` | 更新授权教学文档并创建独立 Teacher commit，回传完整 hash |
+| G1 Teacher 接收 | Teacher | `完成` | 已读取任务卡、Phase 1 源码/历史证据与学习文档 |
+| G2 教学与源码复盘 | Teacher | `完成` | 已覆盖数据流、真源、幂等、输入 Tick、反射/GC 与 Widget 生命周期 |
+| G3 用户练习 | Teacher + 用户 | `完成` | 已记录两轮真实回答、纠正内容、掌握程度与后续深入项 |
+| G4 Teacher 教学提交 | Teacher | `进行中` | 更新授权教学文档并创建独立 Teacher commit，回传完整 hash |
 | G5 Phase 1 最终收尾 | Coordinator | `LOCKED` | 接收 Teacher hash，复核工程/学习/Git Gate，独立收尾 commit；满足授权后 push |
 
 ## 4. G0：Coordinator 工程 Gate 交付

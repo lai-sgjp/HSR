@@ -487,3 +487,26 @@ Phase 0 运行门禁中，哪些检查项必须有用户手动参与，哪些可
 - 二进制 UE 资产无法仅靠文本 diff 证明内部配置，必须明确区分用户 Editor/PIE 回传、Git 路径事实与 Reviewer 独立核对范围。
 - 第三方资产要维护来源、用途、分发方式和 owner decision 台账。当前 Mixamo/Kachujin 风险为 `OWNER ACCEPTED`；未来正式发布、资产迁移或分发方式变化时复核官方条款，但不阻断 P1-005 归档。
 - `Config/DefaultEditor.ini` 属于本地 AssetViewer/Editor 预览状态，已精确加入 `.gitignore`，不应作为项目 Gameplay 配置提交。
+
+## 2026-07-17｜Phase 1 Teacher 复盘：真源、幂等与序列化边界
+
+### Gameplay 真源
+
+Gameplay 真源是某项游戏状态最终由谁决定。HSR Phase 1 中，位置和速度以 Character/CharacterMovement 为真源，控制模式以 PlayerController 为真源；AnimBP 和 HUD 只消费状态用于表现，不能各自保存副本并反向决定规则。GameMode 负责当前 World 的规则与默认 Pawn、Controller、HUD 类以及生成关系，不负责具体 UI 切换或 IMC 生命周期。
+
+### ControlMode 幂等
+
+`bControlModeApplied` 表示当前模式的输入、鼠标和 Context 等副作用是否已经真正执行，不能理解为“枚举有默认值所以程序正常”。它解决默认枚举为 Exploration 时首次调用被幂等短路的问题。`bExplorationContextAdded` 则记录 Context 的实际添加状态，使 Add/Remove 对称且不重复。
+
+调用 `Exploration, Exploration, UIOnly, UIOnly, Exploration, Exploration` 时，Context 操作为 `无、无、Remove、无、Add、无`；模式依次为 `E,E,UI,UI,E,E`；Applied 始终为 true；ContextAdded 为 `T,T,F,F,T,T`。
+
+### 资产/CDO、Transient 与 SaveGame
+
+- 适合序列化进资产或 Blueprint CDO：设计期稳定默认配置、资源引用、可调参数，例如默认输入资产、WidgetClass、相机臂长度。
+- 适合 `Transient`：只属于当前运行会话的状态，例如 CurrentControlMode、是否已经添加 Context、临时 Widget 实例、运行时 handle。
+- 保存资产会把可序列化属性写入磁盘，并影响下次加载或由 CDO 创建的新实例；若运行态字段被误保存，可能污染默认值或把 PIE 临时状态带入后续实例。
+- SaveGame 是另一条显式持久化通道，用于玩家进度等跨会话数据，不等同于保存 Blueprint 资产或 CDO。
+
+### 用户掌握结果
+
+用户已能用自己的话解释 Gameplay 真源、GameMode 边界、Context 幂等序列、UPROPERTY/GC 与 Widget 强引用。需要继续深化：`bControlModeApplied` 的精确定义、AnimBP 内部节点，以及重复输入时按 Context、Binding、InputComponent 栈和 Pawn 生命周期收集证据的完整顺序。
