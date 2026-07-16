@@ -5,7 +5,7 @@
 
 ## 当前 Phase
 
-- **Phase 1 已正式进入；P1-001、P1-002、P1-003A 与 P1-003B 已归档；当前无活动任务**。
+- **Phase 1 已正式进入；P1-001、P1-002、P1-003A 与 P1-003B 已归档；P1-004 已完成协调规划并等待执行者首次只读复述**。
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 已有 Character/Camera 骨架及 UHT、编译、链接成功证据；Editor 类可见性、输入、Possession、移动和 PIE 尚未验证。
 
@@ -13,9 +13,10 @@
 
 - P1-003B 的五资产 commit 为 `7c71ae825fb840ace6d76fc6232883b807d395d1`；用户确认配置满足任务卡并在 Editor 重开后保持，且明确验收通过、跳过独立 Reviewer。
 - Git 提交由用户授权主 Agent 代办；commit 仅含五个 Input 资产。两个未跟踪 Blueprint 仍属用户提前创建的 P1-004 候选，未纳入。
-- 当前无 `tasks/active-task.md`；P1-004 尚未规划或创建。
+- 当前唯一活动任务为 `TASK-P1-004：第三人称探索可玩闭环`；采用 A～E 分段交接，当前处于 Coordinator → Implementation Agent 首次只读复述门禁。
 - 用户已授权将 Phase 1 剩余计划收敛为三个工作包：P1-004 探索可玩闭环、P1-005 动画与最终回归、P1-006 阶段收尾；本轮只维护规划与长期拆卡规则。
-- 最近完成任务：`TASK-P1-003B` — 五个 Enhanced Input 资产创建与持久性确认；资产 commit `7c71ae825fb840ace6d76fc6232883b807d395d1`，Coordinator 归档 commit 待本轮提交后记录。
+- 最近完成任务：`TASK-P1-003B` — 五个 Enhanced Input 资产创建与持久性确认；资产 commit `7c71ae825fb840ace6d76fc6232883b807d395d1`，Coordinator 归档 commit `d57d57a20c903d0ca9e9bfc7128318355bdf9378`。
+- 当前 P1-004 只完成任务卡、证据模板、状态与日志；尚未实施 C++、资产、构建、Editor 或 PIE。
 
 ## 当前阻塞点
 
@@ -76,7 +77,7 @@
 
 ## 下一个推荐任务
 
-- **唯一下一步建议：** 由 Coordinator 另起一轮规划合并后的 `TASK-P1-004：探索可玩闭环`；本轮不创建活动任务、不实施、不构建、不启动 Editor/PIE。
+- **唯一下一步：** Implementation Agent 首次只读 `tasks/active-task.md`，完整复述并精确以 `等待用户确认执行 TASK-P1-004。` 结束；用户再次确认前不得调用工具。
 
 ## 2026-07-16 P1-003 Coordinator 规划更新
 

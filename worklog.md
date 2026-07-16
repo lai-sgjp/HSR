@@ -936,3 +936,14 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 长期规则改为：任务仍只有一个独立验收结果，但默认选择产生用户可见运行结果的最小连贯垂直切片，不按类、文件或资产机械拆卡；每个 Phase 通常 2～5 个工程工作包加 1 个收尾工作包，按复杂度调整。
 - 只有不同作者/权限、危险 Git/Config、第三方资产、新模块、外部依赖、独立失败/回滚边界或明显超出低级模型安全范围时拆分；同一工作包内不同人格和资产作者仍独立交接、独立提交。
 - 本轮仅修改协调规划与规则文档；未创建 `tasks/active-task.md`，未实施 P1-004，未构建、未启动 Editor/PIE、未 push。两个未跟踪 Blueprint 为用户产物，未修改、未暂存、未提交。
+
+## 2026-07-16｜Coordinator：规划并交接 TASK-P1-004
+
+- 用户明确授权正式启动合并后的 `TASK-P1-004：第三人称探索可玩闭环`；本轮只建立协调契约，不实施 Gameplay。
+- 工作包内部固定为 A Implementation Agent C++ → B 用户 UE Editor 资产 → C 用户 PIE 验证 → D 用户验收或 Reviewer → E Coordinator 归档；不同人格与资产作者独立提交。
+- Segment A 仅允许 GameMode、HUD、UserWidget 六个源文件、Build.cs 中增加 UMG 依赖以及执行报告；PlayerController 默认只读，若确需协调修改必须停止申请扩权。
+- Segment B 仅允许两个用户已有未跟踪 Blueprint，以及 BP_HSRGameMode、可选 BP_HSRHUD、WBP_ExplorationHUD 和 Map_Phase1_Exploration；禁止修改 DefaultEngine.ini 或设置项目默认地图。
+- Segment C 强制验证 Editor 重开、唯一 Pawn/Possession、Move/Look/Jump、Interact 无副作用、HUD 单实例、UIOnly 恢复、连续 PIE 去重、Output Log，以及至少一条真实失败路径。
+- 发现 bug 时验证者只记录证据并交回 Coordinator，不在验证阶段顺手越权修复。用户若明确跳过 Reviewer，只记录用户人工验收，不伪造 Reviewer 产物。
+- 当前正式交接为 Coordinator → Implementation Agent 首次只读复述；复述必须以 `等待用户确认执行 TASK-P1-004。` 结束，用户再次确认前零工具调用。
+- 本轮未修改 Gameplay 源码、Build.cs、Content 或 Config，未构建、未启动 Editor/PIE、未 push；两个用户 Blueprint 未修改、未暂存、未提交。
