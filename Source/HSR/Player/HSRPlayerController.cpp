@@ -1,8 +1,6 @@
 ﻿#include "HSRPlayerController.h"
 #include "../Character/HSRExplorationCharacter.h"
 #include "EnhancedInputSubsystems.h"
-#include "Components/InputComponent.h"
-#include "EnhancedInputComponent.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
 
@@ -36,8 +34,6 @@ void AHSRPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// This value describes this controller instance, not Blueprint defaults. Reset
-	// it explicitly so stale serialized CDO data can never skip the first apply.
 	bControlModeApplied = false;
 
 	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::BeginPlay - Controller=%s Local=%s Pawn=%s"),
@@ -66,18 +62,6 @@ void AHSRPlayerController::OnPossess(APawn* InPawn)
 		UE_LOG(LogTemp, Warning, TEXT("AHSRPlayerController::OnPossess - Possessed Pawn is not AHSRExplorationCharacter: %s"), *InPawn->GetName());
 	}
 
-	UInputComponent* PawnInputComponent = InPawn->InputComponent;
-	const UEnhancedInputComponent* PawnEnhancedInput = Cast<UEnhancedInputComponent>(PawnInputComponent);
-	if (PawnInputComponent && !IsInputComponentInStack(PawnInputComponent))
-	{
-		PushInputComponent(PawnInputComponent);
-	}
-	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::OnPossess - PawnInput=%s InInputStack=%s EnhancedBindings=%d BlockInput=%s"),
-		PawnInputComponent ? *PawnInputComponent->GetClass()->GetName() : TEXT("None"),
-		PawnInputComponent && IsInputComponentInStack(PawnInputComponent) ? TEXT("true") : TEXT("false"),
-		PawnEnhancedInput ? PawnEnhancedInput->GetActionEventBindings().Num() : 0,
-		PawnInputComponent && PawnInputComponent->bBlockInput ? TEXT("true") : TEXT("false"));
-
 	if (ExplorationChar && ExplorationMappingContext)
 	{
 		for (const UInputAction* BoundAction : { ExplorationChar->GetMoveAction(), ExplorationChar->GetLookAction(),
@@ -92,7 +76,6 @@ void AHSRPlayerController::OnPossess(APawn* InPawn)
 	}
 
 	// SetupInputComponent owns the initial add, matching the UE 5.6 templates.
-	// This path only restores the context for a later re-possession.
 	if (bInputSystemReady && CurrentControlMode == EHSRPlayerControlMode::Exploration)
 	{
 		AddExplorationContext();
@@ -110,13 +93,11 @@ void AHSRPlayerController::OnUnPossess()
 
 void AHSRPlayerController::SetControlMode(EHSRPlayerControlMode NewMode)
 {
-	// Power-identity: first call always applies even if mode matches default
 	if (bControlModeApplied && CurrentControlMode == NewMode)
 	{
 		return;
 	}
 
-	// Remove old mode's context before switching
 	if (bControlModeApplied)
 	{
 		RemoveExplorationContext();

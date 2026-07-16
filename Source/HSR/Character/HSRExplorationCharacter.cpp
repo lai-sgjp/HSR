@@ -69,8 +69,6 @@ void AHSRExplorationCharacter::SetupPlayerInputComponent(UInputComponent* Player
 void AHSRExplorationCharacter::Move(const FInputActionValue& Value)
 {
 	FVector2D MovementVector = Value.Get<FVector2D>();
-	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationCharacter::Move - Value=(%.3f, %.3f)"),
-		MovementVector.X, MovementVector.Y);
 
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC) return;
@@ -86,8 +84,6 @@ void AHSRExplorationCharacter::Move(const FInputActionValue& Value)
 void AHSRExplorationCharacter::Look(const FInputActionValue& Value)
 {
 	FVector2D LookAxis = Value.Get<FVector2D>();
-	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationCharacter::Look - Value=(%.3f, %.3f)"),
-		LookAxis.X, LookAxis.Y);
 
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC) return;
