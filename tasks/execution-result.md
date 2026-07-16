@@ -1,63 +1,78 @@
-﻿# TASK-P0-007 执行结果
+﻿# TASK-P1-001 执行结果
 
 ## 任务信息
 
-- **任务编号：** TASK-P0-007
-- **任务名称：** Phase 0 阶段审查、文档归档与门禁判定
+- **任务编号：** TASK-P1-001
+- **任务名称：** 第三人称探索角色骨架与相机组件
 - **执行日期：** 2026-07-16
-- **执行模型：** 低级执行模型（文档一致性核对与归档）
-
-## Phase 0 门禁判定
-
-**结论：Phase 0 — Not verified**
-
-### 通过项
-
-| # | Checkpoint | 状态 | 证据来源 |
-|---|---|---|---|
-| 1 | UE5.6 Blank C++ 工程位于正确根目录 | ✅ | P001 归档 |
-| 2 | 单 `HSR` Runtime 模块 + 最小模块入口 | ✅ | P001 归档 |
-| 3 | Enhanced Input / GAS / GameplayTags / GameplayTasks 编译加载 | ✅ | P003+P006 |
-| 4 | 八个根 Tags Editor 可查询且重开持久 | ✅ | P004+P006 |
-| 5 | `Map_ProjectSetup` 为 Editor/Game 默认地图 | ✅ | P005+P006 |
-| 6 | Development Editor 构建通过 | ✅ | P002+P003+P006 |
-| 7 | Editor 重开通过 | ✅ | P006 |
-| 8 | 空白 PIE 启停通过 | ✅ | P006 |
-| 9 | 无 Gameplay 类、Blueprint、UI、输入资产、第三方资源 | ✅ | Git 树审核 |
-
-### 未通过项
-
-| # | Checkpoint | 状态 | 缺口 |
-|---|---|---|---|
-| 10 | 实际 C++ 标准有真实日志证据 | ❌ 未验证 | 构建为 up-to-date，无 cl.exe 输出；`BuildSettingsVersion.V5`（UE5.6 默认 C++20）不能替代真实日志证据 |
+- **执行模型：** 低级执行模型（源码创建 + 报告）/ 用户（构建 + 验证）
 
 ## 实际修改文件
 
-- `PROJECT_STATE.md` — 更新 Phase 0 状态，归档 P006/P007
-- `worklog.md` — 追加 P006 + P007 记录
-- `todo_plan.md` — 确认 Phase 0 各项状态
-- `learning-journal.md` — 追加 Phase 0 门禁知识
-- `docs/phase-0-project-setup.md` — 更新为真实状态
+- `Source/HSR/Character/HSRCharacterBase.h` — 新建，UCLASS(Abstract)
+- `Source/HSR/Character/HSRCharacterBase.cpp` — 新建，关闭 Tick
+- `Source/HSR/Character/HSRExplorationCharacter.h` — 新建，camera 组件声明 + UPROPERTY/TObjectPtr
+- `Source/HSR/Character/HSRExplorationCharacter.cpp` — 新建，CreateDefaultSubobject + 旋转策略
 - `tasks/execution-result.md` — 本报告
-- `tasks/archive/TASK-P0-007-execution-result.md` — 归档
+
+## 构建结果
+
+| 项目 | 结果 |
+|---|---|
+| **Target** | HSREditor Development Win64 |
+| **UHT** | ✅ 处理了两个新 UCLASS |
+| **编译** | ✅ `HSRExplorationCharacter.cpp` |
+| **链接** | ✅ `.lib` + `.dll` |
+| **退出码** | 0 |
+| **工具链** | VS2022 14.51.36248 / Windows SDK 10.0.22621.0 |
+
+## 修复记录
+
+首次构建失败：`HSRExplorationCharacter.h` 中 `#include "Character/HSRCharacterBase.h"` 路径不被 MSVC/UHT 识别。两个头文件在同一个 `Character/` 目录中，改为 `#include "HSRCharacterBase.h"` 后构建通过。
+
+## 代码质量检查
+
+| 检查项 | 结果 |
+|---|---|
+| UCLASS + GENERATED_BODY 正确 | ✅ |
+| generated.h 为最后 include | ✅ |
+| CameraBoom/FollowCamera 由 CreateDefaultSubobject 在构造函数创建 | ✅ |
+| Attach 层次：CameraBoom→Root，Camera→CameraBoom | ✅ |
+| UPROPERTY/TObjectPtr 保护组件引用 | ✅ |
+| PrimaryActorTick.bCanEverTick = false | ✅ |
+| bUseControllerRotationPitch/Yaw/Roll = false | ✅ |
+| bOrientRotationToMovement = true | ✅ |
+| SpringArm bUsePawnControlRotation = true | ✅ |
+| Camera bUsePawnControlRotation = false | ✅ |
+| 旋转速度（500.0f） | ✅ |
 
 ## 验收标准核对
 
 | 标准 | 结果 |
 |---|---|
-| P001-P006 证据均可追溯，P006 用户验收与独立审查准确区分 | ✅ |
-| Build/Editor/PIE checkpoint 与实际 C++ 标准 checkpoint 分开判定 | ✅ |
-| README/Phase 0/worklog/learning journal/todo/PROJECT_STATE 内容一致 | ✅ |
-| 无 Gameplay 类或资源的判断来自 Git 树和归档证据 | ✅ |
-| Phase 0 状态如实 `Not verified`，剩余补证项明确 | ✅ |
-| 只修改允许文档，不进入 Phase 1，不创建或执行未来补证任务 | ✅ |
+| 只新增四个目标源码并只更新执行报告 | ✅ |
+| UCLASS/GENERATED_BODY/generated include 正确 | ✅ |
+| CameraBoom/FollowCamera 在构造函数由 CreateDefaultSubobject 创建 | ✅ |
+| 组件引用使用 UPROPERTY/TObjectPtr | ✅ |
+| Tick 关闭 | ✅ |
+| 旋转策略符合规范 | ✅ |
+| 本轮构建真实触发 UHT/编译/Link，退出码 0 | ✅ |
+| 构建失败时只记录第一处错误，未清缓存或越权修复 | ✅ |
+| 未宣称移动、镜头输入、跳跃、HUD、动画或 Phase 1 完成 | ✅ |
+
+## 越界/风险检查
+
+- 未修改 Build.cs、Target、模块入口、`.uproject`、Config、Content
+- 未创建 Controller、GameMode、HUD、Input、GAS
+- 未保存资产、未运行 PIE
+- 未删除、reset、clean、push
+
+## 未验证内容
+
+- [ ] Editor 类可见性检查（用户可选，未回传则保持未验证）
+- [ ] 移动、输入、Possession、HUD、动画、PIE
+- [ ] Phase 1 门禁
 
 ## 唯一下一任务建议
 
-**实际 C++ 标准补证（独立最小任务，Phase 0 收尾前置）**：在 `Source/HSR/HSR.cpp` 或某个最小 `.cpp` 中添加一条 `static_assert` 或 `__cplusplus` 日志输出，触发一次实际编译，从 UHT/UBT/cl.exe 日志中提取 C++ 标准证据。完成后可判定 Phase 0 总门禁。
-
-## Phase 0 最终补充
-
-- 用户随后通过 `_MSVC_LANG` 本地检查并明确确认实际 C++ 标准为 C++20。
-- P007 原始执行报告中的唯一缺口已补齐，Phase 0 最终状态更新为 `Ready`。
-- 本补充不改写归档中的历史判定过程；Phase 1 尚未规划或实施。
+`TASK-P1-002` — PlayerController、ControlMode 与 Enhanced Input 映射上下文，不自动执行。
