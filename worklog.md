@@ -754,3 +754,50 @@ Stage 7 在 Stage 6 前执行，因为项目 Phase 8 弱点击破早于 Phase 9 
 - 已创建 `tasks/active-task.md`，编号 `TASK-P0-007`，只允许文档一致性审查、归档和门禁判定。
 - P007 禁止修改 C++、Config、Content、`.uproject`，禁止构建、Editor、PIE、push、Phase 1 和自动开始补证任务。
 - 若低级模型参与，必须先复述并以 `等待用户确认执行 TASK-P0-007。` 结束；用户单独确认前零工具调用。
+
+## 2026-07-16｜TASK-P0-006：验证 Development Editor、Editor 重开与空白 PIE 运行门禁
+
+### 执行过程
+
+1. 低级模型复述 P006 计划，用户确认执行。
+2. 只读预检：HSR.uproject、Build.cs、DefaultEngine.ini、DefaultGameplayTags.ini、Map_ProjectSetup.umap 均存在，工作树干净。
+3. 用户执行 HSREditor Development Win64 构建：退出码 0，Target is up to date（无源文件变更）。
+4. 用户重开 Editor：自动加载 Map_ProjectSetup，Enhanced Input 与 GAS 插件已启用，八个根 Tags 可查询。
+5. 空白 PIE 启动并正常停止，Output Log 无 Error/Missing/Assert/Ensure。
+6. 用户确认无问题，明确跳过独立审查。
+
+### 验证状态
+
+- ✅ UBT 退出码 0，工具链 VS2022 14.51.36248 / SDK 10.0.22621.0
+- ✅ Editor 重开自动加载 Map_ProjectSetup
+- ✅ 插件与 Tags 可用
+- ✅ 空白 PIE 启停正常
+- ⬜ 实际 C++ 标准未验证（up-to-date）
+- ⬜ P006 跳过独立审查（用户明确要求）
+
+### 实际修改
+
+仅 `tasks/execution-result.md`；commit `f18269a8f056c110f2e6cf673271cbd2201e19d1`。
+
+## 2026-07-16｜TASK-P0-007：Phase 0 阶段审查、文档归档与门禁判定
+
+### 门禁结论
+
+Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
+
+### 文档修改
+
+- PROJECT_STATE.md — 归档 P006/P007，更新状态
+- todo_plan.md — 确认 Phase 0 各项 checkpoint
+- learning-journal.md — 沉淀 Phase 0 门禁知识
+- docs/phase-0-project-setup.md — 同步真实状态
+- tasks/execution-result.md — P007 执行报告
+- tasks/archive/ — 创建归档
+
+### 剩余缺口
+
+实际 C++ 标准无构建日志证据。需在后续最小补证任务中通过触发一次实际编译（如添加 `static_assert` 或 `__cplusplus` 日志）来获取。
+
+### 下一步
+
+实际 C++ 标准补证 → Phase 1 第三人称探索角色。
