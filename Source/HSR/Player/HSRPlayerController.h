@@ -4,6 +4,8 @@
 #include "GameFramework/PlayerController.h"
 #include "HSRPlayerController.generated.h"
 
+class UInputMappingContext;
+
 UENUM(BlueprintType)
 enum class EHSRPlayerControlMode : uint8
 {
@@ -31,6 +33,17 @@ public:
 	EHSRPlayerControlMode GetControlMode() const { return CurrentControlMode; }
 
 protected:
+	void AddExplorationContext();
+	void RemoveExplorationContext();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputMappingContext> ExplorationMappingContext;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Control")
 	EHSRPlayerControlMode CurrentControlMode;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Control")
+	bool bControlModeApplied;
+
+	bool bExplorationContextAdded;
 };

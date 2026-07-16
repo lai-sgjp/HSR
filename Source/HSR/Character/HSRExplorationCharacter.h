@@ -6,6 +6,7 @@
 
 class USpringArmComponent;
 class UCameraComponent;
+class UInputAction;
 
 UCLASS()
 class HSR_API AHSRExplorationCharacter : public AHSRCharacterBase
@@ -14,11 +15,30 @@ class HSR_API AHSRExplorationCharacter : public AHSRCharacterBase
 
 public:
 	AHSRExplorationCharacter();
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 protected:
+	void Move(const struct FInputActionValue& Value);
+	void Look(const struct FInputActionValue& Value);
+	void HSJump();
+	void HSStopJumping();
+	void Interact();
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USpringArmComponent> CameraBoom;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCameraComponent> FollowCamera;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> MoveAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> LookAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> JumpAction;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> InteractAction;
 };
