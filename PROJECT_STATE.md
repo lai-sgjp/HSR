@@ -11,6 +11,8 @@
 
 ## 当前任务
 
+- 当前唯一活动任务为 `TASK-P1-006：Phase 1 教学与阶段收尾`；使用一张完整任务卡覆盖 Coordinator 工程 Gate、Teacher 接收/教学/练习/提交和 Coordinator 最终收尾，不拆分新卡。
+- 当前正式交接为 `Coordinator → Teacher`；Teacher 无需 Implementation Agent 复述，须直接读取本卡点名的源码、diff、commits、归档证据与学习文档。
 - `TASK-P1-005` 已由最终 Reviewer commit `af6b14898f589cd44fbd176488dcd5e82c309d4b` 判定 `PASS WITH FOLLOW-UP` 并归档；历史 `REVISE` 与最终复审均保留。
 - P1-005 A～F 真实链：Implementation `649e125`、`0c85794`、用户资产 `a539b6d994d638529754c0ce8da6b3b3432b4794` / `abca67921f31a6ddfc5dee468bdd7fb0cdb598d6`、Implementation 汇总 `3d94b74`、Coordinator 补证 `1e8e155db6d18339496f46d67662f88a5de3e009`、Reviewer `af6b14898f589cd44fbd176488dcd5e82c309d4b`。
 - P1-004 已验证 GameMode/灰盒地图/HUD、Spawn/Possess、Move/Look/Jump、无副作用 Interact、UIOnly 往返、同会话 Re-Possess 与 Context/Binding/HUD 去重。
@@ -81,7 +83,7 @@
 
 ## 下一个推荐任务
 
-- **当前唯一下一步：** 创建并执行 `TASK-P1-006`，由 Coordinator 先核对工程 Gate，再直接交接 Teacher 完成 Phase 1 技术教学、源码复盘、练习与独立教学提交；不得提前进入 Phase 2。
+- **当前唯一下一步：** Teacher 按 `tasks/active-task.md` 接收 Phase 1 全部源码/diff/commits/build/PIE/学习证据，完成技术教学、源码复盘和用户练习后创建独立 Teacher commit；不得提前进入 Phase 2。
 
 ## 2026-07-16 P1-003 Coordinator 规划更新
 

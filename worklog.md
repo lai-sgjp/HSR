@@ -1032,3 +1032,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Mixamo/Kachujin 许可决策保持 `OWNER ACCEPTED`；仅在未来正式公开发布、资产迁移或改变分发方式时复核届时官方条款，属于非阻断 follow-up。
 - `Config/DefaultEditor.ini` 保持本地且由 `.gitignore` 精确忽略。活动卡、累计执行结果、初审和最终复审均归档到 `tasks/archive/`。
 - 本次不修改 C++/资产、不构建、不运行 Editor/PIE、不 push；下一步只允许创建 P1-006 完整收尾任务卡并交接 Teacher。
+
+## 2026-07-17｜Coordinator：规划并交接 TASK-P1-006
+
+- P1-005 Coordinator 归档提交已成功，随后严格串行创建唯一活动任务 `TASK-P1-006：Phase 1 教学与阶段收尾`；没有并行修改或 push。
+- 同一任务卡覆盖 G0 Coordinator 工程 Gate → G1 Teacher 接收 → G2 教学/源码复盘 → G3 用户练习 → G4 Teacher 独立提交 → G5 Coordinator 最终 Gate/收尾 commit/push，不为内部步骤创建新卡。
+- Teacher 接收材料包括 Phase 1 全部 Character/Camera、Controller/Possession/ControlMode、Enhanced Input、GameMode/HUD/Widget、AnimBP 源码/资产事实、真实 commits/diffs、Build/Editor/PIE 和学习文档。
+- 教学必须覆盖反射/GC/Tick、PlayerController Tick 静默输入 bug、Context 幂等、PushInputComponent 风险和证据驱动 Debug；必须取得用户复述、预测题、源码阅读和 Debug 练习真实结果。
+- Teacher 只允许修改学习、面试、作品集、必要 Phase 教学文档与本任务记录；禁止修改 C++/资产、判定 Phase Ready 或 push。
+- 当前正式交接 `Coordinator → Teacher`，无需 Implementation Agent 复述。本轮未启动 Teacher 教学、未修改 C++/资产、未构建/PIE、未 push。
