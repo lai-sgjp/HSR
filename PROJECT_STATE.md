@@ -5,14 +5,14 @@
 
 ## 当前 Phase
 
-- **Phase 1 已正式进入；P1-001、P1-002、P1-003A 已归档，下一步为 TASK-P1-003B 用户 Editor 输入资产任务**。
+- **Phase 1 已正式进入；P1-001、P1-002、P1-003A 已归档，TASK-P1-003B 已规划并交接给用户 Editor 执行者**。
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 已有 Character/Camera 骨架及 UHT、编译、链接成功证据；Editor 类可见性、输入、Possession、移动和 PIE 尚未验证。
 
 ## 当前任务
 
 - P1-003A Implementation commit `490440f280f82dbffd84976bad1dd2a92ee1f39d` 已由用户人工验收；独立 Reviewer 按用户决定跳过，未伪造 Reviewer 产物。
-- 当前尚无活动实施；P1-003B 只能由用户 Editor 人格创建和验证五个 IA/IMC 资产。
+- 活动任务卡为 `tasks/active-task.md`；P1-003B 只能由用户 Editor 人格创建和验证五个 IA/IMC 资产。
 - 已存在的两个未跟踪 Blueprint 属于用户提前创建的 P1-004 候选，不得纳入 P1-003B。
 - 最近完成任务：`TASK-P0-007` — Phase 0 阶段审查、文档归档与门禁判定；执行结果 commit `41446f2b771b99eb011a496ac37a26d94214fdb1`。
 
@@ -70,7 +70,7 @@
 
 ## 下一个推荐任务
 
-- **唯一下一步：** Coordinator 创建 P1-003B 活动卡并正式交接给用户 Editor 执行者。
+- **唯一下一步：** 用户按 P1-003B 活动卡核对五资产、重开 Editor 验证、填写证据，并只提交五个 Input 资产后回传完整 hash。
 
 ## 2026-07-16 P1-003 Coordinator 规划更新
 

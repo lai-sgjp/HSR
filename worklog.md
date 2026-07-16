@@ -908,3 +908,11 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 用户明确表示已人工审查通过并无需额外检查；据实跳过独立 Reviewer，不创建或暗示 Reviewer 产物/commit。
 - 工作树中的五个 Input 资产及两个 Blueprint 均为用户未跟踪产物，不属于 P1-003A；归档提交不修改、不暂存、不纳入它们。
 - P1-003A 归档完成后，唯一后续是由用户 Editor 人格执行 P1-003B；Coordinator 和 Implementation Agent 不冒充资产作者。本轮不 push。
+
+## 2026-07-16｜Coordinator：规划并交接 TASK-P1-003B
+
+- 唯一范围锁定为五个 `Content/Input` 资产：四个 IA 与一个 `IMC_Exploration`；用户本人是 UE Editor 执行者和资产 commit 作者。
+- 活动卡要求核对 Value Type、WASD/Mouse/Space/E Mapping 与 Modifiers，并在 Editor 重开后确认配置持久。
+- 两个未跟踪 Blueprint 明确视为用户提前创建的 P1-004 候选；本卡禁止修改、暂存或提交，输入引用绑定和完整 PIE 推迟到 P1-004。
+- 已创建空白用户证据模板；Coordinator 未修改资产、未启动 Editor、未冒充资产作者、未 push。
+- 正式交接：Coordinator → 用户 / UE Editor 执行者。接收条件为完整 Editor 证据及仅含五资产的用户 commit hash。
