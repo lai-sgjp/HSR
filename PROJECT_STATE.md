@@ -10,8 +10,8 @@
 
 ## 当前任务
 
-- 活动任务卡：无；`TASK-P0-004` 已归档，下一任务尚未创建。
-- 当前任务：P004 已完成执行与独立审查；下一任务建议为 `TASK-P0-005`。
+- 活动任务卡：`TASK-P0-005`，只处理 `Map_ProjectSetup` 与两个默认地图设置。
+- 当前任务：P005 已完成协调规划，尚未实施；P004 已完成执行与独立审查。
 - 当前状态：`TASK-P0-004` 判定为 `PASS WITH FOLLOW-UP`；Gameplay Tags 配置和重开持久性已验证，按需目录、地图、工具链/C++ 标准和 PIE 仍未完成。
 - 最近完成任务：`TASK-P0-004` — 建立并验证 Gameplay Tags 配置基线。
 
@@ -64,7 +64,7 @@
 
 ## 下一个推荐任务
 
-- **唯一推荐任务：** 由高级协调者规划 `TASK-P0-005`，创建并设置 `Map_ProjectSetup`。
+- **唯一推荐任务：** 低级模型读取 `tasks/active-task.md`、复述 P005 并等待用户单独确认；确认后才可创建并设置 `Map_ProjectSetup`。
 - P004 仅完成 Gameplay Tags 配置基线；仍不得越过地图和 PIE 门禁进入 Phase 1。
 
 ## 新模型接入时必须读取的文件
@@ -115,3 +115,11 @@
 - 根 Tag 以用户本轮明确指定的八项为准：Ability、State、Status、Event、Damage、Element、Cooldown、UI；P004 不创建 Weakness 或任何子 Tag。
 - 低级模型必须先复述并以 `等待用户确认执行 TASK-P0-004。` 结束；确认前零工具调用。
 - 本轮未实施 Config、未启动 Editor、未运行构建/PIE、未勾选 P004 checkpoint，也未创建 P005。
+
+## 2026-07-16 P005 协调规划更新
+
+- P004 审查 commit 为 `ef1425001c2e957c110aa6c68a7ec5d3f8efdd28`，规划前工作树干净。
+- 已创建唯一活动任务 `TASK-P0-005`，只处理 `Content/Maps/Map_ProjectSetup.umap`、`Config/DefaultEngine.ini` 中目标 `GameMapsSettings` 两项和 `tasks/execution-result.md`。
+- P005 只完成规划；尚未创建地图、修改 Config、启动 Editor、运行构建/PIE 或创建 P006。
+- 低级模型必须先复述并以 `等待用户确认执行 TASK-P0-005。` 结束；确认前零工具调用。
+- P005 实施 checkpoint 未勾选；额外持久文件或 Config 键必须停止并申请扩权。

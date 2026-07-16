@@ -683,3 +683,13 @@ Stage 7 在 Stage 6 前执行，因为项目 Phase 8 弱点击破早于 Phase 9 
 - 首次查询和重开后均无解析、重复或冲突错误；PIE、地图、工具链/C++ 标准仍未完成。
 - 已归档 P004 活动卡、执行结果和本审查报告；Gameplay Tags 部分完成，但按需目录未建立，组合 checkpoint 保持未完成。
 - 未创建或执行 P005；下一步由协调者规划 `TASK-P0-005`。
+
+## 2026-07-16｜高级模型协调者：TASK-P0-005 协调规划
+
+- 当前门禁：Phase 0 / `Not verified`；P004 为 `PASS WITH FOLLOW-UP`，审查 commit 为 `ef1425001c2e957c110aa6c68a7ec5d3f8efdd28`。
+- 已读取指定项目状态、规则、Phase 0 文档、任务/审查模板、P004 审查、低级模型模板、模型切换 Prompt、`Config/DefaultEngine.ini` 和 phase-next-steps 参考。
+- Prompt Planner：将 P005 限定为创建并设置一个 Empty Level `Map_ProjectSetup`。
+- Prompt Reviewer：要求精确记录地图路径、Config diff、Editor 重开和两个默认地图设置证据；不运行 PIE。
+- Architect：只使用单一地图资产和 `GameMapsSettings` 的两个键，不创建 World Partition、GameMode、Blueprint 或玩法资产。
+- Safety Reviewer：允许路径仅为 `Content/Maps/Map_ProjectSetup.umap`、`Config/DefaultEngine.ini`、`tasks/execution-result.md`；额外持久文件或 Config 键必须停止申请扩权。
+- 已创建唯一活动卡 `tasks/active-task.md`；未创建地图、未修改 Config、未启动 Editor、未运行构建/PIE、未创建 P006，未勾选 P005 checkpoint。
