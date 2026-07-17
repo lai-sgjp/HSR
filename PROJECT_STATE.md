@@ -5,13 +5,14 @@
 
 ## 当前 Phase
 
-- **Phase 1 为 `Ready`；Phase 2 进行中。P2-001 已由用户最终验收并归档，P2-002 仅完成协调规划，尚未实施。**
+- **Phase 1 为 `Ready`；Phase 2 工程闭环已通过，P2-003 阶段收尾进行中，尚未判定 `Ready`。P2-001 已归档，P2-002 最终 Reviewer `PASS` 并归档。**
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
 ## 当前任务
 
-- 当前唯一活动任务为 `TASK-P2-002：属性变化、边界与生命周期专项闭环`。Reviewer 对首版卡判定 `REVISE`（测试入口不可执行）；Coordinator 已固定 Character development-only GE/Re-Possess 请求、HUD 安全重建、五个精确测试 GE 与四层诊断计数。三个接口仅限 Debug/Development，C++ 必须在 Test/Shipping 中记录 Warning 并拒绝；Blueprint `DevelopmentOnly` 元数据不替代该边界。当前等待修订卡复核/执行者首次只读复述，尚未实施。
+- 当前唯一活动任务为 `TASK-P2-003：Phase 2 教学、最终回归与阶段收尾`。当前首个门禁是用户本人提交五个测试 GE、`WBP_AttributeDebug` 和已接受的 `BP_GE_InitializeCoreAttributes` 修改并回传 commit hash；Coordinator 不得冒充资产作者或代提交，除非用户另行明确授权。
+- `TASK-P2-002` 经 A1/A2/A3 修订与用户最终补证后由 Reviewer 判定 `PASS`：最终 `HSREditor Win64 Development` 成功，五 GE 配置、Editor 重开、Clamp、Re-Possess、HUD 单 snapshot/teardown 和两轮连续 PIE 均有用户证据并经 Reviewer 只读核验。历史 `REVISE` 链保留。
 - `TASK-P2-001` 最终处置为 `USER ACCEPTED`：独立 Reviewer 结论仍为 `REVISE`，用户明确接受剩余证据边界并授权进入 P2-002；未伪造 Reviewer `PASS`。
 - Reviewer 曾对首版活动卡给出 `REVISE`；Coordinator 已修订 Instant GE 成功判据、P2-001/P2-002 证据边界、同实例幂等表述与首次工具调用门禁。修订不构成实施或验收。
 - Teacher commit 为 `70efd6f24f5d8532f74d0994c8c551d9353d6204`；教学、用户练习、掌握度和非阻断复习项均有真实记录。
@@ -33,6 +34,7 @@
 - 用户已回传 Editor 重开引用、帧率、同会话 Re-Possess、无 Mesh/AnimClass、Development Editor 构建与 Output Log 均无问题；这些是用户证据，完整命令/日志细节未提供且不得补造。Reviewer 已据真实证据边界放行归档。
 - `Config/DefaultEditor.ini` 是本地 AssetViewer/Editor 预览配置，不提交、不删除，并由 `.gitignore` 精确忽略。
 - P2-001 的构建证据仅为当前目标 up-to-date 且 UBT `Succeeded`，不是新鲜 UHT/C++/Link；Editor 重开与 PIE 材料来自用户而非 Reviewer 独立运行。用户明确接受这两项证据边界并判定任务完成。
+- P2-002 当前没有工程阻断；未提交的七个 Content 资产属于用户产物，是 P2-003 Gate 0 的作者提交门禁。P2-003 必须依次经过 Coordinator 交接、Teacher 教学/出题、用户原始作答、Teacher 纠正/提交、Reviewer 独立审查/提交；Reviewer `PASS` 前 Phase 2 不是 `Ready`。Ready 与 push 交付状态分开记录，push 失败不得伪造成功。
 
 ## 已完成事项
 
@@ -59,7 +61,7 @@
 
 - 已存在 `HSR.uproject`、`Source/HSR.Target.cs`、`Source/HSREditor.Target.cs`、`Source/HSR/HSR.Build.cs`、`Source/HSR/HSR.h`、`Source/HSR/HSR.cpp`、`Config/DefaultEngine.ini` 和 `Config/DefaultInput.ini`。
 - `HSR.sln` 与 `.vs/`、`Binaries/`、`Intermediate/`、`Saved/`、`DerivedDataCache/` 为工具/Editor 产物，不作为构建、PIE 或 Gameplay 通过证据。
-- 当前已完成工程基线、Phase 1 可玩闭环及 P2-001 最小 GAS 初始化可见闭环；P2-002 专项尚未实施。
+- 当前已完成工程基线、Phase 1 可玩闭环、P2-001 最小 GAS 初始化可见闭环及 P2-002 属性/生命周期专项；P2-003 教学与阶段收尾尚未执行。
 
 ## 当前设计决策
 
@@ -86,7 +88,7 @@
 
 ## 下一个推荐任务
 
-- **当前唯一下一步：** Implementation Agent 只读复述 `TASK-P2-002` 并等待用户单独确认；不得提前实施或进入 Ability、伤害、Phase 3。
+- **当前唯一下一步：** 用户本人提交 P2-003 Gate 0 列出的七个资产并回传 commit hash；之后才由 Coordinator 核对并交接 Teacher。不得进入 Phase 3。
 
 ## 2026-07-17 TASK-P2-001 Coordinator 规划更新
 
@@ -219,3 +221,19 @@
 - 用户通过 `_MSVC_LANG` 检查并明确确认实际 C++ 标准为 C++20。
 - Phase 0 唯一剩余证据缺口已补齐，最终状态更新为 `Ready`。
 - 当前无活动任务；Phase 1 尚未规划或实施，必须重新经过协调、任务卡、复述与确认流程。
+
+## 2026-07-17 P2-002 Segment A2 协调更新
+
+- P2-002 独立审查结论为 `REVISE`；已在同一活动卡追加 Segment A2 受控修订，不进入 P2-003。
+- 用户确认 `BP_GE_InitializeCoreAttributes.uasset` 当前修改由本人完成且无问题；Coordinator 已追认真实作者，该资产无需回退或再次授权，此项解除。
+- A2 仅处理 MaxHealth/MaxEnergy 降低后的 Current 收敛、测试 GE 精确包路径白名单、诊断广播配置边界、Re-Possess/ActorInfo 成功验证、HUD 判空与日志参数、单一快照路径、四层计数与实例证据。
+- `tasks/execution-result.md` 必须由 Implementation Agent 以 UTF-8 修复并补齐真实 B/C 状态，不得自判 `PASS`；最终 C++ 必须由 `HSREditor Development Win64` 构建覆盖。
+- 当前交接为 Coordinator → Implementation Agent A2 首次只读复述；用户再次确认前不得修改代码、资产或执行构建。
+
+## 2026-07-17 P2-002 Segment A3 协调更新
+
+- P2-002 A2 独立复审仍为 `REVISE`；同一活动卡已追加 Segment A3 最小修订与补证契约，P2-003 不得开始。
+- A3 锁定最终 `Build.bat HSREditor Win64 Development <HSR.uproject>`、Health/Energy 双向 Current Clamp、五个测试 GE 精确 package API 白名单、初始化日志参数、Re-Possess 判空与前后快照、HUD next-tick 链验证，以及独立 `SnapshotBroadcastCount`。
+- 用户需补齐五 GE 配置/作者、Editor 重开、逐用例前后值与各层增量、Re-Possess、Widget 销毁重建及至少两轮连续 PIE 证据；GE 变化与 snapshot 计数必须分开。
+- `BP_GE_InitializeCoreAttributes.uasset` 修改已由用户确认并接受，不再是审查问题。
+- 当前交接为 Coordinator → Implementation Agent A3 首次只读复述；必须以 `等待用户确认执行 TASK-P2-002-A3。` 结束，用户再次确认前不得实施。

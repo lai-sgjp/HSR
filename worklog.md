@@ -1131,3 +1131,40 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 实现契约固定为 `#if UE_BUILD_SHIPPING || UE_BUILD_TEST`：记录明确 Warning 并拒绝执行；两个 `bool` 接口返回 `false`，HUD `void` 接口直接返回。
 - `meta = (DevelopmentOnly)` 仅作为 Blueprint 元数据保留，不得代替 C++ 的 Test/Shipping 防线。
 - 本轮只修订协调文档，未修改源码或资产，未构建、未运行 Editor/PIE、未执行 Git。
+
+## 2026-07-17｜Coordinator：建立 P2-002 Segment A2 受控修订
+
+- 用户明确确认当前 `Content/GameplayEffects/BP_GE_InitializeCoreAttributes.uasset` 修改由本人完成且没有问题。Coordinator 追认用户为真实作者，该资产无需回退或再次授权；Reviewer 对此项的疑问已解除。
+- P2-002 仍保持 `REVISE`。同一活动卡追加 A2，精确锁定 MaxHealth/MaxEnergy 降低后的 Current 收敛、五个测试 GE 精确 package path 白名单、`BroadcastCurrentValues` Development/Test/Shipping 边界、Re-Possess 后 Controller/Pawn 与 Owner/Avatar/ActorInfo 验证、HUD 判空及多余日志参数修正。
+- A2 还必须建立四层计数与实例 ID、旧 Widget 销毁后零增量证据，并将 HUD 重建收敛为单一当前值快照路径，禁止一次重建产生双广播。
+- 当前 `tasks/execution-result.md` 编码损坏且 B/C 未完成；要求 Implementation Agent 以 UTF-8 修复报告、保留真实未验证项且不得自判 `PASS`。
+- 最终源码必须执行 `HSREditor Development Win64` 构建。用户后续补齐五个 GE 配置/作者、Editor 重开、Clamp、Re-Possess、Widget 重建及至少两轮 PIE 的可核证材料。
+- 当前交接为 Coordinator → Implementation Agent A2 首次只读复述，并须以 `等待用户确认执行 TASK-P2-002-A2。` 结束；再次确认前不得实施。
+- 本轮只修改协调 Markdown；未触碰现有未提交 Source/Content、未修改执行报告、未构建、未运行 Editor/PIE、未执行 Git。
+
+## 2026-07-17｜Coordinator：建立 P2-002 Segment A3 最小修订
+
+- 接收 A2 Reviewer `REVISE`，P2-002 保持活动状态，不归档且不进入 P2-003。
+- A3 将最终构建目标固定为通过 Unreal `Build.bat` 执行 `HSREditor Win64 Development` 并覆盖最终 C++；普通 `HSR Development Win64` 不满足门禁。
+- 实现修订收敛为：Instant/base GE 执行路径中的 Health/Energy 双向 Clamp、通过 `GetOutermost()->GetName()` 或等价 API 精确匹配五个 `/Game` package、初始化日志多余参数、Re-Possess 全链判空与前后快照、HUD `GetWorld`/next-tick 链验证，以及独立 `SnapshotBroadcastCount`。
+- 用户证据固定为五 GE 配置和作者、Editor 重开、逐用例前后值与 Delegate/ViewModel/snapshot/UI 增量、Re-Possess、旧 Widget 零增量、新 Widget 唯一快照路径及至少两轮连续 PIE 干净 teardown。
+- `BP_GE_InitializeCoreAttributes.uasset` 修改已由用户明确接受，不再列为问题。Implementation Agent 必须更新 UTF-8 报告、如实保留未验证项且不得自判 `PASS`。
+- 当前交接为 Coordinator → Implementation Agent A3 首次只读复述，结束句固定为 `等待用户确认执行 TASK-P2-002-A3。`；再次确认前不得实施。
+- 本轮只修改 `tasks/active-task.md`、`PROJECT_STATE.md`、`worklog.md`；保留已提交 `a81277b` 与现有未提交 Content/文档，不改 Source/Content，不构建、不运行 Editor/PIE、不执行 Git。
+## 2026-07-17｜TASK-P2-002 最终 PASS 归档与 P2-003 规划
+
+- 用户提供最终 `HSREditor Win64 Development` VS/MSBuild 输出：UBT 目标正确，链接 `UnrealEditor-HSR.lib/.dll`，写入 `HSREditor.target`，`Result: Succeeded`，生成 1 成功 / 0 失败；MSVC 14.51 非 preferred warning 继续作为非阻断风险。
+- 用户提供五个 Instant 测试 GE 截图并确认 Editor 重开无问题；逐用例属性与四层计数、Re-Possess、旧 Widget 零新增回调和新 Widget 单 snapshot 为用户测试确认，连续 PIE/teardown 有用户提供的日志材料。Reviewer 进行只读核验后最终结论为 `PASS`；不将附件日志表述为直接证明全部 Widget/四层计数。
+- `Rebuild HUD` 后属性不恢复初始值是正确行为：HUD 重建只恢复观察关系并读取 ASC 当前快照，不重新应用初始化 GE。
+- Coordinator 已归档 `TASK-P2-002` 活动卡、清理后的执行结果和最终审查，保留 A1/A2/A3 与历史 `REVISE` 链；未改 Source/Content，未运行 Build/PIE，未提交 Git。
+- 已创建唯一活动任务 `TASK-P2-003`。当前 Gate 0 要求用户本人提交五个测试 GE、`WBP_AttributeDebug` 和已接受的 `BP_GE_InitializeCoreAttributes` 修改并回传 commit hash；未经另行明确授权，Coordinator 不代办或冒充资产作者。
+- P2-003 后续顺序固定为：Coordinator 核对/交接 → Teacher 教学与出题 → 用户原始作答 → Teacher 纠正/评估/独立 commit → Reviewer 独立只读审查、final-review 与独立 commit → Reviewer `PASS` 后 Coordinator Ready Gate、收尾 commit 与 push。Ready 与 push 交付状态分开记录；Phase 3 尚未开始。
+
+## 2026-07-17｜Coordinator：响应 TASK-P2-003 任务卡 Reviewer REVISE
+
+- Reviewer 指出首版 P2-003 卡混合了 Teacher 教学、用户作答、Teacher 评估/提交与 Coordinator 自审，且 final-review 作者权限不独立。
+- 强制链已修订为：用户资产提交 → Coordinator 核对/交接 → Teacher 教学/出题 → 用户原始作答 → Teacher 纠正/掌握度/文档与独立 commit → Reviewer 独立只读审查、final-review 与独立 commit → 仅在 Reviewer `PASS` 后 Coordinator 收尾。
+- `TASK-P2-003-final-review.md` 仅允许 Reviewer 创建/修改；Coordinator 可归档但不得代写或改变审查结论。
+- Phase 2 工程/学习 `Ready` 与 push 交付状态分开。push 失败时记录真实错误和未完成交付，不伪造成功。
+- P2-002 的 Widget 零回调与四层计数明确为用户测试确认，不再描述为附件日志直接证明。
+- 本轮只修订协调 Markdown；未修改 Source/Content，未构建、未运行 PIE、未执行 Git。

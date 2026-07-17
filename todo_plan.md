@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0 与 Phase 1 门禁均为 `Ready`；Phase 2 进行中，`TASK-P2-001` 已由用户验收并以 `USER ACCEPTED` 归档，`TASK-P2-002` 仅完成规划、尚未实施。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
+> 当前状态：Phase 0 与 Phase 1 门禁均为 `Ready`；Phase 2 工程闭环已完成，P2-002 最终 `PASS`，当前执行 P2-003 教学与阶段收尾。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
 
 ## 已完成的规划工作
 
@@ -152,7 +152,8 @@
 - [x] P2-001：实现 Health、MaxHealth、Energy、MaxEnergy、Speed 的初始化可见闭环。
 - [x] P2-001：正确初始化当前单机 Owner=Avatar=self 和 Actor Info。
 - [x] P2-001：使用 Attribute Delegate 驱动调试 UI，无业务 Tick。
-- [ ] P2-002（已规划，待用户确认实施）：验证动态属性变化、Max 降低后的 Current 收敛、Widget 重建/解绑、连续 PIE 和 Re-Possess 回归。
+- [x] P2-002：验证动态属性变化、Max 降低后的 Current 收敛、Widget 重建/解绑、连续 PIE 和 Re-Possess 回归；最终 Reviewer `PASS`。
+- [ ] P2-003（已规划）：用户资产作者提交、工程证据核对、Teacher 教学、用户复述/预测/Debug 练习与 Phase 2 最终收尾。
 
 ## Phase 3：交互系统与探索对象
 
