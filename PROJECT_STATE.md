@@ -5,13 +5,15 @@
 
 ## 当前 Phase
 
-- **Phase 1 已完成并判定为 `Ready`；P1-001～P1-006 全部归档。Phase 2 尚未开始。**
+- **Phase 1 为 `Ready`；Phase 2 进行中。P2-001 已由用户最终验收并归档，P2-002 仅完成协调规划，尚未实施。**
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
 ## 当前任务
 
-- 当前无活动任务。`TASK-P1-006` 已完成 Teacher 教学提交与 Coordinator 最终 Gate，并归档到 `tasks/archive/`。
+- 当前唯一活动任务为 `TASK-P2-002：属性变化、边界与生命周期专项闭环`。Reviewer 对首版卡判定 `REVISE`（测试入口不可执行）；Coordinator 已固定 Character development-only GE/Re-Possess 请求、HUD 安全重建、五个精确测试 GE 与四层诊断计数。三个接口仅限 Debug/Development，C++ 必须在 Test/Shipping 中记录 Warning 并拒绝；Blueprint `DevelopmentOnly` 元数据不替代该边界。当前等待修订卡复核/执行者首次只读复述，尚未实施。
+- `TASK-P2-001` 最终处置为 `USER ACCEPTED`：独立 Reviewer 结论仍为 `REVISE`，用户明确接受剩余证据边界并授权进入 P2-002；未伪造 Reviewer `PASS`。
+- Reviewer 曾对首版活动卡给出 `REVISE`；Coordinator 已修订 Instant GE 成功判据、P2-001/P2-002 证据边界、同实例幂等表述与首次工具调用门禁。修订不构成实施或验收。
 - Teacher commit 为 `70efd6f24f5d8532f74d0994c8c551d9353d6204`；教学、用户练习、掌握度和非阻断复习项均有真实记录。
 - `TASK-P1-005` 已由最终 Reviewer commit `af6b14898f589cd44fbd176488dcd5e82c309d4b` 判定 `PASS WITH FOLLOW-UP` 并归档；历史 `REVISE` 与最终复审均保留。
 - P1-005 A～F 真实链：Implementation `649e125`、`0c85794`、用户资产 `a539b6d994d638529754c0ce8da6b3b3432b4794` / `abca67921f31a6ddfc5dee468bdd7fb0cdb598d6`、Implementation 汇总 `3d94b74`、Coordinator 补证 `1e8e155db6d18339496f46d67662f88a5de3e009`、Reviewer `af6b14898f589cd44fbd176488dcd5e82c309d4b`。
@@ -30,6 +32,7 @@
 - P1-005 许可证状态为 `OWNER ACCEPTED`：证据为用户提供的第三方指南 URL/截图，不冒充 Adobe 官方原文；用户确认仓库 public 且保留资产历史，并接受已整合资产的公开发布风险。该项不再阻断。
 - 用户已回传 Editor 重开引用、帧率、同会话 Re-Possess、无 Mesh/AnimClass、Development Editor 构建与 Output Log 均无问题；这些是用户证据，完整命令/日志细节未提供且不得补造。Reviewer 已据真实证据边界放行归档。
 - `Config/DefaultEditor.ini` 是本地 AssetViewer/Editor 预览配置，不提交、不删除，并由 `.gitignore` 精确忽略。
+- P2-001 的构建证据仅为当前目标 up-to-date 且 UBT `Succeeded`，不是新鲜 UHT/C++/Link；Editor 重开与 PIE 材料来自用户而非 Reviewer 独立运行。用户明确接受这两项证据边界并判定任务完成。
 
 ## 已完成事项
 
@@ -56,14 +59,14 @@
 
 - 已存在 `HSR.uproject`、`Source/HSR.Target.cs`、`Source/HSREditor.Target.cs`、`Source/HSR/HSR.Build.cs`、`Source/HSR/HSR.h`、`Source/HSR/HSR.cpp`、`Config/DefaultEngine.ini` 和 `Config/DefaultInput.ini`。
 - `HSR.sln` 与 `.vs/`、`Binaries/`、`Intermediate/`、`Saved/`、`DerivedDataCache/` 为工具/Editor 产物，不作为构建、PIE 或 Gameplay 通过证据。
-- 当前已完成工程基线以及 Phase 1 的 P1-001～P1-004 Gameplay 可玩闭环；GAS Stage 尚未实施。
+- 当前已完成工程基线、Phase 1 可玩闭环及 P2-001 最小 GAS 初始化可见闭环；P2-002 专项尚未实施。
 
 ## 当前设计决策
 
 - 后续 Phase 默认采用“最小连贯垂直切片”：每个任务只有一个可独立验收结果，但优先形成用户可见运行闭环，不再按类、单文件或单资产机械拆卡。
 - 每个 Phase 通常规划 2～5 个工程工作包加 1 个收尾工作包，按真实复杂度调整；同一工作包可以包含 C++、Editor 配置、PIE 和文档证据，但人格与资产作者仍独立交接、独立提交。
 - 只有不同作者/权限、危险 Git/Config、第三方资产、新模块、外部依赖、独立失败/回滚边界，或明显超出低级模型安全范围时拆分。
-- Phase 1 已收尾；后续 Phase 继续采用最小连贯垂直切片，但尚未创建 Phase 2 任务卡。
+- Phase 1 已收尾；Phase 2 继续采用最小连贯垂直切片，`TASK-P2-001` 已锁定 ASC、Core AttributeSet、Actor Info、初始化 GE、Attribute Delegate 与 Debug HUD 的单一可见闭环。
 
 - 模型切换后的主要记忆来自仓库文件，不依赖聊天历史。
 - `PROJECT_STATE.md` 保存项目快照；`tasks/active-task.md` 是唯一活动任务契约；`worklog.md` 保存真实证据；`todo_plan.md` 保存进度；`learning-journal.md` 保存可复用知识。
@@ -83,7 +86,19 @@
 
 ## 下一个推荐任务
 
-- **当前唯一下一步：** 由用户明确授权后再规划 Phase 2；当前不自动开始 GAS 实施。
+- **当前唯一下一步：** Implementation Agent 只读复述 `TASK-P2-002` 并等待用户单独确认；不得提前实施或进入 Ability、伤害、Phase 3。
+
+## 2026-07-17 TASK-P2-001 Coordinator 规划更新
+
+- 用户已明确授权正式进入 Phase 2，并要求 Coordinator 创建第一张活动任务卡；这只授权协调规划，不等于授权低级执行模型立即实施。
+- `TASK-P2-001` 的唯一结果为探索 PIE 中可见的五项 GAS 初始化属性；当前单机固定 `Owner Actor = Avatar Actor = Character`。
+- 任务卡把 `BeginPlay` 总入口拆为 Actor Info、初始化 GE、Attribute Delegate 三个独立幂等步骤，并锁定 UE5.6 的 `InitAbilityActorInfo`、`MakeEffectContext → MakeOutgoingSpec → ApplyGameplayEffectSpecToSelf` 与 Attribute Change Delegate 路径。
+- 初始化资产实际路径追认为 `Content/GameplayEffects/BP_GE_InitializeCoreAttributes.uasset`；`BP_` 前缀是用户对 Blueprint 特殊类的明确命名选择。`Content/UI/WBP_AttributeDebug.uasset`、探索 Character BP 与 Exploration HUD 的资产工作归用户。
+- 用户确认 `f03888e` 中 `ABP_HSRExploration.uasset` 为本人主动修改且无问题；它是 P2-001 范围外附带用户修改，不计入 GAS 验收且不要求移出历史。用户同时更正：`a58f385` 中 `Source/HSR/UI/HSRAttributeViewModel.cpp` 行为修复实际由 Implementation Agent 完成，误与用户资产一起提交；作者与 Segment 归属已校正，但 Git 历史不改写。
+- Reviewer 原 `REVISE` 中上述三项事实疑点已经用户说明解除；仍未解除的是最终源码树真实 `HSREditor Development Win64` 构建证据，以及 Editor 重开、PIE 主路径和缺失 GE 失败路径的可核证材料。该状态不构成 Reviewer 放行。
+- 用户随后补交最终证据：`HSREditor Win64 Development` 构建经 UBT 返回 `Target is up to date` 与 `Result: Succeeded`；Editor 重开后一切功能正常；附件日志记录缺失 GE warning、不崩溃、恢复 GE 后 `WasSuccessfullyApplied` 成功、`Owner=Avatar=self, ActorInfo valid`、五个 Attribute Delegate 绑定与退出解绑。状态推进为等待 Reviewer 最终复审。
+- 独立 Reviewer 结论保持 `REVISE`；用户随后明确判定 P2-001 完成并接受 up-to-date 构建及用户自报 Editor/PIE 的证据边界。最终处置记录为 `USER ACCEPTED`，不写成 Reviewer `PASS`。P2-002 必须继续覆盖动态属性改值、Max 降低后的 Current 收敛、Widget 重建/解绑专项运行证据和 Re-Possess 深度回归。
+- Coordinator 已归档 `tasks/archive/TASK-P2-001-active-task.md`、`tasks/archive/TASK-P2-001-execution-result.md` 和 `tasks/archive/TASK-P2-001-final-review.md`，并创建唯一 P2-002 活动卡。
 
 ## 2026-07-16 P1-003 Coordinator 规划更新
 

@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0 与 Phase 1 门禁均已通过并判定为 `Ready`；Phase 2 尚未开始。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
+> 当前状态：Phase 0 与 Phase 1 门禁均为 `Ready`；Phase 2 进行中，`TASK-P2-001` 已由用户验收并以 `USER ACCEPTED` 归档，`TASK-P2-002` 仅完成规划、尚未实施。详细步骤与验收见 [docs/phase-roadmap-0-20.md](docs/phase-roadmap-0-20.md)。
 
 ## 已完成的规划工作
 
@@ -148,11 +148,11 @@
 
 ## Phase 2：GAS 基础接入
 
-- [ ] 创建 ASC、Core AttributeSet 和初始化 GE。
-- [ ] 实现 Health、MaxHealth、Energy、MaxEnergy、Speed。
-- [ ] 正确初始化 Owner/Avatar 和 Actor Info。
-- [ ] 使用 Attribute Delegate 驱动调试 UI。
-- [ ] 覆盖重复初始化、属性边界和 Widget 解绑测试。
+- [x] P2-001：创建 ASC、Core AttributeSet 和初始化 GE，可在探索 PIE 中显示五项初始化属性。
+- [x] P2-001：实现 Health、MaxHealth、Energy、MaxEnergy、Speed 的初始化可见闭环。
+- [x] P2-001：正确初始化当前单机 Owner=Avatar=self 和 Actor Info。
+- [x] P2-001：使用 Attribute Delegate 驱动调试 UI，无业务 Tick。
+- [ ] P2-002（已规划，待用户确认实施）：验证动态属性变化、Max 降低后的 Current 收敛、Widget 重建/解绑、连续 PIE 和 Re-Possess 回归。
 
 ## Phase 3：交互系统与探索对象
 

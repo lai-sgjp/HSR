@@ -1049,3 +1049,85 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - P1-005 许可证状态保持 `OWNER ACCEPTED`；未来正式发布、资产迁移或分发方式变化时复核官方条款，属于非阻断 follow-up。`Config/DefaultEditor.ini` 保持本地并被精确忽略。
 - Teacher 评定：真源、职责边界、幂等、反射/GC 核心已掌握；AnimBP 内部节点、序列化细节和重复输入完整证据链继续学习，不阻断工程 Gate。
 - Phase 1 最终判定 `Ready`；P1-006 活动卡与累计结果归档。收尾 commit 后按长期授权 push 当前 `main` 到跟踪 remote，不 force；Phase 2 尚未开始。
+
+## 2026-07-17｜Coordinator：规划并交接 TASK-P2-001
+
+- 用户明确授权正式进入 Phase 2；本轮仅承担 Coordinator 协调规划，不把授权扩大为自动实施。
+- 已创建唯一活动任务 `TASK-P2-001：最小 GAS 属性初始化可见闭环`。唯一验收结果为探索 PIE 中当前 Character 以 `Owner=Avatar=self` 持有有效 ASC，通过一次初始化 GE 获得五项属性，并由无 Tick Attribute Delegate 链显示在 Debug HUD。
+- 任务卡固定 `BeginPlay` 为运行时总入口，并把 Actor Info、初始化 GE、Delegate 绑定拆成三个独立幂等步骤；固定 UE5.6 API 路径为 `InitAbilityActorInfo`、`MakeEffectContext → MakeOutgoingSpec → ApplyGameplayEffectSpecToSelf` 和 `GetGameplayAttributeValueChangeDelegate`。
+- C++ 允许范围只覆盖 CharacterBase、GAS/Attribute 新文件、AttributeViewModel、必要的 UserWidget/HUD 与执行报告；Build.cs、uproject、ExplorationCharacter、PlayerController、GameMode、地图、Config 和阶段文档均只读或禁止。
+- 只读核对确认现有资产路径为 `Content/Blueprints/Character/Player/BP_HSRExplorationCharacter.uasset`、`Content/UI/WBP_ExplorationHUD.uasset`、`Content/Blueprints/UI/BP_HSRHUD.uasset`。用户 Editor 新资产固定为 `Content/GameplayEffects/GE_InitializeCoreAttributes.uasset` 与 `Content/UI/WBP_AttributeDebug.uasset`。
+- 用户必须在资产实施前确认 Content Browser 精确包路径并确认自己是资产作者；Implementation Agent 不得创建、修改、暂存或提交 Content。Editor 重开、PIE 主路径与临时清空初始化 GE 的失败路径均由用户执行并回传真实证据。
+- 当前正式交接为 Coordinator → Implementation Agent 首次只读复述；复述必须以 `等待用户确认执行 TASK-P2-001。` 结束，用户再次确认前零工具调用。
+- 本轮未修改 Gameplay、Content、Config 或 todo，未构建、未启动 Editor/PIE、未运行测试、未创建执行/审查结论、未执行 Git 提交。
+
+## 2026-07-17｜Coordinator：响应 TASK-P2-001 任务卡 Reviewer REVISE
+
+- Reviewer 对协调任务卡给出 `REVISE`；该结论只指出契约/API/证据边界问题，不代表任何 Gameplay 实现已经发生。
+- 初始化 GE 成功判据已固定：保存 `ApplyGameplayEffectSpecToSelf` 返回 handle，只使用 `WasSuccessfullyApplied()` 判断 Instant GE 成功，严禁以 `IsValid()` 代替；只有成功后才设置初始化成功标志。
+- P2-001 已收敛为基本安全底座和初始化可见闭环。Max 降低后的 Current 收敛、动态 Effect、完整 Clamp、Widget 重建/解绑与 Re-Possess 专项运行证据明确留给 P2-002，不因 P2-001 缺少这些专项证据而失败。
+- 原“重复进入 BeginPlay”不可执行表述已替换为三个协调函数的同实例幂等代码审查；只有存在不污染正式 Gameplay 的合法受控入口时才补最小运行证据，禁止用 Level Blueprint 直接调用核心初始化函数。
+- 低级执行者首次门禁已收紧为：首次工具调用只能读取活动卡；读取后不得再调用工具，必须先复述并等待用户单独确认。
+- Phase 2 计划中的探索地图名称已统一为真实 `Map_Phase1_Exploration`；本轮仍未修改 Gameplay、Content、Config 或 todo，未构建、未运行 Editor/PIE、未执行 Git。
+
+## 2026-07-17｜Coordinator：记录 TASK-P2-001 实施后事实更正
+
+- 用户明确确认 `f03888e` 中 `ABP_HSRExploration.uasset` 是本人主动修改且无问题。该文件作为 P2-001 范围外附带用户修改保留，不计入 GAS 验收，不要求从历史移出；此说明不等于扩大 P2-001 的 GAS 验收范围。
+- 用户更正 `a58f385` 中 `Source/HSR/UI/HSRAttributeViewModel.cpp` 行为修复实际由 Implementation Agent 完成，只是被用户误与资产一同提交。执行报告和活动卡已将该代码归回 Segment A，并保留资产为 Segment B；只校正作者/Segment 事实，不改写 Git 历史。
+- 初始化 GE 实际路径统一为 `/Game/GameplayEffects/BP_GE_InitializeCoreAttributes`；`BP_` 是用户对 Blueprint 特殊类的明确命名选择，不再要求改回无前缀名称。
+- Reviewer 原 `REVISE` 中上述三项归属/命名疑点已由用户事实说明解除。Reviewer 权限边界保持：当前仍为 `REVISE`，尚缺最终源码树真实 `HSREditor Development Win64` 构建证据，以及 Editor 重开、PIE 主路径和缺失 GE 失败路径的可核证材料；只有 Reviewer 后续复审可以放行。
+- 本轮只修订 Markdown 事实记录，不修改源码或资产，不构建、不运行 Editor/PIE、不执行 Git。
+
+## 2026-07-17｜Coordinator：接收 TASK-P2-001 最终补证
+
+- 用户补交当前最终源码树的 Visual Studio/UBT 构建输出：`HSREditor Win64 Development`，命令进入 UnrealBuildTool，结果为 `Target is up to date`、`Result: Succeeded`，汇总为 `1 成功，0 失败，11 最新，0 已跳过`，耗时 `00.857` 秒。该证据证明当前构建入口成功，但不伪称本次触发了新增 UHT/C++/Link。
+- 用户确认 Editor 重启后一切功能正常。
+- 用户提供附件日志 `C:\Users\Lai\.codex\attachments\82cae8ee-5b8c-4aa0-9e2e-9737e9e3043b\pasted-text.txt`，覆盖缺失 GE 与恢复 GE 后两次 PIE。
+- 缺失 GE 路径记录 `InitialAttributesEffect is not set`，PIE 正常启动并退出，未见崩溃；恢复引用后记录 `GE applied successfully via WasSuccessfullyApplied`。
+- 两次 PIE 均记录 `Owner=Avatar=self, ActorInfo valid`、`Bound 5 attribute delegates`，退出时记录 `Removed all attribute delegates`。
+- `TASK-P2-001` 当前不由 Coordinator 直接判 PASS；状态推进为等待 Reviewer 根据任务卡、实际 diff、执行报告和用户补证做最终复审。
+- P2-002 仍不得开始；动态改值、Max 收敛、Widget 重建专项运行证据和 Re-Possess 深度回归继续留在 P2-002。
+
+## 2026-07-17｜P2-001 补证审查记录
+
+- 独立 Reviewer 结论保持 `REVISE`；后续由用户明确接受剩余证据边界并决定任务完成，不得将用户决定改写为 Reviewer `PASS`。
+- 原 `REVISE` 的三类证据阻断已解除：最终构建入口成功、Editor 重开后功能正常、PIE 日志覆盖主路径与缺失 GE 失败路径。
+- 构建证据为 up-to-date 成功，不伪称本次重新触发 UHT/C++/Link；由于当前最终源码树经 UBT 返回 `Succeeded`，该项不再阻断 P2-001。
+- PIE 证据覆盖 `Owner=Avatar=self, ActorInfo valid`、缺失 GE warning、恢复 GE 后 `WasSuccessfullyApplied`、5 个 Attribute Delegate 绑定，以及退出时 Delegate Teardown。
+- 事实修正已记录：`f03888e` 附带动画资产为用户修改；`a58f385` 的 ViewModel.cpp 修复归 Implementation Agent；初始化 GE 路径接受 `/Game/GameplayEffects/BP_GE_InitializeCoreAttributes`。
+- Follow-up 明确留给 P2-002：动态属性改值、Max 降低后的 Current 收敛、Widget 重建/解绑专项运行证据和 Re-Possess 深度回归。
+- 当前仍需 Coordinator 后续归档 `TASK-P2-001`；归档完成前不开始 P2-002。
+
+## 2026-07-17｜Coordinator：按用户验收归档 TASK-P2-001
+
+- `TASK-P2-001` 最终处置为 `USER ACCEPTED`：独立 Reviewer 结论仍为 `REVISE`，用户明确判定任务完成并授权进入 P2-002；未创建或暗示 Reviewer `PASS`。
+- 用户接受的两项证据边界继续保留：构建仅证明当前目标 up-to-date 且 UBT `Succeeded`，没有新鲜 UHT/C++/Link；Editor 重开与 PIE 材料来自用户而非 Reviewer 独立运行。
+- 归档文件：`tasks/archive/TASK-P2-001-active-task.md`、`tasks/archive/TASK-P2-001-execution-result.md`、`tasks/archive/TASK-P2-001-final-review.md`。
+- P2-001 归档后创建唯一活动任务 `TASK-P2-002`，聚焦动态属性变化、Max 降低后的 Current 收敛、Widget 重建/解绑、连续 PIE 与 Re-Possess 回归。
+- P2-002 不得提前进入 Ability、伤害、治疗、Cost、Cooldown、战斗、TurnSystem 或 SaveGame。
+- 本轮归档只移动任务 Markdown、更新项目快照与 worklog，不修改源码、资产、Config，不构建、不运行 Editor/PIE、不 push。
+
+## 2026-07-17｜Coordinator：规划并交接 TASK-P2-002
+
+- 依据 `docs/phase-2-execution-plan.md` §7 创建唯一活动任务 `TASK-P2-002：属性变化、边界与生命周期专项闭环`；当前仅规划，尚未实施。
+- 唯一结果锁定为：受控测试 GE 改变属性后，每个预期底层变化恰好触发一次 UI 更新；Clamp、Max 降低后的 Current 收敛、Re-Possess、Widget 销毁/重建与连续 PIE 均有可核证结果。
+- 测试入口必须沿 Character/ASC 所有权链应用 GE；禁止 Level Blueprint 或 Widget 直接写真源。用户是 `/Game/GameplayEffects/GE_TestModifyCoreAttribute` 的唯一 Editor 资产作者。
+- C++ 修改范围精确锁定为 P2-001 的 GAS/Attribute/CharacterBase/ViewModel 与必要 HUD/UserWidget 生命周期文件；Build.cs 只读，地图、Input、Controller、GameMode、Config、AnimBP、Ability、伤害和 Phase 3 全部禁止。
+- 当前交接 Coordinator → Implementation Agent 首次只读复述；必须以 `等待用户确认执行 TASK-P2-002。` 结束，用户确认前不得继续调用工具或实施。
+- 本轮未修改源码或资产，未构建、未运行 Editor/PIE、未执行 Git。
+
+## 2026-07-17｜Coordinator：响应 TASK-P2-002 任务卡 Reviewer REVISE
+
+- Reviewer 判定首版卡 `REVISE`，原因是“受控入口”没有可直接实施的 Blueprint/C++ 调用契约；该结论只针对任务卡，不代表 P2-002 实施已经发生。
+- Character 开发期接口固定为 `RequestApplyPhase2TestEffect(TSubclassOf<UGameplayEffect>)` 与 `RequestPhase2Repossess()`；Blueprint 只发请求，前者仅接受五个任务白名单 GE 精确包路径，后者内部保存当前 Controller 后执行 `UnPossess → Possess(this)`。Shipping 明确拒绝。
+- HUD 开发期重建请求固定沿现有 Remove/Show 路径执行，并以 HUD 持有的 next-tick/弱引用安全顺序重建整个 ExplorationHUD；旧 Debug Widget 不得在销毁后继续执行或访问自身。
+- 单一测试 GE 拆为用户创建的五个精确资产：Health 低于零、Health 高于 Max、降低 MaxHealth、Energy 边界、Speed 低于零；不用 SetByCaller 或新 Tags，Modifier 数值和预期回调集合由执行前基线决定。
+- 诊断固定为每属性 ASC Delegate 次数、ViewModel 广播次数、当前 Widget 接收次数和旧 Widget 销毁后接收次数，并记录 Character/ASC/ViewModel/HUD/Widget 实例标识。Blueprint multicast 在 Construct 显式绑定、Destruct 显式解绑。
+- 本轮仅修订活动卡、Phase 2 计划、项目快照与日志；未修改源码或资产，未构建、未运行 Editor/PIE、未执行 Git。
+
+## 2026-07-17｜Coordinator：收紧 P2-002 受控接口配置边界
+
+- Character 的测试 GE/Re-Possess 与 HUD 的安全重建三个接口统一限定为仅 Debug/Development 可用。
+- 实现契约固定为 `#if UE_BUILD_SHIPPING || UE_BUILD_TEST`：记录明确 Warning 并拒绝执行；两个 `bool` 接口返回 `false`，HUD `void` 接口直接返回。
+- `meta = (DevelopmentOnly)` 仅作为 Blueprint 元数据保留，不得代替 C++ 的 Test/Shipping 防线。
+- 本轮只修订协调文档，未修改源码或资产，未构建、未运行 Editor/PIE、未执行 Git。
