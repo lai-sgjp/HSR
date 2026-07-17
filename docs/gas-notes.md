@@ -67,3 +67,31 @@
 ### 编译、PIE 和测试证据
 
 ### 学习与面试要点
+
+## 2026-07-17｜Phase 2 最小 GAS 属性闭环
+
+### 运行职责与数据流
+
+- ASC：保存 Ability Actor Info、应用 GE、维护属性结果并发布 Attribute Change Delegate。
+- AttributeSet：定义 Health、MaxHealth、Energy、MaxEnergy、Speed 及其边界；当前结论只覆盖已验证的 Instant/base GE 路径。
+- GE：数据化描述属性变更。初始化 GE 只成功应用一次；测试 GE 可按测试需要重复应用。
+- Delegate：通知已绑定观察者，不是任务执行管线。ViewModel 绑定 ASC，Widget 消费 ViewModel。
+
+完整链路：`构造期创建 ASC/AttributeSet → 运行期 InitAbilityActorInfo → ASC 应用 GE → AttributeSet 最终值/收敛 → Delegate → ViewModel → Widget`。
+
+### Snapshot、幂等与生命周期
+
+- Snapshot 是观察者创建时主动读取 ASC 当前状态；它不应用 GE、不重置属性，也不替代后续 Delegate。
+- 初始化入口重复不等于初始化 GE 重复。Re-Possess 后 Actor Info 可以刷新，但初始化 GE 成功应用计数保持 1，Delegate 绑定不得叠加。
+- GE `Override` 是属性 Modifier Op，与 C++ 虚函数 `override` 无关。Add 重复会叠加；Override 重复可能把战斗后的合法状态覆盖回初值，并产生重复事件，因此两者都需要幂等保护。
+- Owner 是 ASC 的逻辑拥有者，Avatar 是当前执行/呈现 GAS 行为的实体。本阶段二者都是 Character，但概念不可合并；对象存在也不等于 Actor Info 完整。
+
+### Debug 顺序与证据边界
+
+当 GE 报告成功但 HUD 没变化时，先读取 AttributeSet/ASC 最终真源。若真源已变，再检查 `Delegate → ViewModel → 当前 Widget`；若真源未变，检查 Modifier、目标属性与 Clamp，而不是先改 UI。
+
+P2-001 保持 `USER ACCEPTED` 和历史 Reviewer `REVISE`；P2-002 为 Reviewer `PASS`，其中 Editor/PIE 与部分计数证据来自用户测试确认。Clamp 不外推到未验证的 Duration/Infinite 聚合路径。
+
+### 学习 Gate
+
+用户已达到 Phase 2 最低学习 Gate：掌握基本数据流、snapshot/Delegate、UI 非真源，以及真源已变后的 `Delegate → ViewModel → Widget` 排查链。初始化幂等细节、Add/Override、Owner/Avatar 为非阻断复习项。
