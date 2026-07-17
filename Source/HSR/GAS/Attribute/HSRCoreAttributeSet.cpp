@@ -35,26 +35,52 @@ void UHSRCoreAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 {
 	Super::PostGameplayEffectExecute(Data);
 
-	// When MaxHealth decreases, clamp Health to [0, new MaxHealth]
+	// When MaxHealth changes, clamp Health to [0, new MaxHealth]
 	if (Data.EvaluatedData.Attribute == GetMaxHealthAttribute())
 	{
 		const float NewMaxHealth = GetMaxHealth();
-		const float CurrentHealth = GetHealth();
-		if (CurrentHealth > NewMaxHealth)
+		const float CurHealth = GetHealth();
+		const float ClampedHealth = FMath::Clamp(CurHealth, 0.0f, NewMaxHealth);
+		if (CurHealth != ClampedHealth)
 		{
-			SetHealth(FMath::Clamp(CurrentHealth, 0.0f, NewMaxHealth));
-			UE_LOG(LogTemp, Log, TEXT("UHSRCoreAttributeSet::PostGameplayEffectExecute - MaxHealth decreased; Health clamped from %f to %f"), CurrentHealth, NewMaxHealth);
+			SetHealth(ClampedHealth);
+			UE_LOG(LogTemp, Log, TEXT("UHSRCoreAttributeSet::PostGameplayEffectExecute - MaxHealth changed; Health clamped from %f to %f"), CurHealth, ClampedHealth);
 		}
 	}
-	// When MaxEnergy decreases, clamp Energy to [0, new MaxEnergy]
+	// When MaxEnergy changes, clamp Energy to [0, new MaxEnergy]
 	else if (Data.EvaluatedData.Attribute == GetMaxEnergyAttribute())
 	{
 		const float NewMaxEnergy = GetMaxEnergy();
-		const float CurrentEnergy = GetEnergy();
-		if (CurrentEnergy > NewMaxEnergy)
+		const float CurEnergy = GetEnergy();
+		const float ClampedEnergy = FMath::Clamp(CurEnergy, 0.0f, NewMaxEnergy);
+		if (CurEnergy != ClampedEnergy)
 		{
-			SetEnergy(FMath::Clamp(CurrentEnergy, 0.0f, NewMaxEnergy));
-			UE_LOG(LogTemp, Log, TEXT("UHSRCoreAttributeSet::PostGameplayEffectExecute - MaxEnergy decreased; Energy clamped from %f to %f"), CurrentEnergy, NewMaxEnergy);
+			SetEnergy(ClampedEnergy);
+			UE_LOG(LogTemp, Log, TEXT("UHSRCoreAttributeSet::PostGameplayEffectExecute - MaxEnergy changed; Energy clamped from %f to %f"), CurEnergy, ClampedEnergy);
+		}
+	}
+	// When Health modified directly, clamp to [0, MaxHealth]
+	else if (Data.EvaluatedData.Attribute == GetHealthAttribute())
+	{
+		const float CurHealth = GetHealth();
+		const float MaxH = GetMaxHealth();
+		const float Clamped = FMath::Clamp(CurHealth, 0.0f, MaxH);
+		if (CurHealth != Clamped)
+		{
+			SetHealth(Clamped);
+			UE_LOG(LogTemp, Log, TEXT("UHSRCoreAttributeSet::PostGameplayEffectExecute - Health clamped from %f to %f"), CurHealth, Clamped);
+		}
+	}
+	// When Energy modified directly, clamp to [0, MaxEnergy]
+	else if (Data.EvaluatedData.Attribute == GetEnergyAttribute())
+	{
+		const float CurEnergy = GetEnergy();
+		const float MaxE = GetMaxEnergy();
+		const float Clamped = FMath::Clamp(CurEnergy, 0.0f, MaxE);
+		if (CurEnergy != Clamped)
+		{
+			SetEnergy(Clamped);
+			UE_LOG(LogTemp, Log, TEXT("UHSRCoreAttributeSet::PostGameplayEffectExecute - Energy clamped from %f to %f"), CurEnergy, Clamped);
 		}
 	}
 }

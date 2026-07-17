@@ -111,7 +111,7 @@ void AHSRCharacterBase::ApplyInitialAttributes()
 	{
 		bInitialAttributesApplied = true;
 		InitialAttributesApplySuccessCount++;
-		UE_LOG(LogTemp, Log, TEXT("%s::ApplyInitialAttributes - GE applied successfully via WasSuccessfullyApplied (total=%d)"), *GetName(), InitialAttributesApplySuccessCount, *GetName());
+		UE_LOG(LogTemp, Log, TEXT("%s::ApplyInitialAttributes - GE applied successfully via WasSuccessfullyApplied (total=%d)"), *GetName(), InitialAttributesApplySuccessCount);
 	}
 	else
 	{
@@ -138,16 +138,16 @@ bool AHSRCharacterBase::RequestApplyPhase2TestEffect(TSubclassOf<UGameplayEffect
 		return false;
 	}
 
-	const FString Path = TestEffect->GetPathName();
-	const bool bAllowed = Path == TEXT("/Game/GameplayEffects/BP_GE_Test_HealthBelowZero.BP_GE_Test_HealthBelowZero_C")
-		|| Path == TEXT("/Game/GameplayEffects/BP_GE_Test_HealthAboveMax.BP_GE_Test_HealthAboveMax_C")
-		|| Path == TEXT("/Game/GameplayEffects/BP_GE_Test_LowerMaxHealth.BP_GE_Test_LowerMaxHealth_C")
-		|| Path == TEXT("/Game/GameplayEffects/BP_GE_Test_EnergyBounds.BP_GE_Test_EnergyBounds_C")
-		|| Path == TEXT("/Game/GameplayEffects/BP_GE_Test_SpeedBelowZero.BP_GE_Test_SpeedBelowZero_C");
+	const FString PackagePath = TestEffect->GetOutermost()->GetName();
+	const bool bAllowed = PackagePath == TEXT("/Game/GameplayEffects/BP_GE_Test_HealthBelowZero")
+		|| PackagePath == TEXT("/Game/GameplayEffects/BP_GE_Test_HealthAboveMax")
+		|| PackagePath == TEXT("/Game/GameplayEffects/BP_GE_Test_LowerMaxHealth")
+		|| PackagePath == TEXT("/Game/GameplayEffects/BP_GE_Test_EnergyBounds")
+		|| PackagePath == TEXT("/Game/GameplayEffects/BP_GE_Test_SpeedBelowZero");
 
 	if (!bAllowed)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("%s::RequestApplyPhase2TestEffect - Effect %s not in allowed Phase 2 test list"), *GetName(), *Path);
+		UE_LOG(LogTemp, Warning, TEXT("%s::RequestApplyPhase2TestEffect - Effect %s not in allowed Phase 2 test list"), *GetName(), *PackagePath);
 		return false;
 	}
 
@@ -161,7 +161,7 @@ bool AHSRCharacterBase::RequestApplyPhase2TestEffect(TSubclassOf<UGameplayEffect
 
 	FActiveGameplayEffectHandle Handle = AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 	const bool bResult = Handle.WasSuccessfullyApplied();
-	UE_LOG(LogTemp, Log, TEXT("%s::RequestApplyPhase2TestEffect - Applied %s success=%d"), *GetName(), *Path, bResult);
+	UE_LOG(LogTemp, Log, TEXT("%s::RequestApplyPhase2TestEffect - Applied %s success=%d"), *GetName(), *PackagePath, bResult);
 	return bResult;
 #endif
 }
@@ -172,50 +172,90 @@ bool AHSRCharacterBase::RequestPhase2Repossess()
 	UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - Rejected in Test/Shipping"), *GetName());
 	return false;
 #else
+	// Pre-snapshot
+	UE_LOG(LogTemp, Log, TEXT("%s::RequestPhase2Repossess - PRE: Controller=%s, Pawn=%s, ASC=%s, InitApplyCount=%d"),
+		*GetName(),
+		GetController() ? *GetController()->GetName() : TEXT("null"),
+		*GetName(),
+		AbilitySystemComponent ? *AbilitySystemComponent->GetName() : TEXT("null"),
+		InitialAttributesApplySuccessCount);
+	if (AbilitySystemComponent && AbilitySystemComponent->AbilityActorInfo.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("%s::RequestPhase2Repossess - PRE: ActorInfo valid, Owner=%s, Avatar=%s"),
+			*GetName(),
+			AbilitySystemComponent->AbilityActorInfo->OwnerActor.IsValid() ? *AbilitySystemComponent->AbilityActorInfo->OwnerActor->GetName() : TEXT("null"),
+			AbilitySystemComponent->AbilityActorInfo->AvatarActor.IsValid() ? *AbilitySystemComponent->AbilityActorInfo->AvatarActor->GetName() : TEXT("null"));
+		const UHSRCoreAttributeSet* CoreSet = AbilitySystemComponent->GetSet<UHSRCoreAttributeSet>();
+		if (CoreSet)
+		{
+			UE_LOG(LogTemp, Log, TEXT("%s::RequestPhase2Repossess - PRE: Health=%f MaxHealth=%f Energy=%f MaxEnergy=%f Speed=%f"),
+				*GetName(), CoreSet->GetHealth(), CoreSet->GetMaxHealth(), CoreSet->GetEnergy(), CoreSet->GetMaxEnergy(), CoreSet->GetSpeed());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("%s::RequestPhase2Repossess - PRE: ActorInfo invalid"), *GetName());
+	}
+
 	AController* OriginalController = GetController();
 	if (!OriginalController)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - No Controller to re-possess"), *GetName());
+		UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - No Controller"), *GetName());
 		return false;
 	}
-
 	if (OriginalController->GetPawn() != this)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - Controller %s does not possess this character"), *GetName(), *OriginalController->GetName());
+		UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - Current Controller %s does not possess this"), *GetName(), *OriginalController->GetName());
 		return false;
 	}
-
-	UE_LOG(LogTemp, Log, TEXT("%s::RequestPhase2Repossess - Re-possessing via controller %s"), *GetName(), *OriginalController->GetName());
 
 	OriginalController->UnPossess();
 	OriginalController->Possess(this);
 
-	// Validate post-possess state: controller, ASC, ActorInfo all correct
-	if (OriginalController->GetPawn() != this)
+	// Individual null checks
+	if (!OriginalController)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - Validation FAILED: GetPawn() != this"), *GetName());
+		UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - FAIL: Controller destroyed"), *GetName());
+		return false;
+	}
+	AActor* PostPawn = OriginalController->GetPawn();
+	if (PostPawn != this)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - FAIL: GetPawn()=%s"), *GetName(), PostPawn ? *PostPawn->GetName() : TEXT("null"));
+		return false;
+	}
+	if (!AbilitySystemComponent)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - FAIL: ASC destroyed"), *GetName());
+		return false;
+	}
+	if (!AbilitySystemComponent->AbilityActorInfo.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - FAIL: ActorInfo invalid"), *GetName());
+		return false;
+	}
+	const AActor* OwnerActor = AbilitySystemComponent->AbilityActorInfo->OwnerActor.Get();
+	const AActor* AvatarActor = AbilitySystemComponent->AbilityActorInfo->AvatarActor.Get();
+	if (!OwnerActor || OwnerActor != this)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - FAIL: Owner=%s"), *GetName(), OwnerActor ? *OwnerActor->GetName() : TEXT("null"));
+		return false;
+	}
+	if (!AvatarActor || AvatarActor != this)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - FAIL: Avatar=%s"), *GetName(), AvatarActor ? *AvatarActor->GetName() : TEXT("null"));
 		return false;
 	}
 
-	if (!AbilitySystemComponent || !AbilitySystemComponent->AbilityActorInfo.IsValid())
+	// Post-snapshot
+	const UHSRCoreAttributeSet* CoreSetPost = AbilitySystemComponent->GetSet<UHSRCoreAttributeSet>();
+	if (CoreSetPost)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - Validation FAILED: ASC or ActorInfo invalid"), *GetName());
-		return false;
+		UE_LOG(LogTemp, Log, TEXT("%s::RequestPhase2Repossess - POST: Health=%f MaxHealth=%f Energy=%f MaxEnergy=%f Speed=%f"),
+			*GetName(), CoreSetPost->GetHealth(), CoreSetPost->GetMaxHealth(), CoreSetPost->GetEnergy(), CoreSetPost->GetMaxEnergy(), CoreSetPost->GetSpeed());
 	}
-
-	if (AbilitySystemComponent->AbilityActorInfo->OwnerActor != this || AbilitySystemComponent->AbilityActorInfo->AvatarActor != this)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("%s::RequestPhase2Repossess - Validation FAILED: OwnerActor=%s AvatarActor=%s not both self"),
-			*GetName(),
-			*AbilitySystemComponent->AbilityActorInfo->OwnerActor->GetName(),
-			*AbilitySystemComponent->AbilityActorInfo->AvatarActor->GetName());
-		return false;
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("%s::RequestPhase2Repossess - RE-POSSESS SUCCESS: Controller=%s, Pawn=this, Owner=Avatar=self, InitialAttributesApplySuccessCount=%d"),
-		*GetName(),
-		*OriginalController->GetName(),
-		InitialAttributesApplySuccessCount);
+	UE_LOG(LogTemp, Log, TEXT("%s::RequestPhase2Repossess - SUCCESS: Cont=%s, Pawn=this, Owner=Avatar=self, ActorInfo valid, InitApplyCount=%d"),
+		*GetName(), *OriginalController->GetName(), InitialAttributesApplySuccessCount);
 
 	return true;
 #endif

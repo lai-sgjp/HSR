@@ -52,20 +52,38 @@ void AHSRHUD::RequestRebuildExplorationHUDForPhase2Test()
 	RemoveExplorationHUD();
 
 	TWeakObjectPtr<AHSRHUD> WeakThis(this);
-	if (GetWorld())
+	if (!GetWorld())
 	{
-		GetWorld()->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateLambda([WeakThis]()
-		{
-			AHSRHUD* HUD = WeakThis.Get();
-			if (!HUD)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("AHSRHUD::RequestRebuildExplorationHUDForPhase2Test - HUD destroyed before next tick"));
-				return;
-			}
-			HUD->ShowExplorationHUD();
-			// Snapshot path: new Widget Construct (BP) calls BroadcastCurrentValues as single entry point
-		}));
+		UE_LOG(LogTemp, Warning, TEXT("AHSRHUD::RequestRebuildExplorationHUDForPhase2Test - GetWorld() is null, cannot schedule rebuild"));
+		return;
 	}
+	GetWorld()->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateLambda([WeakThis]()
+	{
+		AHSRHUD* HUD = WeakThis.Get();
+		if (!HUD)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("AHSRHUD::RequestRebuildExplorationHUDForPhase2Test - HUD destroyed before next tick"));
+			return;
+		}
+		HUD->ShowExplorationHUD();
+		// Validate PlayerController -> Pawn -> HUD chain (no second broadcast)
+		APlayerController* PC = HUD->GetOwningPlayerController();
+		if (!PC)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("AHSRHUD::RequestRebuildExplorationHUDForPhase2Test - PC is null after Show"));
+			return;
+		}
+		APawn* Pawn = PC->GetPawn();
+		if (!Pawn)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("AHSRHUD::RequestRebuildExplorationHUDForPhase2Test - Pawn is null after Show"));
+			return;
+		}
+		AHUD* HUDCheck = PC->GetHUD();
+		UE_LOG(LogTemp, Log, TEXT("AHSRHUD::RequestRebuildExplorationHUDForPhase2Test - Chain valid: PC=%s, Pawn=%s, HUD=%s"),
+			*PC->GetName(), *Pawn->GetName(), HUDCheck ? *HUDCheck->GetName() : TEXT("null"));
+		// Snapshot path: new Widget Construct (BP) calls BroadcastCurrentValues as single entry point
+	}));
 #endif
 }
 

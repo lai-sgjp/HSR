@@ -43,6 +43,8 @@ public:
 	int32 SpeedChangeCount;
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Diagnostics")
 	int32 TotalBroadcastCount;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Diagnostics")
+	int32 SnapshotBroadcastCount;
 
 	// Public reset for P2-002
 	void ResetDiagnosticCounters();

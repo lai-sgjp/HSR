@@ -54,6 +54,7 @@ void UHSRAttributeViewModel::ResetDiagnosticCounters()
 	MaxEnergyChangeCount = 0;
 	SpeedChangeCount = 0;
 	TotalBroadcastCount = 0;
+	SnapshotBroadcastCount = 0;
 	UE_LOG(LogTemp, Log, TEXT("UHSRAttributeViewModel::ResetDiagnosticCounters - All counters reset"));
 }
 
@@ -64,8 +65,9 @@ void UHSRAttributeViewModel::BroadcastCurrentValues()
 	return;
 #else
 	PushCurrentValues();
+	SnapshotBroadcastCount++;
 	OnValuesUpdated.Broadcast(this);
-	UE_LOG(LogTemp, Log, TEXT("UHSRAttributeViewModel::BroadcastCurrentValues - Manual broadcast triggered with TotalBroadcastCount=%d"), TotalBroadcastCount);
+	UE_LOG(LogTemp, Log, TEXT("UHSRAttributeViewModel::BroadcastCurrentValues - Manual snapshot broadcast #%d (TotalBroadcastCount=%d)"), SnapshotBroadcastCount, TotalBroadcastCount);
 #endif
 }
 
