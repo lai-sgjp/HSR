@@ -18,6 +18,7 @@ void UHSRAttributeViewModel::InitializeFromASC(UAbilitySystemComponent* InASC)
 	if (!CoreSet)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UHSRAttributeViewModel::InitializeFromASC - No CoreAttributeSet on ASC"));
+		OnValuesUpdated.Broadcast(this);
 		return;
 	}
 
@@ -39,6 +40,8 @@ void UHSRAttributeViewModel::InitializeFromASC(UAbilitySystemComponent* InASC)
 	DelegateHandles.Add(CoreSet->GetSpeedAttribute(), Handle);
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRAttributeViewModel::InitializeFromASC - Bound %d attribute delegates"), DelegateHandles.Num());
+
+	OnValuesUpdated.Broadcast(this);
 }
 
 void UHSRAttributeViewModel::Teardown()
