@@ -95,3 +95,9 @@ P2-001 保持 `USER ACCEPTED` 和历史 Reviewer `REVISE`；P2-002 为 Reviewer 
 ### 学习 Gate
 
 用户已达到 Phase 2 最低学习 Gate：掌握基本数据流、snapshot/Delegate、UI 非真源，以及真源已变后的 `Delegate → ViewModel → Widget` 排查链。初始化幂等细节、Add/Override、Owner/Avatar 为非阻断复习项。
+
+### Reviewer 补答闭环
+
+Reviewer 要求进一步确认后，用户通过最小纠正完成以下闭环：Add 型初始化 GE 在 Health 初值 100 时重复成功应用会得到 200；Re-Possess 后初始化 GE 成功应用次数仍必须为 1；Owner 有效、Avatar 为空不代表依赖 Avatar 的运行行为可靠；HUD 全 0 时先读 AttributeSet/ASC 的 Health 等最终真源，真源也为 0 才向上查 Actor Info 与初始化 GE，真源已变则向下查 `Delegate → ViewModel → Widget`。
+
+用户最初曾将 Add 重复结果答为“不变”，并把 HUD 全 0 的第一检查点答为 Actor Info；最终答案已纠正且明确保留这条学习轨迹。Phase 2 强制学习门禁现已满足，但 Phase 2 `Ready` 仍只能由后续 Reviewer 与 Coordinator 流程判定。
