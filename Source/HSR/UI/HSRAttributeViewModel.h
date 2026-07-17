@@ -30,6 +30,27 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnAttributeValuesUpdated OnValuesUpdated;
 
+	// Diagnostic counters for Phase 2 testing
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Diagnostics")
+	int32 HealthChangeCount;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Diagnostics")
+	int32 MaxHealthChangeCount;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Diagnostics")
+	int32 EnergyChangeCount;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Diagnostics")
+	int32 MaxEnergyChangeCount;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Diagnostics")
+	int32 SpeedChangeCount;
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Diagnostics")
+	int32 TotalBroadcastCount;
+
+	// Public reset for P2-002
+	void ResetDiagnosticCounters();
+
+	// Re-broadcast current values (after HUD rebuild etc.)
+	UFUNCTION(BlueprintCallable, Category = "Diagnostics", meta = (DevelopmentOnly))
+	void BroadcastCurrentValues();
+
 protected:
 	void PushCurrentValues();
 	void OnAttributeChanged(const FOnAttributeChangeData& Data);

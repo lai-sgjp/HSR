@@ -10,6 +10,7 @@ void UHSRAttributeViewModel::InitializeFromASC(UAbilitySystemComponent* InASC)
 	}
 
 	Teardown();
+	ResetDiagnosticCounters();
 
 	ASCWeakPtr = InASC;
 	PushCurrentValues();
@@ -42,6 +43,30 @@ void UHSRAttributeViewModel::InitializeFromASC(UAbilitySystemComponent* InASC)
 	UE_LOG(LogTemp, Log, TEXT("UHSRAttributeViewModel::InitializeFromASC - Bound %d attribute delegates"), DelegateHandles.Num());
 
 	OnValuesUpdated.Broadcast(this);
+}
+
+
+void UHSRAttributeViewModel::ResetDiagnosticCounters()
+{
+	HealthChangeCount = 0;
+	MaxHealthChangeCount = 0;
+	EnergyChangeCount = 0;
+	MaxEnergyChangeCount = 0;
+	SpeedChangeCount = 0;
+	TotalBroadcastCount = 0;
+	UE_LOG(LogTemp, Log, TEXT("UHSRAttributeViewModel::ResetDiagnosticCounters - All counters reset"));
+}
+
+void UHSRAttributeViewModel::BroadcastCurrentValues()
+{
+#if UE_BUILD_SHIPPING || UE_BUILD_TEST
+	UE_LOG(LogTemp, Warning, TEXT("UHSRAttributeViewModel::BroadcastCurrentValues - Rejected in Test/Shipping"));
+	return;
+#else
+	PushCurrentValues();
+	OnValuesUpdated.Broadcast(this);
+	UE_LOG(LogTemp, Log, TEXT("UHSRAttributeViewModel::BroadcastCurrentValues - Manual broadcast triggered with TotalBroadcastCount=%d"), TotalBroadcastCount);
+#endif
 }
 
 void UHSRAttributeViewModel::Teardown()
@@ -79,5 +104,13 @@ void UHSRAttributeViewModel::PushCurrentValues()
 void UHSRAttributeViewModel::OnAttributeChanged(const FOnAttributeChangeData& Data)
 {
 	PushCurrentValues();
+
+	if (Data.Attribute == UHSRCoreAttributeSet::GetHealthAttribute()) HealthChangeCount++;
+	else if (Data.Attribute == UHSRCoreAttributeSet::GetMaxHealthAttribute()) MaxHealthChangeCount++;
+	else if (Data.Attribute == UHSRCoreAttributeSet::GetEnergyAttribute()) EnergyChangeCount++;
+	else if (Data.Attribute == UHSRCoreAttributeSet::GetMaxEnergyAttribute()) MaxEnergyChangeCount++;
+	else if (Data.Attribute == UHSRCoreAttributeSet::GetSpeedAttribute()) SpeedChangeCount++;
+
+	TotalBroadcastCount++;
 	OnValuesUpdated.Broadcast(this);
 }

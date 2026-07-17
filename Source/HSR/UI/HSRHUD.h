@@ -20,6 +20,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "HUD")
 	void RemoveExplorationHUD();
 
+	// Development-only Phase 2 test interface
+	UFUNCTION(BlueprintCallable, Category = "HUD|Development", meta = (DevelopmentOnly))
+	void RequestRebuildExplorationHUDForPhase2Test();
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD")
 	TSubclassOf<UHSRUserWidget> ExplorationWidgetClass;

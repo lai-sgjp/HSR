@@ -10,6 +10,7 @@ class UGameplayEffect;
 class UHSRAbilitySystemComponent;
 class UHSRCoreAttributeSet;
 class UHSRAttributeViewModel;
+class AController;
 
 UCLASS(Abstract)
 class HSR_API AHSRCharacterBase : public ACharacter, public IAbilitySystemInterface
@@ -24,6 +25,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "GAS")
 	UHSRAttributeViewModel* GetAttributeViewModel() const { return AttributeViewModel; }
+
+	// Development-only Phase 2 test interfaces
+	UFUNCTION(BlueprintCallable, Category = "GAS|Development", meta = (DevelopmentOnly))
+	bool RequestApplyPhase2TestEffect(TSubclassOf<UGameplayEffect> TestEffect);
+
+	UFUNCTION(BlueprintCallable, Category = "GAS|Development", meta = (DevelopmentOnly))
+	bool RequestPhase2Repossess();
 
 protected:
 	void InitializeAbilityActorInfo();
@@ -48,4 +56,7 @@ protected:
 	bool bInitialAttributesApplied;
 	UPROPERTY(VisibleInstanceOnly, Category = "GAS")
 	bool bAttributeDelegatesBound;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
+	int32 InitialAttributesApplySuccessCount;
 };

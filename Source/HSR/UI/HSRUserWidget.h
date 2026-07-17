@@ -20,6 +20,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "GAS")
 	UHSRAttributeViewModel* GetAttributeViewModel() const { return AttributeViewModel; }
 
+	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
+
 protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "GAS", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UHSRAttributeViewModel> AttributeViewModel;
