@@ -546,4 +546,4 @@ Reviewer `REVISE` 后，用户完成了独立补答并保留纠正轨迹：
 - HUD 全 0 且真源也为 0：最终能向上检查 Actor Info 与初始化 GE。
 - Re-Possess：最终确认初始化 GE 成功应用次数必须保持 `1`；真源已变但 UI 不刷新时检查 `Delegate → ViewModel → Widget`。
 
-上述补答使原先列为复习项的幂等、Owner/Avatar 与分层 Debug 达到本阶段要求。Phase 2 强制学习门禁现已满足；此处只记录学习结论，不代表 Teacher 有权判定 Phase 2 `Ready`。
+Teacher 曾评估上述补答达到最低门禁，但 Reviewer commits `8c34a33`、`0e1c7c8` 仍判定完整 Debug、Override/C++ `override` 与 Owner/Avatar 边界的独立掌握证据不足，结论保持 `REVISE`。用户明确接受这些项目尚未完全掌握，将其作为非阻断复习项，并授权 Coordinator 以 `USER ACCEPTED` 完成 Phase 2 收尾；不改写为 Reviewer `PASS`。

@@ -1,5 +1,7 @@
 # TASK-P2-003 累计执行与角色交接
 
+> 最终处置（2026-07-17）：`USER ACCEPTED`。工程 Gate 与 P2-002 Reviewer `PASS` 保持有效；P2-003 Reviewer commits `8c34a33`、`0e1c7c8` 仍为 `REVISE`。用户接受未完全掌握的学习项作为非阻断复习项，并授权 Coordinator 收尾；不改写为 Reviewer `PASS`。
+
 ## 当前状态
 
 - Gate 0 用户资产作者提交：完成。

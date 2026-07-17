@@ -1168,3 +1168,20 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Phase 2 工程/学习 `Ready` 与 push 交付状态分开。push 失败时记录真实错误和未完成交付，不伪造成功。
 - P2-002 的 Widget 零回调与四层计数明确为用户测试确认，不再描述为附件日志直接证明。
 - 本轮只修订协调 Markdown；未修改 Source/Content，未构建、未运行 PIE、未执行 Git。
+
+## 2026-07-17｜TASK-P2-003 Gate 0/1：用户资产提交与 Coordinator 工程交接
+
+- 用户 Gate 0 commit `44808d9d30380efd66bd25a68a24eb22cb97e36c`，author `lai_sgjp`，精确包含初始化 GE、五个测试 GE 与 `WBP_AttributeDebug` 七个资产，无 Source/Config/地图或其他资产夹带；核对时工作树干净。
+- Coordinator 核对 P2-001/P2-002 commits 与归档：P2-001 保持 `USER ACCEPTED` 而非 Reviewer `PASS`；P2-002 保持最终 Reviewer `PASS`，并保留 A1/A2/A3 与历史 `REVISE`。
+- `tasks/execution-result.md` 已创建累计 Teacher 交接，记录最终 `HSREditor` 构建、用户 Editor/PIE/Clamp/Re-Possess/HUD/连续 PIE 证据及来源边界。Widget 零回调和四层计数仅表述为用户测试确认，不冒充附件日志或 Reviewer 亲自运行。
+- 非阻断风险包括 MSVC 14.51 非 preferred、P2-001 up-to-date build 边界、Clamp 不扩展到未验证 Duration/Infinite 路径、当前 Character 自持 ASC 的单机边界。
+- Gate 1 已完成；当前交接为 Coordinator → Teacher 首次只读接收。Teacher 只能先复述并等待用户确认，不得直接教学、评估、修改文档或提交。
+- 本轮仅修改允许 Markdown；未修改 Gameplay/Content，未构建、未运行 PIE、未执行 Git。
+
+## 2026-07-17｜TASK-P2-003 / Phase 2 最终 USER ACCEPTED 收尾
+
+- 用户明确接受学习项尚未完全掌握，并授权 Coordinator 将其作为非阻断复习项，以 `USER ACCEPTED` 完成 Phase 2 收尾。
+- P2-003 Reviewer commits `8c34a33`、`0e1c7c8` 的唯一结论保持 `REVISE`；`tasks/archive/TASK-P2-003-final-review.md` 未修改，未伪造 `PASS`。
+- 工程 Gate 与 P2-002 Reviewer `PASS` 保持有效。真实提交链：Implementation `a81277b`/`0a62cb4`，用户资产 `44808d9`，Coordinator `5a4e07e`，Teacher `8037f7c`/`1fce6b6`，Reviewer `8c34a33`/`0e1c7c8`。
+- P2-001 仍为 `USER ACCEPTED` 且历史 Reviewer `REVISE` 保留；P2-003 活动卡与执行记录已归档，当前无活动任务，Phase 3 尚未开始。
+- Phase 2 判定为 `Ready`，但该状态源于工程闭环与用户明确接受剩余学习风险，不等于 Reviewer `PASS`。下一步仅建议规划 Phase 3，不自动实施。

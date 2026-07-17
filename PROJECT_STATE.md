@@ -5,13 +5,13 @@
 
 ## 当前 Phase
 
-- **Phase 1 为 `Ready`；Phase 2 工程闭环已通过，P2-003 阶段收尾进行中，尚未判定 `Ready`。P2-001 已归档，P2-002 最终 Reviewer `PASS` 并归档。**
+- **Phase 1 与 Phase 2 均为 `Ready`。P2-003 最终处置为 `USER ACCEPTED`：Reviewer 的唯一结论仍为 `REVISE`，用户明确接受未完全掌握的学习项作为非阻断复习项。**
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
 ## 当前任务
 
-- 当前唯一活动任务为 `TASK-P2-003：Phase 2 教学、最终回归与阶段收尾`。当前首个门禁是用户本人提交五个测试 GE、`WBP_AttributeDebug` 和已接受的 `BP_GE_InitializeCoreAttributes` 修改并回传 commit hash；Coordinator 不得冒充资产作者或代提交，除非用户另行明确授权。
+- 当前无活动任务。`TASK-P2-003` 已以 `USER ACCEPTED` 归档；Phase 3 尚未开始。
 - `TASK-P2-002` 经 A1/A2/A3 修订与用户最终补证后由 Reviewer 判定 `PASS`：最终 `HSREditor Win64 Development` 成功，五 GE 配置、Editor 重开、Clamp、Re-Possess、HUD 单 snapshot/teardown 和两轮连续 PIE 均有用户证据并经 Reviewer 只读核验。历史 `REVISE` 链保留。
 - `TASK-P2-001` 最终处置为 `USER ACCEPTED`：独立 Reviewer 结论仍为 `REVISE`，用户明确接受剩余证据边界并授权进入 P2-002；未伪造 Reviewer `PASS`。
 - Reviewer 曾对首版活动卡给出 `REVISE`；Coordinator 已修订 Instant GE 成功判据、P2-001/P2-002 证据边界、同实例幂等表述与首次工具调用门禁。修订不构成实施或验收。
@@ -34,7 +34,7 @@
 - 用户已回传 Editor 重开引用、帧率、同会话 Re-Possess、无 Mesh/AnimClass、Development Editor 构建与 Output Log 均无问题；这些是用户证据，完整命令/日志细节未提供且不得补造。Reviewer 已据真实证据边界放行归档。
 - `Config/DefaultEditor.ini` 是本地 AssetViewer/Editor 预览配置，不提交、不删除，并由 `.gitignore` 精确忽略。
 - P2-001 的构建证据仅为当前目标 up-to-date 且 UBT `Succeeded`，不是新鲜 UHT/C++/Link；Editor 重开与 PIE 材料来自用户而非 Reviewer 独立运行。用户明确接受这两项证据边界并判定任务完成。
-- P2-002 当前没有工程阻断；未提交的七个 Content 资产属于用户产物，是 P2-003 Gate 0 的作者提交门禁。P2-003 必须依次经过 Coordinator 交接、Teacher 教学/出题、用户原始作答、Teacher 纠正/提交、Reviewer 独立审查/提交；Reviewer `PASS` 前 Phase 2 不是 `Ready`。Ready 与 push 交付状态分开记录，push 失败不得伪造成功。
+- P2-002 工程 Gate 已通过。P2-003 的 Reviewer commits `8c34a33`、`0e1c7c8` 均保持 `REVISE`；用户接受学习缺口并授权 `USER ACCEPTED` 收尾。Phase 2 `Ready` 与远端 push 状态分开记录。
 
 ## 已完成事项
 
@@ -61,7 +61,7 @@
 
 - 已存在 `HSR.uproject`、`Source/HSR.Target.cs`、`Source/HSREditor.Target.cs`、`Source/HSR/HSR.Build.cs`、`Source/HSR/HSR.h`、`Source/HSR/HSR.cpp`、`Config/DefaultEngine.ini` 和 `Config/DefaultInput.ini`。
 - `HSR.sln` 与 `.vs/`、`Binaries/`、`Intermediate/`、`Saved/`、`DerivedDataCache/` 为工具/Editor 产物，不作为构建、PIE 或 Gameplay 通过证据。
-- 当前已完成工程基线、Phase 1 可玩闭环、P2-001 最小 GAS 初始化可见闭环及 P2-002 属性/生命周期专项；P2-003 教学与阶段收尾尚未执行。
+- 当前已完成工程基线、Phase 1 可玩闭环及 Phase 2 GAS 属性闭环；P2-003 已归档。学习缺口保留为非阻断复习项。
 
 ## 当前设计决策
 
@@ -88,7 +88,7 @@
 
 ## 下一个推荐任务
 
-- **当前唯一下一步：** 用户本人提交 P2-003 Gate 0 列出的七个资产并回传 commit hash；之后才由 Coordinator 核对并交接 Teacher。不得进入 Phase 3。
+- **下一步建议：** 仅规划 Phase 3；未经用户另行授权，不自动实施。
 
 ## 2026-07-17 TASK-P2-001 Coordinator 规划更新
 
