@@ -33,13 +33,13 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UHSRAbilitySystemComponent> AbilitySystemComponent;
 
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<const UHSRCoreAttributeSet> CoreAttributeSet;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<UGameplayEffect> InitialAttributesEffect;
 
-	UPROPERTY(VisibleInstanceOnly, Transient, Category = "GAS")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, Category = "GAS", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UHSRAttributeViewModel> AttributeViewModel;
 
 	UPROPERTY(VisibleInstanceOnly, Category = "GAS")

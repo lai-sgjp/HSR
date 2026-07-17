@@ -12,6 +12,9 @@ AHSRCharacterBase::AHSRCharacterBase()
 	AbilitySystemComponent = CreateDefaultSubobject<UHSRAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AbilitySystemComponent->SetIsReplicated(false);
 	AbilitySystemComponent->SetComponentTickEnabled(false);
+
+	CoreAttributeSet = CreateDefaultSubobject<UHSRCoreAttributeSet>(TEXT("CoreAttributeSet"));
+	AttributeViewModel = CreateDefaultSubobject<UHSRAttributeViewModel>(TEXT("AttributeViewModel"));
 }
 
 UAbilitySystemComponent* AHSRCharacterBase::GetAbilitySystemComponent() const
@@ -27,12 +30,6 @@ void AHSRCharacterBase::BeginPlay()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("%s::BeginPlay - AbilitySystemComponent is nullptr"), *GetName());
 		return;
-	}
-
-	CoreAttributeSet = AbilitySystemComponent->GetSet<UHSRCoreAttributeSet>();
-	if (!CoreAttributeSet)
-	{
-		CoreAttributeSet = AbilitySystemComponent->AddAttributeSetSubobject(NewObject<UHSRCoreAttributeSet>(AbilitySystemComponent.Get()));
 	}
 
 	InitializeAbilityActorInfo();
@@ -117,7 +114,7 @@ void AHSRCharacterBase::ApplyInitialAttributes()
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("%s::ApplyInitialAttributes - GE was NOT successfully applied (WasSuccessfullyApplied=false)"), *GetName());
+		UE_LOG(LogTemp, Warning, TEXT("%s::ApplyInitialAttributes - GE was NOT successfully applied"), *GetName());
 	}
 }
 
