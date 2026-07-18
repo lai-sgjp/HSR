@@ -1379,3 +1379,23 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Phase 3 依据 Reviewer 放行和用户工程风险接受判为 `Ready`；未写成完整 Build/UHT、最终专项或学习无缺口。
 - 保留三个工程 `USER ACCEPTED` 缺口、`OutOfRange` 未动态命中、全部学习 follow-up、同 Git 身份限制、代理提交、资产追认与历史 Git Gate 偏差。
 - 当前无活动任务；未创建或实施 Phase 4，未修改 Source/Content/Config，不 push。下一步仅建议用户审阅后另行授权 Phase 4 规划。
+
+## 2026-07-18｜Coordinator：TASK-P4-001 首次交付审计
+
+- 只读核对 `7056f72` 与 `a4fd762`：前者精确三个允许资产，后者精确九个允许 C++ 与执行报告；无白名单越界。实际顺序为资产先、Implementation 后，两者同一 Git 身份，角色归属只由 message/用户声明支持。
+- 执行报告写“不执行 Git”，实际已有 Implementation commit；commit message 写“构建/PIE 证据”，报告则明确 Editor/PIE 均未验证。保留偏差，不改写历史。
+- 根目录 Build logs 显示首轮 UHT 后失败、fix 日志 UHT/C++/Link 成功、最终日志实际编译 Subsystem 并 Link 成功；Coordinator 未运行 Build，退出码来源为报告，日志仍未跟踪且未删除。
+- 静态成立：反射类型已生成过；Pending DTO 当前无 Actor/UObject/ASC/Widget/GE/Delegate Handle；Consumer/Graybox 无新增 Tick；未越界 GAS、网络、Enemy AI 或 Phase 5。
+- 阻断：Consume 只改 `Consumed` 而未清 Payload，公开 getter 与 Consumer 可在消费后读取旧 Request；Request 缺探索地图路径。非空软地图是否真实可旅行与 OpenLevel 失败恢复也未动态验证，后者保留给 P4-003。
+- Gate 为 `IMPLEMENTATION REVISION REQUIRED`。下一步只在原 C++ 白名单补探索地图路径、改 Consume 返回 DTO 并立即清 Payload、调整 Consumer、更新报告和 fresh Build；Coordinator 复审前不进入用户 Editor/PIE、Reviewer 或 P4-002。
+- 本轮只修改协调 Markdown；未修改 Source/Content/Config，未运行 Build/Editor/PIE，未删除日志，未 stage/commit/push。
+
+## 2026-07-18｜Coordinator：TASK-P4-001 最终归档与 TASK-P4-002 建卡
+
+- 核对最终 `tasks/final-review.md`：Reviewer 结论为 `PASS WITH FOLLOW-UP`。A1/A2 已闭合 ExplorationMapPath、消费即清 Payload、Consume 返回 DTO、Consumer 不回读 Pending、删除公开 getter 与报告卫生；A2 fresh UHT/C++/Link 有日志证据。
+- 用户明确接受 A2 后 Editor 重开/PIE、两轮主路径、失败矩阵、Phase 1～3 回归和错误扫描缺失为非阻断；归档不将其写成动态验证通过。
+- 原样归档当前可读 active/execution/final-review。执行报告卫生修订仍是未提交工作树事实；历史 `REVISE`、资产先提交、同 Git 身份、报告称未 Git 与实际 commits、commit message 声称 PIE 等偏差全部保留。
+- P4-001 只代表工作包放行，不代表 Phase 4 Ready。OpenLevel failure、软路径存在性、AlreadyPending 竞争和三种 initiative 保留到 P4-003。
+- 创建唯一 `TASK-P4-002` 活动卡：只授权 Enemy Types/Character/AIController/Enemy Definition、最小 AI/Navigation Build.cs 依赖和三个用户资产；只复用 P4-001 `RequestEncounter`，禁止修改 P4-001 Source、P4-003 和 Phase 5。
+- 当前 Gate：Implementation Agent 首次只读复述并等待用户二次确认。确认前不得调用工具、实施或执行 Git。
+- 本轮未修改 Source/Content/Config，未运行 Build/Editor/PIE，未删除根目录 Build logs，未 stage/commit/push。

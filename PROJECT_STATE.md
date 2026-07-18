@@ -7,6 +7,7 @@
 
 - **Phase 1 与 Phase 2 均为 `Ready`。P2-003 最终处置为 `USER ACCEPTED`：Reviewer 的唯一结论仍为 `REVISE`，用户明确接受未完全掌握的学习项作为非阻断复习项。**
 - **Phase 3 为 `Ready`：P3-003 最终 Reviewer commit `3b3fbeb` 为 `PASS WITH FOLLOW-UP`，且用户已明确接受三个工程证据缺口；所有 follow-up 原样保留。**
+- **Phase 4 正在执行：P4-001 已以 Reviewer `PASS WITH FOLLOW-UP` 归档，A2 后 Editor/PIE 缺口由用户 `USER ACCEPTED`；当前唯一活动任务为 `TASK-P4-002`，等待首次只读复述与二次确认。**
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
@@ -15,7 +16,8 @@
 - `TASK-P3-001` 已以 Reviewer `PASS WITH FOLLOW-UP` 归档；Reviewer commit `e99078d`，最终修订 commit `64ac977`。
 - `TASK-P3-002` 已以 Reviewer `PASS WITH FOLLOW-UP` 归档；Reviewer commit `d93dbe8`，最终 Implementation/A4 commit `20ab555`。
 - `TASK-P3-003` 已以 Reviewer `PASS WITH FOLLOW-UP` 归档；最终复审 commit `3b3fbeb79cad4a8d3826fd7a13bc140aaf6d4d43`。
-- 当前无活动任务。Phase 4 未授权，未创建活动卡，也未实施。
+- `TASK-P4-001` 已归档：Reviewer 最终结论 `PASS WITH FOLLOW-UP`；commits `7056f72`、`a4fd762`、`b3c26b6`、`af64e661` 与当前可读执行报告均保留。A2 后 Editor/PIE 未验证，由用户明确接受为非阻断风险。
+- 当前唯一活动任务为 `TASK-P4-002`：数据驱动探索敌人、AI Perception/NavMesh 事件驱动巡逻/发现/追击，并只复用 P4-001 `RequestEncounter`。尚未实施。
 - `TASK-P2-003` 已以 `USER ACCEPTED` 归档；其 Reviewer `REVISE` 结论未改写。
 - `TASK-P2-002` 经 A1/A2/A3 修订与用户最终补证后由 Reviewer 判定 `PASS`：最终 `HSREditor Win64 Development` 成功，五 GE 配置、Editor 重开、Clamp、Re-Possess、HUD 单 snapshot/teardown 和两轮连续 PIE 均有用户证据并经 Reviewer 只读核验。历史 `REVISE` 链保留。
 - `TASK-P2-001` 最终处置为 `USER ACCEPTED`：独立 Reviewer 结论仍为 `REVISE`，用户明确接受剩余证据边界并授权进入 P2-002；未伪造 Reviewer `PASS`。
@@ -93,7 +95,23 @@
 
 ## 下一个推荐任务
 
-- **当前下一步：** 按 `tasks/active-task.md` 交接 `TASK-P3-001` 给低级 Implementation Agent。首次只能只读复述并等待用户对该任务编号的二次确认；确认前不得调用工具或实施。
+- **当前下一步：** Implementation Agent 首次只读复述 `TASK-P4-002`，逐字等待用户二次确认；确认前不得调用工具或实施。
+
+## 2026-07-18 TASK-P4-001 最终归档与 P4-002 规划
+
+- Independent Reviewer 最终结论为 `PASS WITH FOLLOW-UP`：A1/A2 已闭合探索地图路径、消费即清 Payload、返回 DTO、删除公开 getter 和报告卫生问题；A2 fresh UHT/C++/Link 成功。
+- 用户明确接受 A2 后 Editor 重开、两轮 PIE、失败矩阵、Phase 1～3 回归和错误扫描缺失为非阻断；不改写为 Reviewer 动态验证通过。
+- P4-001 归档保留初次 `REVISE` 链、资产先于 Implementation、同 Git 身份、报告称未 Git 与实际 commits、commit message 声称 PIE、报告卫生修订未提交等偏差。
+- OpenLevel void 的旅行失败恢复、非空软路径是否真实可加载、AlreadyPending 竞争与三种 initiative 继续留给 P4-003。
+- 已创建唯一 `TASK-P4-002` 活动卡；当前仅等待首次只读复述/二次确认，不自动实施、不进入 P4-003 或 Phase 5。
+
+## 2026-07-18 TASK-P4-001 Coordinator 首次交付审计
+
+- `7056f72` 精确包含三个允许资产；`a4fd762` 精确包含九个允许 C++ 和执行报告，无白名单越界。资产提交先于 Implementation，且两者使用同一 Git 身份；角色归属证据等级受限。
+- 报告称未执行 Git，但实际 Implementation commit 已存在；commit message 声称含 PIE 证据，而报告明确 PIE 未验证。历史不改写。
+- Build 修订链包含真实 UHT、C++ 与 Link 成功日志；Coordinator 未重跑，日志未提交。Editor 重开、资产内部绑定、PIE 与失败矩阵仍无运行证据。
+- 阻断：Consume 后 Payload 未立即清除且仍由公开 getter 读取；Request 缺探索地图路径。OpenLevel void 的旅行失败恢复继续未验证并留给 P4-003。
+- 当前 Gate 为 `IMPLEMENTATION REVISION REQUIRED`；只允许原白名单最小修订，不进入 Editor/PIE、Reviewer 或 P4-002。
 
 ## 2026-07-17 TASK-P3-001 Coordinator 规划更新
 

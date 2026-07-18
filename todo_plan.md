@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0、Phase 1 与 Phase 2 均为 `Ready`。P2-003 以 `USER ACCEPTED` 收尾，Reviewer `REVISE` 原结论保留；Phase 3 尚未开始。
+> 当前状态：Phase 0～3 均为 `Ready`，其历史 follow-up 保留。Phase 4 的 P4-001 已以 `PASS WITH FOLLOW-UP` 和用户 `USER ACCEPTED` 运行证据缺口归档；P4-002 活动卡等待首次只读复述与二次确认，尚未实施。
 
 ## 已完成的规划工作
 
@@ -165,6 +165,8 @@
 
 ## Phase 4：敌人探索表现与遇敌触发
 
+- [x] P4-001：稳定 Encounter 合同、Transition Subsystem、灰盒触发与空 Battle Map 单次消费（Reviewer `PASS WITH FOLLOW-UP`；A2 后 Editor/PIE 缺失由用户 `USER ACCEPTED`，历史 Git/同身份偏差保留）。
+- [ ] P4-002：数据驱动探索敌人、AI Perception/NavMesh 事件驱动巡逻/发现/追击并只复用 `RequestEncounter`（活动卡已创建，等待首次只读复述与二次确认；未实施）。
 - [ ] 创建 EnemyCharacter、AIController、Enemy/Encounter DataAsset。
 - [ ] 实现巡逻占位、AI Perception、发现和追击。
 - [ ] 创建 EncounterRequest 和先手类型。
