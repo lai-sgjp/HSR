@@ -1185,3 +1185,88 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 工程 Gate 与 P2-002 Reviewer `PASS` 保持有效。真实提交链：Implementation `a81277b`/`0a62cb4`，用户资产 `44808d9`，Coordinator `5a4e07e`，Teacher `8037f7c`/`1fce6b6`，Reviewer `8c34a33`/`0e1c7c8`。
 - P2-001 仍为 `USER ACCEPTED` 且历史 Reviewer `REVISE` 保留；P2-003 活动卡与执行记录已归档，当前无活动任务，Phase 3 尚未开始。
 - Phase 2 判定为 `Ready`，但该状态源于工程闭环与用户明确接受剩余学习风险，不等于 Reviewer `PASS`。下一步仅建议规划 Phase 3，不自动实施。
+
+## 2026-07-17｜Coordinator：创建 TASK-P3-001 活动任务
+
+- 用户明确授权正式进入 Phase 3。Coordinator 核对 Phase 2 收尾、Phase 3 路线图、执行计划、任务模板、现有源码与资产路径后，确认前置 Gate 为 `Ready`，Phase 3 功能仍为 `Not verified`。
+- 已创建唯一 `tasks/active-task.md`，锁定“交互协议、弱候选组件与单灰盒对象闭环”一个可见结果；视觉 Prompt/HUD 生命周期留给 P3-002，NPC、宝箱、传送、Encounter、Save 与网络均不在本包。
+- 活动卡精确区分 Implementation C++ 与用户 Editor 资产范围，并规定低级模型首次只能只读复述、逐字等待用户确认；用户二次确认前不得调用工具或实施。
+- 卡内固定 UINTERFACE/`Execute_*`、反射安全默认值、`TWeakObjectPtr`、Overlap 注册/注销幂等、无业务 Tick/UI 真源、现有碰撞响应、结构化失败和未来服务器复核边界。
+- 后续证据必须包括新鲜 `HSREditor Win64 Development` 的 UHT/C++/Link、Editor 重开、PIE 成功/无候选/离开/不可用/销毁/重复事件路径，以及 Move/Look/Jump、输入上下文和 Phase 2 属性 HUD 回归。
+- 当前未跟踪的 `docs/phase-3-execution-plan.md` 是主 Agent依据用户授权创建的合法规划产物，已保留并同步活动状态；计划与任务卡均不是功能完成证据。
+- 本轮只修改必要 Markdown 协调产物；未修改 Source/Content/Config，未构建、未启动 Editor/PIE、未执行 Git stage/commit/push。
+
+## 2026-07-18｜Coordinator：TASK-P3-001 Implementation 只读交付核对
+
+- 实际提交链已前进：用户资产 commits `2e913d0`、`d456d59` 创建灰盒 BP/地图实例；Implementation commit `9356ad0da4b9dc8f41f37e71b7ddd183e43b9a7c` 包含任务允许的九个 C++ 文件和执行报告。
+- 执行报告记录 `HSREditor Win64 Development` 构建退出码 0、新反射 UHT 与模块 Link 成功；Coordinator 只读核对源码和提交，没有亲自重跑 Build，Editor 重开与 PIE 全矩阵仍未验证。
+- 基本实现符合方向：接口调用使用 `Execute_*`，Character 只转发 `TryInteract()`，候选为 `TWeakObjectPtr`，Component/灰盒 Actor 禁用 Tick，碰撞为 QueryOnly overlap，未修改 Config/Build.cs/GAS/UI。
+- 当前阻断：Context 保存目标而非请求者；`OutOfRange` 没有运行期复核路径；Overlap 未显式限制探索角色；弱目标失效后不会广播候选清空；失败日志缺少足够对象上下文。
+- Coordinator 将上述问题收敛为原允许源码范围内的最小修订，不进入 P3-002、不扩大文件范围；修订并重新构建成功前暂缓用户正式 Editor/PIE 验收。
+- 原活动卡禁止 Implementation Agent commit，但 `9356ad0` 已实际存在；历史不删除、不重写，后续 Reviewer 核对真实授权、作者与顺序。
+- 本轮未修改 Gameplay/Content/Config，未运行 Build/Editor/PIE，未执行 Git stage/commit/reset/push。
+
+## 2026-07-18｜Coordinator：TASK-P3-001 最小修订复核与用户 Editor 交接
+
+- Coordinator 逐项核对活动卡六项修订：Context 已改为弱 Interactor 与位置快照；灰盒执行前通过真实 Sphere overlap 复核 `OutOfRange`；Overlap 显式限定 ExplorationCharacter；弱候选失效会 Reset、广播清空并返回 `TargetInvalid`；失败日志含 Owner/有效候选/原因；执行报告记录修订构建成功。
+- 修订 diff 只含五个允许 C++ 文件与 `tasks/execution-result.md`，没有新的 Content/Config/Build.cs/GAS/UI 或其他 Source 越权；当前修订尚未创建新 commit，与报告“未执行 Git”一致。
+- 执行报告记录 `HSREditor Win64 Development` 退出码 0、实际编译和 Link；本地 UHT 生成物与 `UnrealEditor-HSR.dll` 时间戳落在修订构建时段。Coordinator 未亲自运行 Build，不扩大证据来源。
+- 当前交接为 Coordinator → 用户 Editor：核对 BP Parent/Collision、地图实例、IA/IMC 引用，执行两轮 PIE 的 NoCandidate、成功、Unavailable、离开、销毁、重复事件及 Move/Look/Jump/输入/GAS HUD 回归。
+- `OutOfRange` 为执行时二次防御；正常 EndOverlap 通常先注销候选。无安全受控入口时如实保留为未动态命中，不通过 Level Blueprint 或 Widget 直调核心接口造证。
+- 本状态不构成 Reviewer `PASS`；Editor/PIE 证据完成后仍需独立 Reviewer 核对源码、构建、资产、运行证据、提交授权与作者顺序。
+- 本轮只修改协调 Markdown；未修改 Gameplay/Content/Config，未运行 Editor/PIE，未执行 Git stage/commit/push。
+
+## 2026-07-18｜Coordinator：记录 TASK-P3-001 用户一般性验证确认
+
+- 用户回传“我验证过了没问题”。Coordinator 将其如实记录为用户已执行一般性 Editor/PIE 检查且没有观察到问题，不将一句确认扩写成 13 项验收全部通过。
+- 当前仍缺逐项信息：Editor 完整重开、BP/碰撞/地图/IA/IMC 引用、PIE 注册/成功/注销、NoCandidate、Unavailable、对象销毁实际事件顺序、重复进出、第二轮 PIE、输入/GAS HUD 回归和 Error/Ensure/GC warning。
+- 已在活动任务卡提供七段最小结构化模板；允许填“未测”“未检查”“EndOverlap 先发生”或“OutOfRange 未动态命中”。
+- 修订源码仍是五个允许文件的未提交修改，执行报告也未提交；HEAD 仍为 `9356ad0`。执行报告在候选标志字段前仍含 ASCII `0x08` 控制字符，Reviewer/最终提交前需由报告作者清理。
+- 本轮未修改 Source/Content/Config，未运行 Build/Editor/PIE，未执行 Git stage/commit/push，未判 Reviewer `PASS`。
+
+## 2026-07-18｜Coordinator：TASK-P3-001 反射默认值错误阻断
+
+- 只读核对 `Saved/Logs/HSR.log` 后发现，`:1025` 的 `LogClass: Error` 与 `:1027` 的 `LogAutomationTest: Error` 均指出 `FHSRInteractionContext::InteractionLocation` 未正确默认初始化，文件为 `Interaction/HSRInteractionTypes.h`。
+- 该日志是明确阻断，优先于用户“一切没问题”的一般性确认；P3-001 不能进入 Reviewer 或标记运行验收完成。
+- 最小修订只需为 `InteractionLocation` 增加反射可识别的安全成员默认值，重新执行新鲜 `HSREditor` Build，完整重开 Editor 并确认新日志错误消失；执行报告清理既有 ASCII `0x08` 控制字符并追加真实结果。
+- 同一日志 `:1249-1252` 支持注册与成功；`:1256-1260` 支持离开注销后 NoCandidate；`:1261-1266` 支持 Unavailable；`:1272-1282` 证明删除对象实际先 EndOverlap/Unregister，再按键 NoCandidate，而非 TargetInvalid。
+- 尚缺 Editor 重开后的资产引用、第二轮 PIE、完整输入/GAS HUD 回归及全日志 Error/Ensure/GC warning 检查；修复阻断后使用活动卡最小模板补证。
+- 本轮只维护协调 Markdown；未修改 Source/Content/Config，未运行 Build/Editor/PIE，未执行 Git 操作，未判 Reviewer `PASS`。
+
+## 2026-07-18｜Coordinator：TASK-P3-001 反射默认值修复后复核
+
+- `HSRInteractionTypes.h` 已为弱 Interactor 和 InteractionLocation 提供 `nullptr`/`FVector::ZeroVector` 成员默认值，默认构造改为 `= default`。
+- 源码 11:05:25、编译中间产物约 11:06、`UnrealEditor-HSR.dll` 11:06:06；最新 `HSR.log` 为 11:08:55，新会话中不再出现修复前 `InteractionLocation` LogClass/AutomationTest Error。
+- 旧错误保留在修复前历史日志中；本轮明确区分旧会话错误与新会话结果，不删除或改写历史。
+- UHT 生成文件仍为 10:46:26，且没有保存 11:06 Build 的完整控制台输出；因此只确认修复后编译/Link 派生产物更新，不补造 UHT 实际运行明细。
+- `tasks/execution-result.md` 仍未追加第三次修复和新会话证据，ASCII `0x08` 仍存在；修订源码/报告均未提交，HEAD 仍为 `9356ad0`。
+- 下一 Gate：报告作者清理控制字符并追加真实 Build/Editor 证据边界，用户再补资产引用、重复进出/第二轮 PIE、输入/GAS HUD 回归和全日志健康信息，随后才能交 Reviewer。
+- 本轮未修改 Source/Content/Config，未运行 Build/Editor/PIE，未执行 Git 操作，未判 Reviewer `PASS`。
+
+## 2026-07-18｜Coordinator：TASK-P3-001 Reviewer 前最终收口
+
+- 用户结构化确认 Editor 重开资产引用、重复进出、第二轮 PIE、Move/Look/Jump、Exploration/UIOnly、GAS HUD 均正常，最新日志无未解释 Error/Ensure/GC Warning；这些属于用户人工证据。
+- 当前日志直接支持注册/成功、离开注销后 NoCandidate、Unavailable、删除对象实际 EndOverlap/Unregister→NoCandidate；OutOfRange 未动态命中并如实保留。
+- InteractionLocation 默认值修复后，新 Editor 会话不再报告旧 LogClass/Automation Error。源码/中间产物/DLL/日志时间链成立，但完整 Build 控制台与本次 UHT 明细未保存，不补写为已保存证据。
+- 主 Agent 只清除了执行报告中的 ASCII `0x08`，没有代写第三次构建/UHT；控制字符复扫为无。执行报告旧的 Editor/PIE 未验证复选框保留，Reviewer 需结合本交接判断最新状态。
+- HEAD 为 `9356ad0`，历史用户资产 commits 为 `2e913d0`、`d456d59`；最终未提交实现范围为五个允许 C++ 文件和执行报告。其余未提交项为 Coordinator Markdown，无 Content/Config/其他 Source 越权。
+- 已形成 Reviewer 可读交接；当前不判 `PASS`、不归档、不创建 P3-002、不提交或 push。
+
+## 2026-07-18｜Coordinator：记录 TASK-P3-001 Reviewer PASS WITH FOLLOW-UP
+
+- Independent Reviewer 在 `tasks/final-review.md` 给出 `PASS WITH FOLLOW-UP`，并以 commit `e99078deff05291f7ef71b873b2244ec0a017718` 独立提交审查产物。
+- Reviewer follow-up 原样保留：最终修订仍未提交；修复后完整 Build/UHT 控制台未保存；最终 PIE 主要是用户证据；OutOfRange 未动态命中；历史 `9356ad0` Git Gate 偏差、同一 Git 身份与角色声明的证据等级不能改写。
+- 当前唯一阻断是由真实 Implementation 作者精确提交五个已审查 C++ 修订和 `tasks/execution-result.md`，不得夹带 Coordinator Markdown、Reviewer 文件、Content/Config 或其他 Source。
+- Coordinator 已在活动卡列出六文件清单、建议 commit message 和提交后七项只读核对要求。
+- 当前不归档 active task、不创建 P3-002、不提交或 push、不把 Reviewer 结论扩大成 Phase 3 Ready。
+
+## 2026-07-18｜Coordinator：归档 TASK-P3-001 并创建 P3-002 活动卡
+
+- 用户明确授权主 Agent 代理提交最终 Implementation 修订并进入 P3-002。commit `64ac9770248899f2980262bb28019835896980c0` 使用约定 message，精确六文件，无 Coordinator Markdown、Reviewer 文件、Content/Config 或其他 Source 夹带。
+- 历史链 `2e913d0`/`d456d59` → `9356ad0` → Reviewer `e99078d` → 最终修订 `64ac977` 完整保留；代理提交授权与同一 Git 身份的证据等级如实记录。
+- P3-001 已按既有结构归档 active task、execution result 与 final review，最终状态为 `PASS WITH FOLLOW-UP`。
+- Follow-up 不因归档消失：修复后完整 Build/UHT 控制台未保存；最终 PIE 主要为用户人工证据；OutOfRange 未动态命中；`9356ad0` 曾违反活动卡 Git Gate；同一 Git 身份不独立证明不同角色作者。
+- 已创建唯一 `TASK-P3-002` 活动卡，范围仅为事件驱动 Prompt 观察层与生命周期专项：InteractionViewModel、UserWidget/HUD、PlayerController Possess 通知、InteractionComponent 只读快照/诊断，以及用户修改现有 `WBP_ExplorationHUD`。
+- P3-002 固定 UI 只观察、不 Cast 灰盒 Actor、不执行 Gameplay；Delegate 初始快照/成对解绑、旧实例零回调、HUD 重建、Re-Possess、两轮 PIE、无 Tick 和 Phase 2 HUD 回归均为 Gate。
+- 当前等待低级 Implementation Agent 首次只读复述并逐字写“等待用户确认执行 TASK-P3-002。”；用户二次确认前不得实施。
+- 本轮只修改/归档必要 Markdown；未修改 Source/Content/Config，未构建、未运行 Editor/PIE、未执行 Git commit/push。

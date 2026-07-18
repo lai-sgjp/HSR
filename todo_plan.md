@@ -157,10 +157,11 @@
 
 ## Phase 3：交互系统与探索对象
 
-- [ ] 创建 Interactable Interface、InteractionComponent 和交互类型。
-- [ ] 创建 NPC、宝箱、传送点占位对象。
-- [ ] 使用 Overlap 事件维护弱引用候选，不使用 Tick 搜索。
-- [ ] 创建交互提示 UI 和失败原因日志。
+- [x] P3-001：交互协议、弱候选组件与单灰盒对象闭环（Reviewer commit `e99078d` 为 `PASS WITH FOLLOW-UP`；最终修订 commit `64ac977`，follow-up 与历史流程偏差保留）。
+- [ ] P3-002：通过事件驱动的提示 UI 完成候选、Widget、Re-Possess 与连续 PIE 生命周期专项（已创建活动任务卡，等待 Implementation 首次只读复述与用户二次确认；未实施/未验证）。
+- [ ] P3-003：完成最终 Build、Editor 重开、PIE 回归、Teacher、Reviewer 与阶段归档，并只依据真实证据判定阶段状态。
+
+> Phase 3 当前执行边界为一个灰盒交互对象。早期路线图中的 NPC、宝箱和传送点三类占位对象仅作为共享协议的历史扩展依据，不是当前可勾选任务；真实对话、奖励、持久化和传送继续推迟。
 
 ## Phase 4：敌人探索表现与遇敌触发
 
