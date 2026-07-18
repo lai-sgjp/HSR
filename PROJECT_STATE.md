@@ -241,6 +241,20 @@
 - 唯一活动任务改为 P3-003；只做最终 Build/Editor 重开/PIE 回归、Coordinator 工程核对、Teacher 教学与用户原始作答、独立 Reviewer 和阶段归档。禁止 Source/Content/Config 修改、Gameplay 实施与自动进入 Phase 4。
 - 当前 Gate：Implementation/Verification Agent 首次只读复述并等待用户二次确认；确认前不得调用工具或实施。
 
+## 2026-07-18 TASK-P3-003 Gate 1 首次复核
+
+- Verification commit `99d32e6a` 仅修改执行报告；Source/Content/Config 与工作树干净。
+- 用户“全部正常”只记录为 Move/Look/Jump、UIOnly、GAS 属性/HUD 和 Editor 重开引用的人工确认，不提升为日志证据。
+- 最终日志直接闭合两轮目标地图 PIE、单次初始 snapshot、Prompt 进出、Interact 成功、`NoCandidate`、teardown/destruct 与无 Error/Ensure/GC/Blueprint runtime error。
+- Gate 仍为 `REVISE`：`p3-003-final-build.log` 不存在；最终轮次无 HUD rebuild/Re-Possess；无目标销毁/弱失效证据。当前不进入 Teacher/Reviewer，不改变 Phase 3 `Not verified`。
+
+## 2026-07-18 TASK-P3-003 Gate 1 USER ACCEPTED
+
+- 用户明确选择三个执行者证据缺口“先不用管了”，Gate 1 据此以 `USER ACCEPTED` 进入 Teacher Gate，不是 Reviewer `PASS`。
+- 未验证边界原样保留：Build log 不存在、完整 Build 不可核验且 UHT 未运行；最终 Build 后 HUD rebuild/Re-Possess 未补证；目标销毁/弱失效未补证。
+- 用户其他回归与重开引用确认继续作为用户人工证据；日志直接证据等级不变。
+- Phase 3 仍为 `Not verified`。当前唯一下一步为 Teacher 教学、源码导读与出题；出题后必须等待用户原始答案，不得自动纠正、审查、归档或进入 Phase 4。
+
 ## 2026-07-17 TASK-P2-001 Coordinator 规划更新
 
 - 用户已明确授权正式进入 Phase 2，并要求 Coordinator 创建第一张活动任务卡；这只授权协调规划，不等于授权低级执行模型立即实施。

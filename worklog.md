@@ -1340,3 +1340,18 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 创建唯一 P3-003 活动任务卡与空白执行报告，锁定 Build、Editor 完全关闭重开、两轮目标地图 PIE、失败/生命周期/回归矩阵、Coordinator 工程 Gate、Teacher 教学、用户原始作答、Teacher 独立提交、Independent Reviewer 和 Coordinator 阶段归档顺序。
 - P3-003 禁止修改 Source/Content/Config、实施 Gameplay 或自动进入 Phase 4；首次只读复述后必须等待用户二次确认。
 - 本轮只修改协调/归档 Markdown；未运行 Build/Editor/PIE，未修改 Source/Content/Config，不 push。
+
+## 2026-07-18｜Coordinator：TASK-P3-003 Gate 1 用户确认与复核
+
+- 用户回复“全部正常”，记录为 Move/Look/Jump、UIOnly、Health/Energy/Speed、GAS HUD 与 BP/HUD/WBP/IA/IMC/GAS 重开引用的人工确认；不写成 Saved 日志或 Reviewer 亲验。
+- `99d32e6a` 只提交执行报告；工作树和 Source/Content/Config 干净，最新 Saved 日志仍为 17:48 的 `HSR.log`。
+- 日志直接支持两轮目标地图 PIE、唯一初始 snapshot、Prompt 进出、成功/NoCandidate、teardown/destruct 和最终错误扫描干净。
+- Gate 1 保持 `REVISE`：报告引用的 Build log 不存在，缺最终 HUD rebuild/Re-Possess，缺目标销毁/弱失效专项；未交 Teacher、未判 Reviewer PASS、未执行 Git。
+
+## 2026-07-18｜Coordinator：TASK-P3-003 Gate 1 USER ACCEPTED 与 Teacher 交接
+
+- 用户明确表示 Build log、最终 HUD rebuild/Re-Possess、目标销毁/弱失效三个执行者证据缺口“先不用管了”。
+- 按 `USER ACCEPTED` 非阻断处置允许进入 Teacher Gate；未把任何缺口勾为已验证，也未伪造 Reviewer `PASS`。
+- 保留事实：`p3-003-final-build.log` 不存在、完整 Build 不可核验且 UHT 未运行；最终 Build 后两项生命周期专项未补证；目标销毁/弱失效未补证；P3-001/P3-002 follow-up 继续有效。
+- Teacher 下一步只做概念教学、真实源码导读与出题，然后等待用户原始答案；不得提前纠正、判掌握度或阶段 Ready。
+- 本轮仅更新协调/执行 Markdown；未修改 Source/Content/Config，未执行 Git，Phase 3 保持 `Not verified`。
