@@ -64,7 +64,7 @@ FHSRInteractionResult AHSRGrayboxInteractable::ExecuteInteraction_Implementation
 			UHSRBattleTransitionSubsystem* Subsystem = GI->GetSubsystem<UHSRBattleTransitionSubsystem>();
 			if (Subsystem)
 			{
-				FHSREncounterResult EncResult = Subsystem->RequestEncounter(EncounterDefinition);
+				FHSREncounterResult EncResult = Subsystem->RequestEncounter(EncounterDefinition, InteractInitiative);
 				if (EncResult.ResultType == EHSREncounterResultType::Success)
 				{
 					UE_LOG(LogTemp, Log, TEXT("AHSRGrayboxInteractable::ExecuteInteraction - %s submitted EncounterRequest %s"),

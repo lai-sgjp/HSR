@@ -33,6 +33,15 @@ enum class EHSREncounterResultType : uint8
 	TravelInitiationFailed UMETA(DisplayName = "Travel Initiation Failed")
 };
 
+UENUM(BlueprintType)
+enum class EHSREncounterReturnResultType : uint8
+{
+	Success UMETA(DisplayName = "Success"),
+	NothingPending UMETA(DisplayName = "Nothing Pending"),
+	AlreadyConsumed UMETA(DisplayName = "Already Consumed"),
+	InvalidReturnContext UMETA(DisplayName = "Invalid Return Context")
+};
+
 USTRUCT(BlueprintType)
 struct FHSREncounterRequest
 {
@@ -92,6 +101,52 @@ struct FHSREncounterResult
 	static FHSREncounterResult MakeFailure(EHSREncounterResultType Type, const FText& InMessage = FText())
 	{
 		FHSREncounterResult Result;
+		Result.ResultType = Type;
+		Result.Message = InMessage;
+		return Result;
+	}
+};
+
+USTRUCT(BlueprintType)
+struct FHSRExplorationReturnContext
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FGuid RequestId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Return")
+	FName ExplorationMapPath;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Return")
+	FTransform ReturnTransform = FTransform::Identity;
+
+	FHSRExplorationReturnContext() = default;
+};
+
+USTRUCT(BlueprintType)
+struct FHSRExplorationReturnResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Return")
+	EHSREncounterReturnResultType ResultType = EHSREncounterReturnResultType::NothingPending;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Return")
+	FText Message;
+
+	FHSRExplorationReturnResult() = default;
+
+	static FHSRExplorationReturnResult MakeSuccess()
+	{
+		FHSRExplorationReturnResult Result;
+		Result.ResultType = EHSREncounterReturnResultType::Success;
+		return Result;
+	}
+
+	static FHSRExplorationReturnResult MakeFailure(EHSREncounterReturnResultType Type, const FText& InMessage = FText())
+	{
+		FHSRExplorationReturnResult Result;
 		Result.ResultType = Type;
 		Result.Message = InMessage;
 		return Result;

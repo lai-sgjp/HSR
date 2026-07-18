@@ -6,6 +6,7 @@
 #include "../Interaction/HSRInteractableInterface.h"
 #include "Components/SphereComponent.h"
 #include "../Data/Definitions/HSREncounterDefinition.h"
+#include "../Battle/HSREncounterTypes.h"
 #include "HSRGrayboxInteractable.generated.h"
 
 UCLASS()
@@ -36,6 +37,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter")
 	TObjectPtr<UHSREncounterDefinition> EncounterDefinition;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter")
+	EHSREncounterInitiative InteractInitiative = EHSREncounterInitiative::Player;
 };
 
 

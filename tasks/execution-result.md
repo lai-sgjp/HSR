@@ -1,120 +1,112 @@
-# TASK-P4-002: Execution Report (A1 Revision)
+# TASK-P4-003: Execution Report
 
 > Author: Implementation Agent
 > Date: 2026-07-19
-> Status: Pending Reviewer re-audit (4 C++ fixes applied)
+> Status: Pending user Editor operations
 
-## Change Summary
+## Changes Summary
 
-### A1 C++ Fixes (Reviewer REVISE Closure)
+### Extended Types (HSREncounterTypes.h)
+- RequestEncounter now takes explicit EHSREncounterInitiative parameter
+- New FHSRExplorationReturnContext DTO (RequestId, ExplorationMapPath, ReturnTransform)
+- New EHSREncounterReturnResultType enum
+- New FHSRExplorationReturnResult struct
 
-| # | Issue | Fix | File |
-|---|---|---|---|
-| 1 | InitTimer local variable, not cancelable | Saved as member InitTimerHandle, cleared in ClearState + OnUnPossess | header + cpp |
-| 2 | ChaseAcceptanceRadius never consumed | MoveToActor now uses Def->ChaseAcceptanceRadius | cpp |
-| 3 | Perception bind only in BeginPlay/EndPlay | Bind in OnPossess, unbind in OnUnPossess; redundant safety in EndPlay | cpp |
-| 4 | ClearState calls GetTimerManager without World check | Added UWorld* World = GetWorld(); if (World) guard | cpp |
-| 5 | Duplicate perception bind in BeginPlay | Removed from BeginPlay (now only in OnPossess) | cpp |
+### Extended Subsystem (HSRBattleTransitionSubsystem)
+- RequestEncounter accepts EHSREncounterInitiative param (all callers must pass)
+- New RequestTestReturn(): saves return context, travels back to exploration map
+- New ConsumeReturnContext(): single-use, clears internal payload
+- New HasReturnPending() / GetReturnContext() accessors
+- Travel failure delegate: attempted but API not confirmed in available UE5.6 header scope; recorded as unverifiable
 
-### Fresh Build Evidence (A1)
+### New File: HSRExplorationReturnConsumer
+- Actor with no Tick
+- BeginPlay: bounded retry timer for player pawn availability
+- On pawn ready: ConsumeReturnContext + SetActorTransform(return transform)
+- Timer/retries cleared in EndPlay
 
-Target: HSREditor Win64 Development
-UHT: Generated headers (1 written from previous AIController.h change)
-Compile: HSREnemyAIController.cpp
-Link: UnrealEditor-HSR.lib -> UnrealEditor-HSR.dll
-Result: Succeeded (exit code 0)
-Warnings: Only VS2022 preferred version (known, non-blocking)
+### Extended BattleTestConsumer
+- Configurable EnableTestReturn (default off) + ReturnDelay
+- Stored consumed request member
+- When enabled: schedules timer after 1st Consume success, calls RequestTestReturn
 
-Build log saved: Build-Log-P4-002-A1.txt
+### Updated Callers
+- **GrayboxInteractable**: new InteractInitiative property (Player default), passed to RequestEncounter
+- **AIController**: fixed to pass EHSREncounterInitiative::Enemy
 
-## PIE Evidence (from 01:23-01:29, post-fix DLL)
+### Fresh Build Evidence
+- Target: HSREditor Win64 Development
+- UHT: 3 written (reflection for new types)
+- C++: 5 modified + 2 new cpp files compiled
+- Link: lib + dll
+- Result: Succeeded (exit code 0)
+- Warnings: only VS2022 compiler version (known, non-blocking)
 
-### Main Path (Enemy -> Perception -> Chase -> Encounter -> Travel -> BattleMap Consume)
-All proven by Saved/Logs/HSR.log:
+### Travel Failure Delegate
+GEngine->OnTravelFailure API could not be confirmed as accessible in UE5.6 through available headers. The delegate binding was removed from the build. Travel failure during Traveling state is recorded as NOT dynamically verifiable in P4-003. If the UE5.6 API is confirmed through actual engine headers by Reviewer, it can be re-added in P4-004 or P5.
 
-1. Enemy BP Possessed by AIController: OnPossess - Pawn=BP_HSREnemy_Phase4Test_C_1
-2. Patrolling: SetState: 0 -> 2 -> 1 (Idle -> MovingToPatrol -> PatrolWaiting)
-3. Perception senses player: SetState: 1 -> 3 -> 4 (PatrolWaiting -> Alert -> Chasing)
-4. Enemy starts chasing: MoveToActor called with ChaseAcceptanceRadius
-5. EncounterCollision overlap: NotifyActorBeginOverlap - overlapped by BP_HSRExplorationCharacter
-6. RequestEncounter SUCCESS: TryRequestEncounter SUCCESS (RequestId=..., EnemyId=Enemy_TestPatrol)
-7. EncounterPending: SetState: 4 -> 5 (Chasing -> EncounterPending)
-8. Travel to BattleMap: OpenLevel issued for /Game/Maps/Map_BattleTest
-9. First Consume SUCCESS with correct data
-10. Second Consume AlreadyConsumed with empty ConsumedRequest
-11. ExplorationMap=/Game/Maps/Map_Phase1_Exploration (no PIE prefix)
-12. P4-001 Graybox regression: two successful interact->travel chains with correct ExplorationMapPath
+## User Editor Operations
 
-### Failure Paths
-- Definition missing: stays Idle, overlap rejected as non-Chasing, no crash
-- No NavMesh: 
-o reachable point with bounded patrol wait retry (no busy loop)
-- Lost sight: lost sight of BP_HSRExplorationCharacter -> LostTarget -> return to patrol
+### 1. Restart Editor (fresh DLL loaded)
 
-### Clean Log
-- No Ensure errors (old DelegateSignatureImpl Ensure is from pre-fix binary)
-- No Crash/Fatal errors
-- No GC warning
-- No Blueprint Runtime Error
+### 2. Update Graybox (Player)
+Open BP_HSRGrayboxInteractable -> Class Defaults -> Encounter category:
+- InteractInitiative = Player (default, verify it is set)
+- EncounterDefinition = DA_Encounter_Phase4Test (existing)
 
-## Asset Path Deviation
+### 3. Create Neutral BP
+- Create new Blueprint Class -> Parent: AHSRGrayboxInteractable
+- Name: BP_HSRNeutralEncounterTest
+- Class Defaults:
+  - EncounterDefinition = DA_Encounter_Phase4Test
+  - InteractInitiative = Neutral
+  - Available = true
+- Place one instance in Map_Phase1_Exploration (not overlapping Player/Enemy)
 
-| Item | Allowed Path | Actual Path | Status |
-|---|---|---|---|
-| Enemy BP | Content/Blueprints/Enemy/ | Content/Blueprints/Character/Enemy/ | Awaiting user acceptance post-facto |
-| Map_BattleTest | Read-only (P4-001) | Modified by Editor open/save | Awaiting user acceptance post-facto |
-| Implementation+assets | Separate role commits | Mixed in d1cefde | Fact recorded, Git identity limitation |
+### 4. Update Battle Map
+Open Map_BattleTest:
+- Select AHSRBattleTestConsumer instance
+- Set EnableTestReturn = true
+- Set ReturnDelay = 0.3
 
-## Evidence Matrix (S = Static, B = Build, D = Dynamic/PIE)
+### 5. Place Exploration Return Consumer
+In Map_Phase1_Exploration:
+- Place Actors -> search HSRExplorationReturnConsumer
+- Place one instance anywhere (not overlapping)
 
-### Static / Build (S/B)
-- Fresh Development Build exit code 0: B
-- UHT reflection generated: B
-- EnemyCharacter/AIController no custom Gameplay Tick: S
-- Patrol/Init timers saved as members, cleared in lifecycle callbacks: S
-- ChaseAcceptanceRadius consumed by MoveToActor: S
-- Perception bound in OnPossess, unbound in OnUnPossess: S
-- ClearState uses World safety check: S
-- Target as TWeakObjectPtr, no UObject in DTO: S
-- Build.cs only adds AIModule + NavigationSystem: S
-- P4-001 files NOT modified: S
-- GAS/Network/Phase 5 NOT touched: S
+### 6. Save + Restart + PIE Matrix
 
-### Dynamic PIE (D)
-- Patrol cycling (with NavMesh): D - proven by SetState logs
-- Perception senses player, Chasing state entered: D - proven by SetState logs
-- EncounterCollision triggers single RequestEncounter: D - proven by success log
-- BattleMap first Consume SUCCESS, second AlreadyConsumed: D - proven
-- ExplorationMapPath correct, no PIE prefix: D - proven
-- P4-001 Graybox interact -> travel regression: D - two proven rounds
-- Missing Definition safe rejection: D - proven by state=0 fail log
-- Editor restart/asset checks: D - user completed, logs from post-restart session
-- Move/Look/Jump, UIOnly, Prompt, GAS HUD regression: D - user confirmed
+#### Three Initiative Paths
+- *Player*: walk to Graybox -> Interact -> travel -> Consume -> auto-return -> Pawn restored
+- *Enemy*: walk to enemy -> perception -> chase -> Encounter -> travel -> Consume -> auto-return -> Pawn restored
+- *Neutral*: walk to Neutral test object -> Interact -> travel -> Consume -> auto-return -> Pawn restored
 
-### Not Yet Verified (bounds preserved)
-- Target destruction: safe but not specifically logged
-- Repeated perception storm counting: not specifically instrumented
-- MoveTo Failed/Aborted full matrix: partial coverage
-- travel failure recovery: P4-003
+Each path verify:
+- Log shows correct Initiative = 0 (Player) / 1 (Enemy) / 2 (Neutral)
+- ExplorationMapPath correct, no PIE prefix
+- Consume: first SUCCESS, second AlreadyConsumed + empty DTO
+- Return: text map teleports Pawn to stored Transform
+- Two consecutive round-trips: no stale references
 
-## History (pre-fix crashes recorded)
+#### Failure + Repeat
+- Double Interact: only first triggers, second AlreadyPending
+- Definition/ID missing: no travel, clean state, retry works
+- Battle Map direct start: Consumer/Return safely fail (nothing pending)
+- Invalid return: consume fails cleanly
 
-1. Initial: OnTargetPerceptionUpdated missing UFUNCTION() -> Ensure/Crash on perception
-2. Initial: OnMoveCompleted calling MoveToActor -> infinite recursion -> stack overflow crash
-3. Fixed in d1cefde: UFUNCTION() added, recursion removed
-4. Fixed in A1: InitTimer lifecycle, ChaseAcceptanceRadius, Perception bind, World safety
+#### P4-002 Combined Regression (cover >=3 of 4)
+1. Target destruction during chase -> safe
+2. Repeat perception -> no storm
+3. MoveTo Failed/Aborted -> bounded recovery
+4. UnPossess/Re-Possess -> 0 stale callbacks
+Then enemy completes one full Enemy initiative round-trip.
 
-## Git Record
+### 7. Commit
+`powershell
+git add Source/HSR/Battle/HSREncounterTypes.h Source/HSR/Battle/HSRBattleTransitionSubsystem.h Source/HSR/Battle/HSRBattleTransitionSubsystem.cpp Source/HSR/Battle/HSRBattleTestConsumer.h Source/HSR/Battle/HSRBattleTestConsumer.cpp Source/HSR/Battle/HSRExplorationReturnConsumer.h Source/HSR/Battle/HSRExplorationReturnConsumer.cpp Source/HSR/Exploration/HSRGrayboxInteractable.h Source/HSR/Exploration/HSRGrayboxInteractable.cpp Source/HSR/Enemy/HSREnemyAIController.cpp tasks/execution-result.md
+git commit -m "Implementation Agent+TASK-P4-003+?? initiative?Return Context?????? P4-002 ????"
 
-- 19a06c9: Implementation P4-002 initial (7 new files + Build.cs + execution report)
-- d1cefde: Implementation fixes (UFUNCTION, EditAnywhere, OnMoveCompleted recursion) + user assets mixed
-- eae06a4: Coordinator state sync (P4-001 archived, P4-002 active card)
-- Current A1: 4 C++ lifecycle fixes (not yet committed)
-
-## User Acceptance Needed
-
-1. BP path deviation: Content/Blueprints/Character/Enemy/ vs allowed Content/Blueprints/Enemy/
-2. Map_BattleTest modification: read-only asset opened/saved during Editor session
-3. Mixed commit: Implementation + assets in same commit, same Git identity
-
-If accepted, record as post-facto authorization (do not rewrite history).
+# User commit assets
+git add Content/Blueprints/Exploration/BP_HSRGrayboxInteractable.uasset Content/Blueprints/Exploration/BP_HSRNeutralEncounterTest.uasset Content/Maps/Map_Phase1_Exploration.umap Content/Maps/Map_BattleTest.umap
+git commit -m "User+assets+TASK-P4-003+Player/Neutral BP ?????"
+`

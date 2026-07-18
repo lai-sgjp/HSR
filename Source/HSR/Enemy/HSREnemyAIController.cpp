@@ -321,7 +321,7 @@ void AHSREnemyAIController::TryRequestEncounterFromCharacter()
 		return;
 	}
 
-	FHSREncounterResult EncResult = Subsystem->RequestEncounter(EncounterDef);
+	FHSREncounterResult EncResult = Subsystem->RequestEncounter(EncounterDef, EHSREncounterInitiative::Enemy);
 	if (EncResult.ResultType == EHSREncounterResultType::Success)
 	{
 		SetState(EHSREnemyExplorationState::EncounterPending);

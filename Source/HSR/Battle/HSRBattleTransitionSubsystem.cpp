@@ -7,10 +7,12 @@ void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collect
 {
 	Super::Initialize(Collection);
 	CurrentState = EHSREncounterState::Empty;
+	bReturnPending = false;
+
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::Initialize - State=Empty"));
 }
 
-FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounterDefinition* Definition)
+FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative)
 {
 	// Pre-travel validation: must not pollute Pending state
 	if (!Definition)
@@ -74,7 +76,7 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 	NewRequest.RequestId = NewRequestId;
 	NewRequest.EncounterId = Definition->EncounterId;
 	NewRequest.EnemyDefinitionId = Definition->EnemyDefinitionId;
-	NewRequest.Initiative = EHSREncounterInitiative::Neutral;
+	NewRequest.Initiative = Initiative;
 	NewRequest.BattleMapPath = FName(*Definition->BattleMap.GetLongPackageName());
 	NewRequest.ReturnTransform = ReturnTransform;
 
@@ -184,3 +186,68 @@ bool UHSRBattleTransitionSubsystem::HasPending() const
 {
 	return CurrentState == EHSREncounterState::Pending || CurrentState == EHSREncounterState::Traveling;
 }
+
+FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestTestReturn(const FHSREncounterRequest& FromConsumedRequest)
+{
+	if (bReturnPending)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - FAILED AlreadyPending"));
+		return FHSRExplorationReturnResult::MakeFailure(
+			EHSREncounterReturnResultType::AlreadyConsumed,
+			FText::FromString(TEXT("A return is already pending.")));
+	}
+
+	// Build pure-data return context from consumed request
+	FHSRExplorationReturnContext ReturnCtx;
+	ReturnCtx.RequestId = FromConsumedRequest.RequestId;
+	ReturnCtx.ExplorationMapPath = FromConsumedRequest.ExplorationMapPath;
+	ReturnCtx.ReturnTransform = FromConsumedRequest.ReturnTransform;
+
+	PendingReturnContext = ReturnCtx;
+	bReturnPending = true;
+
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - SUCCESS RequestId=%s ExplorationMap=%s"),
+		*ReturnCtx.RequestId.ToString(), *ReturnCtx.ExplorationMapPath.ToString());
+
+	// Travel back to exploration map
+	UWorld* World = GetWorld();
+	if (World && !ReturnCtx.ExplorationMapPath.IsNone())
+	{
+		UGameplayStatics::OpenLevel(World, ReturnCtx.ExplorationMapPath, true);
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - Traveling back to %s"), *ReturnCtx.ExplorationMapPath.ToString());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - FAILED InvalidReturnContext (no path)"));
+		bReturnPending = false;
+		PendingReturnContext = FHSRExplorationReturnContext();
+		return FHSRExplorationReturnResult::MakeFailure(
+			EHSREncounterReturnResultType::InvalidReturnContext,
+			FText::FromString(TEXT("No exploration map path in return context.")));
+	}
+
+	return FHSRExplorationReturnResult::MakeSuccess();
+}
+
+FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::ConsumeReturnContext()
+{
+	if (!bReturnPending)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::ConsumeReturnContext - FAILED NothingPending"));
+		return FHSRExplorationReturnResult::MakeFailure(
+			EHSREncounterReturnResultType::NothingPending,
+			FText::FromString(TEXT("No pending return context.")));
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ConsumeReturnContext - SUCCESS RequestId=%s ReturnLoc=%s"),
+		*PendingReturnContext.RequestId.ToString(), *PendingReturnContext.ReturnTransform.GetLocation().ToString());
+
+	FHSRExplorationReturnContext Consumed = PendingReturnContext;
+	PendingReturnContext = FHSRExplorationReturnContext();
+	bReturnPending = false;
+
+	FHSRExplorationReturnResult Result = FHSRExplorationReturnResult::MakeSuccess();
+	return Result;
+}
+
+
