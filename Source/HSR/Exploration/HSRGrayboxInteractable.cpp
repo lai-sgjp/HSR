@@ -1,5 +1,7 @@
 ﻿#include "HSRGrayboxInteractable.h"
 #include "../Interaction/HSRInteractionComponent.h"
+#include "../Interaction/HSRInteractableInterface.h"
+#include "../Character/HSRExplorationCharacter.h"
 
 AHSRGrayboxInteractable::AHSRGrayboxInteractable()
 {
@@ -31,8 +33,30 @@ FText AHSRGrayboxInteractable::GetInteractionPrompt_Implementation() const
 
 FHSRInteractionResult AHSRGrayboxInteractable::ExecuteInteraction_Implementation(const FHSRInteractionContext& Context)
 {
-	UE_LOG(LogTemp, Log, TEXT("AHSRGrayboxInteractable::ExecuteInteraction - %s interacted"),
-		*GetName());
+	AActor* Interactor = Context.InteractorActor.Get();
+
+	// Reject if the interactor is no longer valid
+	if (!Interactor)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AHSRGrayboxInteractable::ExecuteInteraction - %s FAILED TargetInvalid (interactor expired)"), *GetName());
+		return FHSRInteractionResult::MakeFailure(
+			EHSRInteractionFailureReason::TargetInvalid,
+			FText::FromString(TEXT("Interactor is no longer valid.")));
+	}
+
+	// Verify the interactor is still within range via actual overlap check
+	if (!CollisionComponent->IsOverlappingActor(Interactor))
+	{
+		UE_LOG(LogTemp, Log, TEXT("AHSRGrayboxInteractable::ExecuteInteraction - %s FAILED OutOfRange (interactor=%s not overlapping)"),
+			*GetName(), *Interactor->GetName());
+		return FHSRInteractionResult::MakeFailure(
+			EHSRInteractionFailureReason::OutOfRange,
+			FText::FromString(TEXT("Interactor is out of range.")));
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("AHSRGrayboxInteractable::ExecuteInteraction - %s interacted by %s at location (X=%.0f Y=%.0f Z=%.0f)"),
+		*GetName(), *Interactor->GetName(),
+		Context.InteractionLocation.X, Context.InteractionLocation.Y, Context.InteractionLocation.Z);
 	return FHSRInteractionResult::MakeSuccess();
 }
 
@@ -45,7 +69,13 @@ void AHSRGrayboxInteractable::NotifyActorBeginOverlap(AActor* OtherActor)
 		return;
 	}
 
-	UHSRInteractionComponent* InteractionComp = OtherActor->FindComponentByClass<UHSRInteractionComponent>();
+	AHSRExplorationCharacter* ExplorationChar = Cast<AHSRExplorationCharacter>(OtherActor);
+	if (!ExplorationChar)
+	{
+		return;
+	}
+
+	UHSRInteractionComponent* InteractionComp = ExplorationChar->FindComponentByClass<UHSRInteractionComponent>();
 	if (InteractionComp)
 	{
 		InteractionComp->RegisterCandidate(this);
@@ -61,7 +91,13 @@ void AHSRGrayboxInteractable::NotifyActorEndOverlap(AActor* OtherActor)
 		return;
 	}
 
-	UHSRInteractionComponent* InteractionComp = OtherActor->FindComponentByClass<UHSRInteractionComponent>();
+	AHSRExplorationCharacter* ExplorationChar = Cast<AHSRExplorationCharacter>(OtherActor);
+	if (!ExplorationChar)
+	{
+		return;
+	}
+
+	UHSRInteractionComponent* InteractionComp = ExplorationChar->FindComponentByClass<UHSRInteractionComponent>();
 	if (InteractionComp)
 	{
 		InteractionComp->UnregisterCandidate(this);

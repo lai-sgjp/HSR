@@ -1,9 +1,10 @@
-﻿#include "HSRInteractableInterface.h"
-#include "HSRInteractionComponent.h"
+﻿#include "HSRInteractionComponent.h"
+#include "HSRInteractableInterface.h"
 
 UHSRInteractionComponent::UHSRInteractionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	bCandidateEverRegistered = false;
 }
 
 void UHSRInteractionComponent::RegisterCandidate(AActor* Candidate)
@@ -32,8 +33,10 @@ void UHSRInteractionComponent::RegisterCandidate(AActor* Candidate)
 	}
 
 	CurrentCandidate = Candidate;
+	bCandidateEverRegistered = true;
 	OnCandidateChanged.Broadcast(Candidate);
-	UE_LOG(LogTemp, Log, TEXT("UHSRInteractionComponent::RegisterCandidate - Registered %s"), *Candidate->GetName());
+	UE_LOG(LogTemp, Log, TEXT("UHSRInteractionComponent::RegisterCandidate - Owner=%s Registered %s"),
+		*GetOwner()->GetName(), *Candidate->GetName());
 }
 
 void UHSRInteractionComponent::UnregisterCandidate(AActor* Candidate)
@@ -47,8 +50,10 @@ void UHSRInteractionComponent::UnregisterCandidate(AActor* Candidate)
 	{
 		AActor* OldCandidate = CurrentCandidate.Get();
 		CurrentCandidate.Reset();
+		bCandidateEverRegistered = false;
 		OnCandidateChanged.Broadcast(nullptr);
-		UE_LOG(LogTemp, Log, TEXT("UHSRInteractionComponent::UnregisterCandidate - Unregistered %s"), *OldCandidate->GetName());
+		UE_LOG(LogTemp, Log, TEXT("UHSRInteractionComponent::UnregisterCandidate - Owner=%s Unregistered %s"),
+			*GetOwner()->GetName(), *OldCandidate->GetName());
 	}
 }
 
@@ -81,24 +86,46 @@ bool UHSRInteractionComponent::IsCandidateValid() const
 FHSRInteractionResult UHSRInteractionComponent::TryInteract()
 {
 	AActor* Candidate = CurrentCandidate.Get();
+	AActor* OwnerActor = GetOwner();
 
+	// Candidate existed but the weak pointer expired (target destroyed)
+	if (!Candidate && bCandidateEverRegistered)
+	{
+		CurrentCandidate.Reset();
+		bCandidateEverRegistered = false;
+		OnCandidateChanged.Broadcast(nullptr);
+		FHSRInteractionResult Result = FHSRInteractionResult::MakeFailure(
+			EHSRInteractionFailureReason::TargetInvalid,
+			FText::FromString(TEXT("Candidate was destroyed.")));
+		OnInteractionCompleted.Broadcast(Result);
+		UE_LOG(LogTemp, Log, TEXT("UHSRInteractionComponent::TryInteract - Owner=%s FAILED TargetInvalid (candidate destroyed)"),
+			*GetOwner()->GetName());
+		return Result;
+	}
+
+	// Never had a candidate, or candidate was properly unregistered
 	if (!Candidate)
 	{
 		FHSRInteractionResult Result = FHSRInteractionResult::MakeFailure(
 			EHSRInteractionFailureReason::NoCandidate,
 			FText::FromString(TEXT("No interaction candidate available.")));
 		OnInteractionCompleted.Broadcast(Result);
+		UE_LOG(LogTemp, Log, TEXT("UHSRInteractionComponent::TryInteract - Owner=%s FAILED NoCandidate"),
+			*GetOwner()->GetName());
 		return Result;
 	}
 
 	if (!Candidate->Implements<UHSRInteractableInterface>())
 	{
 		CurrentCandidate.Reset();
+		bCandidateEverRegistered = false;
 		OnCandidateChanged.Broadcast(nullptr);
 		FHSRInteractionResult Result = FHSRInteractionResult::MakeFailure(
 			EHSRInteractionFailureReason::TargetInvalid,
 			FText::FromString(TEXT("Candidate no longer implements the interaction interface.")));
 		OnInteractionCompleted.Broadcast(Result);
+		UE_LOG(LogTemp, Log, TEXT("UHSRInteractionComponent::TryInteract - Owner=%s Candidate=%s FAILED TargetInvalid (no interface)"),
+			*GetOwner()->GetName(), *Candidate->GetName());
 		return Result;
 	}
 
@@ -108,26 +135,36 @@ FHSRInteractionResult UHSRInteractionComponent::TryInteract()
 			EHSRInteractionFailureReason::Unavailable,
 			FText::FromString(TEXT("Candidate is currently unavailable.")));
 		OnInteractionCompleted.Broadcast(Result);
+		UE_LOG(LogTemp, Log, TEXT("UHSRInteractionComponent::TryInteract - Owner=%s Candidate=%s FAILED Unavailable"),
+			*GetOwner()->GetName(), *Candidate->GetName());
 		return Result;
 	}
 
-	FHSRInteractionContext Context(Candidate);
+	FHSRInteractionContext Context(OwnerActor, OwnerActor->GetActorLocation());
 	FHSRInteractionResult Result = IHSRInteractableInterface::Execute_ExecuteInteraction(Candidate, Context);
 
-	OnInteractionCompleted.Broadcast(Result);
-	UE_LOG(LogTemp, Log, TEXT("UHSRInteractionComponent::TryInteract - Executed interaction on %s, success=%d, reason=%d"),
-		*Candidate->GetName(), Result.bSuccess, static_cast<int32>(Result.FailureReason));
+	if (!Result.bSuccess)
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRInteractionComponent::TryInteract - Owner=%s Candidate=%s FAILED ExecutionFailed reason=%d"),
+			*GetOwner()->GetName(), *Candidate->GetName(), static_cast<int32>(Result.FailureReason));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRInteractionComponent::TryInteract - Owner=%s Candidate=%s SUCCESS"),
+			*GetOwner()->GetName(), *Candidate->GetName());
+	}
 
+	OnInteractionCompleted.Broadcast(Result);
 	return Result;
 }
 
 void UHSRInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	CurrentCandidate.Reset();
+	bCandidateEverRegistered = false;
 	OnCandidateChanged.Clear();
 	OnInteractionCompleted.Clear();
 	Super::EndPlay(EndPlayReason);
 }
-
 
 

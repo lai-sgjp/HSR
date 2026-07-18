@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
@@ -40,6 +40,7 @@ public:
 
 private:
 	TWeakObjectPtr<AActor> CurrentCandidate;
+	bool bCandidateEverRegistered;
 
 	bool IsCandidateValid() const;
 };

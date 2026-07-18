@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "HSRInteractionTypes.generated.h"
@@ -20,10 +20,14 @@ struct FHSRInteractionContext
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
-	TWeakObjectPtr<AActor> TargetActor;
+	TWeakObjectPtr<AActor> InteractorActor = nullptr;
 
-	FHSRInteractionContext() {}
-	explicit FHSRInteractionContext(AActor* InTarget) : TargetActor(InTarget) {}
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
+	FVector InteractionLocation = FVector::ZeroVector;
+
+	FHSRInteractionContext() = default;
+	FHSRInteractionContext(AActor* InInteractor, const FVector& InLocation)
+		: InteractorActor(InInteractor), InteractionLocation(InLocation) {}
 };
 
 USTRUCT(BlueprintType)

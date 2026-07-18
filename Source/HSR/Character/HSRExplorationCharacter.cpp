@@ -116,8 +116,7 @@ void AHSRExplorationCharacter::Interact()
 	}
 
 	FHSRInteractionResult Result = InteractionComponent->TryInteract();
-	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationCharacter::Interact - TryInteract returned success=%d, reason=%d"),
-		Result.bSuccess, static_cast<int32>(Result.FailureReason));
+	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationCharacter::Interact - Character=%s result=success=%d reason=%s"),
+		*GetName(), Result.bSuccess, *UEnum::GetValueAsString(Result.FailureReason));
 }
-
 
