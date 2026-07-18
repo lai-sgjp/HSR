@@ -28,9 +28,6 @@ public:
 	bool HasPending() const;
 
 	UFUNCTION(BlueprintPure, Category = "Encounter")
-	const FHSREncounterRequest& GetPendingRequest() const { return PendingRequest; }
-
-	UFUNCTION(BlueprintPure, Category = "Encounter")
 	EHSREncounterState GetCurrentState() const { return CurrentState; }
 
 private:
