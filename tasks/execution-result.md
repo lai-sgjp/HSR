@@ -1,136 +1,102 @@
-# TASK-P4-001 ????
+# TASK-P4-002 ????
 
-> ???Implementation Agent
-> ?????2026-07-18
-> ????? Reviewer
+> Author: Implementation Agent
+> Date: 2026-07-18
+> Status: Pending Coordinator/Reviewer
 
-## ????????
+## Allowed File Changes
 
-### ????
-- Source/HSR/Battle/HSREncounterTypes.h
-- Source/HSR/Battle/HSRBattleTransitionSubsystem.h
-- Source/HSR/Battle/HSRBattleTransitionSubsystem.cpp
-- Source/HSR/Battle/HSRBattleTestConsumer.h
-- Source/HSR/Battle/HSRBattleTestConsumer.cpp
-- Source/HSR/Data/Definitions/HSREncounterDefinition.h
-- Source/HSR/Data/Definitions/HSREncounterDefinition.cpp
+### New Files (7)
+- Source/HSR/Enemy/HSREnemyTypes.h (enum)
+- Source/HSR/Enemy/HSREnemyCharacter.h/.cpp (character with encounter collision)
+- Source/HSR/Enemy/HSREnemyAIController.h/.cpp (AI, perception, patrol, chase, state machine)
+- Source/HSR/Data/Definitions/HSREnemyDefinition.h/.cpp (PrimaryDataAsset)
 
-### ????
-- Source/HSR/Exploration/HSRGrayboxInteractable.h
-- Source/HSR/Exploration/HSRGrayboxInteractable.cpp
+### Modified Files (1)
+- Source/HSR/HSR.Build.cs (added AIModule + NavigationSystem)
 
-### ???
-- Source/HSR/HSR.Build.cs?Config/?HSR.uproject ?? ????
+### NOT Modified
+- All P4-001 files, Config/, .uproject, Character/, Interaction/, GAS/ ? untouched
 
-## ??????? + A1 + A2?
+## Design Overview
+
+### State Machine
+`
+Idle -> PatrolWaiting -> MovingToPatrol
+   -> Alert/Chasing -> EncounterPending
+   -> MoveFailed / LostTarget -> Idle or PatrolWaiting
+`
+
+### Component Responsibilities
+- **HSREnemyDefinition**: PrimaryDataAsset with EnemyDefinitionId, EncounterDefinition ref, PatrolRadius/PatrolWaitTime/ChaseAcceptanceRadius
+- **AHSREnemyCharacter**: ACharacter, no Tick, USS EncounterCollision (pawn-only), calls AIController for Encounter
+- **AHSREnemyAIController**: AAIController, no Tick, UAIPerceptionComponent (Sight), patrol timer, state machine
+
+### Event Flow
+1. BeginPlay -> StartPatrol (0.2s delay for NavMesh init)
+2. Patrol: NavSys->GetRandomReachablePointInRadius -> MoveTo -> OnMoveCompleted -> wait PatrolWaitTime -> repeat
+3. Perception: OnTargetPerceptionUpdated (sensed) -> Alert -> Chasing -> MoveToActor
+4. Perception: OnTargetPerceptionUpdated (lost) -> LostTarget -> return to patrol
+5. Encounter overlap: EnemyCharacter NotifyActorBeginOverlap -> AIController TryRequestEncounterFromCharacter
+6. RequestEncounter: checks Chasing state, not already EncounterPending, then submits to P4-001 Subsystem
+7. Success -> EncounterPending state, stop movement, clear timer
+8. Failure -> stay in Chasing (can retrigger)
+
+## Build Evidence
 
 ### UHT
-- ???Total of 11 written?????DTO?Subsystem?Consumer?Definition???? Graybox?
-- A1 ???Total of 4 written?ExplorationMapPath + ConsumedRequest ?????
-- A2 ??????? generated code up to date?????? getter???????
+- 9 headers written (all new types + Build.cs module changes propagated)
 
-### C++ ?????
-- ???HSREditor Win64 Development
-- A1 ?????HSRBattleTestConsumer.cpp?HSRBattleTransitionSubsystem.cpp?Module.HSR.cpp
-- A2 ???????header-only inline ???unity ?????
-- ???UnrealEditor-HSR.lib ? UnrealEditor-HSR.dll
-- ???Result: Succeeded???? 0
-- ???? Visual Studio 2022 compiler is not a preferred version????????
+### C++ Compile & Link
+- Files: HSREnemyDefinition.cpp, HSREnemyCharacter.cpp, HSREnemyAIController.cpp, Module.HSR.cpp
+- Link: UnrealEditor-HSR.lib -> .dll
+- Result: Succeeded, exit code 0
+- Warnings: only VS2022 compiler version (known non-blocking)
 
-## ????
+## Evidence Level Matrix
 
-1. **UHSREncounterDefinition** ? UPrimaryDataAsset??????
-2. **UHSRBattleTransitionSubsystem** ? UGameInstanceSubsystem???? Empty -> Pending -> Traveling -> Consumed -> Empty
-3. **Pending DTO** ?? FGuid?FName?enum?FTransform ?? ? Actor/World/UObject/Widget/Handle
-4. **Consume ??**?????? DTO????? Payload???? FHSREncounterResult.ConsumedRequest ????Consume ? GetPendingRequest() ???
-5. **ExplorationMapPath**??????? World->GetOutermost()->GetPathName() ????? UWorld::RemovePIEPrefix ?? PIE ??
-6. **Graybox**?? Definition ???? Subsystem????? Success????? ExecutionFailed?? Definition ??????
-7. **Consumer**?? Tick?BeginPlay ? Consume ???????????? + ? DTO + Clear ? Empty
-8. **Initiative** ?? Neutral
-9. **OpenLevel** ?? void?travel ??/????????
+S = Static source audit, B = Build verification, D = Dynamic PIE
 
-## ??????
+### Build / Static (S/B)
+- Fresh Development Build exit code 0: B
+- UHT 9 reflection files generated: B
+- Build.cs only adds AIModule + NavigationSystem: S
+- EnemyCharacter and AIController have no custom Gameplay Tick: S
+- Patrol timer is single-shot, cleared on UnPossess/EndPlay: S
+- Target uses TWeakObjectPtr, no UObject reference in DTO: S
+- Perception driven by OnTargetPerceptionUpdated delegate only: S
+- Same target repeat perception does NOT restart chase: S
+- EncounterPending prevents duplicate RequestEncounter: S
+- MoveFailed/LostTarget return to safe states: S
+- P4-001 files NOT modified: S
+- GAS/Network/Phase 5 NOT touched: S
 
-?????**S** = ?????????/???????**B** = ?????UHT/??/??????**P** = PIE ???????? Editor ???
+### Dynamic PIE (D - requires user Editor run)
+- Editor restart and type loadability
+- Patrol: enemy moves to random navigable points, no busy loop on NavMesh failure
+- Perception: enemy detects player, enters Chasing state
+- Chase: enemy moves toward player
+- Encounter overlap: triggers RequestEncounter only once
+- Subsystem: Success -> EncounterPending; AlreadyPending -> rejected
+- P4-001 regression: BattleMap travel + First/Second Consume + ExplorationMapPath
+- Lost target / destroyed target: safe return to patrol
+- Repeated perception: no Timer/MoveTo/Encounter storm
+- Move/Look/Jump, UIOnly, Prompt, GAS HUD regression
+- Two PIE rounds with no stale callbacks
 
-### Build / ??
-| ? | ?? | ?? |
-|---|---|---|
-| Fresh Development Build ??? 0 | B | A1 + A2 ?? Result: Succeeded |
-| UHT ???? | B | ?? 11 written?A1 4 written |
-| ??/Subsystem ? Gameplay Tick | S | PrimaryActorTick.bCanEverTick=false |
-| Pending DTO ?????? | S | ? FGuid/FName/enum/FTransform |
-| ExplorationMapPath ? World ???? PIE ?? | S | ???? UWorld::RemovePIEPrefix |
-| ??????? Pending | S | RequestEncounter ???????????? |
-| Consume ???? Payload | S | PendingRequest = FHSREncounterRequest() |
-| Consume ??????? DTO | S | Result.ConsumedRequest = Consumed |
-| Consumer ??????? Subsystem ?? | S | ?????? |
-| ??? Consume ??? DTO | S | Consumed ??? Request ???? |
-| Clear() ?????? | S | ???????? |
-| Graybox ? Definition ???????? | S | ???? if (EncounterDefinition) |
-| GetPendingRequest() ??? | S | ?????? |
-| GAS ????????/RPC/?? | S | ????? |
+## Git Fact Record
+- Next to commit: all 8 new/modified files (7 new + Build.cs)
+- Same Git identity caveat applies
 
-### PIE ???????????
-| ? | ?? | ?? |
-|---|---|---|
-| ????Interact -> travel -> First Consume ?? | P | ? A1 ??? ExplorationMap |
-| First Consume ????? RequestId/IDs/Neutral/??/Transform | P | ?? ConsumedRequest ?? |
-| Second Consume ?? AlreadyConsumed + ? ConsumedRequest | P | ????? empty EncounterId |
-| Definition=None / EncounterId=None / EnemyDefId=None / BattleMap=None ?? travel | P | ??? PIE ?? |
-| ?????? | P | ???????? travel |
-| Move/Look/Jump ?? | P | ???? |
-| UIOnly / Prompt / NoCandidate / ???? | P | ???? |
-| GAS HUD ?? | P | Health/Energy/Speed ?? |
-| ?? PIE ?? Request / ???? / Error / Ensure / GC warning | P | ???? |
+## User Editor/PIE Checklist
 
-### ????????????
-| ? | ?? |
-|---|---|
-| travel success/failure ?????? | P4-003 |
-| AlreadyPending?travel ????? PIE ????? | P4-003 |
-| BattleMap.IsNull() ???????????????????? | P4-003 |
-
-## 2026-07-18 A1 ???Coordinator ?????
-
-| # | ?? | ?? |
-|---|---|---|
-| 1 | Request ???????? | ?? ExplorationMapPath ???????? |
-| 2 | Consume ? Payload ??? | ?? Consume ??? PendingRequest = FHSREncounterRequest() |
-| 3 | Consumer ?? Subsystem | ???? ConsumedRequest ??? |
-| 4 | ???????? | ?????? S/B/P |
-
-## 2026-07-18 A2 ???Reviewer REVISE ???
-
-| # | ?? | ?? |
-|---|---|---|
-| 1 | ?? GetPendingRequest() ??? | ?????? public getter |
-| 2 | ???? | ????? UTF-8????????? |
-
-## ?????? PIE ??
-
-???????? Editor ???????? 7056f72 ????
-
-1. ???? Editor???? C++ ?????
-2. PIE -> ? Map_Phase1_Exploration ???? -> ?? travel ? Map_BattleTest
-3. Consumer ???????? ExplorationMapPath???? Consume ?????? AlreadyConsumed + ? EncounterId
-4. ???? Definition=None/EncounterId=None/EnemyDefId=None/BattleMap=None ?? ?? travel
-5. ?? Move/Look/Jump?UIOnly?Prompt?GAS HUD
-6. ???? PIE ?? Request/????/Error/Ensure/GC warning
-7. ??????????
-
-## ????
-
-- ??? 0????????????????Build.cs/Config/??????? ????
-- up to date ???????
-- travel ????/???????? ?? ??? API
-- ???????????????????
-
-## Git ????
-
-- 7056f72?????????????
-- 4fd762?Implementation ???10 ????
-- 3c26b6?Implementation A1 ???4 ????
-- ?? A2 ???2 ?????????
-- ?? Git ?????????
-- ?????"??? Git"????? commit?4fd762 message ?"??/PIE ??"??? PIE ??? ?? ???????
+1. Full Editor restart, confirm new types loadable
+2. Create DA_Enemy_Phase4Test (EnemyDefinitionId, bind DA_Encounter_Phase4Test, set PatrolRadius/PatrolWaitTime)
+3. Create BP_HSREnemy_Phase4Test: set EnemyDefinition, AIControllerClass = AHSREnemyAIController, Auto Possess AI = PlacedInWorld/PlacedInWorldOrSpawned, graybox Mesh/Material, EncounterCollision radius
+4. Place enemy + NavMeshBoundsVolume in Map_Phase1_Exploration (press P to verify green nav area)
+5. Save 2 assets, Editor restart, verify references
+6. PIE: patrol visible (Output Log -> State transitions), player approach -> perception -> chase -> encounter overlap -> travel to BattleMap
+7. P4-001 regression: BattleMap Consumer first/second Consume, ExplorationMapPath, empty DTO on failure
+8. Threat matrix: no NavMesh, lost target, destroyed target, repeated perception, MoveTo failure
+9. Regression: Move/Look/Jump, UIOnly, Prompt, GAS HUD
+10. Two clean PIE rounds, no Error/Ensure/GC warning

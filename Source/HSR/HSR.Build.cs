@@ -17,6 +17,8 @@ public class HSR : ModuleRules
 			"GameplayTags",
 			"GameplayTasks",
 			"UMG",
+			"AIModule",
+			"NavigationSystem",
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
