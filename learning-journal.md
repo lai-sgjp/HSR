@@ -645,3 +645,26 @@ Teacher 曾评估上述补答达到最低门禁，但 Reviewer commits `8c34a33`
 4. Prompt 显示但 F 无效时，从 `Character::Interact` 开始，依次写出你要观察的三项具体证据。
 
 工程 Gate 的三个 `USER ACCEPTED` 缺口与 `OutOfRange` 未动态命中继续保留。Teacher 不判 Phase Ready，也不替代 Reviewer。
+
+## 2026-07-18｜最终四行补答与 Teacher 最终 Gate
+
+### 用户最终补答原话（原样保留）
+
+> interaction component+actor, viewmodel+widget
+> nocandidate, targetinvalid
+> 旧viewmodel解绑， 旧widget解绑， new widget/viewmodel绑定componet， new widget snapshot
+> interaction component, interface/actor, result
+
+### 题目映射复核
+
+1. **达到最低要求。** 用户能把 Gameplay 候选/执行职责归到 InteractionComponent 与 Actor，把 UI 表现职责归到 ViewModel 与 Widget。答案简短，但职责分组正确。
+2. **达到失败名最低要求。** `NoCandidate` 与 `TargetInvalid` 的映射正确。弱引用“只观察、不拥有、不延长目标生命周期”没有在本次答案中独立写出，因此保留为 follow-up，不能计作本答独立掌握。
+3. **达到生命周期顺序最低要求。** 已写出旧 ViewModel 解绑、旧 Widget 解绑、新 Widget/ViewModel 绑定 Component、新 Widget snapshot。旧实例 teardown 后回调不再增长没有在本次答案中显式写出，保留为 follow-up。
+4. **达到分层 Debug 最低要求。** 题干已经规定从 `Character::Interact` 开始，因此本答给出后续 `InteractionComponent → Interface/Actor → Result` 可以成立；无需机械重复题干。仍需继续练习每层应观察的具体字段和日志，而不仅是层名。
+
+### 最终掌握度与 Gate
+
+- **本次独立覆盖：** Gameplay 与 UI 职责分组；`NoCandidate/TargetInvalid`；旧链解绑、新链绑定和 snapshot 顺序；从 Character 起点之后的三层 Debug。
+- **经先前教学掌握、但本次未独立复述：** 弱引用只观察不拥有；目标弱失效时清候选并广播 `nullptr`；旧 Widget/ViewModel teardown 后零新增回调；Result 的 `bSuccess/FailureReason/Message` 具体证据。
+- **最低学习 Gate：达到，可交 Independent Reviewer 复审。** 结论为 Teacher `PASS WITH FOLLOW-UP`；follow-up 必须保留，不能把先前提示写成用户本次独立答案。
+- Teacher 不判 Phase 3 Ready，也不替代 Reviewer。三个工程 `USER ACCEPTED` 缺口与 `OutOfRange` 未动态命中继续有效。

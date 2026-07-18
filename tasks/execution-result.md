@@ -160,3 +160,25 @@
 - **最低学习 Gate：`REVISE / BLOCKING`，暂不可交 Independent Reviewer 复审。** 先前 Teacher 摘要与提示不能冒充用户独立答案；本次原始补证暴露出职责、失败语义、生命周期和具体 Debug 证据仍不完整。
 - 下一最小动作：用户先阅读 `learning-journal.md` 本节的四条最小纠正，再独立回答唯一一个四行小题；Teacher 收到原话后再复核。
 - 三个 `USER ACCEPTED` 工程缺口及 `OutOfRange` 未动态命中继续有效。Teacher 不判 Phase Ready、不创建 Reviewer 结论。
+
+## 2026-07-18 最终四行补答与 Teacher Gate
+
+### 用户最终补答原话（原样保留）
+
+> interaction component+actor, viewmodel+widget
+> nocandidate, targetinvalid
+> 旧viewmodel解绑， 旧widget解绑， new widget/viewmodel绑定componet， new widget snapshot
+> interaction component, interface/actor, result
+
+### 最终复核
+
+- 职责：InteractionComponent/Actor 与 ViewModel/Widget 分组正确，覆盖 Gameplay 真源与 UI 表现最低边界。
+- 失败原因：`NoCandidate/TargetInvalid` 对应正确；弱引用只观察不拥有未在本答独立写出，保留 follow-up。
+- 生命周期：覆盖旧 VM/Widget 解绑、新链绑定和新 Widget snapshot；旧实例回调零增长未显式写出，保留 follow-up。
+- Debug：题干已指定从 `Character::Interact` 起步，本答后续 `InteractionComponent → Interface/Actor → Result` 满足三层要求；具体字段/日志仍需练习。
+
+### Teacher 最终 Gate
+
+- **最低学习 Gate：达到，可交 Independent Reviewer 复审。** Teacher 结论为 `PASS WITH FOLLOW-UP`。
+- 本次独立覆盖与先前提示内容已分开记录，不把提示冒充用户答案。
+- 三个 `USER ACCEPTED` 工程缺口及 `OutOfRange` 未动态命中继续有效。Teacher 不判 Phase Ready、不创建 Reviewer 结论。
