@@ -119,3 +119,22 @@
 - `p3-003-final-build.log` 不存在，完整 Build 不可独立核验且 UHT 未运行。
 - 最终 Build 后 HUD rebuild/同会话 Re-Possess 未补证。
 - 目标销毁/弱失效未补证；`OutOfRange` 仍未动态命中。
+
+## 2026-07-18 Teacher 最终复核：分步补答轨迹
+
+- 命令链：补答能给出 `Character → TryInteract → Interface/Actor → Result`。
+- 观察链：经纠正能给出 `OnCandidateChanged → ViewModel → OnPromptChanged → Widget`，并知道 snapshot 不是常规候选变化事件。
+- 失败原因：能正确区分 `NoCandidate` 与 `TargetInvalid`。
+- Delegate/snapshot/dedup：概念职责正确；snapshot 初始顺序经纠正后修正。
+- Prompt 存在但 F 无效：能先查 `Character::Interact`，并理解观察链不等于命令链；后续经提示补齐 Candidate、Interface 与 Result 字段。
+- HUD rebuild：首答 `B-D-C-A`，经纠正为 `D-B-C-A`。
+- UI 边界：能选出禁止项 B/C/E，理解 UI 是消费者；经纠正明确 UI 可修改自身表现。
+- 弱引用：能解释只观察不拥有、目标销毁后清理候选；经提示补齐广播 `nullptr` 并返回 `TargetInvalid`。
+
+### Teacher 最终掌握度与 Gate
+
+- 真正独立掌握：基本职责方向、`NoCandidate/TargetInvalid`、Delegate/snapshot/dedup 概念、观察链不等于命令链、UI 非真源。
+- 经提示后掌握：完整链节点、snapshot 时序、HUD rebuild 顺序、Debug 的 Interface/Candidate/Result 字段、弱失效广播与结果。
+- 仍需复习：脱离选项完整复述；Re-Possess 生命周期；全链分层 Debug；Delegate 绑定/解绑与 snapshot/dedup 的源码映射。
+- **最低学习 Gate：达到，可交 Independent Reviewer。** 结论按 `PASS WITH FOLLOW-UP` 记录，不把经提示答案改写为独立掌握。Teacher 不判 Phase Ready、不创建 Reviewer 结论。
+- 三个 `USER ACCEPTED` 工程缺口及 `OutOfRange` 未动态命中继续有效，不因学习 Gate 达到而关闭。

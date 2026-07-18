@@ -588,3 +588,28 @@ Teacher 曾评估上述补答达到最低门禁，但 Reviewer commits `8c34a33`
 - **未掌握：** 两条完整数据流、弱候选失效与结构化失败、Delegate 绑定/解绑生命周期、HUD rebuild/Re-Possess、UI 禁止边界和分层 Debug。
 - **学习 Gate：阻断 Phase 3 Ready。** 原始答案中 6/8 题为不知道，尚不能独立复述 Phase 3 的核心数据流与 Debug 路径。建议先完成上面四个最小填空，再由 Teacher 复核；这不是对工程实现失败的判断。
 - 工程 Gate 的三个 `USER ACCEPTED` 缺口继续保留：完整 Build 日志不存在且 UHT 未运行；最终 Build 后 HUD rebuild/Re-Possess 未补证；目标销毁/弱失效未补证。`OutOfRange` 仍未动态命中。Teacher 不判定 Phase Ready，也不替代 Reviewer。
+
+## 2026-07-18｜Phase 3 分步补答与 Teacher 最终复核
+
+### 补答轨迹
+
+- **命令链：** 用户补答能给出 `Character → TryInteract → Interface/Actor → Result`，已建立从输入转发、组件协调、接口分发到结构化结果的主干。
+- **观察链：** 初次不能完整复述；经纠正后能识别 `OnCandidateChanged → ViewModel → OnPromptChanged → Widget`，并知道 snapshot 不是常规候选变化事件。
+- **失败语义：** 能正确区分正常离开后的 `NoCandidate` 与候选弱失效后的 `TargetInvalid`。
+- **Delegate/snapshot/dedup：** 能解释 Delegate 广播变化、snapshot 主动获取当前初始状态、dedup 避免重复广播；snapshot 的发生顺序最初不准，纠正后已修正。
+- **Prompt 存在但 F 无效：** 能选择先检查 `Character::Interact`，理解观察链成立不等于命令链成立；后续能继续检查 `TryInteract`、Actor 与 Result，经提示补齐 Interface、Candidate 和 Result 字段。
+- **HUD rebuild：** 首答顺序为 `B-D-C-A`，经纠正后为 `D-B-C-A`：先断开旧观察关系，再清理旧实例，创建/绑定新链，最后获得当前 snapshot。
+- **UI 边界：** 能选出禁止项 B/C/E，理解 UI 是消费者；经纠正后明确 UI 可以修改自身表现，但不能修改 Gameplay 真源或提交交互。
+- **弱引用：** 最终能回答“只观察、不拥有；目标销毁后清理候选”；经提示补齐清理时还应广播 `nullptr` 并返回 `TargetInvalid`。
+
+### 最终掌握度
+
+- **真正独立掌握：** Interface/Actor/UI 的基本职责方向；`NoCandidate` 与 `TargetInvalid` 的区别；Delegate、snapshot、dedup 的概念职责；Prompt 观察链与按键命令链不是同一条链；UI 是消费者而非 Gameplay 真源。
+- **经提示后掌握：** 两条链的完整节点；snapshot 的精确时序；HUD rebuild 的解绑/清理/重绑/snapshot 顺序；Debug 中 Interface、Candidate 与 Result 字段；弱失效后的 `Broadcast(nullptr)` 与 `TargetInvalid`。
+- **仍需复习：** 不借助选项完整复述两条链；HUD rebuild 与 Re-Possess 生命周期的独立排序；按 `IA/IMC → Character → Candidate/Component → Interface/Actor → Result → UI` 自主定位第一处断点；`AddUniqueDynamic/RemoveDynamic` 与 snapshot/dedup 的源码映射。
+
+### Teacher 最终结论
+
+- **最低学习 Gate 已达到，可交 Independent Reviewer。** 用户已从“多数不知道”推进到能解释核心职责、失败语义、两条链的主干和 Debug 首个分层，并能在纠正后完成生命周期与弱失效细节。
+- 该结论是 `PASS WITH FOLLOW-UP` 性质的教学结论：大量细节属于经提示后掌握，不能记录为首次独立掌握；上列复习项继续保留。
+- Teacher 不判定 Phase 3 Ready，也不替代 Independent Reviewer。工程 Gate 的三个 `USER ACCEPTED` 缺口继续保留：完整 Build 日志不存在且 UHT 未运行；最终 Build 后 HUD rebuild/Re-Possess 未补证；目标销毁/弱失效未补证。`OutOfRange` 仍未动态命中。
