@@ -46,6 +46,7 @@ protected:
 	EHSREnemyExplorationState CurrentState;
 
 	FTimerHandle PatrolWaitTimerHandle;
+	FTimerHandle InitTimerHandle;
 
 	UPROPERTY()
 	TObjectPtr<UAISenseConfig_Sight> SightConfig;

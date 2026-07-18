@@ -36,15 +36,8 @@ void AHSREnemyAIController::BeginPlay()
 
 	UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::BeginPlay - %s"), *GetName());
 
-	// Bind perception delegate
-	if (PerceptionComponent)
-	{
-		PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AHSREnemyAIController::OnTargetPerceptionUpdated);
-	}
-
 	// Start patrol after a short frame delay to allow NavMesh to initialize
-	FTimerHandle InitTimer;
-	GetWorld()->GetTimerManager().SetTimer(InitTimer, this, &AHSREnemyAIController::StartPatrol, 0.2f, false);
+	GetWorld()->GetTimerManager().SetTimer(InitTimerHandle, this, &AHSREnemyAIController::StartPatrol, 0.2f, false);
 }
 
 void AHSREnemyAIController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -63,11 +56,23 @@ void AHSREnemyAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 	UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::OnPossess - Controller=%s Pawn=%s"), *GetName(), InPawn ? *InPawn->GetName() : TEXT("null"));
+
+	// Bind perception delegate when possessing a pawn
+	if (PerceptionComponent)
+	{
+		PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AHSREnemyAIController::OnTargetPerceptionUpdated);
+	}
 }
 
 void AHSREnemyAIController::OnUnPossess()
 {
 	ClearState();
+
+	if (PerceptionComponent)
+	{
+		PerceptionComponent->OnTargetPerceptionUpdated.RemoveAll(this);
+	}
+
 	Super::OnUnPossess();
 }
 
@@ -85,8 +90,13 @@ void AHSREnemyAIController::SetState(EHSREnemyExplorationState NewState)
 
 void AHSREnemyAIController::ClearState()
 {
-	// Clear patrol timer
-	GetWorld()->GetTimerManager().ClearTimer(PatrolWaitTimerHandle);
+	// Clear all timers (with world safety for teardown edge)
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		World->GetTimerManager().ClearTimer(PatrolWaitTimerHandle);
+		World->GetTimerManager().ClearTimer(InitTimerHandle);
+	}
 
 	// Stop movement
 	if (GetPathFollowingComponent())
@@ -223,9 +233,12 @@ void AHSREnemyAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus
 		GetWorld()->GetTimerManager().ClearTimer(PatrolWaitTimerHandle);
 		StopMovement();
 
-		// Start chase
+		// Start chase with configured acceptance radius
 		SetState(EHSREnemyExplorationState::Chasing);
-		MoveToActor(Actor);
+		AHSREnemyCharacter* EnemyChar = Cast<AHSREnemyCharacter>(GetPawn());
+		UHSREnemyDefinition* EDef = EnemyChar ? EnemyChar->EnemyDefinition : nullptr;
+		float Acceptance = EDef ? EDef->ChaseAcceptanceRadius : 50.0f;
+		MoveToActor(Actor, Acceptance);
 
 		UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::OnTargetPerceptionUpdated - %s sensed %s, chasing"), *GetName(), *Actor->GetName());
 	}
