@@ -1,8 +1,8 @@
 # Phase 3 详细执行计划：单对象交互系统
 
 > 计划日期：2026-07-17  
-> 当前状态：P3-001 已以 Reviewer `PASS WITH FOLLOW-UP` 归档；唯一活动任务为 `TASK-P3-002`，等待 Implementation 首次只读复述与用户确认  
-> 阶段门禁：前置条件 `Ready`；Phase 3 本身为 `Not verified`
+> 当前状态：P3-001、P3-002、P3-003 均已归档；P3-003 最终 Reviewer commit `3b3fbeb` 为 `PASS WITH FOLLOW-UP`
+> 阶段门禁：Phase 3 为 `Ready`，所有工程、运行、学习与流程 follow-up 继续保留
 
 ## 1. 当前阶段、证据与 Gate
 
@@ -134,7 +134,7 @@ Overlap End / Actor Destroyed
 |---|---|---|
 | P3-001 | 交互协议、弱候选组件与单对象无 UI 闭环可编译、可在 PIE 成功/失败 | Reviewer `PASS WITH FOLLOW-UP`；最终修订 commit `64ac977`，已归档 |
 | P3-002 | 提示 UI 事件链与候选/生命周期边界稳定 | Reviewer `d93dbe8` 为 `PASS WITH FOLLOW-UP`；最终 Implementation/A4 `20ab555`，已归档 |
-| P3-003 | 最终回归、教学、审查与阶段归档闭合 | 已创建唯一活动任务卡，等待首次只读复述与用户确认 |
+| P3-003 | 最终回归、教学、审查与阶段归档闭合 | Reviewer `3b3fbeb` 为 `PASS WITH FOLLOW-UP`；已归档 |
 
 ## 6. P3-001：协议、组件与单对象垂直闭环
 
@@ -238,7 +238,14 @@ Overlap End / Actor Destroyed
 
 ## 8. P3-003：最终回归、教学、审查与阶段收尾
 
-> 2026-07-18 执行状态：P3-002 已完成 Reviewer 与最终 Implementation 提交并归档；P3-003 成为唯一活动任务。详细契约位于 `tasks/active-task.md`。当前只允许首次只读复述，用户二次确认前不得运行 Build/Editor/PIE 或修改文件。
+> 2026-07-18 最终状态：P3-003 已完成 Verification、Coordinator、Teacher、用户原始补答与两轮 Reviewer 链，最终复审 `PASS WITH FOLLOW-UP` 并归档。Phase 3 以 `Ready` 收尾，但下列证据和学习边界不得改写为已验证。
+
+最终保留边界：
+
+- `p3-003-final-build.log` 不存在，完整 Build 控制台不可独立核验，UHT 未运行。
+- 最终 Build 后 HUD rebuild/同会话 Re-Possess 未补新证据；目标销毁/弱失效未补新证据。
+- P3-001 `OutOfRange` 未动态命中；P3-001/P3-002 的 Build/UHT、用户 PIE、Git Gate、资产追认、代理提交与同一 Git 身份边界继续有效。
+- 学习 follow-up：弱引用原因、弱失效清理/广播/`TargetInvalid` 完整语义、旧实例零增长、Result 字段/日志、脱离提示的 Re-Possess 与全链 Debug。
 
 ### 8.1 唯一可验收结果
 
@@ -335,3 +342,7 @@ IA_Interact → Character → InteractionComponent::TryInteract
 ### 2026-07-18 当前唯一下一步
 
 历史“创建 P3-001”已完成，不再作为当前入口。当前唯一下一步是由 Implementation/Verification Agent 对 `TASK-P3-003` 做首次只读复述并逐字等待用户确认；确认后依次闭合最终工程 Gate、Coordinator 交接、Teacher 教学与用户原始作答、Teacher 独立提交、Independent Reviewer 独立审查及 Coordinator 阶段归档。不得自动进入 Phase 4，不得实施 Gameplay 或修改 Source/Content/Config。
+
+### 2026-07-18 阶段归档后的建议
+
+上述 P3-003 执行入口现已完成并归档，不再使用。当前没有活动任务；唯一建议是由用户先审阅 Phase 3 的 `Ready` 与 follow-up 边界，再明确决定是否授权 Phase 4 规划。不得自动创建 Phase 4 活动卡、开始实现或修改 Gameplay/Content/Config。

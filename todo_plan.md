@@ -159,7 +159,7 @@
 
 - [x] P3-001：交互协议、弱候选组件与单灰盒对象闭环（Reviewer commit `e99078d` 为 `PASS WITH FOLLOW-UP`；最终修订 commit `64ac977`，follow-up 与历史流程偏差保留）。
 - [x] P3-002：事件驱动 Prompt 观察层与生命周期专项（Reviewer `d93dbe8` 为 `PASS WITH FOLLOW-UP`；最终 Implementation/A4 `20ab555`，已归档；Build/UHT、用户 PIE、归属笔误及历史流程边界保留）。
-- [ ] P3-003：完成最终回归、Teacher、用户原始作答、Reviewer 与阶段归档（Teacher 补证 commits `bfae6c0`/`3ad471b` 已完成，最低学习 Gate 为 `PASS WITH FOLLOW-UP`；当前等待 Independent Reviewer 复审；工程/学习 follow-up 与 `OutOfRange` 保留，不进入 Phase 4）。
+- [x] P3-003：完成最终回归、Teacher、用户原始作答、Reviewer 与阶段归档（最终 Reviewer `3b3fbeb` 为 `PASS WITH FOLLOW-UP`；Phase 3 为 `Ready`；三个工程 `USER ACCEPTED` 缺口、`OutOfRange`、学习与历史流程 follow-up 全部保留，不自动进入 Phase 4）。
 
 > Phase 3 当前执行边界为一个灰盒交互对象。早期路线图中的 NPC、宝箱和传送点三类占位对象仅作为共享协议的历史扩展依据，不是当前可勾选任务；真实对话、奖励、持久化和传送继续推迟。
 
