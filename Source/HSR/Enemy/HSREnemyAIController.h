@@ -33,6 +33,7 @@ protected:
 	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 
 	void StartPatrol();
+	UFUNCTION()
 	void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 	void HandleChaseTargetLost();
 	void HandleMoveFailedOrAborted();

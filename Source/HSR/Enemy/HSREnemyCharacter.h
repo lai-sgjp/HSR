@@ -18,7 +18,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Encounter")
 	void TryRequestEncounter();
 
-	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "Enemy")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
 	TObjectPtr<UHSREnemyDefinition> EnemyDefinition;
 
 	UFUNCTION(BlueprintPure, Category = "Enemy")

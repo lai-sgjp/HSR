@@ -183,14 +183,12 @@ void AHSREnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathF
 	}
 	else if (CurrentState == EHSREnemyExplorationState::Chasing)
 	{
-		// Chase move completed - re-evaluate target
+		// DONT call MoveToActor here - would cause infinite recursion
+		// when MoveTo completes synchronously. The EncounterCollision
+		// overlap (triggered when player enters EncounterCollision range)
+		// or a new Perception stimulus will handle re-engagement.
 		AActor* Target = CurrentTarget.Get();
-		if (Target && IsValid(Target))
-		{
-			// Continue chasing
-			MoveToActor(Target);
-		}
-		else
+		if (!Target || !IsValid(Target))
 		{
 			HandleChaseTargetLost();
 		}
