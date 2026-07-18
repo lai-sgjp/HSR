@@ -1,6 +1,6 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-07-17
+> 最后更新：2026-07-18
 > 作用：CC-SWITCH 切换模型后的快速恢复快照。高级模型负责维护；低级模型不得把本文件作为执行入口。
 
 ## 当前 Phase
@@ -13,7 +13,8 @@
 ## 当前任务
 
 - `TASK-P3-001` 已以 Reviewer `PASS WITH FOLLOW-UP` 归档；Reviewer commit `e99078d`，最终修订 commit `64ac977`。
-- 当前唯一活动任务为 `TASK-P3-002`：事件驱动交互提示观察层与生命周期专项。任务卡已创建，等待 Implementation 首次只读复述与用户二次确认；尚未实施、构建或运行 Editor/PIE。
+- `TASK-P3-002` 已以 Reviewer `PASS WITH FOLLOW-UP` 归档；Reviewer commit `d93dbe8`，最终 Implementation/A4 commit `20ab555`。
+- 当前唯一活动任务为 `TASK-P3-003`：Phase 3 最终工程回归、Teacher 教学、用户原始作答、Independent Reviewer 与阶段归档。等待首次只读复述和用户二次确认；Phase 3 仍为 `Not verified`，不自动进入 Phase 4。
 - `TASK-P2-003` 已以 `USER ACCEPTED` 归档；其 Reviewer `REVISE` 结论未改写。
 - `TASK-P2-002` 经 A1/A2/A3 修订与用户最终补证后由 Reviewer 判定 `PASS`：最终 `HSREditor Win64 Development` 成功，五 GE 配置、Editor 重开、Clamp、Re-Possess、HUD 单 snapshot/teardown 和两轮连续 PIE 均有用户证据并经 Reviewer 只读核验。历史 `REVISE` 链保留。
 - `TASK-P2-001` 最终处置为 `USER ACCEPTED`：独立 Reviewer 结论仍为 `REVISE`，用户明确接受剩余证据边界并授权进入 P2-002；未伪造 Reviewer `PASS`。
@@ -173,6 +174,72 @@
 - Follow-up 原样保留：完整 Build/UHT 输出未保存、最终 PIE 主要是用户证据、OutOfRange 未动态命中、`9356ad0` 流程偏差、同一 Git 身份不能独立证明不同角色作者。
 - 已创建唯一 P3-002 活动卡，只规划事件驱动 Prompt 观察层、Delegate 初始快照/解绑、HUD 重建、Re-Possess 和连续 PIE；不实施源码/资产。
 - 本轮仅维护/归档 Markdown；未修改 Source/Content/Config，未运行 Build/Editor/PIE，未执行 Git commit/push。
+
+## 2026-07-18 TASK-P3-002 Coordinator 只读交付核对
+
+- commits：用户 Prompt 资产 `6d86e1a`；只读 BP_HSRHUD 修复 `f9fc069`；Implementation C++ `9fb5deb`；只读 WBP_AttributeDebug 隐藏 `04ddd82`。当前工作树干净。
+- 基本方向成立：Interaction event → weak ViewModel → UserWidget Blueprint event；共享接口 Prompt、动态 Delegate 成对 API、无 UI Tick/世界扫描，Implementation commit 文件在 C++ 允许范围内。
+- 当前 `REVISE`：OnUnPossess 未调用 HUD Clear；Observe 同 Component 不幂等且日志每轮同帧出现两次；无 Prompt 状态缓存去重；Widget 独立 Destruct 不 teardown Component；缺 VM/Widget 实例与回调计数。
+- `HSR.log:1277/1279` 明确显示 Re-Possess 与 HUD rebuild 的 `ce` 命令未被处理并记录 Error，所以两项没有运行证据；三轮 PIE 启动本身不能替代生命周期专项。
+- `f9fc069` 和 `04ddd82` 执行时越出原资产允许范围；该轮首次核对曾要求用户处置，随后已按下节用户明确作者/授权决定解除阻断。历史流程偏差不得 reset/rewrite。
+- 执行报告仍有两个 ASCII `0x08`，未记录越权 commits、CE Error 与重复 Observe；报告作者需追加真实状态。
+- 活动卡已给出原 C++ 范围内的最小修订和修订后 Gate；当前不交 Reviewer、不标记 P3-002 完成、不进入 P3-003。
+- 本轮仅更新协调 Markdown；未修改 Source/Content/Config，未运行 Build/Editor/PIE，未执行 Git。
+
+## 2026-07-18 TASK-P3-002 用户资产作者与临时测试方式处置
+
+- 用户确认 `f9fc069` 与 `04ddd82` 的资产作者均为本人；事后接受 `BP_HSRHUD` WidgetClass 必要修复，并接受/坚持隐藏 `WBP_AttributeDebug` 测试按钮。两个资产授权阻断解除，流程偏差继续记录。
+- 最终资产不要求恢复按钮常驻可见。HUD rebuild/Re-Possess 专项只允许用户在 PIE 前临时把现有按钮设为 Visible，验证后恢复 Hidden/Collapsed，且不提交中间状态。
+- 若 Editor 无法安全恢复或按钮不能合法触发，则如实记未验证；禁止 Level Blueprint、Console/CE 伪入口、新资产或临时业务 API。
+- C++ 最小修订仍限原允许范围：OnUnPossess 清理、Observe 幂等、状态去重/强制 snapshot、NativeDestruct teardown、实例/计数日志，以及执行报告清除两个 `0x08` 并追加真实证据。
+- 修订轮使用 `TASK-P3-002-A1` 首次复述门禁；用户确认前不得实施。
+- 本轮只更新协调 Markdown；未修改 Source/Content/Config，未执行 Git。
+
+## 2026-07-18 TASK-P3-002-A1 Coordinator 只读复核
+
+- A1 已修复 OnUnPossess 清理，并增加 ViewModel 状态缓存、VM实例与广播/skip计数。修订后源码→DLL→Editor日志时间链成立。
+- 用户通过临时显示的现有按钮合法完成 Re-Possess 和两次 HUD rebuild；日志支持 VM teardown/重建，最新无 Error/Ensure/GC warning；最终 Content 无 diff，按钮已恢复隐藏。
+- A1 仍 `REVISE`：HUD 的已有 VM 每次 Refresh 都 Force snapshot；新 VM 无候选 snapshot 依赖第二次 Refresh；Observe same Component 仍可能广播；Widget NativeDestruct 不 Teardown；无 Widget实例/接收计数；VM teardown 诊断不足。
+- 执行报告未更新且两个 `0x08` 仍存在；未记录资产授权、旧 CE Error、合法按钮证据与当前缺口。
+- 最新日志仅一轮目标探索地图 PIE，另一会话是 Map_ProjectSetup，不满足两轮目标地图回归。
+- 活动卡已锁定 A2 六文件最小修订、首次复述确认和 A2 后验证 Gate；当前不交 Reviewer。
+- 本轮只更新协调 Markdown；未修改 Gameplay/Content/Config，未运行 Build/Editor/PIE，未执行 Git。
+
+## 2026-07-18 TASK-P3-002-A2 Coordinator 只读复核
+
+- A2 已完成 HUD Observe→Widget连接顺序、same Component/VM no-op、Candidate状态去重、新Widget唯一Force snapshot、NativeDestruct解绑+Teardown，以及VM/Widget实例与计数。
+- 最新日志支持 Widget10→Widget11、VM2→VM3→VM4 的 rebuild/Re-Possess 生命周期；旧实例解绑后无后续回调，新连接各一次 snapshot。合法按钮成功，Content无diff，最新无Error/Ensure/GC warning。
+- A2 仍有三个主要缺口：正常HUD Remove先清VM导致NativeDestruct没有无条件实例/最终计数日志；执行报告未更新且两个0x08仍在；A2最终代码只运行一轮目标地图PIE。
+- Move/Look/Jump/Interact/UIOnly/视觉Prompt仍需用户逐项回传；GAS Re-Possess数值由日志支持。
+- 已建立A3两文件最小收口与首次复述门禁；当前不交Reviewer。
+- 本轮只修改协调Markdown，未修改Gameplay/Content/Config，未运行工具链/Editor/PIE，未执行Git。
+
+## 2026-07-18 TASK-P3-002-A3 Coordinator 只读复核
+
+- NativeDestruct 无条件 Widget ID/VM/final receive 日志已实现；A3源码→obj/DLL→Editor日志时间链成立。
+- A3后最终日志有两轮Map_Phase1_Exploration PIE；Widget10/11/12均有唯一初始snapshot、事件计数和Destruct，旧实例解绑/销毁后无后续回调。
+- 合法HUD rebuild与两次Re-Possess成功；GAS属性/InitApplyCount保持；用户确认输入/UIOnly/视觉Prompt/GAS HUD正常；日志无Error/Ensure/GC warning；Content/Config无diff。
+- 功能Gate闭合，但报告新含0x0C/0x00，且缺旧CE、资产授权、Build/UHT边界和准确Widget11顺序；根目录还有未授权未跟踪edit_widget.py。
+- 已建立A4仅报告清理+删除作者helper的Gate；禁止再改Source/Content/Config，当前不交Reviewer。
+- 本轮只更新协调Markdown，未修改实现/资产/配置，未运行工具链/Editor/PIE，未执行Git。
+
+## 2026-07-18 TASK-P3-002-A4 与 Reviewer 前最终收口
+
+- execution-result 已恢复严格UTF-8文本，异常控制字符0；未跟踪edit_widget.py已删除；Content/Config无diff。
+- 最终未提交实现精确六个允许Source文件；初版Implementation commit为9fb5deb，用户资产commits为6d86e1a/f9fc069/04ddd82，作者/事后授权边界已记录。
+- A3后两轮目标地图日志、HUD rebuild/Re-Possess、实例/计数、旧实例零增长和日志健康证据闭合；用户回归证据来源明确。
+- Build边界保持为源码→obj/DLL→Editor时间链；完整控制台/UHT明细未保存。
+- 已知差异：报告将OnUnPossess误列初版闭合（实际A1）；git diff --check仍报告PlayerController.cpp文件尾新增空行。两项均在Reviewer交接中明示，由Reviewer决定是否修订。
+- A1-A3最终Source+报告尚无最终Implementation作者提交；Reviewer放行后仍需精确提交。
+- 当前等待Independent Reviewer；不判PASS、不归档、不建P3-003、不执行Git。
+
+## 2026-07-18 TASK-P3-002 归档与 P3-003 启动
+
+- Independent Reviewer commit `d93dbe8725ce735eae3aa0c5ae38a057a99a716e` 仅提交 `tasks/final-review.md`，结论为 `PASS WITH FOLLOW-UP`。
+- 用户授权主 Agent 代理创建最终 Implementation/A4 commit `20ab55590f0e192c003f15cdad263cf303636d50`；精确包含六个 Source 与 `tasks/execution-result.md`，并清除 PlayerController EOF 空行。
+- P3-002 已归档 active/execution/final-review。仍保留：完整 fresh Build/UHT 控制台未保存、部分 PIE/回归来自用户、OnUnPossess 归属笔误、历史 CE 失败、资产先修改后追认、同 Git 身份和代理提交边界；P3-001 follow-up 继续有效。
+- 唯一活动任务改为 P3-003；只做最终 Build/Editor 重开/PIE 回归、Coordinator 工程核对、Teacher 教学与用户原始作答、独立 Reviewer 和阶段归档。禁止 Source/Content/Config 修改、Gameplay 实施与自动进入 Phase 4。
+- 当前 Gate：Implementation/Verification Agent 首次只读复述并等待用户二次确认；确认前不得调用工具或实施。
 
 ## 2026-07-17 TASK-P2-001 Coordinator 规划更新
 

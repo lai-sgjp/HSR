@@ -133,8 +133,8 @@ Overlap End / Actor Destroyed
 | 工作包 | 单一可验收结果 | 状态 |
 |---|---|---|
 | P3-001 | 交互协议、弱候选组件与单对象无 UI 闭环可编译、可在 PIE 成功/失败 | Reviewer `PASS WITH FOLLOW-UP`；最终修订 commit `64ac977`，已归档 |
-| P3-002 | 提示 UI 事件链与候选/生命周期边界稳定 | 已创建唯一活动任务卡，等待首次复述与确认 |
-| P3-003 | 最终回归、教学、审查与阶段归档闭合 | 未开始 |
+| P3-002 | 提示 UI 事件链与候选/生命周期边界稳定 | Reviewer `d93dbe8` 为 `PASS WITH FOLLOW-UP`；最终 Implementation/A4 `20ab555`，已归档 |
+| P3-003 | 最终回归、教学、审查与阶段归档闭合 | 已创建唯一活动任务卡，等待首次只读复述与用户确认 |
 
 ## 6. P3-001：协议、组件与单对象垂直闭环
 
@@ -238,6 +238,8 @@ Overlap End / Actor Destroyed
 
 ## 8. P3-003：最终回归、教学、审查与阶段收尾
 
+> 2026-07-18 执行状态：P3-002 已完成 Reviewer 与最终 Implementation 提交并归档；P3-003 成为唯一活动任务。详细契约位于 `tasks/active-task.md`。当前只允许首次只读复述，用户二次确认前不得运行 Build/Editor/PIE 或修改文件。
+
 ### 8.1 唯一可验收结果
 
 Phase 3 的工程证据、Editor/PIE 证据、源码教学、独立审查和文档状态全部闭合；阶段结论只依据真实材料判定为 `Ready`、`Not verified` 或 `Blocked`。
@@ -329,3 +331,7 @@ IA_Interact → Character → InteractionComponent::TryInteract
 ## 12. 计划归档后的唯一下一步
 
 创建并审查 `TASK-P3-001` 活动任务卡：只授权交互 Types、Interface、InteractionComponent、ExplorationCharacter 接入、一个灰盒 Actor 及其最小 Editor 资产/验证证据。任务卡经 Reviewer 审查且用户确认执行后，再开始源码与资产实施；不得自动进入 P3-002 或 Phase 4。
+
+### 2026-07-18 当前唯一下一步
+
+历史“创建 P3-001”已完成，不再作为当前入口。当前唯一下一步是由 Implementation/Verification Agent 对 `TASK-P3-003` 做首次只读复述并逐字等待用户确认；确认后依次闭合最终工程 Gate、Coordinator 交接、Teacher 教学与用户原始作答、Teacher 独立提交、Independent Reviewer 独立审查及 Coordinator 阶段归档。不得自动进入 Phase 4，不得实施 Gameplay 或修改 Source/Content/Config。

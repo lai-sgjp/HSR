@@ -158,8 +158,8 @@
 ## Phase 3：交互系统与探索对象
 
 - [x] P3-001：交互协议、弱候选组件与单灰盒对象闭环（Reviewer commit `e99078d` 为 `PASS WITH FOLLOW-UP`；最终修订 commit `64ac977`，follow-up 与历史流程偏差保留）。
-- [ ] P3-002：通过事件驱动的提示 UI 完成候选、Widget、Re-Possess 与连续 PIE 生命周期专项（已创建活动任务卡，等待 Implementation 首次只读复述与用户二次确认；未实施/未验证）。
-- [ ] P3-003：完成最终 Build、Editor 重开、PIE 回归、Teacher、Reviewer 与阶段归档，并只依据真实证据判定阶段状态。
+- [x] P3-002：事件驱动 Prompt 观察层与生命周期专项（Reviewer `d93dbe8` 为 `PASS WITH FOLLOW-UP`；最终 Implementation/A4 `20ab555`，已归档；Build/UHT、用户 PIE、归属笔误及历史流程边界保留）。
+- [ ] P3-003：完成最终 Build、Editor 重开、PIE 回归、Teacher、用户原始作答、Reviewer 与阶段归档（唯一活动任务；等待首次只读复述与用户二次确认，不自动进入 Phase 4）。
 
 > Phase 3 当前执行边界为一个灰盒交互对象。早期路线图中的 NPC、宝箱和传送点三类占位对象仅作为共享协议的历史扩展依据，不是当前可勾选任务；真实对话、奖励、持久化和传送继续推迟。
 
