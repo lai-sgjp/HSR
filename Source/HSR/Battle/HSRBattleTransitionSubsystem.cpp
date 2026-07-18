@@ -78,11 +78,19 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 	NewRequest.BattleMapPath = FName(*Definition->BattleMap.GetLongPackageName());
 	NewRequest.ReturnTransform = ReturnTransform;
 
+	// Record the exploration map soft path (strip PIE prefix for pure data path)
+	if (World)
+	{
+		FString WorldPath = World->GetOutermost()->GetPathName();
+		NewRequest.ExplorationMapPath = FName(*UWorld::RemovePIEPrefix(WorldPath));
+	}
+
 	PendingRequest = NewRequest;
 	CurrentState = EHSREncounterState::Pending;
 
-	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - RequestId=%s EncounterId=%s EnemyDefId=%s"),
-		*NewRequestId.ToString(), *Definition->EncounterId.ToString(), *Definition->EnemyDefinitionId.ToString());
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - RequestId=%s EncounterId=%s EnemyDefId=%s ExplorationMap=%s"),
+		*NewRequestId.ToString(), *Definition->EncounterId.ToString(), *Definition->EnemyDefinitionId.ToString(),
+		*NewRequest.ExplorationMapPath.ToString());
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - BattleMap=%s ReturnLoc=%s"),
 		*Definition->BattleMap.GetLongPackageName(),
 		*ReturnTransform.GetLocation().ToString());
@@ -139,17 +147,25 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::ConsumePendingEncounter()
 			FText::FromString(TEXT("Travel has not completed yet.")));
 	}
 
+	// Capture the full DTO before clearing internal payload
 	FHSREncounterRequest Consumed = PendingRequest;
 	FGuid ConsumedId = Consumed.RequestId;
+
+	// Immediately clear internal payload (consume invariant: payload is no longer readable)
+	PendingRequest = FHSREncounterRequest();
 	CurrentState = EHSREncounterState::Consumed;
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ConsumePendingEncounter - SUCCESS RequestId=%s EncounterId=%s EnemyDefId=%s"),
 		*Consumed.RequestId.ToString(), *Consumed.EncounterId.ToString(), *Consumed.EnemyDefinitionId.ToString());
-	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ConsumePendingEncounter - Initiative=%d BattleMapPath=%s ReturnLoc=%s"),
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ConsumePendingEncounter - Initiative=%d BattleMapPath=%s ExplorationMap=%s ReturnLoc=%s"),
 		static_cast<int32>(Consumed.Initiative), *Consumed.BattleMapPath.ToString(),
+		*Consumed.ExplorationMapPath.ToString(),
 		*Consumed.ReturnTransform.GetLocation().ToString());
 
-	return FHSREncounterResult::MakeSuccess(ConsumedId);
+	// Return the full consumed DTO in the result so Consumer does not re-read from Subsystem
+	FHSREncounterResult Result = FHSREncounterResult::MakeSuccess(ConsumedId);
+	Result.ConsumedRequest = Consumed;
+	return Result;
 }
 
 void UHSRBattleTransitionSubsystem::ClearPending()

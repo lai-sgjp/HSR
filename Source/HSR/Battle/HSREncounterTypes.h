@@ -56,6 +56,9 @@ struct FHSREncounterRequest
 	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
 	FTransform ReturnTransform = FTransform::Identity;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
+	FName ExplorationMapPath;
+
 	FHSREncounterRequest() = default;
 };
 
@@ -72,6 +75,9 @@ struct FHSREncounterResult
 
 	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
 	FText Message;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
+	FHSREncounterRequest ConsumedRequest;
 
 	FHSREncounterResult() = default;
 

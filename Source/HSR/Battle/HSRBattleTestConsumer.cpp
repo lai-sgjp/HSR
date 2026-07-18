@@ -18,18 +18,23 @@ void AHSRBattleTestConsumer::BeginPlay()
 	}
 
 	// --- First consumption: should succeed ---
+	// Use the Consume return value (ConsumedRequest), NOT GetPendingRequest()
+	// because the internal payload is cleared after successful consume.
 	FHSREncounterResult FirstResult = Subsystem->ConsumePendingEncounter();
 	if (FirstResult.ResultType == EHSREncounterResultType::Success)
 	{
+		const FHSREncounterRequest ConsumedReq = FirstResult.ConsumedRequest;
 		UE_LOG(LogTemp, Log, TEXT("AHSRBattleTestConsumer::BeginPlay - First Consume SUCCESS"));
-		UE_LOG(LogTemp, Log, TEXT("  RequestId    = %s"), *FirstResult.RequestId.ToString());
+		UE_LOG(LogTemp, Log, TEXT("  RequestId       = %s"), *ConsumedReq.RequestId.ToString());
+		UE_LOG(LogTemp, Log, TEXT("  EncounterId     = %s"), *ConsumedReq.EncounterId.ToString());
+		UE_LOG(LogTemp, Log, TEXT("  EnemyDefId      = %s"), *ConsumedReq.EnemyDefinitionId.ToString());
+		UE_LOG(LogTemp, Log, TEXT("  Initiative      = %d"), static_cast<int32>(ConsumedReq.Initiative));
+		UE_LOG(LogTemp, Log, TEXT("  BattleMap       = %s"), *ConsumedReq.BattleMapPath.ToString());
+		UE_LOG(LogTemp, Log, TEXT("  ExplorationMap  = %s"), *ConsumedReq.ExplorationMapPath.ToString());
+		UE_LOG(LogTemp, Log, TEXT("  ReturnLoc       = %s"), *ConsumedReq.ReturnTransform.GetLocation().ToString());
 
-		const FHSREncounterRequest& Req = Subsystem->GetPendingRequest();
-		UE_LOG(LogTemp, Log, TEXT("  EncounterId  = %s"), *Req.EncounterId.ToString());
-		UE_LOG(LogTemp, Log, TEXT("  EnemyDefId   = %s"), *Req.EnemyDefinitionId.ToString());
-		UE_LOG(LogTemp, Log, TEXT("  Initiative   = %d"), static_cast<int32>(Req.Initiative));
-		UE_LOG(LogTemp, Log, TEXT("  BattleMap    = %s"), *Req.BattleMapPath.ToString());
-		UE_LOG(LogTemp, Log, TEXT("  ReturnLoc    = %s"), *Req.ReturnTransform.GetLocation().ToString());
+		// Verify internal payload is already cleared after consume
+		UE_LOG(LogTemp, Log, TEXT("  Subsystem State = %d (should be 3 = Consumed)"), static_cast<int32>(Subsystem->GetCurrentState()));
 	}
 	else
 	{
@@ -39,10 +44,16 @@ void AHSRBattleTestConsumer::BeginPlay()
 	}
 
 	// --- Second consumption: must FAIL with AlreadyConsumed ---
+	// After first consume, the internal payload is cleared; second consume must fail
+	// and must not return any ConsumedRequest data.
 	FHSREncounterResult SecondResult = Subsystem->ConsumePendingEncounter();
 	if (SecondResult.ResultType == EHSREncounterResultType::AlreadyConsumed)
 	{
 		UE_LOG(LogTemp, Log, TEXT("AHSRBattleTestConsumer::BeginPlay - Second Consume correctly FAILED AlreadyConsumed"));
+
+		// Verify no old payload data through ConsumedRequest on failure
+		const FHSREncounterRequest& EmptyReq = SecondResult.ConsumedRequest;
+		UE_LOG(LogTemp, Log, TEXT("  ConsumedRequest.EncounterId (should be None): %s"), *EmptyReq.EncounterId.ToString());
 	}
 	else
 	{
