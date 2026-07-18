@@ -1355,3 +1355,19 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 保留事实：`p3-003-final-build.log` 不存在、完整 Build 不可核验且 UHT 未运行；最终 Build 后两项生命周期专项未补证；目标销毁/弱失效未补证；P3-001/P3-002 follow-up 继续有效。
 - Teacher 下一步只做概念教学、真实源码导读与出题，然后等待用户原始答案；不得提前纠正、判掌握度或阶段 Ready。
 - 本轮仅更新协调/执行 Markdown；未修改 Source/Content/Config，未执行 Git，Phase 3 保持 `Not verified`。
+
+## 2026-07-18｜Coordinator：记录 TASK-P3-003 Reviewer REVISE
+
+- Teacher commits `080d1b2`/`2f9222c` 已完成首轮教学与最终复核；首轮用户 6/8“不知道”和 Teacher `BLOCKING / REVISE` 被保留。
+- Independent Reviewer 最终判定 `REVISE`：Teacher 最终结论所依据的分步补答只有摘要，没有用户原话、题目/选项映射、最小纠正与用户再答的可审计时间链；活动卡与长期状态也未同步。
+- 当前只同步 Coordinator 状态文档，不修改 Teacher 的 `learning-journal.md`/`tasks/execution-result.md`，也不修改 Reviewer 的 `tasks/final-review.md`。
+- 用户最小补证入口固定为四项独立原答：两条完整链与真源/UI 边界；NoCandidate/TargetInvalid；HUD rebuild/Re-Possess 生命周期顺序；Prompt 存在但 F 无效的全链 Debug。
+- Teacher 收到后必须原样保存、再纠正/评估并创建新独立提交，之后重新交 Reviewer。三个工程 `USER ACCEPTED` 缺口与 `OutOfRange` 继续保留；未判 Phase Ready、未归档、未进入 Phase 4、未执行 Git。
+
+## 2026-07-18｜Coordinator：Teacher 补证完成并交 Reviewer 复审
+
+- Reviewer `REVISE` commit `923a7a6` 后，Teacher 创建 `bfae6c0` 与 `3ad471baa59d756474f42bb9dedc8b090c5d322b` 补齐用户原话与题目映射。
+- 核对 `3ad471b` 仅修改 `learning-journal.md` 和 `tasks/execution-result.md`，原样保留用户最终四行补答，并区分本次独立覆盖、先前提示掌握与仍需复习项。
+- Teacher 最低学习 Gate 为 `PASS WITH FOLLOW-UP`，可交 Independent Reviewer 复审；Coordinator 不将其写成 Reviewer PASS 或 Phase Ready。
+- 学习 follow-up 继续包括弱引用/弱失效广播、旧实例零增长、Result 字段与日志、脱离提示完整复述和全链 Debug；三个工程 `USER ACCEPTED` 缺口与 `OutOfRange` 继续保留。
+- 当前唯一下一步为 Independent Reviewer 复审；P3-003 未归档，不进入 Phase 4。本轮仅更新四个 Coordinator Markdown，不修改 Source/Content/Config。

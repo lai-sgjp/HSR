@@ -1,6 +1,6 @@
 # TASK-P3-003：Phase 3 最终回归、教学、独立审查与阶段归档
 
-> 状态：`GATE 1 USER ACCEPTED / READY FOR TEACHER GATE`
+> 状态：`TEACHER EVIDENCE REVISION COMPLETE / WAITING FOR INDEPENDENT REVIEWER RE-REVIEW`
 > 创建日期：2026-07-18  
 > 唯一活动任务；P3-001、P3-002 均已以 Reviewer `PASS WITH FOLLOW-UP` 归档，Phase 3 仍为 `Not verified`。
 
@@ -151,6 +151,34 @@ Reviewer 只读核对：
 - 所有 follow-up 是否保留，是否错误声称 Reviewer 亲自运行或身份独立。
 
 Reviewer 唯一可写 `tasks/final-review.md`，结论只能为 `PASS`、`PASS WITH FOLLOW-UP`、`REVISE` 或 `BLOCKED`，并独立提交。Reviewer 不得修改实现、执行报告、教学文档或阶段状态。
+
+### 2026-07-18 Independent Reviewer `REVISE`
+
+Reviewer 已完成独立只读审查，结论为 `REVISE`。当前不需要修改 Source/Content/Config；两个阻断为：
+
+1. Teacher 最终学习结论依赖分步补答，但仓库只保存 Teacher 摘要，没有按时间顺序保存用户补答原话、题目/选项含义、最小纠正和用户再答，Reviewer 无法独立审计掌握度归属。
+2. 活动卡、`PROJECT_STATE.md`、`todo_plan.md` 和 `worklog.md` 未同步 Teacher commits 与 Reviewer Gate；本节及协调文档更新只解决状态一致性，不替代学习证据补齐。
+
+工程 Gate 的三个 `USER ACCEPTED` 缺口继续原样保留：`p3-003-final-build.log` 不存在、完整 Build 不可核验且 UHT 未运行；最终 Build 后 HUD rebuild/Re-Possess 未补证；目标销毁/弱失效未补证。P3-001 `OutOfRange` 仍未动态命中。它们未被勾成已验证，也不是 Reviewer `PASS`。
+
+当前唯一入口为用户最小补证：用户重新独立回答下列四项，原话必须先完整保留，Teacher 在收到后才可逐项纠正和复核：
+
+1. 不看提示，写出完整命令链和完整观察链，并分别说明 Gameplay 真源与 UI 的职责。
+2. 说明正常离开范围与候选目标未正常注销却弱失效时，分别应返回什么失败原因，以及为什么。
+3. 按顺序说明 HUD rebuild/Re-Possess 时旧 Delegate、旧 Widget/VM、新观察链和初始 snapshot 应如何处理。
+4. 面对“Prompt 已显示但按 F 无效果”，按 `IA/IMC → Character → Component/Candidate → Interface/Actor → Result → UI` 写出逐层检查顺序和每层要看的关键事实。
+
+用户答案不得由 Coordinator 或 Teacher 预填、改写或反向生成。Teacher 必须原样保存答案，明确区分独立掌握、经最小纠正后掌握和仍未掌握，创建新的独立 Teacher commit，再交 Independent Reviewer 复审。完成前不归档、不判 Phase 3 `Ready`、不进入 Phase 4。
+
+### 2026-07-18 Teacher 补证完成与 Reviewer 复审交接
+
+- Reviewer `REVISE` commit：`923a7a67632cbda799e4918de0bde39f8bf3a333`。
+- Teacher 修订 commits：`bfae6c04c1f166c14f934bc3b396916331cefc6b`、`3ad471baa59d756474f42bb9dedc8b090c5d322b`；最终提交仅修改允许的 `learning-journal.md` 与 `tasks/execution-result.md`。
+- `3ad471b` 已原样保存用户最终四行补答，并将题目映射、独立覆盖与先前提示内容分开。Teacher 最终结论为最低学习 Gate 达到，`PASS WITH FOLLOW-UP`，可交 Independent Reviewer 复审。
+- 学习 follow-up 保留：弱引用只观察不拥有、弱失效清候选并广播 `nullptr`、旧实例 teardown 后零增长、Result 具体字段/日志，以及脱离提示完整复述和全链 Debug 仍需复习。
+- 工程 follow-up 不变：三个 `USER ACCEPTED` 缺口和 P3-001 `OutOfRange` 未动态命中继续有效，不因 Teacher Gate 关闭。
+
+当前唯一下一步：Independent Reviewer 只读复审 `923a7a` 后新增的 Teacher commits、用户原话、题目映射、掌握度归属、四个 Coordinator 状态文档和全部保留边界。Coordinator 不预判 Reviewer 结论；P3-003 不归档，Phase 3 仍为 `Not verified`，不进入 Phase 4。
 
 ## Gate 6：Coordinator 阶段归档
 

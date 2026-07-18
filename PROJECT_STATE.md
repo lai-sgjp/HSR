@@ -255,6 +255,20 @@
 - 用户其他回归与重开引用确认继续作为用户人工证据；日志直接证据等级不变。
 - Phase 3 仍为 `Not verified`。当前唯一下一步为 Teacher 教学、源码导读与出题；出题后必须等待用户原始答案，不得自动纠正、审查、归档或进入 Phase 4。
 
+## 2026-07-18 TASK-P3-003 Independent Reviewer REVISE
+
+- Teacher commits `080d1b229cda3d5ae3884371eed38fb0d25c1279` 与 `2f9222c7cd642872f8a57660963114e3aff23057` 已存在；Teacher 首轮保留用户 6/8“不知道”和 `BLOCKING / REVISE`，后续将最低学习 Gate 提升为达到。
+- Independent Reviewer 最终结论为 `REVISE`：Teacher 对分步补答的摘要不能替代用户原话；另有阶段状态文档未同步。工程架构无需修改，禁止 Source/Content/Config 变更。
+- 协调文档现已同步为等待 Teacher 补证。用户必须重新给出最小原始复述/Debug 答案，Teacher 原样保存并独立提交修订后，再交 Reviewer 复审。
+- 三个工程 `USER ACCEPTED` 缺口及 P3-001 `OutOfRange` 未动态命中继续有效；Reviewer 未判 PASS，Phase 3 保持 `Not verified`，P3-003 不归档且不进入 Phase 4。
+
+## 2026-07-18 TASK-P3-003 Teacher 补证完成
+
+- Reviewer `REVISE` commit 为 `923a7a67632cbda799e4918de0bde39f8bf3a333`；阻断是用户补答原话未入库及协调状态不一致，不要求工程修改。
+- Teacher 通过 `bfae6c0` 与最终 `3ad471baa59d756474f42bb9dedc8b090c5d322b` 补齐学习证据；最终四行用户原话、题目映射和掌握度归属已进入允许教学文档。
+- Teacher 最低学习 Gate 结论为 `PASS WITH FOLLOW-UP`，可交 Independent Reviewer 复审；这不是 Reviewer PASS，也不判 Phase Ready。
+- 学习 follow-up、三个工程 `USER ACCEPTED` 缺口和 `OutOfRange` 未动态命中全部保留。当前唯一 Gate 为 Independent Reviewer 复审，P3-003 不归档、不进入 Phase 4。
+
 ## 2026-07-17 TASK-P2-001 Coordinator 规划更新
 
 - 用户已明确授权正式进入 Phase 2，并要求 Coordinator 创建第一张活动任务卡；这只授权协调规划，不等于授权低级执行模型立即实施。
