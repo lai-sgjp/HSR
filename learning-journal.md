@@ -613,3 +613,35 @@ Teacher 曾评估上述补答达到最低门禁，但 Reviewer commits `8c34a33`
 - **最低学习 Gate 已达到，可交 Independent Reviewer。** 用户已从“多数不知道”推进到能解释核心职责、失败语义、两条链的主干和 Debug 首个分层，并能在纠正后完成生命周期与弱失效细节。
 - 该结论是 `PASS WITH FOLLOW-UP` 性质的教学结论：大量细节属于经提示后掌握，不能记录为首次独立掌握；上列复习项继续保留。
 - Teacher 不判定 Phase 3 Ready，也不替代 Independent Reviewer。工程 Gate 的三个 `USER ACCEPTED` 缺口继续保留：完整 Build 日志不存在且 UHT 未运行；最终 Build 后 HUD rebuild/Re-Possess 未补证；目标销毁/弱失效未补证。`OutOfRange` 仍未动态命中。
+
+## 2026-07-18｜Reviewer 补证后的用户原始回答与 Teacher 证据修订
+
+### 用户补证原话（原样保留）
+
+> 1.ia_interact->character::interact->interactcomponent::tryinteract->interface->actor->result; overlap->weak candidate->on candidatechanged->view model->on promptchanged->widget
+> 2.character走出overlap范围，对象异常删去
+> 3.不太清楚
+> 4.哪个地方开始不正常就在哪里设断点
+
+### 逐题最小纠正
+
+1. **部分掌握。** 两条链的节点顺序已能独立写出，这是有效进步；但答案仍缺职责：Actor/InteractionComponent 是 Gameplay 候选与执行真源，ViewModel/Widget 只观察和表现，不能反写候选或执行交互。
+2. **部分掌握。** 已识别两种触发场景，但没有给出语义对应：正常走出 Overlap 会 `UnregisterCandidate`，之后交互返回 `NoCandidate`；对象异常销毁使弱引用失效，Component 应清候选、`Broadcast(nullptr)` 并返回 `TargetInvalid`。弱引用的原因是“只观察、不拥有目标，不延长目标生命周期”。
+3. **未掌握。** 最小生命周期顺序应理解为：旧 Widget 从旧 VM 解绑，旧 VM 从旧 Component 解绑并清理；新 VM 观察新 Pawn 的 Component；新 Widget 绑定新 VM；最后主动取得一次当前 snapshot。旧实例 teardown 后必须零新增回调。Re-Possess 中清理发生在旧 Pawn 引用被 `Super::OnUnPossess()` 清除以前。
+4. **方向正确但证据不足。** “第一处异常处设断点”是正确原则，但必须先定义逐层应看到的证据：`IA/IMC → Character::Interact → TryInteract/Candidate → Interface Execute_* → Actor → Result字段/OnInteractionCompleted → UI表现`。Prompt 已显示只证明观察链部分成立，不能跳过输入与命令链检查。
+
+### 重新评估与最小补救
+
+- 独立掌握：两条链的节点顺序；Debug 要寻找第一处异常的原则。
+- 部分掌握：正常离开与异常销毁是不同场景，但尚不能独立给出失败原因与弱引用语义；UI/Gameplay 职责尚未写入答案；分层 Debug 尚无具体证据。
+- 未掌握：HUD rebuild/Re-Possess 的成对解绑、重绑、snapshot 顺序及旧实例零回调标准。
+- **最低学习 Gate 恢复为 `REVISE / BLOCKING`。** Reviewer 要的是用户可审查的独立表达；Teacher 先前摘要或提示不能冒充用户答案。当前补证仍缺三项核心能力，因此暂不可交 Independent Reviewer 复审。
+
+先学习上面四条纠正，再只回答以下一个四行小题；不得照抄 Teacher 摘要：
+
+1. 两条链中谁拥有 Gameplay 候选/执行真源，谁只负责 UI 表现？
+2. “正常离开”和“对象异常销毁”分别返回什么失败原因？为什么使用弱引用？
+3. 用四步写出 HUD rebuild/Re-Possess 的“旧链解绑 → 新链绑定 → snapshot”顺序，并说明旧实例之后应发生什么。
+4. Prompt 显示但 F 无效时，从 `Character::Interact` 开始，依次写出你要观察的三项具体证据。
+
+工程 Gate 的三个 `USER ACCEPTED` 缺口与 `OutOfRange` 未动态命中继续保留。Teacher 不判 Phase Ready，也不替代 Reviewer。

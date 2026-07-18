@@ -138,3 +138,25 @@
 - 仍需复习：脱离选项完整复述；Re-Possess 生命周期；全链分层 Debug；Delegate 绑定/解绑与 snapshot/dedup 的源码映射。
 - **最低学习 Gate：达到，可交 Independent Reviewer。** 结论按 `PASS WITH FOLLOW-UP` 记录，不把经提示答案改写为独立掌握。Teacher 不判 Phase Ready、不创建 Reviewer 结论。
 - 三个 `USER ACCEPTED` 工程缺口及 `OutOfRange` 未动态命中继续有效，不因学习 Gate 达到而关闭。
+
+## 2026-07-18 Reviewer 补证后的 Teacher 证据修订
+
+### 用户补证原话（原样保留）
+
+> 1.ia_interact->character::interact->interactcomponent::tryinteract->interface->actor->result; overlap->weak candidate->on candidatechanged->view model->on promptchanged->widget
+> 2.character走出overlap范围，对象异常删去
+> 3.不太清楚
+> 4.哪个地方开始不正常就在哪里设断点
+
+### 逐题复核
+
+- 第 1 题部分掌握：两条链节点正确，但缺 Gameplay 真源与 UI 只读职责。
+- 第 2 题部分掌握：能识别正常离开/异常销毁两种场景，但缺 `NoCandidate/TargetInvalid` 对应、弱引用不拥有语义，以及失效时 `Broadcast(nullptr)`。
+- 第 3 题未掌握：HUD rebuild/Re-Possess 的成对解绑、重绑、初始 snapshot 与旧实例零回调没有独立答案。
+- 第 4 题原则方向正确但不足：需要按 Character、TryInteract/Candidate、Interface/Actor、Result 字段与 UI 分层收集具体证据。
+
+### Gate 修订
+
+- **最低学习 Gate：`REVISE / BLOCKING`，暂不可交 Independent Reviewer 复审。** 先前 Teacher 摘要与提示不能冒充用户独立答案；本次原始补证暴露出职责、失败语义、生命周期和具体 Debug 证据仍不完整。
+- 下一最小动作：用户先阅读 `learning-journal.md` 本节的四条最小纠正，再独立回答唯一一个四行小题；Teacher 收到原话后再复核。
+- 三个 `USER ACCEPTED` 工程缺口及 `OutOfRange` 未动态命中继续有效。Teacher 不判 Phase Ready、不创建 Reviewer 结论。
