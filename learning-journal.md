@@ -547,3 +547,44 @@ Reviewer `REVISE` 后，用户完成了独立补答并保留纠正轨迹：
 - Re-Possess：最终确认初始化 GE 成功应用次数必须保持 `1`；真源已变但 UI 不刷新时检查 `Delegate → ViewModel → Widget`。
 
 Teacher 曾评估上述补答达到最低门禁，但 Reviewer commits `8c34a33`、`0e1c7c8` 仍判定完整 Debug、Override/C++ `override` 与 Owner/Avatar 边界的独立掌握证据不足，结论保持 `REVISE`。用户明确接受这些项目尚未完全掌握，将其作为非阻断复习项，并授权 Coordinator 以 `USER ACCEPTED` 完成 Phase 2 收尾；不改写为 Reviewer `PASS`。
+
+## 2026-07-18｜Phase 3 交互命令链与观察链 Teacher 纠正
+
+### 用户原始作答（原样保留）
+
+> 1.interface负责可用性，提示和执行方法，负责申明能用什么，Components不知道，Actor就保存自身的信息，去具体实现interface， UI就是提示用户现在的状态
+> 2.不知道
+> 3.不知道
+> 4。不知道
+> 5.delegate负责广播数据变换， 初始snapshot则是实例在构建时主动去获取数据吗dedup防止相同状态广播（不过我对于dedup和snapshot只知道是这样不知道具体的实现形式），因为delegate只负责有变化时广播，需要通过snapshot得到初始的数据
+> 6.不知道
+> 7.不知到
+> 8.不知道
+
+### 逐题纠正与掌握度
+
+1. **部分掌握。** 已能说出 Interface 声明可用性、提示和执行能力，Actor 保存并实现自身状态，UI 用于提示。需要纠正的是 Component 并非“不知道”：`UHSRInteractionComponent` 保存玩家侧弱候选、复核候选并提交命令；Interface 是无状态能力合同，不保存 `bAvailable` 或当前候选。真实映射见 `Source/HSR/Interaction/HSRInteractableInterface.h`、`HSRInteractionComponent.*` 与 `Source/HSR/Exploration/HSRGrayboxInteractable.*`。
+2. **未掌握。** 命令链为 `IA/IMC → Character::Interact → InteractionComponent::TryInteract → Interface 可用性检查/Execute_* → FHSRInteractionResult → OnInteractionCompleted`。Character 只转发；Component 复核弱候选、创建 `FHSRInteractionContext`；Actor 执行业务；Result 返回成功、失败原因和消息。
+3. **未掌握。** 观察链为 `Begin/End Overlap → Register/UnregisterCandidate → weak CurrentCandidate → OnCandidateChanged → InteractionViewModel → OnPromptChanged → UserWidget/WBP`。离开范围时候选清空并广播空候选，ViewModel 生成隐藏/空文本状态，Widget 更新表现。
+4. **未掌握。** `TWeakObjectPtr` 不拥有目标、不延长其生命周期；每次读取和执行前仍需检查有效性。候选曾注册但随后弱失效时，`TryInteract()` 清理候选并返回 `TargetInvalid`；正常 EndOverlap 已注销后再按键返回 `NoCandidate`。当前 P3-003 没有目标销毁/弱失效动态补证，因此机制理解与运行证据必须分开。
+5. **部分掌握。** 已正确识别 Delegate 通知变化、snapshot 获取初始状态、dedup 阻止相同状态重复广播。具体实现是 ViewModel 用 `AddUniqueDynamic/RemoveDynamic` 观察 Component；Widget 连接新 VM 后调用 `ForceCurrentSnapshot()`；ViewModel 缓存 `bLastVisible/LastPrompt` 并用 `FText::EqualTo` 去重。Delegate 只覆盖绑定后的变化，所以不能替代 snapshot。
+6. **未掌握。** HUD rebuild/Re-Possess 必须先解绑旧链，再绑定新 Pawn/VM/Widget：VM 从 Component `RemoveDynamic`，Widget 从 VM `RemoveDynamic`，旧实例 teardown 后不得再收到回调；新 Widget 获得一次当前 snapshot。`AHSRPlayerController::OnUnPossess()` 在 `Super` 清 Pawn 前让 HUD 清理观察者，`OnPossess()` 再刷新新 Pawn。P3-003 最终 Build 后此专项没有补证。
+7. **未掌握。** UI 只能观察和表现，不得 Tick/世界扫描、Cast 具体业务 Actor、注册候选、调用 `TryInteract`/Interface 执行业务或反写 Gameplay 状态，否则会形成多头真源、生命周期泄漏、具体类型耦合和重复执行。
+8. **未掌握。** `Prompt 存在但按键无效果` 应按 `IA/IMC → Character 输入绑定/Interact → Component::TryInteract 与 Candidate/Result → Interface Execute_* → Actor ExecuteInteraction → Result/OnInteractionCompleted → UI 是否仅缺表现` 找第一处断点。Prompt 只证明观察链部分成立，不能证明命令链成立。
+
+### 最小复习练习
+
+不要求重写长答案，先独立完成四个填空：
+
+1. 命令链：`IA_Interact → ______ → ______::TryInteract → Interface → ______`。
+2. 观察链：`Overlap → weak Candidate → ______ → ViewModel → ______ → Widget`。
+3. 正常离开后按键返回 `______`；目标未正常注销而弱失效后按键返回 `______`。
+4. Prompt 已显示但按键无效时，先证明 `Character::______` 是否进入，再读取 `TryInteract()` 返回的 `______`，不能先修改 Widget。
+
+### Teacher 学习 Gate 结论
+
+- **已掌握：** Interface 的能力声明、Actor 保存具体状态、UI 是提示层的基本方向。
+- **部分掌握：** Interface/Component/Actor/UI 的精确职责边界；Delegate、初始 snapshot 与 dedup 的概念区别。
+- **未掌握：** 两条完整数据流、弱候选失效与结构化失败、Delegate 绑定/解绑生命周期、HUD rebuild/Re-Possess、UI 禁止边界和分层 Debug。
+- **学习 Gate：阻断 Phase 3 Ready。** 原始答案中 6/8 题为不知道，尚不能独立复述 Phase 3 的核心数据流与 Debug 路径。建议先完成上面四个最小填空，再由 Teacher 复核；这不是对工程实现失败的判断。
+- 工程 Gate 的三个 `USER ACCEPTED` 缺口继续保留：完整 Build 日志不存在且 UHT 未运行；最终 Build 后 HUD rebuild/Re-Possess 未补证；目标销毁/弱失效未补证。`OutOfRange` 仍未动态命中。Teacher 不判定 Phase Ready，也不替代 Reviewer。

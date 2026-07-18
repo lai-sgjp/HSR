@@ -84,3 +84,38 @@
 - 该处置不是 Reviewer `PASS`，上述项目不得勾成已验证。P3-001/P3-002 follow-up 和 `OutOfRange` 未动态命中继续有效。
 - 用户此前“全部正常”仍只作为 Move/Look/Jump、UIOnly、GAS 属性/HUD 与 Editor 重开引用的人工确认。
 - 当前下一步：Teacher 先教学与出题，随后停止并等待用户原始作答；Phase 3 仍为 `Not verified`。
+
+## 2026-07-18 Teacher Gate：用户原始作答、纠正与掌握度
+
+### 用户原始作答（原样保留）
+
+> 1.interface负责可用性，提示和执行方法，负责申明能用什么，Components不知道，Actor就保存自身的信息，去具体实现interface， UI就是提示用户现在的状态
+> 2.不知道
+> 3.不知道
+> 4。不知道
+> 5.delegate负责广播数据变换， 初始snapshot则是实例在构建时主动去获取数据吗dedup防止相同状态广播（不过我对于dedup和snapshot只知道是这样不知道具体的实现形式），因为delegate只负责有变化时广播，需要通过snapshot得到初始的数据
+> 6.不知道
+> 7.不知到
+> 8.不知道
+
+### Teacher 纠正摘要
+
+- 第 1 题部分掌握：Interface 是无状态能力合同；Actor 保存业务状态；Component 实际保存玩家侧弱候选、复核并提交命令；UI 只观察表现。
+- 第 2、3 题未掌握：需复述命令链 `IA/IMC → Character → InteractionComponent → Interface → Result` 和观察链 `Overlap → weak Candidate → CandidateChanged → ViewModel → Widget`。
+- 第 4 题未掌握：弱引用不延长目标生命周期；正常注销后是 `NoCandidate`，候选曾注册后弱失效是 `TargetInvalid`。
+- 第 5 题部分掌握：概念方向正确；具体为 `AddUniqueDynamic/RemoveDynamic`、`ForceCurrentSnapshot` 和 `bLastVisible/LastPrompt + FText::EqualTo` 去重。
+- 第 6、7、8 题未掌握：需补齐 HUD rebuild/Re-Possess 成对解绑与新 snapshot、UI 只读边界，以及 Prompt 存在但按键无效的分层 Debug。
+
+### 掌握度与 Gate
+
+- 已掌握：Interface/Actor/UI 的基本方向。
+- 部分掌握：精确职责边界；Delegate/snapshot/dedup 概念。
+- 未掌握：两条完整数据流、弱引用失败语义、生命周期、UI 禁止边界和分层 Debug。
+- **Teacher 学习 Gate：`BLOCKING / REVISE`。** 6/8 题原答为不知道，尚不足以支持 Phase 3 Ready。用户需先完成 `learning-journal.md` 中四个最小填空，再进行最小复核。Teacher 不判 Phase Ready、不创建 Reviewer 结论。
+
+### 工程证据边界（继续保留）
+
+- Gate 1 处置仍为 `USER ACCEPTED`，不是 Reviewer `PASS`。
+- `p3-003-final-build.log` 不存在，完整 Build 不可独立核验且 UHT 未运行。
+- 最终 Build 后 HUD rebuild/同会话 Re-Possess 未补证。
+- 目标销毁/弱失效未补证；`OutOfRange` 仍未动态命中。
