@@ -1,39 +1,78 @@
-﻿#include "HSRInteractionViewModel.h"
+#include "HSRInteractionViewModel.h"
 #include "../Interaction/HSRInteractionComponent.h"
 #include "../Interaction/HSRInteractableInterface.h"
 
+static int32 NextViewModelInstanceId = 1;
+
+UHSRInteractionViewModel::UHSRInteractionViewModel()
+{
+	InstanceId = NextViewModelInstanceId++;
+	bLastVisible = false;
+	LastPrompt = FText::GetEmpty();
+	BroadcastCount = 0;
+	SkippedDedupCount = 0;
+	TeardownCount = 0;
+}
+
 void UHSRInteractionViewModel::Observe(UHSRInteractionComponent* InComponent)
 {
-	// Always teardown old observation first
-	if (UHSRInteractionComponent* OldComp = ObservedComponent.Get())
+	// Same component: pure no-op — candidate changes handled by OnCandidateChanged event
+	if (ObservedComponent.Get() == InComponent && InComponent)
 	{
-		OldComp->OnCandidateChanged.RemoveDynamic(this, &UHSRInteractionViewModel::OnComponentCandidateChanged);
-	}
-	ObservedComponent.Reset();
-
-	if (!InComponent)
-	{
-		BroadcastCurrentState(nullptr);
+		UE_LOG(LogTemp, Verbose, TEXT("UHSRInteractionViewModel[%d]::Observe - Same component, pure no-op"), InstanceId);
 		return;
 	}
 
-	ObservedComponent = InComponent;
-	InComponent->OnCandidateChanged.AddUniqueDynamic(this, &UHSRInteractionViewModel::OnComponentCandidateChanged);
+	// Different or null component: full teardown + bind
+	Teardown();
 
-	// Broadcast initial snapshot based on current candidate
-	BroadcastCurrentState(InComponent->GetCurrentCandidate());
-	UE_LOG(LogTemp, Log, TEXT("UHSRInteractionViewModel::Observe - Component=%s"), *InComponent->GetName());
+	if (InComponent)
+	{
+		ObservedComponent = InComponent;
+		InComponent->OnCandidateChanged.AddUniqueDynamic(this, &UHSRInteractionViewModel::OnComponentCandidateChanged);
+		BroadcastCurrentState(InComponent->GetCurrentCandidate());
+		UE_LOG(LogTemp, Log, TEXT("UHSRInteractionViewModel[%d]::Observe - Bound to Component=%s"),
+			InstanceId, *InComponent->GetName());
+	}
 }
 
 void UHSRInteractionViewModel::Teardown()
 {
-	if (UHSRInteractionComponent* OldComp = ObservedComponent.Get())
+	UHSRInteractionComponent* OldComp = ObservedComponent.Get();
+	if (!OldComp)
 	{
-		OldComp->OnCandidateChanged.RemoveDynamic(this, &UHSRInteractionViewModel::OnComponentCandidateChanged);
+		TeardownCount++;
+		UE_LOG(LogTemp, Verbose, TEXT("UHSRInteractionViewModel[%d]::Teardown - Already torn down (teardown#%d)"),
+			InstanceId, TeardownCount);
+		return;
 	}
+
+	OldComp->OnCandidateChanged.RemoveDynamic(this, &UHSRInteractionViewModel::OnComponentCandidateChanged);
 	ObservedComponent.Reset();
-	BroadcastCurrentState(nullptr);
-	UE_LOG(LogTemp, Log, TEXT("UHSRInteractionViewModel::Teardown - Observation cleared"));
+	bLastVisible = false;
+	LastPrompt = FText::GetEmpty();
+	TeardownCount++;
+	UE_LOG(LogTemp, Log, TEXT("UHSRInteractionViewModel[%d]::Teardown - Unbound from Component=%s, totalBroadcast=%d, skippedDedup=%d, teardown#%d"),
+		InstanceId, *OldComp->GetName(), BroadcastCount, SkippedDedupCount, TeardownCount);
+}
+
+void UHSRInteractionViewModel::ForceCurrentSnapshot()
+{
+	AActor* Candidate = ObservedComponent.IsValid() ? ObservedComponent.Get()->GetCurrentCandidate() : nullptr;
+	FText Prompt;
+	bool bVisible = false;
+	if (IsValid(Candidate) && Candidate->Implements<UHSRInteractableInterface>())
+	{
+		Prompt = IHSRInteractableInterface::Execute_GetInteractionPrompt(Candidate);
+		bVisible = true;
+	}
+
+	bLastVisible = bVisible;
+	LastPrompt = Prompt;
+	OnPromptChanged.Broadcast(bVisible, Prompt);
+	BroadcastCount++;
+	UE_LOG(LogTemp, Log, TEXT("UHSRInteractionViewModel[%d]::ForceCurrentSnapshot - visible=%d prompt=%s (totalBroadcast=%d)"),
+		InstanceId, bVisible, *Prompt.ToString(), BroadcastCount);
 }
 
 void UHSRInteractionViewModel::OnComponentCandidateChanged(AActor* NewCandidate)
@@ -43,16 +82,27 @@ void UHSRInteractionViewModel::OnComponentCandidateChanged(AActor* NewCandidate)
 
 void UHSRInteractionViewModel::BroadcastCurrentState(AActor* Candidate)
 {
+	FText Prompt;
+	bool bVisible = false;
+
 	if (IsValid(Candidate) && Candidate->Implements<UHSRInteractableInterface>())
 	{
-		FText Prompt = IHSRInteractableInterface::Execute_GetInteractionPrompt(Candidate);
-		OnPromptChanged.Broadcast(true, Prompt);
-		UE_LOG(LogTemp, Verbose, TEXT("UHSRInteractionViewModel::BroadcastCurrentState - visible=true prompt=%s"),
-			*Prompt.ToString());
+		Prompt = IHSRInteractableInterface::Execute_GetInteractionPrompt(Candidate);
+		bVisible = true;
 	}
-	else
+
+	if (bVisible == bLastVisible && Prompt.EqualTo(LastPrompt))
 	{
-		OnPromptChanged.Broadcast(false, FText::GetEmpty());
-		UE_LOG(LogTemp, Verbose, TEXT("UHSRInteractionViewModel::BroadcastCurrentState - visible=false"));
+		SkippedDedupCount++;
+		UE_LOG(LogTemp, Verbose, TEXT("UHSRInteractionViewModel[%d]::BroadcastCurrentState - skipped (skip#%d)"),
+			InstanceId, SkippedDedupCount);
+		return;
 	}
+
+	bLastVisible = bVisible;
+	LastPrompt = Prompt;
+	OnPromptChanged.Broadcast(bVisible, Prompt);
+	BroadcastCount++;
+	UE_LOG(LogTemp, Log, TEXT("UHSRInteractionViewModel[%d]::BroadcastCurrentState - visible=%d prompt=%s (totalBroadcast=%d)"),
+		InstanceId, bVisible, *Prompt.ToString(), BroadcastCount);
 }

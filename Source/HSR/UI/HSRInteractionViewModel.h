@@ -14,6 +14,8 @@ class HSR_API UHSRInteractionViewModel : public UObject
 	GENERATED_BODY()
 
 public:
+	UHSRInteractionViewModel();
+
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void Observe(UHSRInteractionComponent* InComponent);
 
@@ -22,6 +24,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	UHSRInteractionComponent* GetObservedComponent() const { return ObservedComponent.Get(); }
+
+	/** Force broadcast current snapshot to all connected Widgets, bypassing dedup. */
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void ForceCurrentSnapshot();
+
+	int32 GetInstanceId() const { return InstanceId; }
 
 	UPROPERTY(BlueprintAssignable, Category = "Interaction")
 	FHSROnPromptChanged OnPromptChanged;
@@ -33,4 +41,11 @@ private:
 	void OnComponentCandidateChanged(AActor* NewCandidate);
 
 	void BroadcastCurrentState(AActor* Candidate);
+
+	int32 InstanceId;
+	bool bLastVisible;
+	FText LastPrompt;
+	int32 BroadcastCount;
+	int32 SkippedDedupCount;
+	int32 TeardownCount;
 };

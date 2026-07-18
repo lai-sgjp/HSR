@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
@@ -47,4 +47,7 @@ protected:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "Interaction", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UHSRInteractionViewModel> InteractionViewModel;
+
+	int32 WidgetInstanceId;
+	int32 PromptReceiveCount;
 };

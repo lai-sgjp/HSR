@@ -95,6 +95,13 @@ void AHSRPlayerController::OnPossess(APawn* InPawn)
 void AHSRPlayerController::OnUnPossess()
 {
 	RemoveExplorationContext();
+
+	// Clear HUD interaction observation before Super clears pawn reference
+	if (AHSRHUD* HSRHUD = Cast<AHSRHUD>(GetHUD()))
+	{
+		HSRHUD->ClearInteractionObserverInstance();
+	}
+
 	Super::OnUnPossess();
 }
 

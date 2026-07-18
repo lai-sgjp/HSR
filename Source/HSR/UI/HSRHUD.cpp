@@ -1,4 +1,4 @@
-﻿#include "HSRHUD.h"
+#include "HSRHUD.h"
 #include "HSRUserWidget.h"
 #include "HSRAttributeViewModel.h"
 #include "HSRInteractionViewModel.h"
@@ -47,6 +47,7 @@ void AHSRHUD::ShowExplorationHUD()
 	RefreshInteractionObserver();
 }
 
+
 void AHSRHUD::RefreshInteractionObserver()
 {
 	APlayerController* PC = GetOwningPlayerController();
@@ -73,17 +74,20 @@ void AHSRHUD::RefreshInteractionObserver()
 	if (!InteractionViewModel)
 	{
 		InteractionViewModel = NewObject<UHSRInteractionViewModel>(this);
+		UE_LOG(LogTemp, Log, TEXT("AHSRHUD::RefreshInteractionObserver - Created new VM[%d]"), InteractionViewModel->GetInstanceId());
 	}
 
-	// Always reconnect ViewModel to Widget when possible — OnPossess may pre-create ViewModel before Widget exists
+	// Observe first to establish component binding
+	InteractionViewModel->Observe(InteractComp);
+
+	// Then connect Widget — SetInteractionViewModel handles ForceCurrentSnapshot on new VM connections
 	if (ExplorationWidgetInstance)
 	{
 		ExplorationWidgetInstance->SetInteractionViewModel(InteractionViewModel);
 	}
 
-	InteractionViewModel->Observe(InteractComp);
-	UE_LOG(LogTemp, Log, TEXT("AHSRHUD::RefreshInteractionObserver - Observed Component=%s on Pawn=%s"),
-		*InteractComp->GetName(), *CurrentPawn->GetName());
+	UE_LOG(LogTemp, Log, TEXT("AHSRHUD::RefreshInteractionObserver - VM[%d] Component=%s Pawn=%s"),
+		InteractionViewModel->GetInstanceId(), *InteractComp->GetName(), *CurrentPawn->GetName());
 }
 
 void AHSRHUD::ClearInteractionObserverInstance()
