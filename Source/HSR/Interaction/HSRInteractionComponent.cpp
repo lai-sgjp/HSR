@@ -62,6 +62,17 @@ bool UHSRInteractionComponent::HasValidCandidate() const
 	return IsCandidateValid();
 }
 
+
+FText UHSRInteractionComponent::GetCurrentPrompt() const
+{
+	AActor* Candidate = CurrentCandidate.Get();
+	if (!Candidate || !Candidate->Implements<UHSRInteractableInterface>())
+	{
+		return FText::GetEmpty();
+	}
+	return IHSRInteractableInterface::Execute_GetInteractionPrompt(Candidate);
+}
+
 bool UHSRInteractionComponent::IsCandidateValid() const
 {
 	AActor* Candidate = CurrentCandidate.Get();

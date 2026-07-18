@@ -1,6 +1,8 @@
 ﻿#include "HSRHUD.h"
 #include "HSRUserWidget.h"
 #include "HSRAttributeViewModel.h"
+#include "HSRInteractionViewModel.h"
+#include "../Interaction/HSRInteractionComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
@@ -40,6 +42,62 @@ void AHSRHUD::ShowExplorationHUD()
 	}
 
 	ExplorationWidgetInstance->AddToViewport();
+
+	// Set up interaction observation for current pawn
+	RefreshInteractionObserver();
+}
+
+void AHSRHUD::RefreshInteractionObserver()
+{
+	APlayerController* PC = GetOwningPlayerController();
+	if (!PC)
+	{
+		ClearInteractionObserverInstance();
+		return;
+	}
+
+	APawn* CurrentPawn = PC->GetPawn();
+	if (!CurrentPawn)
+	{
+		ClearInteractionObserverInstance();
+		return;
+	}
+
+	UHSRInteractionComponent* InteractComp = CurrentPawn->FindComponentByClass<UHSRInteractionComponent>();
+	if (!InteractComp)
+	{
+		ClearInteractionObserverInstance();
+		return;
+	}
+
+	if (!InteractionViewModel)
+	{
+		InteractionViewModel = NewObject<UHSRInteractionViewModel>(this);
+	}
+
+	// Always reconnect ViewModel to Widget when possible — OnPossess may pre-create ViewModel before Widget exists
+	if (ExplorationWidgetInstance)
+	{
+		ExplorationWidgetInstance->SetInteractionViewModel(InteractionViewModel);
+	}
+
+	InteractionViewModel->Observe(InteractComp);
+	UE_LOG(LogTemp, Log, TEXT("AHSRHUD::RefreshInteractionObserver - Observed Component=%s on Pawn=%s"),
+		*InteractComp->GetName(), *CurrentPawn->GetName());
+}
+
+void AHSRHUD::ClearInteractionObserverInstance()
+{
+	if (InteractionViewModel)
+	{
+		InteractionViewModel->Teardown();
+		InteractionViewModel = nullptr;
+	}
+	if (ExplorationWidgetInstance)
+	{
+		ExplorationWidgetInstance->SetInteractionViewModel(nullptr);
+	}
+	UE_LOG(LogTemp, Log, TEXT("AHSRHUD::ClearInteractionObserverInstance - Cleared"));
 }
 
 void AHSRHUD::RequestRebuildExplorationHUDForPhase2Test()
@@ -89,6 +147,8 @@ void AHSRHUD::RequestRebuildExplorationHUDForPhase2Test()
 
 void AHSRHUD::RemoveExplorationHUD()
 {
+	ClearInteractionObserverInstance();
+
 	if (!ExplorationWidgetInstance)
 	{
 		return;

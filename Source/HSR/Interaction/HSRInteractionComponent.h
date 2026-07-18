@@ -42,5 +42,6 @@ private:
 	TWeakObjectPtr<AActor> CurrentCandidate;
 	bool bCandidateEverRegistered;
 
+	FText GetCurrentPrompt() const;
 	bool IsCandidateValid() const;
 };

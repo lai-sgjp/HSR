@@ -5,6 +5,7 @@
 #include "HSRHUD.generated.h"
 
 class UHSRUserWidget;
+class UHSRInteractionViewModel;
 
 UCLASS()
 class HSR_API AHSRHUD : public AHUD
@@ -20,6 +21,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "HUD")
 	void RemoveExplorationHUD();
 
+	// Interaction observer lifecycle
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void RefreshInteractionObserver();
+
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void ClearInteractionObserverInstance();
+
 	// Development-only Phase 2 test interface
 	UFUNCTION(BlueprintCallable, Category = "HUD|Development", meta = (DevelopmentOnly))
 	void RequestRebuildExplorationHUDForPhase2Test();
@@ -30,4 +38,7 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UHSRUserWidget> ExplorationWidgetInstance;
+
+	UPROPERTY()
+	TObjectPtr<UHSRInteractionViewModel> InteractionViewModel;
 };

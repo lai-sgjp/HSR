@@ -1,4 +1,5 @@
 ﻿#include "HSRPlayerController.h"
+#include "../UI/HSRHUD.h"
 #include "../Character/HSRExplorationCharacter.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputAction.h"
@@ -79,6 +80,12 @@ void AHSRPlayerController::OnPossess(APawn* InPawn)
 	if (bInputSystemReady && CurrentControlMode == EHSRPlayerControlMode::Exploration)
 	{
 		AddExplorationContext();
+	}
+
+	// Refresh HUD interaction observation if HUD already exists
+	if (AHSRHUD* HSRHUD = Cast<AHSRHUD>(GetHUD()))
+	{
+		HSRHUD->RefreshInteractionObserver();
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::OnPossess - Controller=%s Pawn=%s"),
