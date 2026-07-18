@@ -4,6 +4,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
+#include "../Interaction/HSRInteractionComponent.h"
 
 AHSRExplorationCharacter::AHSRExplorationCharacter()
 {
@@ -23,6 +24,8 @@ AHSRExplorationCharacter::AHSRExplorationCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
+
+	InteractionComponent = CreateDefaultSubobject<UHSRInteractionComponent>(TEXT("InteractionComponent"));
 }
 
 void AHSRExplorationCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -106,5 +109,15 @@ void AHSRExplorationCharacter::HSStopJumping()
 
 void AHSRExplorationCharacter::Interact()
 {
-	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationCharacter::Interact - Called (placeholder)"));
+	if (!InteractionComponent)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AHSRExplorationCharacter::Interact - InteractionComponent is null"));
+		return;
+	}
+
+	FHSRInteractionResult Result = InteractionComponent->TryInteract();
+	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationCharacter::Interact - TryInteract returned success=%d, reason=%d"),
+		Result.bSuccess, static_cast<int32>(Result.FailureReason));
 }
+
+

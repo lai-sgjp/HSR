@@ -5,6 +5,7 @@
 #include "HSRExplorationCharacter.generated.h"
 
 class USpringArmComponent;
+class UHSRInteractionComponent;
 class UCameraComponent;
 class UInputAction;
 
@@ -22,12 +23,18 @@ public:
 	const UInputAction* GetJumpAction() const { return JumpAction; }
 	const UInputAction* GetInteractAction() const { return InteractAction; }
 
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	UHSRInteractionComponent* GetInteractionComponent() const { return InteractionComponent; }
+
 protected:
 	void Move(const struct FInputActionValue& Value);
 	void Look(const struct FInputActionValue& Value);
 	void HSJump();
 	void HSStopJumping();
 	void Interact();
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UHSRInteractionComponent> InteractionComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USpringArmComponent> CameraBoom;
