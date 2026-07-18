@@ -5,6 +5,7 @@
 #include "../Interaction/HSRInteractionTypes.h"
 #include "../Interaction/HSRInteractableInterface.h"
 #include "Components/SphereComponent.h"
+#include "../Data/Definitions/HSREncounterDefinition.h"
 #include "HSRGrayboxInteractable.generated.h"
 
 UCLASS()
@@ -32,6 +33,9 @@ protected:
 public:
 	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "Interaction|Debug")
 	bool bAvailable;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter")
+	TObjectPtr<UHSREncounterDefinition> EncounterDefinition;
 };
 
 

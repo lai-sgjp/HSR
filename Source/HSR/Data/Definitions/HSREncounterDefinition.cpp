@@ -1,0 +1,1 @@
+#include "HSREncounterDefinition.h"

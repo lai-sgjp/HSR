@@ -1,6 +1,7 @@
 ﻿#include "HSRGrayboxInteractable.h"
 #include "../Interaction/HSRInteractionComponent.h"
 #include "../Interaction/HSRInteractableInterface.h"
+#include "../Battle/HSRBattleTransitionSubsystem.h"
 #include "../Character/HSRExplorationCharacter.h"
 
 AHSRGrayboxInteractable::AHSRGrayboxInteractable()
@@ -54,6 +55,49 @@ FHSRInteractionResult AHSRGrayboxInteractable::ExecuteInteraction_Implementation
 			FText::FromString(TEXT("Interactor is out of range.")));
 	}
 
+	// If an EncounterDefinition is assigned, submit it to the BattleTransitionSubsystem
+	if (EncounterDefinition)
+	{
+		UGameInstance* GI = GetGameInstance();
+		if (GI)
+		{
+			UHSRBattleTransitionSubsystem* Subsystem = GI->GetSubsystem<UHSRBattleTransitionSubsystem>();
+			if (Subsystem)
+			{
+				FHSREncounterResult EncResult = Subsystem->RequestEncounter(EncounterDefinition);
+				if (EncResult.ResultType == EHSREncounterResultType::Success)
+				{
+					UE_LOG(LogTemp, Log, TEXT("AHSRGrayboxInteractable::ExecuteInteraction - %s submitted EncounterRequest %s"),
+						*GetName(), *EncResult.RequestId.ToString());
+					return FHSRInteractionResult::MakeSuccess();
+				}
+				else
+				{
+					UE_LOG(LogTemp, Warning, TEXT("AHSRGrayboxInteractable::ExecuteInteraction - %s EncounterRequest FAILED type=%d msg=%s"),
+						*GetName(), static_cast<int32>(EncResult.ResultType), *EncResult.Message.ToString());
+					return FHSRInteractionResult::MakeFailure(
+						EHSRInteractionFailureReason::ExecutionFailed,
+						FText::Format(NSLOCTEXT("Graybox", "EncounterFailed", "Encounter failed: {0}"), EncResult.Message));
+				}
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("AHSRGrayboxInteractable::ExecuteInteraction - %s FAILED ExecutionFailed (no subsystem)"), *GetName());
+				return FHSRInteractionResult::MakeFailure(
+					EHSRInteractionFailureReason::ExecutionFailed,
+					FText::FromString(TEXT("Cannot access BattleTransition subsystem.")));
+			}
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("AHSRGrayboxInteractable::ExecuteInteraction - %s FAILED ExecutionFailed (no GameInstance)"), *GetName());
+			return FHSRInteractionResult::MakeFailure(
+				EHSRInteractionFailureReason::ExecutionFailed,
+				FText::FromString(TEXT("Cannot access GameInstance.")));
+		}
+	}
+
+	// No EncounterDefinition: fall through to original log-and-success
 	UE_LOG(LogTemp, Log, TEXT("AHSRGrayboxInteractable::ExecuteInteraction - %s interacted by %s at location (X=%.0f Y=%.0f Z=%.0f)"),
 		*GetName(), *Interactor->GetName(),
 		Context.InteractionLocation.X, Context.InteractionLocation.Y, Context.InteractionLocation.Z);
