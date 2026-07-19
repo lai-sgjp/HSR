@@ -1498,3 +1498,7 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 用户已提供 PlayerVictory/PlayerDefeat 各两轮证据；Reviewer 结论为 `PASS WITH FOLLOW-UP`。
 - 防重复旅行修复 `d58f17b`、Return Transform、BattleResult exactly-once 均已记录。
 - P5-004 可归档，下一步创建 P5-005 阶段收尾任务。
+## 2026-07-19｜Coordinator：补齐 P5 归档指针链
+
+- 为 P5-001～P5-004 补齐 archive active/execution/final-review 可审计指针；根目录 final-review 保留原始审查产物，archive 文件明确指向其路径。
+- 这些是归档索引，不改写历史证据等级或角色提交归属。
