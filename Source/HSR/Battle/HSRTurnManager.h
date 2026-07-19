@@ -31,6 +31,11 @@ public:
 	const TArray<FHSRBattleParticipant>& GetOrderedParticipants() const { return OrderedParticipants; }
 	FHSRActionResolvedDelegate& OnActionResolved() { return ActionResolved; }
 
+#if WITH_EDITOR
+	/** Development-only seam used by the Battle GameMode PIE verification harness. */
+	bool InvalidateCurrentParticipantForDevelopmentTest();
+#endif
+
 private:
 	bool AdvanceToNextValidTurn();
 	bool IsCurrentParticipantValid() const;

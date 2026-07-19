@@ -1,8 +1,74 @@
 #include "HSRBattleGameMode.h"
 #include "HSRBattleCoordinator.h"
+#include "HSRTurnManager.h"
 #include "HSRBattleTransitionSubsystem.h"
 #include "Engine/World.h"
 #include "AbilitySystemComponent.h"
+#include "../GAS/Attribute/HSRCoreAttributeSet.h"
+
+#if WITH_EDITOR
+namespace HSRBattleDevelopmentTest
+{
+	static void LogCase(const TCHAR* CaseName, bool bPassed)
+	{
+		UE_LOG(LogTemp, bPassed ? Log : Error, TEXT("P5-002 TurnTest Case=%s Result=%s"), CaseName, bPassed ? TEXT("PASS") : TEXT("FAIL"));
+	}
+
+	static bool SetSpeed(const FHSRBattleParticipant& Participant, float Speed)
+	{
+		if (!Participant.AbilitySystemComponent.IsValid())
+		{
+			return false;
+		}
+		Participant.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), Speed);
+		return true;
+	}
+
+	static void Run(UHSRBattleCoordinator* Coordinator)
+	{
+		if (!Coordinator || Coordinator->GetParticipants().Num() != 2)
+		{
+			UE_LOG(LogTemp, Error, TEXT("P5-002 TurnTest Harness=SKIPPED reason=missing-coordinator-or-participants"));
+			return;
+		}
+
+		const TArray<FHSRBattleParticipant>& Participants = Coordinator->GetParticipants();
+		const bool bSpeedSetup = SetSpeed(Participants[0], 120.0f) && SetSpeed(Participants[1], 80.0f);
+		UHSRTurnManager* TestManager = NewObject<UHSRTurnManager>(Coordinator);
+		const bool bDifferentSpeed = bSpeedSetup && TestManager->Initialize(Participants) && TestManager->GetCurrentParticipantId() == FName(TEXT("Player"));
+		LogCase(TEXT("DifferentSpeed_PlayerFirst"), bDifferentSpeed);
+
+		const bool bNonCurrentRejected = !TestManager->ResolveAction(FName(TEXT("Enemy"))) && TestManager->GetCurrentParticipantId() == FName(TEXT("Player"));
+		LogCase(TEXT("NonCurrentRejected"), bNonCurrentRejected);
+
+		const bool bLegalResolved = TestManager->ResolveAction(FName(TEXT("Player"))) && TestManager->GetCurrentParticipantId() == FName(TEXT("Enemy"));
+		LogCase(TEXT("LegalActionResolvedOnce"), bLegalResolved);
+
+		const bool bDuplicateRejected = !TestManager->ResolveAction(FName(TEXT("Player"))) && TestManager->GetCurrentParticipantId() == FName(TEXT("Enemy"));
+		LogCase(TEXT("DuplicateRejected_NoExtraAdvance"), bDuplicateRejected);
+
+		const bool bTieSetup = SetSpeed(Participants[0], 100.0f) && SetSpeed(Participants[1], 100.0f);
+		const bool bTieBreak = bTieSetup && TestManager->Initialize(Participants) && TestManager->GetCurrentParticipantId() == FName(TEXT("Enemy"));
+		LogCase(TEXT("SameSpeed_StableParticipantIdTieBreak"), bTieBreak);
+
+		SetSpeed(Participants[0], 120.0f);
+		SetSpeed(Participants[1], 80.0f);
+		const bool bInvalidSetup = TestManager->Initialize(Participants) && TestManager->GetCurrentParticipantId() == FName(TEXT("Player")) && TestManager->InvalidateCurrentParticipantForDevelopmentTest();
+		const bool bInvalidRejectedAndAdvanced = bInvalidSetup && !TestManager->ResolveAction(FName(TEXT("Player"))) && TestManager->GetCurrentParticipantId() == FName(TEXT("Enemy"));
+		LogCase(TEXT("InvalidActorRejected_Advanced"), bInvalidRejectedAndAdvanced);
+
+		TestManager->Reset();
+		const bool bResetSafe = !TestManager->ResolveAction(FName(TEXT("Player"))) && TestManager->GetState() == EHSRTurnManagerState::Waiting;
+		LogCase(TEXT("ResetSafe"), bResetSafe);
+		const bool bEmptySafe = !TestManager->Initialize(TArray<FHSRBattleParticipant>()) && TestManager->GetState() == EHSRTurnManagerState::Waiting;
+		LogCase(TEXT("EmptyQueueSafe"), bEmptySafe);
+
+		const bool bRestoreMainQueue = Coordinator->GetTurnManager() && Coordinator->GetTurnManager()->Initialize(Participants);
+		LogCase(TEXT("RestoreBattleQueue"), bRestoreMainQueue);
+		UE_LOG(LogTemp, Log, TEXT("P5-002 TurnTest Harness=COMPLETE"));
+	}
+}
+#endif
 
 AHSRBattleGameMode::AHSRBattleGameMode()
 {
@@ -90,6 +156,10 @@ void AHSRBattleGameMode::BeginPlay()
 				Participants[i].IsValid() ? 1 : 0);
 		}
 	}
+
+#if WITH_EDITOR
+	HSRBattleDevelopmentTest::Run(Coordinator);
+#endif
 }
 
 void AHSRBattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)

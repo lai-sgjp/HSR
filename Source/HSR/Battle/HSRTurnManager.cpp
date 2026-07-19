@@ -106,3 +106,18 @@ float UHSRTurnManager::ReadInitiativeSpeed(const FHSRBattleParticipant& Particip
 {
 	return Participant.AbilitySystemComponent.IsValid() ? FMath::Max(0.0f, Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetSpeedAttribute())) : 0.0f;
 }
+
+#if WITH_EDITOR
+bool UHSRTurnManager::InvalidateCurrentParticipantForDevelopmentTest()
+{
+	if (!OrderedParticipants.IsValidIndex(CurrentTurnIndex))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRTurnManager::InvalidateCurrentParticipantForDevelopmentTest - REJECTED no active turn"));
+		return false;
+	}
+
+	OrderedParticipants[CurrentTurnIndex].Actor.Reset();
+	UE_LOG(LogTemp, Log, TEXT("UHSRTurnManager::InvalidateCurrentParticipantForDevelopmentTest - SUCCESS ParticipantId=%s"), *GetCurrentParticipantId().ToString());
+	return true;
+}
+#endif

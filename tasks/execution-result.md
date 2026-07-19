@@ -153,3 +153,10 @@ Implementation Agent has completed TASK-P5-001 C++ implementation, build verific
 - Fresh `HSREditor Win64 Development` Build/UHT/C++/Link has not yet been run for this implementation.
 - No Editor asset configuration is required: the manager is created by `UHSRBattleCoordinator` after participants spawn.
 - PIE must demonstrate ordered turns, same-speed tie-break, duplicate/non-current rejection, and a second PIE session without stale references.
+
+## TASK-P5-002 Development PIE Harness (2026-07-19)
+
+- Added a `WITH_EDITOR`-only harness in `AHSRBattleGameMode::BeginPlay`; Shipping builds do not compile this entry point.
+- The harness assigns Player/Enemy test speeds, checks both queue ordering cases, legal resolve, duplicate and non-current rejection, invalid current actor recovery, Reset, and empty queue handling.
+- It only uses a temporary `UHSRTurnManager`, writes structured `P5-002 TurnTest` logs, and restores the real battle queue after testing. It adds no UI, ability, damage, victory/defeat, Tick, or network feature.
+- Still unverified: fresh Development Editor Build and the user-run PIE log for the listed cases.
