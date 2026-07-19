@@ -30,7 +30,6 @@ enum class EHSRBattleInitFailureType : uint8
 	InitFailed UMETA(DisplayName = "ASC Init Failed")
 };
 
-UENUM(BlueprintType)
 USTRUCT(BlueprintType)
 struct FHSRBattleParticipantDefinition
 {
