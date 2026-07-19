@@ -1,6 +1,7 @@
 #include "HSRBattleCoordinator.h"
 #include "HSRTurnManager.h"
 #include "HSREncounterTypes.h"
+#include "../GAS/Ability/HSRBasicAttackAbility.h"
 #include "../GAS/HSRAbilitySystemComponent.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "GameFramework/Actor.h"
@@ -149,6 +150,16 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		Participant.Team = Def.Team;
 		Participant.Actor = SpawnedActor;
 		Participant.AbilitySystemComponent = SpawnedActor->FindComponentByClass<UAbilitySystemComponent>();
+		if (!GrantBasicAttackAbility(Participant))
+		{
+			UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED to grant BasicAttack ParticipantId=%s"), *Participant.ParticipantId.ToString());
+			SpawnedActor->Destroy();
+			for (FHSRBattleParticipant& ExistingParticipant : Participants) { if (ExistingParticipant.Actor.IsValid()) ExistingParticipant.Actor->Destroy(); }
+			Participants.Empty();
+			ParticipantDefinitions.Empty();
+			CurrentState = EHSRBattleCoordinatorState::Failed;
+			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to grant BasicAttack ability.")), Def.DefinitionId);
+		}
 		Participants.Add(Participant);
 
 		UE_LOG(LogTemp, Log,
@@ -178,6 +189,48 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		*CurrentRequestId.ToString(), Participants.Num(), ParticipantDefinitions.Num());
 
 	return FHSRBattleInitResult::MakeSuccess();
+}
+
+bool UHSRBattleCoordinator::RequestBasicAttack(FName AttackerParticipantId, FName TargetParticipantId)
+{
+	if (CurrentState != EHSRBattleCoordinatorState::Spawned || !TurnManager || TurnManager->GetCurrentParticipantId() != AttackerParticipantId)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::RequestBasicAttack - REJECTED non-current or inactive Attacker=%s Current=%s"), *AttackerParticipantId.ToString(), TurnManager ? *TurnManager->GetCurrentParticipantId().ToString() : TEXT("None"));
+		return false;
+	}
+
+	const FHSRBattleParticipant* Attacker = Participants.FindByPredicate([AttackerParticipantId](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == AttackerParticipantId; });
+	const FHSRBattleParticipant* Target = Participants.FindByPredicate([TargetParticipantId](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == TargetParticipantId; });
+	if (!Attacker || !Target || !Attacker->IsValid() || !Target->IsValid() || Attacker->Team == Target->Team)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::RequestBasicAttack - REJECTED invalid target Attacker=%s Target=%s"), *AttackerParticipantId.ToString(), *TargetParticipantId.ToString());
+		return false;
+	}
+
+	FGameplayAbilitySpec* AbilitySpec = Attacker->AbilitySystemComponent->FindAbilitySpecFromClass(UHSRBasicAttackAbility::StaticClass());
+	UHSRBasicAttackAbility* Ability = AbilitySpec ? Cast<UHSRBasicAttackAbility>(AbilitySpec->GetPrimaryInstance()) : nullptr;
+	if (!Ability || !Ability->SetPendingTarget(Target->AbilitySystemComponent.Get()))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::RequestBasicAttack - REJECTED missing BasicAttack ability Attacker=%s"), *AttackerParticipantId.ToString());
+		return false;
+	}
+
+	if (!Attacker->AbilitySystemComponent->TryActivateAbility(AbilitySpec->Handle) || !Ability->DidLastActivationSucceed())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::RequestBasicAttack - REJECTED activation failed Attacker=%s Target=%s"), *AttackerParticipantId.ToString(), *TargetParticipantId.ToString());
+		return false;
+	}
+
+	const bool bResolved = TurnManager->ResolveAction(AttackerParticipantId);
+	if (bResolved)
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::RequestBasicAttack - SUCCESS Attacker=%s Target=%s"), *AttackerParticipantId.ToString(), *TargetParticipantId.ToString());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::RequestBasicAttack - FAILED ResolveAction Attacker=%s Target=%s"), *AttackerParticipantId.ToString(), *TargetParticipantId.ToString());
+	}
+	return bResolved;
 }
 
 FHSRBattleInitResult UHSRBattleCoordinator::BuildAndValidateParticipantDefinitions()
@@ -364,4 +417,24 @@ bool UHSRBattleCoordinator::InitParticipantASC(AActor* TargetActor)
 		*TargetActor->GetName(), *ASC->GetName());
 
 	return true;
+}
+
+bool UHSRBattleCoordinator::GrantBasicAttackAbility(const FHSRBattleParticipant& Participant)
+{
+	if (!Participant.AbilitySystemComponent.IsValid())
+	{
+		return false;
+	}
+
+	const FGameplayAbilitySpecHandle AbilityHandle = Participant.AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(UHSRBasicAttackAbility::StaticClass(), 1, INDEX_NONE, this));
+	const bool bGranted = AbilityHandle.IsValid();
+	if (bGranted)
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::GrantBasicAttackAbility - SUCCESS Participant=%s"), *Participant.ParticipantId.ToString());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantBasicAttackAbility - FAILED Participant=%s"), *Participant.ParticipantId.ToString());
+	}
+	return bGranted;
 }

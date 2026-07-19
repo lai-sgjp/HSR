@@ -38,6 +38,9 @@ public:
 	const TArray<FHSRBattleParticipant>& GetParticipants() const { return Participants; }
 	UHSRTurnManager* GetTurnManager() const { return TurnManager; }
 
+	/** Requests one synchronous basic attack. Only a current participant may attack an opposing valid target. */
+	bool RequestBasicAttack(FName AttackerParticipantId, FName TargetParticipantId);
+
 	/** Reset to Idle for a fresh battle session. */
 	void Reset();
 
@@ -55,5 +58,6 @@ private:
 
 	AActor* SpawnParticipantActor(UWorld* World, const FHSRBattleParticipantDefinition& Definition);
 	bool InitParticipantASC(AActor* TargetActor);
+	bool GrantBasicAttackAbility(const FHSRBattleParticipant& Participant);
 	FHSRBattleInitResult BuildAndValidateParticipantDefinitions();
 };

@@ -1,5 +1,29 @@
 # TASK-P5-001 Execution Report
 
+## TASK-P5-003 Implementation Handoff (2026-07-19)
+
+### Implemented C++ seam
+
+- Added `UHSRBasicAttackAbility`, an `InstancedPerActor` synchronous GameplayAbility.
+- `UHSRBattleCoordinator` grants that ability to each valid battle Participant after ASC initialization.
+- `RequestBasicAttack(AttackerId, TargetId)` owns command validation: battle must be active, attacker must be current, both participants must be valid, and target must be on the opposing team.
+- A successful GAS effect application is the only path that calls `UHSRTurnManager::ResolveAction`; rejected activation therefore leaves HP and turn state unchanged.
+- The effect is intentionally a user-owned Blueprint GameplayEffect loaded from `/Game/GameplayEffects/GE_P5_BasicAttackDamage`. It is not present yet, so the missing-effect path is currently safe-fail and no Editor asset was created by the agent.
+
+### Build verification
+
+- Command: `Build.bat HSREditor Win64 Development -Project=E:\\work\\unreal_projects\\HSR\\HSR.uproject -WaitMutex -FromMsBuild -architecture=x64`
+- Result: **Succeeded**, exit code `0`; C++ and Link completed in 4 actions.
+- Warning: Visual Studio 2022 compiler `14.51.36248` is not UE's preferred version. No P5-003 compile/link errors remain.
+
+### Required user Editor handoff
+
+Create one Blueprint GameplayEffect asset exactly at `Content/GameplayEffects/GE_P5_BasicAttackDamage` with: Duration Policy `Instant`; one modifier: Attribute `HSRCoreAttributeSet.Health`, Modifier Op `Add`, Magnitude `Scalable Float`, value `-10.0`. Do not configure execution calculations, tags, costs, cooldowns, cues, UI, or networking. Save only this asset, commit it as a user Editor commit, then provide the commit hash before PIE verification.
+
+### Commit status
+
+- Pending Implementation Agent commit after the allowlisted code/report diff is reviewed and staged.
+
 ## Basic Info
 
 | Field | Value |
