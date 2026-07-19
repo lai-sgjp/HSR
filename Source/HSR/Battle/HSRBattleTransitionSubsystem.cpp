@@ -119,8 +119,10 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 	if (World)
 	{
 		CurrentState = EHSREncounterState::Traveling;
-		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - Traveling to %s"),
-			*Definition->BattleMap.GetLongPackageName());
+		TravelKind = EHSRTravelKind::Encounter;
+		TravelTargetMap = FName(*Definition->BattleMap.GetLongPackageName());
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - Traveling to %s (kind=Encounter, map=%s)"),
+			*Definition->BattleMap.GetLongPackageName(), *TravelTargetMap.ToString());
 
 		UGameplayStatics::OpenLevel(World, FName(*Definition->BattleMap.GetLongPackageName()), true);
 
