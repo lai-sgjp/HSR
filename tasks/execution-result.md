@@ -95,7 +95,7 @@ BeginPlay - No pending encounter to consume (type=6).
 
 ### Fixes Applied During Revision
 
-- Removed FHSRBattleResult struct from HSRBattleTypes.h (naming conflict with BattleResult non-goal). All Coordinator methods now return ool.
+- Removed FHSRBattleResult struct from HSRBattleTypes.h (naming conflict with BattleResult non-goal). All Coordinator methods now return bool.
 - Cleaned dangling FText::Format(NSLOCTEXT(...)) leftover content after bool conversion
 - Fixed execution-result.md encoding to UTF-8 without BOM
 
@@ -120,3 +120,36 @@ TurnManager, Speed sorting, GameplayAbility, damage, death, Victory/Defeat, Batt
 ## Status
 
 Implementation Agent has completed TASK-P5-001 C++ implementation, build verification, and user-provided PIE verification. Main path and exactly-once confirmed. Current state: **awaiting Coordinator / Independent Reviewer review**. Not ready for P5-002.
+
+## Revision Debugger Update (2026-07-19)
+
+- First compile issue identified by source inspection: `AHSRBattleGameMode::BeginPlay` referenced `BuildResult` inside the `SubmitBattleRequest` failure log before `BuildResult` was declared. The log now reports the consumed request ID and no longer references the later result.
+- Added an explicit phase-5 definition registry check. `PlayerCharacter` and `Enemy_TestGoblin` are accepted; any other non-empty enemy definition now returns structured `DefinitionNotFound` and transitions the coordinator to `Failed`.
+- Player DefinitionId remains the stable `PlayerCharacter` definition (never EncounterId).
+- Build command/exit code: **not run by Debugger in this turn**; prior report's success is retained as historical/user-provided evidence and must be revalidated with a fresh build.
+- Remaining unverified: fresh UHT/C++/link after this patch and a runtime invalid non-empty DefinitionId failure trace.
+- Workspace diff review: debugger edits are limited to allowlisted `HSRBattleCoordinator.cpp`, `HSRBattleGameMode.cpp`, and `tasks/execution-result.md`; other modified assets/docs were pre-existing user/coordinator changes.
+- Fresh Build attempt: UnrealBuildTool/engine installation was not discoverable in the sandbox (`Get-Command UnrealBuildTool` and standard Epic Games locations returned no executable), so no build was launched and no exit code is claimed.
+- Definition classes are now explicitly resolved into each validated definition (`APawn::StaticClass()` in this prototype); actor spawning uses the resolved class and does not rely on a null fallback for accepted definitions.
+
+## Fresh Build Debugger Verification (2026-07-19)
+
+- First reported compiler errors: missing complete `UAbilitySystemComponent` include in `HSRBattleGameMode.cpp` (C2027/C2039), plus trailing commas before `)` in two `MakeFailure` calls in `HSRBattleCoordinator.cpp` (C2059 at lines 84 and 96).
+- Fixes: added `#include "AbilitySystemComponent.h"`; removed the two trailing commas.
+- Command: `E:\programs\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat HSREditor Win64 Development -Project="E:\work\unreal_projects\HSR\HSR.uproject" -WaitMutex -FromMsBuild -architecture=x64`
+- Result: **Succeeded, exit code 0**. UHT/C++/link completed (4 actions). First warning: Visual Studio 2022 compiler is not a preferred version. No compile/link errors remain. AISystem C4996 remains a known non-blocking warning if emitted in broader builds.
+# TASK-P5-002 Implementation Handoff (2026-07-19)
+
+## Implemented
+
+- Added `UHSRTurnManager`: event-driven, `PrimaryActorTick`-free initiative ordering.
+- Captures each participant's GAS `Speed` once, sorts descending, then uses lexical `ParticipantId` as the stable tie-break.
+- Enforces current-participant-only resolution; duplicate/non-current/no-active requests return `false` without advancing the prior turn.
+- Invalid current actor/ASC is rejected and safely advanced; an empty or entirely invalid queue finishes safely.
+- `Reset()` clears all runtime references. `UHSRBattleCoordinator` owns the manager and resets it with battle runtime state.
+
+## Unverified / User Editor Work Required
+
+- Fresh `HSREditor Win64 Development` Build/UHT/C++/Link has not yet been run for this implementation.
+- No Editor asset configuration is required: the manager is created by `UHSRBattleCoordinator` after participants spawn.
+- PIE must demonstrate ordered turns, same-speed tie-break, duplicate/non-current rejection, and a second PIE session without stale references.
