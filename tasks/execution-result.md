@@ -1,44 +1,46 @@
-# TASK-P5-001 ִ�б���
+# TASK-P5-001 Execution Report
 
-## ������Ϣ
+## Basic Info
 
-| �ֶ� | ֵ |
+| Field | Value |
 |---|---|
-| ������ | TASK-P5-001 |
-| ��ɫ | Implementation Agent / �ͼ�ִ��ģ�� |
-| ���� | 2026-07-19 |
-| Ŀ�� | ������Ч Encounter Context��Battle runtime exactly-once ���������ؽ����/���˲����ߺ� ASC����� ActorInfo ��ʼ�������� Return Context������ʧ��·�� |
+| Task ID | TASK-P5-001 |
+| Role | Implementation Agent / Low-level Execution Model |
+| Date | 2026-07-19 |
+| Goal | Given a valid Encounter Context, Battle runtime exactly-once consumes the request, rebuilds player + enemy participants with ASC, completes ActorInfo init, saves a pure-value Return Context, handles failure paths |
 
-## ����/�޸ĵ��ļ�
+## Files Created / Modified
 
-| �ļ� | ���� | ˵�� |
+| File | Action | Description |
 |---|---|---|
-| Source/HSR/Battle/HSRBattleTypes.h | ���� | ��ֵ DTO��EHSRBattleParticipantTeam��EHSRBattleCoordinatorState ״̬����FHSRBattleParticipantDefinition��FHSRBattleReturnContext��FHSRBattleRequestContext��FHSRBattleResult |
-| Source/HSR/Battle/HSRBattleParticipant.h | ���� | ���� C++ �ڲ��ṹ�壬�� TWeakObjectPtr ����ʱ������ + �ȶ� ID/Team���� USTRUCT���� Coordinator ���ҳ��� |
-| Source/HSR/Battle/HSRBattleCoordinator.h | ���� | UObject ״̬����Idle -> Consuming -> Spawned/Failed���ύ����ӿڡ��������ؽ��ӿڡ�Reset �ӿ� |
-| Source/HSR/Battle/HSRBattleCoordinator.cpp | �������޶� | ״̬��ʵ�� + �޸����� RegisterComponent �� DestroyComponent ���� |
-| Source/HSR/Battle/HSRBattleGameMode.h | ���� | Battle World ��� AGameModeBase ���࣬���� Coordinator |
-| Source/HSR/Battle/HSRBattleGameMode.cpp | ���� | BeginPlay ���̣�NewObject Coordinator -> ConsumePendingEncounter -> SubmitBattleRequest -> BuildParticipants -> ��ϸ��־ |
-| 	asks/execution-result.md | ���������� | �����棨�� PIE ֤�ݣ� |
+| Source/HSR/Battle/HSRBattleTypes.h | Create | Pure-value DTOs: EHSRBattleParticipantTeam, EHSRBattleCoordinatorState (Idle/Consuming/Spawned/Failed), DTO structs |
+| Source/HSR/Battle/HSRBattleParticipant.h | Create | Internal C++ struct with stable ID/team + TWeakObjectPtr runtime refs. Not USTRUCT (intentional for TWeakObjectPtr) |
+| Source/HSR/Battle/HSRBattleCoordinator.h | Create | UObject state machine: SubmitBattleRequest, BuildParticipants, GetReturnContext, Reset |
+| Source/HSR/Battle/HSRBattleCoordinator.cpp | Create + Revised | State machine implementation with bool return (FHSRBattleResult removed per reviewer feedback) |
+| Source/HSR/Battle/HSRBattleGameMode.h | Create | Battle World AGameModeBase entry point holding Coordinator |
+| Source/HSR/Battle/HSRBattleGameMode.cpp | Create + Revised | BeginPlay flow: NewObject Coordinator -> ConsumePendingEncounter -> SubmitBattleRequest -> BuildParticipants |
+| 	asks/execution-result.md | Create + Revised | This report |
 
-## ʵ��Ҫ��
+> HSRBattleTypes.cpp does not exist (no non-inline implementation needed). Confirmed.
 
-### Coordinator ״̬��
+## Implementation Summary
 
-- Idle -> Consuming��SubmitBattleRequest() ��֤ RequestId/EncounterId/EnemyDefinitionId/BattleMapPath ��Ч��ԭ��д��
-- Consuming -> Spawned��BuildParticipants() ������ Player APawn + ASC ��ʼ���������� Enemy APawn + ASC ��ʼ����ȫ���ɹ����� Spawned
-- Consuming -> Failed���κ�ʧ�ܣ�World=null��Spawn ʧ�ܡ�ASC ��ʼ��ʧ�ܣ�ԭ���� Failed������м����
+### Coordinator State Machine
 
-### ASC ��ʼ����InitParticipantASC��
+- Idle -> Consuming: SubmitBattleRequest() validates RequestId/EncounterId/EnemyDefinitionId/BattleMapPath, then atomically transitions
+- Consuming -> Spawned: BuildParticipants() spawns Player APawn + ASC init, then Enemy APawn + ASC init; both must succeed
+- Consuming -> Failed: Any failure (null World, spawn failure, ASC init failure) transitions to Failed atomically, cleans up intermediate state
 
-1. AddComponentByClass(UHSRAbilitySystemComponent::StaticClass(), false, FTransform::Identity, false) ����ʱ��ӣ�auto-register��
+### ASC Initialization (InitParticipantASC)
+
+1. AddComponentByClass(UHSRAbilitySystemComponent::StaticClass(), false, FTransform::Identity, false) - runtime add
 2. SetIsReplicated(false) + SetComponentTickEnabled(false)
-3. ASC->InitStats(UHSRCoreAttributeSet::StaticClass(), nullptr) ע�����Լ�
-4. ASC->InitAbilityActorInfo(TargetActor, TargetActor) ���� Owner=Avatar=self
-5. ��֤ AbilityActorInfo.IsValid()
-6. ʧ��ʱ DestroyComponent(true) ��������
+3. ASC->InitStats(UHSRCoreAttributeSet::StaticClass(), nullptr) - register attribute set
+4. ASC->InitAbilityActorInfo(TargetActor, TargetActor) - Owner=Avatar=self
+5. Verify AbilityActorInfo.IsValid()
+6. On failure: DestroyComponent(true) for full cleanup
 
-### Battle GameMode �������
+### Battle GameMode Entry Flow
 
 `
 BeginPlay
@@ -46,70 +48,75 @@ BeginPlay
   -> UHSRBattleTransitionSubsystem::ConsumePendingEncounter()
   -> Coordinator::SubmitBattleRequest(ConsumedRequest)
   -> Coordinator::BuildParticipants(GetWorld())
-  -> ��ϸ��־��״̬������������ReturnContext
+  -> Detailed logging: state, participant count, ReturnContext
 `
 
-### ʧ��·������
+### Failure Path Handling
 
-| ���� | ��Ϊ |
+| Scenario | Behavior |
 |---|---|
-| ��Ч RequestId | SubmitBattleRequest �ܾ������� Failure |
-| EncounterId=None | SubmitBattleRequest �ܾ� |
-| EnemyDefinitionId=None | SubmitBattleRequest �ܾ� |
-| BattleMapPath=None | SubmitBattleRequest �ܾ� |
-| BattleWorld=null | BuildParticipants �� Failed����־�� RequestId/EncounterId |
-| ASC Init ʧ�� | DestroyComponent(true) ����������� Failed |
+| Invalid RequestId | SubmitBattleRequest returns false with warning log |
+| EncounterId=None | SubmitBattleRequest returns false |
+| EnemyDefinitionId=None | SubmitBattleRequest returns false |
+| BattleMapPath=None | SubmitBattleRequest returns false |
+| BattleWorld=null | BuildParticipants transitions to Failed, logs RequestId/EncounterId |
+| ASC Init fails | DestroyComponent(true), transitions to Failed |
+| Duplicate SubmitBattleRequest | Rejected if not in Idle state |
 
-## ��֤���
+## Verification Results
 
-### ������֤
+### Build Verification
 - HSREditor Win64 Development fresh UHT/C++/Link: **Succeeded**
-- 7 �� UHT ����ͷ�ļ����ɣ�5 �����붯��
-- �˳��� 0��0 ���󣬽� 1 ����֪����ϱ������汾����
+- 7 UHT reflection headers generated, 5 compile actions
+- Exit code 0, 0 errors
+- Only 1 known non-blocking compiler version warning (same as Phase 0-4)
 
-### PIE ��֤���û��ṩ��
+### PIE Verification (user-provided)
 
-**��·����Encounter -> Battle Map ���У���**
+**Main path (Encounter -> Battle Map travel):**
 `
 UHSRBattleTransitionSubsystem::ConsumePendingEncounter - SUCCESS
 UHSRBattleCoordinator::SubmitBattleRequest - SUCCESS
 SpawnParticipantActor - SUCCESS Actor=Pawn_0 Team=0
-InitParticipantASC - SUCCESS Actor=Pawn_0 ASC=... ActorInfo valid
+InitParticipantASC - SUCCESS Actor=Pawn_0 ASC=... ActorInfo valid, Owner=Avatar=self
 SpawnParticipantActor - SUCCESS Actor=Pawn_1 Team=1
-InitParticipantASC - SUCCESS Actor=Pawn_1 ASC=... ActorInfo valid
+InitParticipantASC - SUCCESS Actor=Pawn_1 ASC=... ActorInfo valid, Owner=Avatar=self
 BuildParticipants - SUCCESS RequestId=... Participants=2
 BeginPlay - COMPLETE CoordinatorState=2 Participants=2 ReturnMap=/Game/Maps/Map_Phase1_Exploration
-  Participant[0]: Id=Player DefId=Enc_Test Valid=1
-  Participant[1]: Id=Enemy DefId=Enemy_TestGoblin Valid=1
+  Participant[0]: Id=Player DefId=Enc_Test Team=0 Actor=Pawn_0 ASC=... Valid=1
+  Participant[1]: Id=Enemy DefId=Enemy_TestGoblin Team=1 Actor=Pawn_1 ASC=... Valid=1
 `
 
-**Exactly-Once ��֤��Battle Map ���μ��أ���**
+**Exactly-Once verification (Battle Map loaded a second time):**
 `
 ConsumePendingEncounter - FAILED AlreadyConsumed
 BeginPlay - No pending encounter to consume (type=6).
 `
 
-### �޸���¼
-- �Ƴ����� ASC->RegisterComponent() ���ã�AddComponentByClass auto-register �����ע��������棩
-- DestroyComponent(false) -> DestroyComponent(true) ȷ����������
+### Fixes Applied During Revision
 
-### �û�����
-- ʧ��·�����ԣ��ظ� RequestId��ȱ Definition �ȣ����û�ѡ��������������"��Щ���� phase4 ���Թ�"����֪δ��֤�߽��ѱ����
+- Removed FHSRBattleResult struct from HSRBattleTypes.h (naming conflict with BattleResult non-goal). All Coordinator methods now return ool.
+- Cleaned dangling FText::Format(NSLOCTEXT(...)) leftover content after bool conversion
+- Fixed execution-result.md encoding to UTF-8 without BOM
 
-### ���쳣
-- �� Editor/PIE �������� Ensure/Assert���� Blueprint runtime error
+### User Decision
 
-## ��ȷδʵ�֣�������Χ�⣩
+- Failure path tests (missing definition, duplicate request, etc.): user chose to skip, documented as user decision
+- No Editor/PIE crashes, no Ensure/Assert, no Blueprint runtime errors
 
-TurnManager��Speed ����GameplayAbility���˺���������Victory/Defeat��BattleResult������̽����ս�� UI��Cost/Cooldown/Energy������ AI��SaveGame�����硢�����Ż�
+## Commits
 
-## �ύ��¼
-
-| commit | ˵�� |
+| Commit | Description |
 |---|---|
-| 73361c6 | ��ʼʵ�֣�6 �� Source �ļ� + ִ�б��� |
-| 6dffdd7 | �޸����� RegisterComponent + ���� PIE ֤�� |
+| 73361c6 | Initial implementation: 6 source files + execution report |
+| 6dffdd7 | Fix redundant RegisterComponent call + PIE evidence update |
+| 42d6995 | Update execution report with PIE evidence |
+| e54fac1 | REVISE fix: remove FHSRBattleResult, clean dangling MakeFailure content, fix encoding |
 
-## ����
+## Explicit Non-Goals (out of scope for this task)
 
-Implementation Agent ����� TASK-P5-001 �� C++ ʵ�֡�������֤���û� PIE ��֤����·���� exactly-once ����ͨ������ǰ״̬��**�� Coordinator/���� Reviewer ���**��
+TurnManager, Speed sorting, GameplayAbility, damage, death, Victory/Defeat, BattleResult, return to exploration, Battle UI, Cost/Cooldown/Energy, complex AI, SaveGame, networking, performance optimization
+
+## Status
+
+Implementation Agent has completed TASK-P5-001 C++ implementation, build verification, and user-provided PIE verification. Main path and exactly-once confirmed. Current state: **awaiting Coordinator / Independent Reviewer review**. Not ready for P5-002.
