@@ -7,7 +7,7 @@
 
 - **Phase 1 与 Phase 2 均为 `Ready`。P2-003 最终处置为 `USER ACCEPTED`：Reviewer 的唯一结论仍为 `REVISE`，用户明确接受未完全掌握的学习项作为非阻断复习项。**
 - **Phase 3 为 `Ready`：P3-003 最终 Reviewer commit `3b3fbeb` 为 `PASS WITH FOLLOW-UP`，且用户已明确接受三个工程证据缺口；所有 follow-up 原样保留。**
-- **Phase 4 正在执行：P4-001 已以 Reviewer `PASS WITH FOLLOW-UP` 归档，A2 后 Editor/PIE 缺口由用户 `USER ACCEPTED`；当前唯一活动任务为 `TASK-P4-002`，等待首次只读复述与二次确认。**
+- **Phase 4 正在执行：P4-001、P4-002 均已以 Reviewer `PASS WITH FOLLOW-UP` 归档；当前唯一活动任务为 `TASK-P4-003`，等待首次只读复述与二次确认。**
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
@@ -17,7 +17,8 @@
 - `TASK-P3-002` 已以 Reviewer `PASS WITH FOLLOW-UP` 归档；Reviewer commit `d93dbe8`，最终 Implementation/A4 commit `20ab555`。
 - `TASK-P3-003` 已以 Reviewer `PASS WITH FOLLOW-UP` 归档；最终复审 commit `3b3fbeb79cad4a8d3826fd7a13bc140aaf6d4d43`。
 - `TASK-P4-001` 已归档：Reviewer 最终结论 `PASS WITH FOLLOW-UP`；commits `7056f72`、`a4fd762`、`b3c26b6`、`af64e661` 与当前可读执行报告均保留。A2 后 Editor/PIE 未验证，由用户明确接受为非阻断风险。
-- 当前唯一活动任务为 `TASK-P4-002`：数据驱动探索敌人、AI Perception/NavMesh 事件驱动巡逻/发现/追击，并只复用 P4-001 `RequestEncounter`。尚未实施。
+- `TASK-P4-002` 已归档：A1 源码与用户 02:07 PIE 支持主路径；A1 Build 完整日志已被用户删除，只保留报告级证据。BP 路径、Map 误保存撤回、mixed commit/同身份/Git 偏差及生命周期专项 follow-up 全部保留。
+- 当前唯一活动任务为 `TASK-P4-003`：三种 initiative、重复触发/失败恢复/生命周期与空 Battle Map 测试返回；尚未实施。
 - `TASK-P2-003` 已以 `USER ACCEPTED` 归档；其 Reviewer `REVISE` 结论未改写。
 - `TASK-P2-002` 经 A1/A2/A3 修订与用户最终补证后由 Reviewer 判定 `PASS`：最终 `HSREditor Win64 Development` 成功，五 GE 配置、Editor 重开、Clamp、Re-Possess、HUD 单 snapshot/teardown 和两轮连续 PIE 均有用户证据并经 Reviewer 只读核验。历史 `REVISE` 链保留。
 - `TASK-P2-001` 最终处置为 `USER ACCEPTED`：独立 Reviewer 结论仍为 `REVISE`，用户明确接受剩余证据边界并授权进入 P2-002；未伪造 Reviewer `PASS`。
@@ -95,7 +96,15 @@
 
 ## 下一个推荐任务
 
-- **当前下一步：** Implementation Agent 首次只读复述 `TASK-P4-002`，逐字等待用户二次确认；确认前不得调用工具或实施。
+- **当前下一步：** Implementation Agent 首次只读复述 `TASK-P4-003`，逐字等待用户二次确认；确认前不得调用工具或实施。
+
+## 2026-07-19 TASK-P4-002 最终归档与 P4-003 规划
+
+- Reviewer 最终结论为 `PASS WITH FOLLOW-UP`。A1 commit `4590f97` 闭合 Timer、ChaseAcceptanceRadius、Perception Possess/UnPossess 与 World teardown 阻断。
+- A1 Build log 被用户删除，Build 只保留执行报告与 DLL/PIE 时间链；02:07 PIE 是用户提供的运行证据，不是 Reviewer/Coordinator 亲验。
+- 用户事后接受 Enemy BP 实际路径、Map_BattleTest 误保存后撤回、mixed commit 与同 Git 身份；Implementation Git 权限偏差和 `eae06a4` 把 P4-002 写成“尚未实施”的时序错误均保留并在当前状态修正。
+- 目标销毁、重复 Perception 计数、MoveTo Failed/Aborted、独立 UnPossess/Re-Possess 未完整专项验证，进入 P4-003 组合回归。
+- 已创建唯一 `TASK-P4-003` 活动卡；只规划三种 initiative、失败恢复、单次 Return Context 与空图测试返回，不实现 Phase 5 BattleResult/正式返回。
 
 ## 2026-07-18 TASK-P4-001 最终归档与 P4-002 规划
 

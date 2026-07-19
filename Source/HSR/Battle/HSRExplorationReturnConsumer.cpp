@@ -57,17 +57,17 @@ void AHSRExplorationReturnConsumer::TryConsumeAndReturn()
 		return;
 	}
 
-	// Consume return context
-	const FHSRExplorationReturnContext& Ctx = Subsystem->GetReturnContext();
+	// Consume return context and get full DTO from the Result.
+	// Do NOT use GetReturnContext() - it no longer exists; consume atomically returns the data.
 	FHSRExplorationReturnResult Result = Subsystem->ConsumeReturnContext();
 
 	if (Result.ResultType == EHSREncounterReturnResultType::Success)
 	{
-		// Apply the return transform to the player pawn
-		PlayerPawn->SetActorTransform(Ctx.ReturnTransform, false, nullptr, ETeleportType::TeleportPhysics);
+		// Apply the return transform to the player pawn using ConsumedContext from the Result
+		PlayerPawn->SetActorTransform(Result.ConsumedContext.ReturnTransform, false, nullptr, ETeleportType::TeleportPhysics);
 
 		UE_LOG(LogTemp, Log, TEXT("AHSRExplorationReturnConsumer::TryConsumeAndReturn - SUCCESS: Teleported pawn to %s"),
-			*Ctx.ReturnTransform.GetLocation().ToString());
+			*Result.ConsumedContext.ReturnTransform.GetLocation().ToString());
 	}
 	else
 	{

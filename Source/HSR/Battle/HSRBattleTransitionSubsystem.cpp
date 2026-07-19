@@ -2,6 +2,7 @@
 #include "../Data/Definitions/HSREncounterDefinition.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/Engine.h"
 
 void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -9,7 +10,23 @@ void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collect
 	CurrentState = EHSREncounterState::Empty;
 	bReturnPending = false;
 
+	if (GEngine)
+	{
+		GEngine->OnTravelFailure().AddUObject(this, &UHSRBattleTransitionSubsystem::HandleTravelFailure);
+	}
+
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::Initialize - State=Empty"));
+}
+
+void UHSRBattleTransitionSubsystem::Deinitialize()
+{
+	if (GEngine)
+	{
+		GEngine->OnTravelFailure().RemoveAll(this);
+	}
+
+	Super::Deinitialize();
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::Deinitialize"));
 }
 
 FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative)
@@ -187,14 +204,46 @@ bool UHSRBattleTransitionSubsystem::HasPending() const
 	return CurrentState == EHSREncounterState::Pending || CurrentState == EHSREncounterState::Traveling;
 }
 
+void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravelFailure::Type FailureType, const FString& ErrorString)
+{
+	UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - type=%d World=%s"),
+		static_cast<int32>(FailureType), InWorld ? *InWorld->GetName() : TEXT("null"));
+
+	// Clean up Encounter state if we were Traveling
+	if (CurrentState == EHSREncounterState::Traveling)
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - Clearing Encounter state (RequestId=%s)"),
+			*PendingRequest.RequestId.ToString());
+		ClearPending();
+	}
+
+	// Clean up Return state if we have a pending return
+	if (bReturnPending)
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - Clearing Return context"));
+		PendingReturnContext = FHSRExplorationReturnContext();
+		bReturnPending = false;
+	}
+}
+
+
 FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestTestReturn(const FHSREncounterRequest& FromConsumedRequest)
 {
+	// Validate BEFORE writing (must not pollute Pending)
 	if (bReturnPending)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - FAILED AlreadyPending"));
 		return FHSRExplorationReturnResult::MakeFailure(
-			EHSREncounterReturnResultType::AlreadyConsumed,
+			EHSREncounterReturnResultType::AlreadyPending,
 			FText::FromString(TEXT("A return is already pending.")));
+	}
+
+	if (FromConsumedRequest.ExplorationMapPath.IsNone())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - FAILED InvalidReturnContext (no path)"));
+		return FHSRExplorationReturnResult::MakeFailure(
+			EHSREncounterReturnResultType::InvalidReturnContext,
+			FText::FromString(TEXT("No exploration map path in return context.")));
 	}
 
 	// Build pure-data return context from consumed request
@@ -211,19 +260,10 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestTestReturn(con
 
 	// Travel back to exploration map
 	UWorld* World = GetWorld();
-	if (World && !ReturnCtx.ExplorationMapPath.IsNone())
+	if (World)
 	{
 		UGameplayStatics::OpenLevel(World, ReturnCtx.ExplorationMapPath, true);
 		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - Traveling back to %s"), *ReturnCtx.ExplorationMapPath.ToString());
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - FAILED InvalidReturnContext (no path)"));
-		bReturnPending = false;
-		PendingReturnContext = FHSRExplorationReturnContext();
-		return FHSRExplorationReturnResult::MakeFailure(
-			EHSREncounterReturnResultType::InvalidReturnContext,
-			FText::FromString(TEXT("No exploration map path in return context.")));
 	}
 
 	return FHSRExplorationReturnResult::MakeSuccess();
@@ -239,14 +279,17 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::ConsumeReturnContext(
 			FText::FromString(TEXT("No pending return context.")));
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ConsumeReturnContext - SUCCESS RequestId=%s ReturnLoc=%s"),
-		*PendingReturnContext.RequestId.ToString(), *PendingReturnContext.ReturnTransform.GetLocation().ToString());
-
+	// Capture the full DTO before clearing internal payload
 	FHSRExplorationReturnContext Consumed = PendingReturnContext;
 	PendingReturnContext = FHSRExplorationReturnContext();
 	bReturnPending = false;
 
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ConsumeReturnContext - SUCCESS RequestId=%s ReturnLoc=%s"),
+		*Consumed.RequestId.ToString(), *Consumed.ReturnTransform.GetLocation().ToString());
+
+	// Return the full consumed context in the Result so consumer does NOT re-read from Subsystem
 	FHSRExplorationReturnResult Result = FHSRExplorationReturnResult::MakeSuccess();
+	Result.ConsumedContext = Consumed;
 	return Result;
 }
 

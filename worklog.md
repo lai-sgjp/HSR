@@ -1399,3 +1399,13 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 创建唯一 `TASK-P4-002` 活动卡：只授权 Enemy Types/Character/AIController/Enemy Definition、最小 AI/Navigation Build.cs 依赖和三个用户资产；只复用 P4-001 `RequestEncounter`，禁止修改 P4-001 Source、P4-003 和 Phase 5。
 - 当前 Gate：Implementation Agent 首次只读复述并等待用户二次确认。确认前不得调用工具、实施或执行 Git。
 - 本轮未修改 Source/Content/Config，未运行 Build/Editor/PIE，未删除根目录 Build logs，未 stage/commit/push。
+
+## 2026-07-19｜Coordinator：TASK-P4-002 最终归档与 TASK-P4-003 建卡
+
+- 核对最终执行报告和 Reviewer：`4590f97` 闭合 Init Timer、ChaseAcceptanceRadius、Perception Possess/UnPossess 对称绑定及 ClearState World 安全；Reviewer 结论 `PASS WITH FOLLOW-UP`。
+- A1 standalone Build log 已被用户删除，fresh Build 只保留执行报告与 DLL/PIE 时间链，不能写成 Reviewer 独立核验。02:07 PIE 文档由用户提供，直接支持巡逻→感知→追击→Enemy Encounter→Battle Map 单次消费主路径。
+- 归档保留：Enemy BP 路径事后接受、Map_BattleTest 误保存后撤回、`d1cefde` mixed commit、同 Git 身份、Implementation Git 权限偏差，以及 `eae06a4` 将当时 P4-002 写为“尚未实施”的时序错误。
+- 目标销毁、重复 Perception 计数、MoveTo Failed/Aborted、独立 UnPossess/Re-Possess 未完整专项验证，锁入 P4-003 至少三项组合回归。
+- 已归档 P4-002 active/execution/final-review，并创建唯一 `TASK-P4-003`：显式 Player/Enemy/Neutral initiative、重复请求/地图/travel failure 恢复、纯值 Return Context 单次消费、空 Battle Map 测试返回和连续两轮往返。
+- P4-003 明确禁止 Phase 5 BattleResult、胜负/奖励、Battle Actor/TurnManager 和正式战后返回；当前只等待首次只读复述与用户二次确认，不自动实施。
+- 本轮未修改 Source/Content/Config，未运行 Build/Editor/PIE，未删除日志，未执行 Git。

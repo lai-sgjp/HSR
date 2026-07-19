@@ -1,215 +1,241 @@
-# TASK-P4-002：数据驱动探索敌人与事件驱动感知追击
+# TASK-P4-003：三种先手、过渡失败恢复与空图测试返回
 
-> 创建日期：2026-07-18  
+> 创建日期：2026-07-19
 > 状态：`WAITING FOR FIRST READ-BACK`  
-> 本卡是当前唯一活动任务契约。P4-001 已归档为 `PASS WITH FOLLOW-UP`；创建本卡仅代表规划完成，不代表 P4-002 已实施、构建或通过 Editor/PIE。
+> 本卡是当前唯一活动任务契约。P4-002 已归档为 `PASS WITH FOLLOW-UP`；创建本卡不代表已实施、构建、通过 Editor/PIE 或 Phase 4 已完成。
 
-## Role Lock / 首次执行与二次确认门禁
+## Role Lock / 首次只读复述与二次确认
 
-低级执行模型当前且仅能担任 `Implementation Agent`，不得切换为 Coordinator、Reviewer、Teacher、资产作者或擅自扩大权限。
+低级执行模型当前且仅能担任 `Implementation Agent`，不得切换为 Coordinator、Reviewer、Teacher、资产作者或自行扩大权限。
 
-首次收到本卡后只能读取本文件，不得调用工具。必须复述：任务编号、唯一可见结果、状态机和事件链、精确允许/只读/禁止文件、Build.cs 依赖边界、用户 Editor 操作、Build/Editor/PIE 证据、反射/GC/Tick/GAS/网络风险、无 NavMesh/丢失目标/目标销毁/重复感知失败矩阵和停止条件。末尾必须逐字写：
+首次收到本卡后只能读取本文件，不得调用任何工具。必须复述：任务编号、唯一可见结果、三种 initiative 来源、Encounter/Return 状态与数据流、精确允许/只读/禁止文件、用户 Editor 资产、Build/Editor/PIE、失败/重复/生命周期矩阵、P4-002 组合回归、反射/GC/Tick/GAS/网络与 Phase 5 边界、停止条件。末尾必须逐字写：
 
-`等待用户确认执行 TASK-P4-002。`
+`等待用户确认执行 TASK-P4-003。`
 
-随后停止。只有用户在复述后另发明确确认，才可调用工具或实施；用户要求进入下一子任务协调工作不替代这次二次确认。
+随后停止。只有用户在复述后另发明确确认，才可调用工具或实施。用户要求进入下一子任务的授权只允许 Coordinator 建卡，不替代二次执行确认。
 
 ## 当前 Phase 与前置 Gate
 
-- Phase 0～3 均为 `Ready`，历史 follow-up 保留。
-- P4-001 最终 Reviewer 结论为 `PASS WITH FOLLOW-UP`，允许相邻规划；A2 后 Editor 重开/PIE 缺失由用户 `USER ACCEPTED`，不是动态验证通过。
-- P4-001 已建立 Encounter Definition、纯值 Request、`UHSRBattleTransitionSubsystem::RequestEncounter`、空 Battle Map Consumer 和单次消费语义。
-- P4-002 必须重新覆盖至少一条“探索触发 → RequestEncounter → Battle Map 单次消费”主路径，降低 P4-001 已接受的运行证据风险。
+- Phase 0～3 为 `Ready`，历史 follow-up 保留。
+- P4-001 已以 Reviewer `PASS WITH FOLLOW-UP` 归档；A2 后 Editor/PIE 缺失由用户 `USER ACCEPTED`。
+- P4-002 已以 Reviewer `PASS WITH FOLLOW-UP` 归档；用户 02:07 PIE 支持 Enemy→Encounter→Battle Map 主路径，A1 Build 完整日志已被用户删除且仅保留报告级证据。
+- P4-002 继承 follow-up：目标销毁、重复 Perception 计数、MoveTo Failed/Aborted、独立 UnPossess/Re-Possess 未完整专项验证；BP 路径事后接受、Map_BattleTest 误保存后撤回、mixed commit/同 Git 身份/Git 权限偏差保留。
 
 ## 唯一可验收结果
 
-在 `Map_Phase1_Exploration` 中，一个由 Enemy Definition 配置的灰盒敌人由 AIController 事件驱动巡逻；AI Perception 发现玩家后进入追击，丢失/销毁目标或 MoveTo 失败时安全恢复；玩家进入敌人的 Encounter 范围后，敌人只复用 P4-001 的 `RequestEncounter` 入口并最多触发一次跨图请求。整个流程无自定义 Gameplay Tick，不由 AI、Blueprint 或 UI 直接 OpenLevel。
+玩家主动交互、敌人追击接触和中性测试对象分别产生 `Player`、`Enemy`、`Neutral` 三种确定且可达的 initiative；每次只通过 P4-001 Transition Subsystem 构造纯值 Context。重复触发、无效地图与可控旅行失败不会覆盖或永久悬挂状态。空 `Map_BattleTest` 在单次消费后通过开发测试入口返回探索地图，并由探索 Return Consumer 恢复原 Transform；连续两轮往返无旧 World 引用。此返回仅验证生命周期，不创建 BattleResult、胜负、奖励或正式战后流程。
 
-## 范围拆分
+## 三种 initiative 的唯一来源
 
-- 本包只完成单敌人、单玩家、灰盒巡逻/发现/追击与 Encounter 请求复用。
-- P4-003 才处理三种 initiative、OpenLevel 失败恢复、重复往返和空图测试返回。
-- Phase 5 才处理 Battle Actor/ASC 重建、TurnManager、攻击、胜负、奖励和正式返回。
+- **Player：** 现有玩家主动 `BP_HSRGrayboxInteractable` 交互路径。
+- **Enemy：** P4-002 敌人 `Chasing → EncounterCollision → RequestEncounter` 路径。
+- **Neutral：** 新建同一灰盒 C++ 类的中性测试 BP/实例，仅把可编辑 initiative 配为 `Neutral`；不复制请求/OpenLevel 蓝图逻辑。
+- 缺失或非法输入安全回落/拒绝规则由 C++ 明确，Blueprint 不推导 initiative。
 
 ## 执行角色
 
-- **Implementation Agent：** 精确允许范围内实现 C++/Build.cs，并执行 fresh Build；只写执行报告，不操作资产或 Git。
-- **用户/Editor 资产作者：** 创建 Enemy DataAsset/BP，修改探索地图的 NavMesh/敌人摆放，重开 Editor、执行 PIE 并独立提交资产。
-- **Reviewer：** 独立审查源码、依赖、反射/GC/Tick、AI 生命周期、Build/PIE 与越权后给结论。
-- **Coordinator：** 审查后同步和归档，不替代执行者、用户或 Reviewer。
+- **Implementation Agent：** 只修改精确 C++，执行 fresh Build 并只写执行报告；不得操作资产或 Git。
+- **用户/Editor 资产作者：** 修改/创建允许资产，完成两轮往返、失败矩阵和 P4-002 组合回归，独立提交资产。
+- **Reviewer：** 独立核对源码、反射/GC/状态机、Build、Editor/PIE、失败与边界后给唯一结论。
+- **Coordinator：** 审查后同步/归档并进入 P4-004；不得把本任务放行写成 Phase 4 自动完成。
 
 ## 执行前读取边界
 
 - 首次复述：仅 `tasks/active-task.md`。
-- 二次确认后：仅按需读取允许修改文件、直接 include 依赖和精确只读文件；不得读取全局文档扩充任务。
+- 二次确认后：仅按需读取允许修改文件、直接 include 依赖与精确只读文件；不得读取全局文档扩充目标。
 
 ## 精确允许修改文件
 
 ### Implementation Agent
 
-- `Source/HSR/Enemy/HSREnemyTypes.h`
-- `Source/HSR/Enemy/HSREnemyCharacter.h`
-- `Source/HSR/Enemy/HSREnemyCharacter.cpp`
+- `Source/HSR/Battle/HSREncounterTypes.h`
+- `Source/HSR/Battle/HSRBattleTransitionSubsystem.h`
+- `Source/HSR/Battle/HSRBattleTransitionSubsystem.cpp`
+- `Source/HSR/Battle/HSRBattleTestConsumer.h`
+- `Source/HSR/Battle/HSRBattleTestConsumer.cpp`
+- `Source/HSR/Battle/HSRExplorationReturnConsumer.h`
+- `Source/HSR/Battle/HSRExplorationReturnConsumer.cpp`
+- `Source/HSR/Exploration/HSRGrayboxInteractable.h`
+- `Source/HSR/Exploration/HSRGrayboxInteractable.cpp`
 - `Source/HSR/Enemy/HSREnemyAIController.h`
 - `Source/HSR/Enemy/HSREnemyAIController.cpp`
-- `Source/HSR/Data/Definitions/HSREnemyDefinition.h`
-- `Source/HSR/Data/Definitions/HSREnemyDefinition.cpp`
-- `Source/HSR/HSR.Build.cs`
 - `tasks/execution-result.md`
 
-可创建不存在的上述目录。`HSR.Build.cs` 只允许增加实际编译所需的 `AIModule` 与 `NavigationSystem`；现有 `GameplayTasks` 已存在，不得重排或增加其他模块。若 UE5.6 编译证明还需其他依赖，停止请求扩权。
+不得修改 `HSR.Build.cs`；现有 `Core/CoreUObject/Engine/AIModule/NavigationSystem` 应满足本包。若实际编译需要额外模块或文件，停止请求扩权。
 
 ### 用户 Editor 资产作者
 
-- `Content/Data/Enemies/DA_Enemy_Phase4Test.uasset`
-- `Content/Blueprints/Enemy/BP_HSREnemy_Phase4Test.uasset`
+- `Content/Blueprints/Exploration/BP_HSRGrayboxInteractable.uasset`
+- `Content/Blueprints/Exploration/BP_HSRNeutralEncounterTest.uasset`
 - `Content/Maps/Map_Phase1_Exploration.umap`
+- `Content/Maps/Map_BattleTest.umap`
 
-地图修改只允许：放置一个 Enemy BP、`NavMeshBoundsVolume` 和本任务所需灰盒导航范围；不得删除或重构现有玩家、交互物、HUD、地图规则。
+地图仅允许放置/配置 Neutral 测试对象、Exploration Return Consumer，以及 Battle Test Consumer 的测试返回属性；不得添加正式 Battle GameMode、战斗角色、UI、奖励或结果流程。
 
 ## 精确只读文件与资产
 
-- `Source/HSR/Character/HSRCharacterBase.h/.cpp`
-- `Source/HSR/Character/HSRExplorationCharacter.h/.cpp`
-- `Source/HSR/Battle/HSREncounterTypes.h`
-- `Source/HSR/Battle/HSRBattleTransitionSubsystem.h/.cpp`
 - `Source/HSR/Data/Definitions/HSREncounterDefinition.h/.cpp`
+- `Source/HSR/Data/Definitions/HSREnemyDefinition.h/.cpp`
+- `Source/HSR/Enemy/HSREnemyCharacter.h/.cpp`
+- `Source/HSR/Enemy/HSREnemyTypes.h`
+- `Source/HSR/Character/HSRExplorationCharacter.h/.cpp`
+- `Source/HSR/Interaction/HSRInteractionComponent.h/.cpp`
+- `Source/HSR/UI/HSRHUD.h/.cpp`
 - `Source/HSR/GAS/HSRAbilitySystemComponent.h/.cpp`
-- `Source/HSR/Exploration/HSRGrayboxInteractable.h/.cpp`
+- `Source/HSR/HSR.Build.cs`
 - `Content/Data/Encounters/DA_Encounter_Phase4Test.uasset`
-- `Content/Maps/Map_BattleTest.umap`
-- `Content/Blueprints/Exploration/BP_HSRGrayboxInteractable.uasset`
+- `Content/Data/Enemies/DA_Enemy_Phase4Test.uasset`
+- `Content/Blueprints/Character/Enemy/BP_HSREnemy_Phase4Test.uasset`
 - `Content/Input/IA_Interact.uasset`
 - `Content/Input/IMC_Exploration.uasset`
 - `Content/UI/WBP_ExplorationHUD.uasset`
 
-Implementation Agent 不得脚本修改二进制资产或声称验证其内部配置。
+Implementation Agent 不得脚本修改二进制资产或声称验证内部配置。
 
 ## 禁止修改内容
 
-- `HSR.uproject`、全部 `Config/`，以及允许列表外的 Source/Content/Markdown。
-- P4-001 Encounter/Transition/Consumer/Graybox 源码；本包只能调用其公开 `RequestEncounter`，发现接口不足必须停止请求扩权。
-- Player、Interaction、UI、GAS、Framework、Battle、TurnSystem、SaveGame 源码。
-- Behavior Tree、Blackboard、EQS、StateTree、Mass、复杂队列、多敌人选择、多目标或战斗 AI。
-- 自定义 Gameplay Tick、每帧距离扫描、`GetAllActorsOfClass`、每帧 MoveTo、Widget Tick。
-- Ability、伤害、胜负、奖励、BattleResult、返回探索、三种 initiative、旅行失败恢复。
+- `HSR.uproject`、`Source/HSR/HSR.Build.cs`、全部 `Config/`，以及白名单外 Source/Content/Markdown。
+- Encounter/Enemy Definition schema、Enemy Character、Character/Interaction/UI/GAS/Framework/Player/TurnSystem/SaveGame。
+- Battle Actor/ASC 重建、TurnManager、Ability、攻击、伤害、胜负、奖励、BattleResult、正式战后返回。
+- Blueprint/Widget/Level Blueprint 复制 RequestEncounter、Pending、OpenLevel 或 Return 状态真源。
+- 自定义 Gameplay/UI Tick、世界扫描、每帧 MoveTo、无界 Timer 重试。
 - RPC、Replication、Prediction、PlayerState ASC、新模块/插件、第三方资产。
-- 删除、重命名、批量移动/格式化、Git stage/commit/push/reset/clean。
+- 删除、重命名、批量操作、Git stage/commit/push/reset/clean。
 
-## 固定架构与状态机
+## 固定类型与数据所有权
 
-### DataAsset / Runtime 边界
+### Encounter Request 与 initiative
 
-- `UHSREnemyDefinition` 为 `UPrimaryDataAsset`，至少保存稳定非空 `EnemyDefinitionId`、P4-001 Encounter Definition 引用，以及原创的巡逻半径、巡逻等待、追击接受半径等最小静态配置；所有数值有安全默认值和非负 Clamp 元数据。
-- Definition 只保存静态数据，不保存 World Actor、Controller、感知目标、MoveRequest、Timer Handle、ASC 或运行状态。
-- `AHSREnemyCharacter` 持有受 GC 保护的 Definition 引用、当前 World 的 Encounter 触发碰撞和生成点快照；不得成为 AI 决策或跨图 Pending 真源。
+- `RequestEncounter` 增加显式 `EHSREncounterInitiative` 输入；所有调用者必须传入，不允许 Subsystem 根据 Actor 类型或 World 隐式猜测。
+- Request 继续只含纯值 DTO；initiative 写入后跨图消费，不进入 TurnSystem 或决定行动队列。
+- Graybox 暴露安全默认 `Player` 的 initiative 配置；正式玩家交互 BP 保持 Player，中性测试 BP 配 Neutral。
+- P4-002 AIController 固定传 Enemy；不得新增第二套请求或 OpenLevel。
 
-### 探索状态与事件链
+### Return Context
 
-`EHSREnemyExplorationState` 至少表达：
+- 新增最小 `FHSRExplorationReturnContext`（或等价类型）：原 Encounter Request ID、探索地图稳定软路径、返回 Transform；安全默认值，不含 Actor/World/ASC/Widget/Handle。
+- Transition Subsystem 是 Pending Return Context 的唯一跨图 Runtime 真源；Battle Consumer 只提交测试返回请求，Exploration Return Consumer 只消费并应用一次。
+- Return Context 必须单次消费；第二次返回结构化失败，不重复 Teleport。
+- Exploration Return Consumer 可使用一次性 next-tick/短 Timer 等待玩家 Pawn，但必须有有界尝试、成员 Timer Handle 和 EndPlay 清理；无 Tick、无无限重试。
+
+## Transition 状态、重复触发与失败恢复
+
+- Encounter 的 `Empty/Pending/Traveling/Consumed` 语义继续保持；Return 使用独立明确状态/Presence，不能覆盖未完成 Encounter。
+- 同帧/连续两个请求时，首个 Request ID 和 initiative 保持，第二个返回 `AlreadyPending`，不得触发第二次 OpenLevel。
+- 请求前验证 Definition、稳定 ID、软地图非空及可由 UE5.6 安全检查的 package/path；所有前置失败不污染 Pending。
+- 使用 UE5.6 实际头文件确认的本地 travel failure delegate/回调，在 `Traveling` 失败时清理对应 Encounter/Return Pending 并记录 Request ID、地图和失败类型。不得猜 API；若可靠回调需要越权或无法确认，停止报告。
+- 失败清理不能清除无关的新请求；delegate 必须在 Subsystem Initialize/Deinitialize 对称绑定/解绑，避免重复回调。
+- Battle Consumer 的自动测试返回必须可配置且默认关闭；开启后第一次 Consume 成功、第二次失败，再按有界延迟调用统一 Return API。
+
+## 空 Battle Map 测试返回
 
 ```text
-Idle → PatrolWaiting → MovingToPatrol
-  → Alert/Chasing → EncounterPending
-  ↘ MoveFailed / LostTarget / TargetInvalid → Idle 或 PatrolWaiting
+Exploration RequestEncounter(initiative)
+→ Battle Map Consume Encounter once
+→ Battle Test Consumer RequestTestReturn(consumed DTO)
+→ Transition Subsystem 保存纯值 Return Context / OpenLevel Exploration
+→ Exploration Return Consumer ConsumeReturn once
+→ 恢复 Player Pawn Transform
+→ 第二次 ConsumeReturn 失败，状态清理
 ```
 
-- AIController 拥有探索状态、感知组件和当前 World 的目标弱引用；Enemy Character 不复制 Controller 状态。
-- 巡逻由 MoveCompleted 和有限的一次性 Timer/事件触发下一目标；Timer 只用于巡逻等待，必须在 UnPossess/EndPlay 清理，禁止轮询。
-- 感知只由 `OnTargetPerceptionUpdated` 或 UE5.6 等价委托驱动。重复感知同一目标不得重复绑定、重复创建 Timer、每帧下发 MoveTo 或重复请求 Encounter。
-- 当前目标使用 `TWeakObjectPtr<AActor>`；每次追击、MoveCompleted、丢失感知和 Encounter 前复核有效性与玩家身份。
-- 丢失目标、目标销毁、UnPossess、EndPlay、MoveTo Failed/Aborted 均清弱引用并回到安全状态；不得忙循环重试。
+- 测试返回不是 BattleResult，不判断胜负、不给奖励、不影响 SaveGame。
+- 返回 Transform 应在合理位置/旋转容差内恢复；若碰撞导致调整，记录实际值与原因，不静默宣称完全相等。
+- Battle Map 直接启动时没有 Encounter/Return Context，Consumer 只输出可诊断失败，不制造 Error 风暴或错误旅行。
 
-### 巡逻、NavMesh 与 Encounter
+## P4-002 继承组合回归
 
-- 巡逻点在生成点周围按 Definition 半径通过 NavigationSystem 选择；无 NavMesh/找点失败时保持 Idle/PatrolWaiting、输出可诊断日志，并以有限等待重试或停止，不触发 Encounter。
-- AI MoveTo 只由状态事件下发；Character/Controller 均不直接 OpenLevel。
-- Enemy Character 的事件驱动 Encounter 碰撞只接受有效 `AHSRExplorationCharacter`；触发时调用 AIController/Character 的单一 `TryRequestEncounter` 边界，最终只调用 P4-001 `RequestEncounter(EncounterDefinition)`。
-- Request 成功后进入 `EncounterPending`，停止移动、清理巡逻 Timer 并拒绝重复触发。失败时记录 P4-001 Result；配置失败可安全留在非 Pending 状态，不覆盖 Subsystem 请求。
-- 本包固定 `Neutral` initiative，不另建 OpenLevel、Pending 或 Consume 逻辑。
+本包至少保存一条组合生命周期证据，覆盖下列四项中的至少三项，并明确未覆盖项：
 
-### 反射、GC、Tick、GAS、网络
+1. 追击中目标销毁/失效，弱引用清理且无悬挂访问。
+2. 同一目标重复 Perception 更新，不产生 MoveTo/Timer/Request 风暴。
+3. MoveTo Failed 或 Aborted 后有界恢复，无同步递归或忙循环。
+4. 独立 UnPossess→Re-Possess，旧 Timer/Delegate 零增长，新实例/新 Possession 只保留一条观察链。
 
-- `UENUM/UCLASS` 宏正确，`*.generated.h` 是最后 include；反射字段有安全默认值。
-- UObject/Component 引用用 `UPROPERTY/TObjectPtr`；当前目标用弱引用；动态委托、Timer 在生命周期边界成对清理。
-- Character 与 AIController 明确关闭自定义 Gameplay Tick；允许引擎内部 CharacterMovement、AI MoveTo、Perception 工作，不把“无自定义 Tick”误写成引擎完全无 Tick。
-- Enemy 可继承现有 CharacterBase/ASC 基线，但本包不授予 Ability、不应用 GE、不修改 Attribute、不让 GAS 决定 AI 状态或 Encounter。
-- 未来权威边界只保留 `RequestEncounter` 与目标复核点；禁止实现或声称 RPC/复制/预测。
+组合回归后敌人仍能恢复为合法状态并完成一次 Enemy initiative Encounter→Battle→Return；不得为测试添加永久作弊逻辑或扩大资产范围。
+
+## 反射、GC、Tick、GAS 与网络边界
+
+- 新/改 `UENUM/USTRUCT/UCLASS/UFUNCTION` 宏正确，`*.generated.h` 最后 include，字段有安全默认值。
+- UObject 引用使用 `UPROPERTY/TObjectPtr`；跨图只传 `FGuid/FName/enum/FTransform` 等值；Timer/delegate 生命周期对称清理。
+- Battle/Return Consumers、Graybox、AIController 不新增自定义 Gameplay Tick；只允许有界一次性 Timer，禁止轮询。
+- GAS 只回归，不保存/修改 ASC、Attribute、GE、Ability；Return 不把旧 ASC 跨图带回。
+- 网络只保留 Request/Consume/Return 验证边界，不实现 RPC、复制、预测或声称服务器权威。
 
 ## 实现步骤
 
-1. 二次确认后核对工作树与允许范围；发现意外修改不覆盖，停止报告。
-2. 仅给 Build.cs 增加实际必需的 AI/Navigation 依赖。
-3. 创建探索状态 enum 与 Enemy PrimaryDataAsset，锁定安全默认值和静态/Runtime 边界。
-4. 创建无自定义 Tick 的 Enemy Character：Definition、Encounter overlap、生成点快照和唯一请求转发。
-5. 创建无自定义 Tick 的 AIController：Perception、目标弱引用、巡逻 Timer、MoveTo/MoveCompleted 与安全状态转换。
-6. 静态检查无世界扫描、无 P4-001 源码修改、无 GAS/网络/Phase 5 越界。
-7. 关闭 Editor 后 fresh 构建 `HSREditor Win64 Development`；保存完整命令、目标、退出码、UHT/C++/Link 和第一处 warning/error。
-8. 只更新 `tasks/execution-result.md`，按静态/Build/动态 PIE 分层记录证据与未验证项，然后停止交接用户。
+1. 二次确认后核对允许范围；发现意外修改不覆盖，停止报告。
+2. 扩展纯值类型：显式 initiative 输入、结构化 Return Context/Result/状态，安全默认值。
+3. 扩展 Transition Subsystem：三种 initiative、重复拒绝、前置地图校验、travel failure 对称回调与 Return 单次事务。
+4. Graybox 传可配置 Player/Neutral；AIController 固定传 Enemy，不改变 P4-002 状态机职责。
+5. 扩展 Battle Test Consumer：记录 initiative/Context、可选有界延迟测试返回；新建无 Tick Exploration Return Consumer 单次恢复 Transform。
+6. 静态审查 DTO、delegate/Timer、无 Tick、GAS/网络/Phase 5 边界和全部调用点。
+7. 关闭 Editor 后 fresh 构建 `HSREditor Win64 Development`，保存命令、目标、退出码、UHT/C++/Link 和第一处 warning/error。
+8. 只更新 `tasks/execution-result.md`，按 S/B/D 证据分层，停止交接用户。
 
-## 用户 UE Editor 手动操作
+## 用户 UE Editor 操作
 
-1. fresh Build 成功后完整重开 Editor，确认 Enemy Definition、Character、AIController 类型可加载。
-2. 创建 `DA_Enemy_Phase4Test`：填写原创稳定 ID，绑定只读 `DA_Encounter_Phase4Test`，配置最小巡逻/等待/追击数值。
-3. 创建 `BP_HSREnemy_Phase4Test`：绑定 Definition、灰盒 Mesh/材质、AIControllerClass、Auto Possess AI、Encounter 碰撞；不在 Event Graph 写感知、状态机、MoveTo、OpenLevel 或 RequestEncounter。
-4. 修改 `Map_Phase1_Exploration`：放置一个 Enemy BP 和覆盖玩家/敌人活动范围的 `NavMeshBoundsVolume`；按 `P` 可视化确认绿色导航区域。
-5. 保存三个允许资产，完整重开 Editor，核对 Parent、Definition、Encounter 引用、AIControllerClass、Auto Possess AI、碰撞和 NavMesh 保持。
-6. 执行下方 PIE 主路径、失败矩阵和 P4-001 跨图回归；提供 Output Log、截图/录屏或结构化逐项结果。资产由用户独立提交并回传 hash。
+1. fresh Build 成功后完整重开 Editor，确认新增/变更类型与属性可加载。
+2. 现有 `BP_HSRGrayboxInteractable` 明确设为 Player；创建 `BP_HSRNeutralEncounterTest` 并只把 initiative 设 Neutral、复用同一 Encounter Definition。
+3. 在探索地图放置一个 Neutral 测试对象和一个 Exploration Return Consumer；避免与 Enemy/玩家出生点重叠。
+4. 在 Battle Map 保留恰好一个 Battle Test Consumer，开启本包的测试自动返回并配置合理延迟；不添加战斗规则。
+5. 保存四个允许资产，重开 Editor 核对 Parent、initiative、Definition、两个 Consumer、地图引用保持。
+6. 分别执行 Player、Enemy、Neutral 三条完整往返；每条核对 Request ID、initiative、单次 Encounter/Return Consume、地图和 Transform。
+7. 执行重复触发、无效/不存在地图、直接启动 Battle Map、两轮连续往返及 P4-002 组合生命周期回归；回传日志/截图/录屏或结构化结果。
+8. 用户独立提交资产并回传 hash，不与 Implementation/Reviewer 文档混合。
 
-## Build / Editor / PIE 验收
+## Build / Editor / PIE 验收矩阵
 
 ### Build 与静态
 
-- [ ] fresh Development Editor 退出码 0；UHT、全部新增 C++、Link 有保存证据，`up to date` 不冒充本轮构建。
-- [ ] Build.cs 只增加实际需要的 `AIModule`/`NavigationSystem`，无其他依赖或模块变化。
-- [ ] 无自定义 Gameplay Tick、世界扫描、每帧 MoveTo；Timer 仅用于一次性巡逻等待并能清理。
-- [ ] Definition 无 Runtime/World 状态；目标为弱引用；委托/Timer 生命周期安全。
+- [ ] fresh Development Editor 退出码 0；UHT、全部相关 C++、Link 有保留日志，`up to date` 不冒充 fresh。
+- [ ] DTO 无 Actor/World/UObject/ASC/Widget/Handle；Return payload 单次消费。
+- [ ] travel delegate Initialize/Deinitialize 对称；Timer 有界并在 EndPlay 清理；无自定义 Tick。
+- [ ] 全部 RequestEncounter 调用点显式传 initiative，且只有 Transition Subsystem OpenLevel。
 
-### Editor 重开与主路径
+### 三种 initiative 与往返
 
-- [ ] 重开后 Enemy DA/BP、AIController、Auto Possess AI、Perception、Encounter Definition、碰撞、NavMesh 与地图引用保持。
-- [ ] 有 NavMesh 时敌人 `Idle/PatrolWaiting → MovingToPatrol`，不会忙循环或每帧重发 MoveTo。
-- [ ] 发现玩家只建立一个有效目标并进入 `Alert/Chasing`；接近后只提交一次 P4-001 Request，进入 `EncounterPending`。
-- [ ] 至少一条完整 `探索敌人 → RequestEncounter → Map_BattleTest → First Consume SUCCESS / Second AlreadyConsumed` 主路径成立。
+- [ ] Player/Enemy/Neutral 三条路径分别消费正确 initiative，来源可解释且不由 Blueprint 核心逻辑推导。
+- [ ] 每条在 Battle Map Encounter 只消费一次；Return Context 只消费一次并恢复探索 Transform。
+- [ ] 至少两轮连续往返无旧 Request/Return、重复 Consumer/delegate/Timer 或旧 World 引用。
 
-### 失败与生命周期矩阵
+### 重复与失败恢复
 
-- [ ] **无 NavMesh：** 找点/MoveTo 可诊断失败，保持安全状态，不崩溃、不忙循环、不触发 Encounter。
-- [ ] **丢失目标：** 感知丢失后停止追击、清弱引用，安全返回 Idle/PatrolWaiting。
-- [ ] **目标销毁：** 追击中销毁/失效目标不访问悬挂对象，无 crash/ensure/GC warning。
-- [ ] **重复感知：** 同一目标重复 Updated 不产生重复 Timer、重复 MoveTo 风暴、重复 Encounter/OpenLevel。
-- [ ] **MoveTo Failed/Aborted：** 有结构化状态恢复，不立即无限重试。
-- [ ] **Definition/Encounter 缺失：** 不请求、不旅行，日志可定位稳定 Enemy ID/失败原因，修正后可重试。
-- [ ] **UnPossess/EndPlay：** Timer/委托/目标清理，第二轮 PIE 无残留回调。
+- [ ] 同帧/连续请求只有首个成功，第二个 `AlreadyPending`，首个 ID/initiative 不被覆盖且只有一次 travel。
+- [ ] Definition/ID/空地图/不存在软地图在旅行前失败且状态干净，修正后可重试。
+- [ ] 可控 travel failure 触发回调后从 Traveling 安全恢复，之后合法请求可成功；若无法在允许范围安全制造，保留真实边界并由 Reviewer决定 Gate，不伪造。
+- [ ] Battle Map 直接启动：Consume/Return 安全失败，不产生错误往返。
+- [ ] 返回地图/Transform 无效：不覆盖合法 Context，失败可诊断并可清理/重试。
 
-### 回归
+### P4-002 组合与全局回归
 
-- [ ] P4-001 A2 后 ExplorationMapPath、Consume 清 Payload、第二次空 DTO 的运行现象有至少一条新证据。
-- [ ] Move/Look/Jump、Exploration/UIOnly、Prompt、NoCandidate、目标销毁与 GAS HUD 正常。
-- [ ] 至少两轮 PIE 无旧 Request、重复回调、Error/Ensure/GC warning/Blueprint Runtime Error。
+- [ ] 保存一条覆盖至少三项的目标销毁/重复 Perception/MoveTo Failed-Aborted/UnPossess-RePossess 组合证据，未覆盖项明确列出。
+- [ ] Enemy 恢复后完成 Enemy initiative 往返，无重复 Request/OpenLevel。
+- [ ] Move/Look/Jump、Exploration/UIOnly、Prompt、NoCandidate、GAS HUD 正常。
+- [ ] 无未解释 Error/Ensure/Fatal/GC warning/Blueprint Runtime Error。
 
 ## 停止条件
 
-- 需要修改 P4-001 Battle/Encounter/Graybox、Character/Interaction/UI/GAS/Config 或白名单外文件。
-- UE5.6 AI/Perception/Navigation API 无法由实际头文件或编译确认。
-- 需要 Behavior Tree/EQS/新插件/模块、网络、正式战斗或返回逻辑。
-- Build 非 0 或 Editor 资产实际路径与白名单不同。
+- 需要修改 Definition schema、Enemy Character、Character/Interaction/UI/GAS/Config/Build.cs 或白名单外文件。
+- UE5.6 travel failure delegate/package validation API 无法由实际头文件或编译证据确认。
+- 需要 BattleResult、胜负、奖励、正式返回、TurnManager、Battle Actor/ASC、新模块/插件或网络。
+- Build 非 0、资产真实路径与白名单不一致或无法安全复现失败。
 
-出现任一条件立即保留第一处证据并请求 Coordinator/用户扩权，不得自行绕过。
+出现任一条件立即保留第一处真实证据并请求 Coordinator/用户授权，不得绕过或伪造。
 
 ## 明确非目标
 
-- 多敌人、多候选、队伍、复杂巡逻路线、视野 UI、攻击动画或战斗 AI。
-- 三种 initiative、旅行失败恢复、测试返回与连续往返（P4-003）。
-- Battle Actor/ASC、TurnManager、Ability、伤害、胜负、奖励、BattleResult、正式返回（Phase 5）。
-- SaveGame、正式美术/音频/VFX、第三方资产、RPC/Replication/Prediction。
+- Phase 5 BattleResult 驱动的正式战后返回、Battle Actor/ASC、TurnManager、攻击、胜负、奖励。
+- 多敌群、多队伍、复杂 initiative 公式、中途战斗存档、SaveGame。
+- 正式 UI/动画/音频/VFX、第三方资产、联网。
+- P4-004 的最终教学、独立全阶段审查和 Phase 4 Ready 归档。
 
 ## 执行后职责与 Git
 
 - Implementation 只更新 `tasks/execution-result.md`，不得更新本卡/长期状态或自行判 `PASS`。
-- Reviewer 后续只更新 `tasks/final-review.md`；Coordinator 审查后归档和同步。
-- 各角色只提交自己的真实产物；本卡不授权 Implementation 执行 Git。任务中途不 push。
+- Reviewer 后续只更新 `tasks/final-review.md`；Coordinator 审查后归档并创建 P4-004，而不是 Phase 5。
+- 本卡不授权 Implementation 执行 Git；任务中途不 push，各角色只提交自己的真实产物。
 
 ## 当前唯一下一步
 
-Implementation Agent 首次只读复述本卡并逐字等待用户二次确认。确认前不得调用工具或实施；不得自动进入 P4-003 或 Phase 5。
+Implementation Agent 首次只读复述本卡并逐字等待用户二次确认。确认前不得调用工具、实施或执行 Git；不得自动进入 P4-004 或 Phase 5。

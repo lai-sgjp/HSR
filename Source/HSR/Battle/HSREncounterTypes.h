@@ -38,6 +38,7 @@ enum class EHSREncounterReturnResultType : uint8
 {
 	Success UMETA(DisplayName = "Success"),
 	NothingPending UMETA(DisplayName = "Nothing Pending"),
+	AlreadyPending UMETA(DisplayName = "Already Pending"),
 	AlreadyConsumed UMETA(DisplayName = "Already Consumed"),
 	InvalidReturnContext UMETA(DisplayName = "Invalid Return Context")
 };
@@ -136,6 +137,9 @@ struct FHSRExplorationReturnResult
 	FText Message;
 
 	FHSRExplorationReturnResult() = default;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Return")
+	FHSRExplorationReturnContext ConsumedContext;
 
 	static FHSRExplorationReturnResult MakeSuccess()
 	{

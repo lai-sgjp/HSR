@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "HSREncounterTypes.h"
+#include "Engine/EngineBaseTypes.h"
 #include "HSRBattleTransitionSubsystem.generated.h"
 
 class UHSREncounterDefinition;
@@ -14,6 +15,7 @@ class HSR_API UHSRBattleTransitionSubsystem : public UGameInstanceSubsystem
 
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
 
 	UFUNCTION(BlueprintCallable, Category = "Encounter")
 	FHSREncounterResult RequestEncounter(UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative);
@@ -39,9 +41,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Return")
 	bool HasReturnPending() const { return bReturnPending; }
 
-	UFUNCTION(BlueprintPure, Category = "Return")
-	const FHSRExplorationReturnContext& GetReturnContext() const { return PendingReturnContext; }
-
+	void HandleTravelFailure(UWorld* InWorld, ETravelFailure::Type FailureType, const FString& ErrorString);
 
 private:
 	EHSREncounterState CurrentState;
