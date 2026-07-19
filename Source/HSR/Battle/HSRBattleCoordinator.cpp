@@ -8,24 +8,20 @@
 #include "AbilitySystemComponent.h"
 #include "AttributeSet.h"
 
-FHSRBattleResult UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRequest)
+bool SubmitBattleRequest(const FHSREncounterRequest& InRequest)
 {
 	if (CurrentState != EHSRBattleCoordinatorState::Idle)
 	{
 		UE_LOG(LogTemp, Warning,
 			TEXT("UHSRBattleCoordinator::SubmitBattleRequest - REJECTED state=%d RequestId=%s (expected Idle)"),
 			static_cast<int32>(CurrentState), *InRequest.RequestId.ToString());
-		return FHSRBattleResult::MakeFailure(
-			FText::Format(NSLOCTEXT("HSRBattle", "CoordinatorNotIdle", "Coordinator is not Idle (state={0})"),
-				FText::AsNumber(static_cast<int32>(CurrentState))));
-	}
+		return false;
 
 	if (!InRequest.RequestId.IsValid())
 	{
 		UE_LOG(LogTemp, Warning,
 			TEXT("UHSRBattleCoordinator::SubmitBattleRequest - REJECTED invalid RequestId"));
-		return FHSRBattleResult::MakeFailure(
-			FText::FromString(TEXT("Invalid RequestId in encounter request.")));
+		return false;
 	}
 
 	if (InRequest.EncounterId.IsNone())
@@ -33,8 +29,7 @@ FHSRBattleResult UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterR
 		UE_LOG(LogTemp, Warning,
 			TEXT("UHSRBattleCoordinator::SubmitBattleRequest - REJECTED EncounterId=None RequestId=%s"),
 			*InRequest.RequestId.ToString());
-		return FHSRBattleResult::MakeFailure(
-			FText::FromString(TEXT("EncounterId is None.")), InRequest.RequestId);
+		return false;
 	}
 
 	if (InRequest.EnemyDefinitionId.IsNone())
@@ -42,8 +37,7 @@ FHSRBattleResult UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterR
 		UE_LOG(LogTemp, Warning,
 			TEXT("UHSRBattleCoordinator::SubmitBattleRequest - REJECTED EnemyDefinitionId=None RequestId=%s"),
 			*InRequest.RequestId.ToString());
-		return FHSRBattleResult::MakeFailure(
-			FText::FromString(TEXT("EnemyDefinitionId is None.")), InRequest.RequestId);
+		return false;
 	}
 
 	if (InRequest.BattleMapPath.IsNone())
@@ -51,8 +45,7 @@ FHSRBattleResult UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterR
 		UE_LOG(LogTemp, Warning,
 			TEXT("UHSRBattleCoordinator::SubmitBattleRequest - REJECTED BattleMapPath=None RequestId=%s"),
 			*InRequest.RequestId.ToString());
-		return FHSRBattleResult::MakeFailure(
-			FText::FromString(TEXT("BattleMapPath is None.")), InRequest.RequestId);
+		return false;
 	}
 
 	// Build pure-value ReturnContext from the consumed request
@@ -74,20 +67,17 @@ FHSRBattleResult UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterR
 		*InRequest.EnemyDefinitionId.ToString(), *InRequest.BattleMapPath.ToString(),
 		*InRequest.ExplorationMapPath.ToString());
 
-	return FHSRBattleResult::MakeSuccess(InRequest.RequestId);
+	return true;
 }
 
-FHSRBattleResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
+bool BuildParticipants(UWorld* BattleWorld)
 {
 	if (CurrentState != EHSRBattleCoordinatorState::Consuming)
 	{
 		UE_LOG(LogTemp, Warning,
 			TEXT("UHSRBattleCoordinator::BuildParticipants - REJECTED state=%d RequestId=%s (expected Consuming)"),
 			static_cast<int32>(CurrentState), *CurrentRequestId.ToString());
-		return FHSRBattleResult::MakeFailure(
-			FText::Format(NSLOCTEXT("HSRBattle", "BuildNotConsuming", "Coordinator is not in Consuming state (state={0})"),
-				FText::AsNumber(static_cast<int32>(CurrentState))),
-			CurrentRequestId);
+		return false;
 	}
 
 	if (!BattleWorld)
@@ -96,8 +86,7 @@ FHSRBattleResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
 			TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED BattleWorld=null RequestId=%s EncounterId=%s"),
 			*CurrentRequestId.ToString(), *CurrentEncounterId.ToString());
 		CurrentState = EHSRBattleCoordinatorState::Failed;
-		return FHSRBattleResult::MakeFailure(
-			FText::FromString(TEXT("Battle World is null.")), CurrentRequestId);
+		return false;
 	}
 
 	// Clear previous participants
@@ -111,8 +100,7 @@ FHSRBattleResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
 			TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED spawn PlayerActor RequestId=%s EncounterId=%s"),
 			*CurrentRequestId.ToString(), *CurrentEncounterId.ToString());
 		CurrentState = EHSRBattleCoordinatorState::Failed;
-		return FHSRBattleResult::MakeFailure(
-			FText::FromString(TEXT("Failed to spawn player participant actor.")), CurrentRequestId);
+		return false;
 	}
 
 	if (!InitParticipantASC(PlayerActor))
@@ -122,8 +110,7 @@ FHSRBattleResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
 			*CurrentRequestId.ToString(), *CurrentEncounterId.ToString());
 		PlayerActor->Destroy();
 		CurrentState = EHSRBattleCoordinatorState::Failed;
-		return FHSRBattleResult::MakeFailure(
-			FText::FromString(TEXT("Failed to initialize ASC on player participant.")), CurrentRequestId);
+		return false;
 	}
 
 	FHSRBattleParticipant PlayerParticipant;
@@ -149,8 +136,7 @@ FHSRBattleResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
 		PlayerActor->Destroy();
 		Participants.Empty();
 		CurrentState = EHSRBattleCoordinatorState::Failed;
-		return FHSRBattleResult::MakeFailure(
-			FText::FromString(TEXT("Failed to spawn enemy participant actor.")), CurrentRequestId);
+		return false;
 	}
 
 	if (!InitParticipantASC(EnemyActor))
@@ -162,8 +148,7 @@ FHSRBattleResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
 		PlayerActor->Destroy();
 		Participants.Empty();
 		CurrentState = EHSRBattleCoordinatorState::Failed;
-		return FHSRBattleResult::MakeFailure(
-			FText::FromString(TEXT("Failed to initialize ASC on enemy participant.")), CurrentRequestId);
+		return false;
 	}
 
 	FHSRBattleParticipant EnemyParticipant;
@@ -186,7 +171,7 @@ FHSRBattleResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
 		*CurrentRequestId.ToString(), *CurrentEncounterId.ToString(),
 		*CurrentEnemyDefinitionId.ToString(), Participants.Num());
 
-	return FHSRBattleResult::MakeSuccess(CurrentRequestId);
+	return true;
 }
 
 void UHSRBattleCoordinator::Reset()

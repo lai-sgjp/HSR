@@ -41,26 +41,26 @@ void AHSRBattleGameMode::BeginPlay()
 	}
 
 	// Submit the consumed request to the Coordinator (exactly-once validation)
-	FHSRBattleResult SubmitResult = Coordinator->SubmitBattleRequest(ConsumeResult.ConsumedRequest);
-	if (!SubmitResult.bSuccess)
+	bool bSubmitResult = Coordinator->SubmitBattleRequest(ConsumeResult.ConsumedRequest);
+	if (!bSubmitResult)
 	{
 		UE_LOG(LogTemp, Error,
 			TEXT("AHSRBattleGameMode::BeginPlay - SubmitBattleRequest FAILED: %s (RequestId=%s)"),
-			*SubmitResult.Message.ToString(), *SubmitResult.RequestId.ToString());
+			"see Coordinator log above", *Coordinator->GetCurrentRequestId().ToString());
 		return;
 	}
 
 	UE_LOG(LogTemp, Log,
 		TEXT("AHSRBattleGameMode::BeginPlay - SubmitBattleRequest SUCCESS RequestId=%s"),
-		*SubmitResult.RequestId.ToString());
+		*Coordinator->GetCurrentRequestId().ToString());
 
 	// Build participants in the Battle World
-	FHSRBattleResult BuildResult = Coordinator->BuildParticipants(GetWorld());
-	if (!BuildResult.bSuccess)
+	bool bBuildResult = Coordinator->BuildParticipants(GetWorld());
+	if (!bBuildResult)
 	{
 		UE_LOG(LogTemp, Error,
 			TEXT("AHSRBattleGameMode::BeginPlay - BuildParticipants FAILED: %s (RequestId=%s)"),
-			*BuildResult.Message.ToString(), *BuildResult.RequestId.ToString());
+			"see Coordinator log above", *Coordinator->GetCurrentRequestId().ToString());
 		return;
 	}
 

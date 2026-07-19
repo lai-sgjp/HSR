@@ -76,36 +76,4 @@ struct FHSRBattleRequestContext
 	FHSRBattleRequestContext() = default;
 };
 
-USTRUCT(BlueprintType)
-struct FHSRBattleResult
-{
-	GENERATED_BODY()
-
-	UPROPERTY(BlueprintReadOnly, Category = "Battle")
-	bool bSuccess = false;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Battle")
-	FGuid RequestId;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Battle")
-	FText Message;
-
-	FHSRBattleResult() = default;
-
-	static FHSRBattleResult MakeSuccess(const FGuid& InRequestId)
-	{
-		FHSRBattleResult Result;
-		Result.bSuccess = true;
-		Result.RequestId = InRequestId;
-		return Result;
-	}
-
-	static FHSRBattleResult MakeFailure(const FText& InMessage, const FGuid& InRequestId = FGuid())
-	{
-		FHSRBattleResult Result;
-		Result.bSuccess = false;
-		Result.RequestId = InRequestId;
-		Result.Message = InMessage;
-		return Result;
-	}
 };

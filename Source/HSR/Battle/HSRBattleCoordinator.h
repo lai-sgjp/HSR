@@ -25,10 +25,10 @@ public:
 	FGuid GetCurrentRequestId() const { return CurrentRequestId; }
 
 	/** Submit a consumed encounter request exactly once. Rejects duplicate RequestId. */
-	FHSRBattleResult SubmitBattleRequest(const struct FHSREncounterRequest& InRequest);
+	bool SubmitBattleRequest(const struct FHSREncounterRequest& InRequest);
 
 	/** Spawn player + enemy actors and initialize their ASC in the Battle World. */
-	FHSRBattleResult BuildParticipants(UWorld* BattleWorld);
+	bool BuildParticipants(UWorld* BattleWorld);
 
 	/** Pure-value return context for later travel back to exploration. */
 	const FHSRBattleReturnContext& GetReturnContext() const { return ReturnContext; }
