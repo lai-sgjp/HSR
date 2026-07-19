@@ -1473,3 +1473,13 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 用户确认 invalid-but-nonempty DefinitionId 失败路径正常，作为 `USER PROVIDED` 证据记录。
 - TASK-P5-001 最终 Reviewer 结论更新为 `PASS`，活动卡已归档。
 - 创建唯一 `TASK-P5-002` 活动卡：TurnManager、Speed 降序稳定同速裁决、一次性 ActionResolved、无 Tick；等待用户独立确认。
+## 2026-07-19｜Coordinator：授权 P5-002 最小测试入口
+
+- 根据 Reviewer 的 `PASS WITH FOLLOW-UP`，授权 P5-002 增加 Development/Editor/PIE 专用最小测试入口。
+- 测试范围锁定为 Speed 排序、同速 tie-break、ActionResolved 合法/重复/越权/失效 Actor、Reset/空队列；不扩展到 UI、Ability、伤害、胜负、SaveGame、网络或 Tick。
+- 执行者需先提交代码和执行报告，再由用户按详细指引完成 PIE 验证，之后重新交 Reviewer。
+## 2026-07-19｜Coordinator：TASK-P5-002 最终审查与归档准备
+
+- 两轮用户 PIE 日志均显示 9 项 TurnTest 全部 PASS、Harness=COMPLETE、Map_Battle teardown 正常；Build 已 exit 0。
+- Reviewer 结论为 `PASS WITH FOLLOW-UP`，证据等级保持 `USER PROVIDED`。
+- P5-002 可归档；P5-003 需新的活动卡和用户确认，不自动创建。

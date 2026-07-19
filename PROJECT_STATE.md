@@ -474,3 +474,14 @@
 - 用户确认 invalid-but-nonempty DefinitionId 失败路径正常，证据等级为 `USER PROVIDED`。
 - TASK-P5-001 最终状态为 `PASS`，活动卡已归档至 `tasks/archive/TASK-P5-001-active-task.md`。
 - 已创建唯一 `TASK-P5-002` 活动卡，目标为无 Tick、Speed 稳定排序和一次性 ActionResolved 的 TurnManager；等待用户确认执行。
+## 2026-07-19 P5-002 测试入口授权
+
+- Coordinator 根据 Reviewer follow-up 授权一个最小 Development/Editor/PIE 测试入口。
+- 入口只用于 Speed、ActionResolved 合法/重复/越权/失效 Actor、Reset/空队列验证；禁止 UI、Ability、伤害、胜负、SaveGame、网络和 Tick。
+- 执行者必须先提交测试入口代码，再提供用户 PIE 详细步骤；未完成证据前不得创建 P5-003。
+## 2026-07-19 P5-002 最终审查
+
+- P5-002 Reviewer 结论为 `PASS WITH FOLLOW-UP`。
+- 两轮用户 PIE 均完成 9 项 TurnTest、Harness=COMPLETE 和 Map_Battle teardown；fresh Build exit 0/UHT/C++/Link 5 actions。
+- 证据等级为 `USER PROVIDED`；后续 Ability/伤害/胜负/UI/网络不属于 P5-002。
+- P5-002 活动卡已归档；P5-003 需用户另行确认后创建。
