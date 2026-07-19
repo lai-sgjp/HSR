@@ -31,17 +31,6 @@ enum class EHSRBattleInitFailureType : uint8
 };
 
 UENUM(BlueprintType)
-enum class EHSRBattleInitFailureType : uint8
-{
-	None UMETA(DisplayName = "None"),
-	DefinitionNotFound UMETA(DisplayName = "Definition Not Found"),
-	DefinitionTypeMismatch UMETA(DisplayName = "Definition Type Mismatch"),
-	ClassLoadFailed UMETA(DisplayName = "Class Load Failed"),
-	SpawnFailed UMETA(DisplayName = "Spawn Failed"),
-	InitFailed UMETA(DisplayName = "ASC Init Failed")
-};
-};
-
 USTRUCT(BlueprintType)
 struct FHSRBattleParticipantDefinition
 {
