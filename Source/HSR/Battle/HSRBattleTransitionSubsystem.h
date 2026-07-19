@@ -8,6 +8,14 @@
 
 class UHSREncounterDefinition;
 
+UENUM()
+enum class EHSRTravelKind : uint8
+{
+	None,
+	Encounter,
+	Return
+};
+
 UCLASS()
 class HSR_API UHSRBattleTransitionSubsystem : public UGameInstanceSubsystem
 {
@@ -51,4 +59,6 @@ private:
 	FHSREncounterRequest PendingRequest;
 	FHSRExplorationReturnContext PendingReturnContext;
 	bool bReturnPending;
+	EHSRTravelKind TravelKind;
+	FName TravelTargetMap;
 };

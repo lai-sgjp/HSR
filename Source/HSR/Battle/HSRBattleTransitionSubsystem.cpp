@@ -9,6 +9,7 @@ void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collect
 	Super::Initialize(Collection);
 	CurrentState = EHSREncounterState::Empty;
 	bReturnPending = false;
+	TravelKind = EHSRTravelKind::None;
 
 	if (GEngine)
 	{
@@ -173,6 +174,8 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::ConsumePendingEncounter()
 	// Immediately clear internal payload (consume invariant: payload is no longer readable)
 	PendingRequest = FHSREncounterRequest();
 	CurrentState = EHSREncounterState::Consumed;
+	TravelKind = EHSRTravelKind::None;
+	TravelTargetMap = NAME_None;
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ConsumePendingEncounter - SUCCESS RequestId=%s EncounterId=%s EnemyDefId=%s"),
 		*Consumed.RequestId.ToString(), *Consumed.EncounterId.ToString(), *Consumed.EnemyDefinitionId.ToString());
@@ -197,6 +200,8 @@ void UHSRBattleTransitionSubsystem::ClearPending()
 
 	CurrentState = EHSREncounterState::Empty;
 	PendingRequest = FHSREncounterRequest();
+	TravelKind = EHSRTravelKind::None;
+	TravelTargetMap = NAME_None;
 }
 
 bool UHSRBattleTransitionSubsystem::HasPending() const
@@ -209,28 +214,35 @@ void UHSRBattleTransitionSubsystem::ClearReturn()
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ClearReturn - Clearing Return context"));
 	PendingReturnContext = FHSRExplorationReturnContext();
 	bReturnPending = false;
+	TravelKind = EHSRTravelKind::None;
+	TravelTargetMap = NAME_None;
 }
 
 void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravelFailure::Type FailureType, const FString& ErrorString)
 {
-	UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - type=%d Error=%s World=%s"),
-		static_cast<int32>(FailureType), *ErrorString, InWorld ? *InWorld->GetName() : TEXT("null"));
+	UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - type=%d Error=%s World=%s TargetMap=%s"),
+		static_cast<int32>(FailureType), *ErrorString, InWorld ? *InWorld->GetName() : TEXT("null"), *TravelTargetMap.ToString());
 
-	// Clean up Encounter state if we were Traveling
-	if (CurrentState == EHSREncounterState::Traveling)
+	// Only clear the matching pending transaction (not unrelated new requests)
+	if (TravelKind == EHSRTravelKind::Encounter)
 	{
 		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - Clearing Encounter state (RequestId=%s)"),
 			*PendingRequest.RequestId.ToString());
 		ClearPending();
 	}
-
-	// Clean up Return state if we have a pending return
-	if (bReturnPending)
+	else if (TravelKind == EHSRTravelKind::Return)
 	{
 		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - Clearing Return context"));
-		PendingReturnContext = FHSRExplorationReturnContext();
-		bReturnPending = false;
+		ClearReturn();
 	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - No matching pending transaction, ignoring"));
+	}
+
+	// Clear travel tracking
+	TravelKind = EHSRTravelKind::None;
+	TravelTargetMap = NAME_None;
 }
 
 
@@ -253,25 +265,42 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestTestReturn(con
 			FText::FromString(TEXT("No exploration map path in return context.")));
 	}
 
+	// Also reject invalid RequestId
+	if (!FromConsumedRequest.RequestId.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - FAILED InvalidReturnContext (invalid RequestId)"));
+		return FHSRExplorationReturnResult::MakeFailure(
+			EHSREncounterReturnResultType::InvalidReturnContext,
+			FText::FromString(TEXT("Invalid RequestId in return context.")));
+	}
+
 	// Build pure-data return context from consumed request
 	FHSRExplorationReturnContext ReturnCtx;
 	ReturnCtx.RequestId = FromConsumedRequest.RequestId;
 	ReturnCtx.ExplorationMapPath = FromConsumedRequest.ExplorationMapPath;
 	ReturnCtx.ReturnTransform = FromConsumedRequest.ReturnTransform;
 
+	// Check World availability BEFORE writing Pending
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - FAILED: no World, rejecting"));
+		return FHSRExplorationReturnResult::MakeFailure(
+			EHSREncounterReturnResultType::InvalidReturnContext,
+			FText::FromString(TEXT("Cannot resolve World for travel.")));
+	}
+
 	PendingReturnContext = ReturnCtx;
 	bReturnPending = true;
 
-	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - SUCCESS RequestId=%s ExplorationMap=%s"),
+	TravelKind = EHSRTravelKind::Return;
+	TravelTargetMap = ReturnCtx.ExplorationMapPath;
+
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - SUCCESS RequestId=%s ExplorationMap=%s (kind=Return)"),
 		*ReturnCtx.RequestId.ToString(), *ReturnCtx.ExplorationMapPath.ToString());
 
-	// Travel back to exploration map
-	UWorld* World = GetWorld();
-	if (World)
-	{
-		UGameplayStatics::OpenLevel(World, ReturnCtx.ExplorationMapPath, true);
-		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - Traveling back to %s"), *ReturnCtx.ExplorationMapPath.ToString());
-	}
+	UGameplayStatics::OpenLevel(World, ReturnCtx.ExplorationMapPath, true);
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - Traveling back to %s"), *ReturnCtx.ExplorationMapPath.ToString());
 
 	return FHSRExplorationReturnResult::MakeSuccess();
 }
@@ -290,6 +319,8 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::ConsumeReturnContext(
 	FHSRExplorationReturnContext Consumed = PendingReturnContext;
 	PendingReturnContext = FHSRExplorationReturnContext();
 	bReturnPending = false;
+	TravelKind = EHSRTravelKind::None;
+	TravelTargetMap = NAME_None;
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ConsumeReturnContext - SUCCESS RequestId=%s ReturnLoc=%s"),
 		*Consumed.RequestId.ToString(), *Consumed.ReturnTransform.GetLocation().ToString());
