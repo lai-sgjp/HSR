@@ -1,90 +1,88 @@
-# TASK-P4-004 Independent Reviewer Final Review
+# TASK-P4-004 Independent Reviewer Final Re-review
 
 > Date: 2026-07-19
-> Review mode: read-only evidence review
-> Final verdict: `REVISE`
-> Phase 4 disposition: `Not verified`
+> Review mode: read-only evidence and role-chain re-review
+> Final verdict: `PASS WITH FOLLOW-UP`
+> Phase 4 gate: `Ready with inherited follow-ups`
 
 ## 1. Final Verdict
 
-`TASK-P4-004` is **`REVISE`**. Phase 4 remains **`Not verified`**.
+`TASK-P4-004` final re-review is **`PASS WITH FOLLOW-UP`**. The Phase 4 engineering, evidence, teaching, and independent-review gate is released as **`Ready with inherited follow-ups`**.
 
-This is a closeout-evidence and document-consistency finding, not a new engineering failure finding. The Reviewer did not run Build, Editor, PIE, Automation, or network actions and did not modify Source, Content, or Config. Existing P4-001 through P4-003 conclusions remain exactly `PASS WITH FOLLOW-UP`; their `USER ACCEPTED`, deferred, report-level, and unverified boundaries are not upgraded to dynamic verification.
+This does not upgrade any accepted, deferred, report-level, or User-provided evidence into Reviewer dynamic verification. The Reviewer did not run Build, Editor, PIE, Automation, or network actions and did not modify Source, Content, or Config.
 
-The Teacher record now exists in `learning-journal.md`, including the user's original answers, corrections, mastery items, review items, Phase 4/5 boundary, and evidence-level teaching. However, the current P4-004 execution report and all primary status documents still state that the Teacher artifact has not been produced. P4-003 archive files and all P4-004/Teacher/status changes are also not represented by role commits in the current commit history. Therefore the required auditable closeout chain is internally inconsistent and cannot be declared `Ready`.
+Coordinator may now archive TASK-P4-004, synchronize the final `Ready` state, retain the evidence summaries and accepted/deferred boundaries, clean only redundant Build-log artifacts whose critical evidence has already been preserved, create the distinct Phase 4 closeout commit, and record the actual non-force push result. Phase 5 must not begin until that closeout commit and push result are recorded truthfully.
 
-## 2. Findings Requiring Revision
+## 2. Closure of the Previous REVISE Findings
 
-### R1 — Execution report contradicts the Teacher artifact
+### R1 — Execution report / Teacher contradiction: closed
 
-`tasks/execution-result.md` says the Teacher record has not been produced and lists Teacher as a future role. In contrast, `learning-journal.md` contains the completed Phase 4 teaching sequence and preserves the user's original answers, including:
+Verification commit `df903cc89cae9dab68bca7ca4b69cc6bafa4ad30` modifies only `tasks/execution-result.md`. It now acknowledges that the Teacher artifact exists, distinguishes the separate role products, preserves Phase 4 as pre-review `Not verified`, and creates no new runtime claim.
 
-- `B,A 均正确。` for duplicate Pending and initiative;
-- `b,a 均正确。` for invalid-map Pending and ReturnContext second consumption;
-- `B,B 均正确。` for the Phase 5 TurnManager boundary and User evidence level.
+### R2 — Primary status synchronization: closed for Reviewer release
 
-The report must be synchronized to the real evidence without rewriting any prior runtime conclusion.
+Coordinator commit `0e8d99f563d8ff0abeec462f42ba5049b9fbebd8` updates only Coordinator-owned status/active-task files and adds the three P4-003 archive files. `PROJECT_STATE.md`, `README.md`, `todo_plan.md`, `worklog.md`, and `docs/phase-4-execution-plan.md` consistently record the Teacher artifact, the prior Reviewer `REVISE`, preserved evidence boundaries, and the pre-final-review `Not verified` state.
 
-### R2 — Primary status documents are stale after Teacher completion
+Some current-summary wording still says role commits are awaited. The role commits now exist, so Coordinator must replace that pre-review wording during final archive/phase synchronization. This is a bounded closeout follow-up, not a remaining evidence blocker, because the real hashes and exact file sets are independently verified below and Coordinator could not pre-fill this final Reviewer verdict.
 
-`PROJECT_STATE.md`, `README.md`, `todo_plan.md`, `worklog.md`, and `docs/phase-4-execution-plan.md` still say Teacher has not started or that Teacher output is missing. Those statements are now false. They must distinguish:
+### R3 — Archive and role-commit chain: closed
 
-- Teacher artifact: produced, currently uncommitted;
-- Independent Reviewer result: this `REVISE`;
-- Coordinator archive/phase closeout: not complete;
-- Phase 4: `Not verified`, not `Ready` and not `Blocked`.
+The required independent commits exist in order:
 
-### R3 — Archive and role-commit chain is not closed
+- Verification `df903cc`: only `tasks/execution-result.md`.
+- Teacher `48e754ac0c0c84e2a2512b76f29601ebf95a1907`: only `.agents/agents.md`, `docs/battle-system-design.md`, `docs/data-asset-guidelines.md`, and `learning-journal.md`.
+- Reviewer REVISE `be0719961b33c9799d3c425ece9695cafcba09cc`: only `tasks/final-review.md`.
+- Coordinator `0e8d99f`: only `PROJECT_STATE.md`, `README.md`, `docs/phase-4-execution-plan.md`, `tasks/active-task.md`, `todo_plan.md`, `worklog.md`, plus the three P4-003 archive files.
 
-The filesystem contains all three P4-003 archive files, but Git reports them as untracked. The current history ends at implementation commit `7bbd0d4`; it contains no P4-003 archive commit, P4-004 verification commit, Phase 4 Teacher commit, or P4-004 Reviewer commit. The project rule requiring distinct role authorship/commits and a later Coordinator phase-close commit therefore has not yet been satisfied.
+The tracked P4-003 archive contains active-task, execution-result, and final-review. Its final conclusion remains `PASS WITH FOLLOW-UP / ARCHIVED` with all user-accepted/deferred boundaries intact.
 
-This Reviewer does not stage, commit, push, or infer a successful remote delivery. Coordinator must record real hashes and the real push result separately before Phase 5 begins.
+### R4 — Worktree classification: closed with cleanup follow-up
 
-### R4 — Worktree is not a clean phase-close snapshot
+Git still reports `Source/HSR/Player/HSRPlayerController.cpp` as modified, but ordinary diff, raw diff, and numstat are empty; `git diff --quiet` returns success, and the documented index/worktree blob comparison is identical. This is stat/index noise. Coordinator must not stage, restore, or attribute it to P4-004.
 
-The worktree contains multiple modified Markdown files, untracked P4-003 archive files, and untracked P4 Build-log artifacts. `Source/HSR/Player/HSRPlayerController.cpp` is also reported modified by Git, although the ordinary unstaged textual diff shown during this review was empty. It must be classified by Coordinator before staging; it must not be silently attributed to P4-004 or included in a documentation-only role commit.
+The remaining untracked `Build-Log-P4-003-*` files are derived evidence artifacts, not missing source changes. They must not enter role or phase commits. Under the recorded user rule, Coordinator may remove only redundant copies after retaining the accepted one-A4c-build summary, critical errors/time chain, and evidence grades. No log was deleted by Reviewer.
 
-`git diff --check` additionally reports Markdown whitespace/EOF hygiene issues. These are not gameplay defects, but should be corrected within the authorized Markdown set before the closeout commit.
-
-## 3. Preserved P4-001 to P4-003 Evidence Boundaries
+## 3. Preserved Evidence Boundaries
 
 ### P4-001 — `PASS WITH FOLLOW-UP`
 
-- A2 UHT/C++/Link evidence remains accepted at the archived review level.
-- A2-after Editor reopen/PIE and its runtime matrix remain absent.
-- The user explicitly accepted that gap; it is not Reviewer dynamic verification.
+- A2 UHT/C++/Link remains supported at the archived-review level.
+- A2-after Editor reopen/PIE matrix remains absent and `USER ACCEPTED`.
+- This is not Reviewer dynamic verification.
 
 ### P4-002 — `PASS WITH FOLLOW-UP`
 
-- The A1 full Build log was deleted; the Build claim remains report/time-chain level.
-- The 02:07 PIE material remains User-provided runtime evidence.
-- Target destruction, repeated perception, MoveTo Failed/Aborted, and standalone UnPossess/Re-Possess remain follow-ups.
-- The post-hoc BP path acceptance, reverted map save, mixed commit, and same-Git-identity boundaries remain preserved.
+- The A1 complete Build log remains deleted; its Build statement remains report/time-chain level.
+- The 02:07 PIE remains User-provided evidence.
+- BP path post-acceptance, reverted map save, mixed commit, same Git identity, target destruction, repeated perception, MoveTo Failed/Aborted, and standalone UnPossess/Re-Possess boundaries remain preserved.
 
 ### P4-003 — `PASS WITH FOLLOW-UP`
 
-- Only one A4c Build log is directly locatable for the accepted build claim; prior wording suggesting two Builds is not upgraded.
-- The combined P4-002 matrix remains static guards plus `1 of 4 dynamic`, never “4/4 resolved.”
-- HandleTravelFailure, AlreadyPending, invalid RequestId, World=null, retry-after-failure, target destruction, repeated perception, and MoveTo Failed remain `USER ACCEPTED`/deferred and unverified dynamically.
-- Existing User PIE supports the main encounter/return path, three initiative values, Return Transform restoration, repeated round trips, second-consume behavior, and UnPossess/Re-Possess only at its recorded evidence level.
+- Exactly one A4c Build is directly locatable for the accepted claim; previous two-Build wording is not promoted.
+- The P4-002 combination remains static guards plus `1 of 4 dynamic`, never “4/4 resolved.”
+- HandleTravelFailure, AlreadyPending, invalid RequestId, World=null, retry after failure, target destruction, repeated perception, and MoveTo Failed remain `USER ACCEPTED`/deferred and dynamically unverified.
+- User PIE supports the recorded main encounter/return path, three initiative values, Return Transform restoration, repeated round trips, second-consume behavior, and UnPossess/Re-Possess only at its stated User evidence level.
 
-## 4. Architecture and Phase Boundary
+## 4. Teacher and Phase Boundary
 
-The reviewed records preserve the intended Phase 4 boundary: pure-value Encounter/Return contexts, no cross-map Actor/ASC/Widget ownership, event-driven exploration AI, and no new Gameplay/UI Tick claim. No reviewed P4-004 material claims Replication, RPC, Prediction, or a completed GAS battle loop.
+Teacher commit `48e754a` preserves the user's original answers before correction, including `B,A 均正确。`, `b,a 均正确。`, and `B,B 均正确。`; it records mastery, correction/review items, evidence levels, and the difference between Phase 4 test return and Phase 5 formal battle return.
 
-Phase 5 remains out of scope: Battle Actor/ASC reconstruction, TurnManager, abilities, damage, victory/defeat, rewards, BattleResult, and formal post-battle return must not begin merely because P4-001 through P4-003 were individually released.
+Phase 4 remains limited to exploration Enemy/AI, Encounter definitions and pure-value requests, the transition subsystem, independent empty Battle Map consumption, and test return. No reviewed closeout material adds or claims Battle Actor/ASC reconstruction, TurnManager, abilities, damage, victory/defeat, rewards, BattleResult, Replication, RPC, or Prediction.
 
-## 5. Required Revision Sequence
+## 5. Coordinator Closeout Conditions
 
-1. Update `tasks/execution-result.md` to acknowledge the real Teacher artifact and preserve its original-answer/correction/mastery trail.
-2. Synchronize `PROJECT_STATE.md`, `README.md`, `todo_plan.md`, `worklog.md`, and `docs/phase-4-execution-plan.md` to this Reviewer `REVISE` and Phase 4 `Not verified` state.
-3. Preserve every P4-001 through P4-003 follow-up, `USER ACCEPTED`, deferred item, deleted/missing log fact, and evidence grade without promotion.
-4. Resolve the archive tracking and role-authorship chain using real, separate commits; classify the reported PlayerController worktree state before staging.
-5. Return the synchronized evidence to Independent Reviewer. Only after Reviewer release may Coordinator archive P4-004, decide Phase 4 disposition, create the phase-close commit, and record the actual non-force push result.
+Coordinator is released to perform the remaining closeout sequence:
+
+1. Archive P4-004 active-task, execution-result, and this final-review without deleting the historical `REVISE` chain.
+2. Synchronize all current-status summaries from pre-review `Not verified`/“waiting role commits” to `Ready with inherited follow-ups`, while preserving every evidence grade and user disposition.
+3. Keep the PlayerController stat-noise file out of staging and do not restore it as part of this task.
+4. Exclude derived Build logs from commits; after preserving the accepted evidence summary, clean only redundant Build-log copies allowed by the recorded user rule.
+5. Create a distinct Coordinator Phase 4 closeout commit, record its exact hash, then perform the authorized non-force push and record remote, branch, exit status, and any failure truthfully.
+6. Do not begin Phase 5 unless the closeout commit exists and the push result has been recorded.
 
 ## 6. Unique Conclusion
 
-**Reviewer: `REVISE`**
-**Phase 4: `Not verified`**
+**Reviewer: `PASS WITH FOLLOW-UP`**
+**Phase 4: `Ready with inherited follow-ups`**
 
-The phase is not `Blocked`: the missing work is locally actionable document/archive/commit reconciliation. It is not `Ready`: the current evidence chain contradicts itself and has not completed the required role commits, Coordinator archive, phase-close commit, or recorded push. No new dynamic conclusion was created in this review.
+The phase is not `Blocked` and no longer `Not verified` at the Reviewer gate. Remaining work is Coordinator-owned archival, current-summary synchronization, derived-log cleanup, closeout commit, and truthful push recording; it does not require new Gameplay implementation or new dynamic evidence because the user-accepted/deferred gaps remain explicitly preserved.
