@@ -22,7 +22,7 @@ Create one Blueprint GameplayEffect asset exactly at `Content/GameplayEffects/GE
 
 ### Commit status
 
-- Pending Implementation Agent commit after the allowlisted code/report diff is reviewed and staged.
+- Implementation Agent code/report commit: `427d4da` (`Implementation Agent+P5-003+add basic attack GAS command seam`).
 
 ## Basic Info
 
