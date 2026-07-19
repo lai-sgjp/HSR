@@ -1,4 +1,4 @@
-# TASK-P4-004: Verification Evidence Consolidation
+# TASK-P4-004: Verification Evidence Consolidation (Archived)
 
 > Date: 2026-07-19
 > Role: Implementation/Verification Agent

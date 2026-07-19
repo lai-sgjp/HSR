@@ -1,7 +1,7 @@
 # TASK-P4-004：Phase 4 最终回归、教学、独立审查与阶段收尾
 
 > 创建日期：2026-07-19
-> 状态：`WAITING FOR FIRST READ-BACK`  
+> 最终状态：`PASS WITH FOLLOW-UP / ARCHIVED`
 > 本卡是当前唯一活动任务契约。P4-001～003 已分别以 `PASS WITH FOLLOW-UP` 归档；本卡只做文档、证据核对、教学与阶段判定，不新增 Gameplay、Content 或 Config。
 
 ## Role Lock / 首次只读复述与二次确认

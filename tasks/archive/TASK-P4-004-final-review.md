@@ -1,4 +1,4 @@
-# TASK-P4-004 Independent Reviewer Final Re-review
+# TASK-P4-004 Independent Reviewer Final Re-review (Archived)
 
 > Date: 2026-07-19
 > Review mode: read-only evidence and role-chain re-review

@@ -1,7 +1,7 @@
 # HSR Phase 4 详细执行计划
 
 > 创建日期：2026-07-18  
-> 当前状态：P4-001～003 已归档；P4-004 Verification 与 Teacher 已完成，Independent Reviewer 当前 `REVISE`。角色提交、Coordinator 归档与最终复审未闭合；Phase 4 为 `Not verified`。
+> 当前状态：P4-001～004 已归档；最终 Reviewer `a3e37575` 为 `PASS WITH FOLLOW-UP`，Phase 4 为 `Ready with inherited follow-ups`。等待本次阶段收尾 commit/push 结果记录；Phase 5 尚未实施。
 > 阶段主题：敌人探索表现、Encounter 请求与独立 Battle Map 纯数据过渡
 
 ## 1. 当前阶段与门禁结论
@@ -100,7 +100,7 @@ Empty → Pending → Traveling → Consumed / Cleared
 | P4-001 | 从现有灰盒交互入口构造纯数据 Encounter Request，进入空 Battle Map 并恰好消费一次 | Phase 3 Ready | Reviewer `PASS WITH FOLLOW-UP`，已归档；A2 后 Editor/PIE 为 `USER ACCEPTED` 缺口 |
 | P4-002 | 数据驱动敌人在 NavMesh 上事件驱动巡逻、发现和追击，并复用 P4-001 的唯一 Encounter 入口 | P4-001 通过审查 | Reviewer `PASS WITH FOLLOW-UP`，已归档；A1 Build/用户 PIE/范围与生命周期 follow-up 保留 |
 | P4-003 | 三种先手、失败恢复、生命周期与空图测试返回形成可重复的跨图矩阵 | P4-002 通过审查 | Reviewer `PASS WITH FOLLOW-UP`，已归档；A4c 一次可定位 Build、1/4 组合动态，其余用户接受/延期 |
-| P4-004 | 最终回归、教学、独立审查和阶段文档归档闭合 | P4-001～003 完成 | Verification/Teacher 已完成；Reviewer `REVISE`，等待角色提交、Coordinator 同步与复审；Phase 4 `Not verified` |
+| P4-004 | 最终回归、教学、独立审查和阶段文档归档闭合 | P4-001～003 完成 | Reviewer `PASS WITH FOLLOW-UP`，已归档；Phase 4 `Ready with inherited follow-ups`，等待阶段收尾 commit/push 记录 |
 
 每次只创建一张活动任务卡。后一工作包不得因为本计划存在而自动开始；必须在前一包归档后，由 Coordinator 创建并审查新的 `tasks/active-task.md`，再经过执行者首次只读复述和用户对该任务编号的二次确认。
 
@@ -337,4 +337,4 @@ Phase 4 的工程、Editor、PIE、失败路径、教学、独立审查和文档
 
 `TASK-P4-001` 的 A1/A2 修订与最终 Reviewer `PASS WITH FOLLOW-UP` 已完成归档。用户接受 A2 后 Editor/PIE 缺失为非阻断，但 P4-002 回归必须重新覆盖至少一条 Encounter 跨图与单次消费主路径。
 
-P4-002/003 已归档。P4-004 Verification 与 Teacher 产物已产生，Independent Reviewer 当前结论为 `REVISE`；必须依次闭合独立角色提交、Coordinator 自有协调提交和 Reviewer 复审。Phase 4 保持 `Not verified`，不得自动进入 Phase 5。
+P4-002/003 已归档。P4-004 最终 Reviewer `PASS WITH FOLLOW-UP` 已放行；Coordinator 现在只需完成阶段收尾 commit、清理已摘要的 P4-003 根目录 Build 派生产物并记录非强制 push 结果。Phase 4 的 inherited follow-ups 保持，Phase 5 在上述记录完成前不得开始。

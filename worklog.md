@@ -1434,3 +1434,11 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 合规交付顺序：Verification 提交 `tasks/execution-result.md`；Teacher 独立提交 learning/规则/专项教学文档；Reviewer 提交当前 `tasks/final-review.md`；随后 Coordinator 只提交 P4-003 归档、P4-004 活动卡和状态协调文档；最后交 Reviewer 复审。
 - 当前没有执行 commit：Coordinator 不代替前三个角色提交，且它们尚未闭合。最终 Reviewer 放行和全部角色 commit 完成前不归档 P4-004、不创建阶段收尾 commit、不 push、不进入 Phase 5。
 - 本轮未修改 Source/Content/Config，未运行 Build/Editor/PIE，未删除日志。
+
+## 2026-07-19｜Coordinator：TASK-P4-004 最终归档与 Phase 4 放行
+
+- 最终 Reviewer commit `a3e37575` 结论为 `PASS WITH FOLLOW-UP`，闭合 P4-004 REVISE。P4-004 active/execution/final-review 已归档。
+- Phase 4 状态更新为 `Ready with inherited follow-ups`；P4-001～003 的用户接受、延期、报告级 Build、未动态验证和同身份/Git 边界全部保留，不升级证据等级。
+- P4-003 A4c Build/PIE 摘要已在归档 execution/final-review 中保存：仅一次可定位 Build、三种 initiative/Return 主路径和 UnPossess/Re-Possess 用户证据；其余 failure/生命周期 follow-up 保留。
+- 根目录 `Build-Log-P4-003*` raw txt/json/uba 已摘要归档，按规则可清理；不删除 Saved/Logs、其他 Build logs、Source 或资产。
+- Phase 4 收尾 commit 与 push 仍需本轮完成并记录真实 remote/branch/结果；在此之前不得开始 Phase 5。
