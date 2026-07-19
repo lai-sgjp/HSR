@@ -67,13 +67,25 @@ void AHSRExplorationReturnConsumer::TryConsumeAndReturn()
 
 	if (Result.ResultType == EHSREncounterReturnResultType::Success)
 	{
-		// Apply the return transform to the player pawn using ConsumedContext from the Result
-		PlayerPawn->SetActorTransform(Result.ConsumedContext.ReturnTransform, false, nullptr, ETeleportType::TeleportPhysics);
+	// Apply the return transform to the player pawn using ConsumedContext from the Result
+	PlayerPawn->SetActorTransform(Result.ConsumedContext.ReturnTransform, false, nullptr, ETeleportType::TeleportPhysics);
 
-		UE_LOG(LogTemp, Log, TEXT("AHSRExplorationReturnConsumer::TryConsumeAndReturn - SUCCESS: Teleported pawn to %s"),
-			*Result.ConsumedContext.ReturnTransform.GetLocation().ToString());
+	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationReturnConsumer::TryConsumeAndReturn - SUCCESS: Teleported pawn to %s"),
+		*Result.ConsumedContext.ReturnTransform.GetLocation().ToString());
+
+	// A4c: Test second ConsumeReturnContext — must return AlreadyConsumed
+	FHSRExplorationReturnResult SecondResult = Subsystem->ConsumeReturnContext();
+	if (SecondResult.ResultType == EHSREncounterReturnResultType::AlreadyConsumed)
+	{
+		UE_LOG(LogTemp, Log, TEXT("A4c: Second ConsumeReturnContext correctly returned AlreadyConsumed"));
 	}
 	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("A4c: Second ConsumeReturnContext unexpected type=%d (expected AlreadyConsumed)"),
+			static_cast<int32>(SecondResult.ResultType));
+	}
+}
+else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AHSRExplorationReturnConsumer::TryConsumeAndReturn - FAILED: ConsumeReturnContext returned type=%d"),
 			static_cast<int32>(Result.ResultType));

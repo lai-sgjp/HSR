@@ -59,6 +59,8 @@ private:
 	FHSREncounterRequest PendingRequest;
 	FHSRExplorationReturnContext PendingReturnContext;
 	bool bReturnPending;
+	bool bReturnConsumed;
 	EHSRTravelKind TravelKind;
+	FGuid TravelRequestId;
 	FName TravelTargetMap;
 };

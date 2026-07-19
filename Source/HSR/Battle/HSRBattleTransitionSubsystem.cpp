@@ -2,6 +2,7 @@
 #include "../Data/Definitions/HSREncounterDefinition.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/PackageName.h"
 #include "Engine/Engine.h"
 
 void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -9,7 +10,9 @@ void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collect
 	Super::Initialize(Collection);
 	CurrentState = EHSREncounterState::Empty;
 	bReturnPending = false;
+	bReturnConsumed = false;
 	TravelKind = EHSRTravelKind::None;
+	TravelRequestId = FGuid();
 
 	if (GEngine)
 	{
@@ -63,6 +66,16 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 		return FHSREncounterResult::MakeFailure(
 			EHSREncounterResultType::InvalidMap,
 			FText::FromString(TEXT("BattleMap is not set.")));
+	}
+
+	// Pre-flight: verify the map package actually exists on disk
+	FString MapPackageName = Definition->BattleMap.GetLongPackageName();
+	if (!FPackageName::DoesPackageExist(MapPackageName))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - FAILED InvalidMap (package does not exist: %s)"), *MapPackageName);
+		return FHSREncounterResult::MakeFailure(
+			EHSREncounterResultType::InvalidMap,
+			FText::FromString(TEXT("BattleMap package does not exist on disk.")));
 	}
 
 	// Reject if a transition is already in progress
@@ -120,6 +133,7 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 	{
 		CurrentState = EHSREncounterState::Traveling;
 		TravelKind = EHSRTravelKind::Encounter;
+		TravelRequestId = NewRequestId;
 		TravelTargetMap = FName(*Definition->BattleMap.GetLongPackageName());
 		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - Traveling to %s (kind=Encounter, map=%s)"),
 			*Definition->BattleMap.GetLongPackageName(), *TravelTargetMap.ToString());
@@ -177,6 +191,7 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::ConsumePendingEncounter()
 	PendingRequest = FHSREncounterRequest();
 	CurrentState = EHSREncounterState::Consumed;
 	TravelKind = EHSRTravelKind::None;
+	TravelRequestId = FGuid();
 	TravelTargetMap = NAME_None;
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ConsumePendingEncounter - SUCCESS RequestId=%s EncounterId=%s EnemyDefId=%s"),
@@ -203,6 +218,7 @@ void UHSRBattleTransitionSubsystem::ClearPending()
 	CurrentState = EHSREncounterState::Empty;
 	PendingRequest = FHSREncounterRequest();
 	TravelKind = EHSRTravelKind::None;
+	TravelRequestId = FGuid();
 	TravelTargetMap = NAME_None;
 }
 
@@ -216,35 +232,67 @@ void UHSRBattleTransitionSubsystem::ClearReturn()
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ClearReturn - Clearing Return context"));
 	PendingReturnContext = FHSRExplorationReturnContext();
 	bReturnPending = false;
+	bReturnConsumed = false;
 	TravelKind = EHSRTravelKind::None;
+	TravelRequestId = FGuid();
 	TravelTargetMap = NAME_None;
 }
 
 void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravelFailure::Type FailureType, const FString& ErrorString)
 {
-	UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - type=%d Error=%s World=%s TargetMap=%s"),
-		static_cast<int32>(FailureType), *ErrorString, InWorld ? *InWorld->GetName() : TEXT("null"), *TravelTargetMap.ToString());
+	UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - type=%d Error=%s World=%s TargetMap=%s RequestId=%s"),
+		static_cast<int32>(FailureType), *ErrorString, InWorld ? *InWorld->GetName() : TEXT("null"),
+		*TravelTargetMap.ToString(), *TravelRequestId.ToString());
 
-	// Only clear the matching pending transaction (not unrelated new requests)
+	// 1. Early-exit if no active transaction (nothing to match)
+	if (TravelKind == EHSRTravelKind::None)
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - IGNORED (no active transaction, type=%d)"), static_cast<int32>(FailureType));
+		return;
+	}
+
+	// 2. Attempt to match InWorld's package path against stored TravelTargetMap
+	FString FailureWorldPath;
+	if (InWorld && InWorld->GetOutermost())
+	{
+		FailureWorldPath = UWorld::RemovePIEPrefix(InWorld->GetOutermost()->GetPathName());
+	}
+	bool bWorldMatchesMap = !TravelTargetMap.IsNone() && !FailureWorldPath.IsEmpty() &&
+		(FailureWorldPath == TravelTargetMap.ToString() || FailureWorldPath.EndsWith(TravelTargetMap.ToString()));
+	bool bWorldIsNull = (InWorld == nullptr);
+	bool bMatchesOurTransaction = bWorldIsNull || bWorldMatchesMap;
+
+	UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - MatchCheck: WorldPath=%s TargetMap=%s RequestId=%s bMatch=%d"),
+		*FailureWorldPath, *TravelTargetMap.ToString(), *TravelRequestId.ToString(), bMatchesOurTransaction ? 1 : 0);
+
+	// 3. Only clear state if the failure belongs to our tracked transaction
+	if (!bMatchesOurTransaction)
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - IGNORED (world/map mismatch). FailureWorld=%s ExpectedMap=%s"),
+			*FailureWorldPath, *TravelTargetMap.ToString());
+		return;
+	}
+
+	// 4. Clear the matching transaction
 	if (TravelKind == EHSRTravelKind::Encounter)
 	{
-		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - Clearing Encounter state (RequestId=%s)"),
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - Clearing Encounter state (RequestId=%s, now clean, retry available)"),
 			*PendingRequest.RequestId.ToString());
 		ClearPending();
 	}
 	else if (TravelKind == EHSRTravelKind::Return)
 	{
-		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - Clearing Return context"));
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - Clearing Return context (RequestId=%s, now clean, retry available)"),
+			*TravelRequestId.ToString());
 		ClearReturn();
 	}
-	else
-	{
-		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - No matching pending transaction, ignoring"));
-	}
 
-	// Clear travel tracking
+	// 5. Clear travel tracking (redundant with ClearPending/ClearReturn but explicit for safety)
 	TravelKind = EHSRTravelKind::None;
+	TravelRequestId = FGuid();
 	TravelTargetMap = NAME_None;
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - State clean. New requests can proceed."));
+	return;
 }
 
 
@@ -294,8 +342,10 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestTestReturn(con
 
 	PendingReturnContext = ReturnCtx;
 	bReturnPending = true;
+	bReturnConsumed = false;
 
 	TravelKind = EHSRTravelKind::Return;
+	TravelRequestId = ReturnCtx.RequestId;
 	TravelTargetMap = ReturnCtx.ExplorationMapPath;
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - SUCCESS RequestId=%s ExplorationMap=%s (kind=Return)"),
@@ -311,6 +361,14 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::ConsumeReturnContext(
 {
 	if (!bReturnPending)
 	{
+		if (bReturnConsumed)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::ConsumeReturnContext - FAILED AlreadyConsumed (request=%s)"),
+				*PendingReturnContext.RequestId.ToString());
+			return FHSRExplorationReturnResult::MakeFailure(
+				EHSREncounterReturnResultType::AlreadyConsumed,
+				FText::FromString(TEXT("Return context has already been consumed.")));
+		}
 		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::ConsumeReturnContext - FAILED NothingPending"));
 		return FHSRExplorationReturnResult::MakeFailure(
 			EHSREncounterReturnResultType::NothingPending,
@@ -321,7 +379,9 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::ConsumeReturnContext(
 	FHSRExplorationReturnContext Consumed = PendingReturnContext;
 	PendingReturnContext = FHSRExplorationReturnContext();
 	bReturnPending = false;
+	bReturnConsumed = true;
 	TravelKind = EHSRTravelKind::None;
+	TravelRequestId = FGuid();
 	TravelTargetMap = NAME_None;
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ConsumeReturnContext - SUCCESS RequestId=%s ReturnLoc=%s"),

@@ -57,6 +57,9 @@ void AHSREnemyAIController::OnPossess(APawn* InPawn)
 	Super::OnPossess(InPawn);
 	UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::OnPossess - Controller=%s Pawn=%s"), *GetName(), InPawn ? *InPawn->GetName() : TEXT("null"));
 
+	// P4-002: Re-Possess -> fresh binding, single observation chain
+	UE_LOG(LogTemp, Log, TEXT("P4-002: %s - OnPossess, fresh delegate binding (single observation chain)"), *GetName());
+
 	// Bind perception delegate when possessing a pawn
 	if (PerceptionComponent)
 	{
@@ -66,6 +69,8 @@ void AHSREnemyAIController::OnPossess(APawn* InPawn)
 
 void AHSREnemyAIController::OnUnPossess()
 {
+	// P4-002: UnPossess -> clear timers/state, remove delegates (zero stale callbacks)
+	UE_LOG(LogTemp, Log, TEXT("P4-002: %s - OnUnPossess, clearing state and delegates"), *GetName());
 	ClearState();
 
 	if (PerceptionComponent)
@@ -148,6 +153,7 @@ void AHSREnemyAIController::StartPatrol()
 		else if (MoveResult == EPathFollowingRequestResult::Failed)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("AHSREnemyAIController::StartPatrol - %s: MoveTo Failed"), *GetName());
+			// P4-002: MoveTo failed/aborted -> bounded recovery via HandleMoveFailedOrAborted (timer + retry)
 			HandleMoveFailedOrAborted();
 		}
 	}
@@ -200,7 +206,8 @@ void AHSREnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathF
 		AActor* Target = CurrentTarget.Get();
 		if (!Target || !IsValid(Target))
 		{
-			HandleChaseTargetLost();
+				// P4-002: Target destroyed/expired during chase, safe cleanup via weak reference
+				HandleChaseTargetLost();
 		}
 	}
 }
@@ -223,6 +230,7 @@ void AHSREnemyAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus
 		// If already chasing the same target, don't restart
 		if (CurrentState == EHSREnemyExplorationState::Chasing && CurrentTarget.Get() == Actor)
 		{
+			UE_LOG(LogTemp, Log, TEXT("P4-002: repeat perception of same target, blocked (no storm)"));
 			return;
 		}
 
@@ -233,14 +241,20 @@ void AHSREnemyAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus
 		GetWorld()->GetTimerManager().ClearTimer(PatrolWaitTimerHandle);
 		StopMovement();
 
-		// Start chase with configured acceptance radius
-		SetState(EHSREnemyExplorationState::Chasing);
-		AHSREnemyCharacter* EnemyChar = Cast<AHSREnemyCharacter>(GetPawn());
-		UHSREnemyDefinition* EDef = EnemyChar ? EnemyChar->EnemyDefinition : nullptr;
-		float Acceptance = EDef ? EDef->ChaseAcceptanceRadius : 50.0f;
-		MoveToActor(Actor, Acceptance);
+	// Start chase with configured acceptance radius
+	SetState(EHSREnemyExplorationState::Chasing);
+	AHSREnemyCharacter* EnemyChar = Cast<AHSREnemyCharacter>(GetPawn());
+	UHSREnemyDefinition* EDef = EnemyChar ? EnemyChar->EnemyDefinition : nullptr;
+	float Acceptance = EDef ? EDef->ChaseAcceptanceRadius : 50.0f;
+	MoveToActor(Actor, Acceptance);
 
-		UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::OnTargetPerceptionUpdated - %s sensed %s, chasing"), *GetName(), *Actor->GetName());
+	// A4c: Try request encounter now that we're in Chasing state.
+	// The physical overlap (NotifyActorBeginOverlap) may have already fired while the AI
+	// was in PatrolWaiting/MovingToPatrol and was rejected by the Chasing guard.
+	// Retrying here ensures the encounter proceeds once the AI is properly chasing.
+	TryRequestEncounterFromCharacter();
+
+	UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::OnTargetPerceptionUpdated - %s sensed %s, chasing"), *GetName(), *Actor->GetName());
 	}
 	else
 	{
@@ -249,7 +263,8 @@ void AHSREnemyAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus
 			(CurrentState == EHSREnemyExplorationState::Chasing || CurrentState == EHSREnemyExplorationState::Alert))
 		{
 			UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::OnTargetPerceptionUpdated - %s lost sight of %s"), *GetName(), *Actor->GetName());
-			HandleChaseTargetLost();
+				// P4-002: Target destroyed/expired during chase, safe cleanup via weak reference
+				HandleChaseTargetLost();
 		}
 	}
 }
