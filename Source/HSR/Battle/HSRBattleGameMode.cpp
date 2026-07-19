@@ -4,6 +4,8 @@
 #include "HSRBattleTransitionSubsystem.h"
 #include "Engine/World.h"
 #include "AbilitySystemComponent.h"
+#include "GameplayAbilitySpec.h"
+#include "../GAS/Ability/HSRBasicAttackAbility.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 
 #if WITH_EDITOR
@@ -29,6 +31,32 @@ namespace HSRBattleDevelopmentTest
 		}
 		Participant.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), Speed);
 		return true;
+	}
+
+	static bool SetHealth(const FHSRBattleParticipant& Participant, float Health, float MaxHealth)
+	{
+		if (!Participant.AbilitySystemComponent.IsValid())
+		{
+			return false;
+		}
+		Participant.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(), MaxHealth);
+		Participant.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), Health);
+		return true;
+	}
+
+	static float GetHealth(const FHSRBattleParticipant& Participant)
+	{
+		return Participant.AbilitySystemComponent.IsValid() ? Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) : -1.0f;
+	}
+
+	static UHSRBasicAttackAbility* FindBasicAttackAbility(const FHSRBattleParticipant& Participant)
+	{
+		if (!Participant.AbilitySystemComponent.IsValid())
+		{
+			return nullptr;
+		}
+		FGameplayAbilitySpec* AbilitySpec = Participant.AbilitySystemComponent->FindAbilitySpecFromClass(UHSRBasicAttackAbility::StaticClass());
+		return AbilitySpec ? Cast<UHSRBasicAttackAbility>(AbilitySpec->GetPrimaryInstance()) : nullptr;
 	}
 
 	static void Run(UHSRBattleCoordinator* Coordinator)
@@ -73,6 +101,64 @@ namespace HSRBattleDevelopmentTest
 		const bool bRestoreMainQueue = Coordinator->GetTurnManager() && Coordinator->GetTurnManager()->Initialize(Participants);
 		LogCase(TEXT("RestoreBattleQueue"), bRestoreMainQueue);
 		UE_LOG(LogTemp, Log, TEXT("P5-002 TurnTest Harness=COMPLETE"));
+
+		UHSRTurnManager* MainTurnManager = Coordinator->GetTurnManager();
+		const bool bAttackSetup = bRestoreMainQueue
+			&& SetSpeed(Participants[0], 120.0f) && SetSpeed(Participants[1], 80.0f)
+			&& SetHealth(Participants[0], 100.0f, 100.0f) && SetHealth(Participants[1], 100.0f, 100.0f)
+			&& MainTurnManager->Initialize(Participants)
+			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Player"));
+		int32 ActionResolvedCount = 0;
+		const FDelegateHandle ActionResolvedHandle = MainTurnManager->OnActionResolved().AddLambda([&ActionResolvedCount](FName) { ++ActionResolvedCount; });
+		LogCase(TEXT("P5-003_AttackSetup_PlayerCurrent"), bAttackSetup);
+
+		const float PlayerHealthBeforeRejected = GetHealth(Participants[0]);
+		const float EnemyHealthBeforeRejected = GetHealth(Participants[1]);
+		const bool bAttackNonCurrentRejected = !Coordinator->RequestBasicAttack(FName(TEXT("Enemy")), FName(TEXT("Player")))
+			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Player"))
+			&& FMath::IsNearlyEqual(PlayerHealthBeforeRejected, GetHealth(Participants[0]))
+			&& FMath::IsNearlyEqual(EnemyHealthBeforeRejected, GetHealth(Participants[1]))
+			&& ActionResolvedCount == 0;
+		LogCase(TEXT("P5-003_NonCurrentRejected_NoMutation"), bAttackNonCurrentRejected);
+
+		const bool bInvalidTargetRejected = !Coordinator->RequestBasicAttack(FName(TEXT("Player")), FName(TEXT("Player")))
+			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Player"))
+			&& FMath::IsNearlyEqual(PlayerHealthBeforeRejected, GetHealth(Participants[0]))
+			&& FMath::IsNearlyEqual(EnemyHealthBeforeRejected, GetHealth(Participants[1]))
+			&& ActionResolvedCount == 0;
+		LogCase(TEXT("P5-003_InvalidTargetRejected_NoMutation"), bInvalidTargetRejected);
+
+		UHSRBasicAttackAbility* PlayerAttack = FindBasicAttackAbility(Participants[0]);
+		const TSoftClassPtr<UGameplayEffect> OriginalEffectClass = PlayerAttack ? PlayerAttack->GetDamageEffectClassForDevelopmentTest() : nullptr;
+		if (PlayerAttack)
+		{
+			PlayerAttack->SetDamageEffectClassForDevelopmentTest(TSoftClassPtr<UGameplayEffect>(FSoftObjectPath(TEXT("/Game/GameplayEffects/GE_P5_MissingDamageEffect.GE_P5_MissingDamageEffect_C"))));
+		}
+		const bool bMissingEffectRejected = PlayerAttack && !Coordinator->RequestBasicAttack(FName(TEXT("Player")), FName(TEXT("Enemy")))
+			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Player"))
+			&& FMath::IsNearlyEqual(PlayerHealthBeforeRejected, GetHealth(Participants[0]))
+			&& FMath::IsNearlyEqual(EnemyHealthBeforeRejected, GetHealth(Participants[1]))
+			&& ActionResolvedCount == 0;
+		if (PlayerAttack)
+		{
+			PlayerAttack->SetDamageEffectClassForDevelopmentTest(OriginalEffectClass);
+		}
+		LogCase(TEXT("P5-003_MissingEffectRejected_NoMutation"), bMissingEffectRejected);
+
+		const bool bLegalAttack = Coordinator->RequestBasicAttack(FName(TEXT("Player")), FName(TEXT("Enemy")))
+			&& FMath::IsNearlyEqual(GetHealth(Participants[1]), 90.0f)
+			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Enemy"))
+			&& ActionResolvedCount == 1;
+		LogCase(TEXT("P5-003_LegalFixedDamageAndSingleResolve"), bLegalAttack);
+
+		const float EnemyHealthAfterLegal = GetHealth(Participants[1]);
+		const bool bAttackDuplicateRejected = !Coordinator->RequestBasicAttack(FName(TEXT("Player")), FName(TEXT("Enemy")))
+			&& FMath::IsNearlyEqual(EnemyHealthAfterLegal, GetHealth(Participants[1]))
+			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Enemy"))
+			&& ActionResolvedCount == 1;
+		LogCase(TEXT("P5-003_DuplicateRejected_NoExtraMutation"), bAttackDuplicateRejected);
+		MainTurnManager->OnActionResolved().Remove(ActionResolvedHandle);
+		UE_LOG(LogTemp, Log, TEXT("P5-003 AttackTest Harness=COMPLETE"));
 	}
 }
 #endif

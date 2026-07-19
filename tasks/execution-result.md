@@ -8,21 +8,23 @@
 - `UHSRBattleCoordinator` grants that ability to each valid battle Participant after ASC initialization.
 - `RequestBasicAttack(AttackerId, TargetId)` owns command validation: battle must be active, attacker must be current, both participants must be valid, and target must be on the opposing team.
 - A successful GAS effect application is the only path that calls `UHSRTurnManager::ResolveAction`; rejected activation therefore leaves HP and turn state unchanged.
-- The effect is intentionally a user-owned Blueprint GameplayEffect loaded from `/Game/GameplayEffects/GE_P5_BasicAttackDamage`. It is not present yet, so the missing-effect path is currently safe-fail and no Editor asset was created by the agent.
+- The effect is intentionally a user-owned Blueprint GameplayEffect loaded from `/Game/GameplayEffects/BP_GE_P5_BasicAttackDamage`. User asset commit `b643877` supplies that exact asset; the prior `GE_` versus `BP_GE_` naming mismatch was corrected in C++.
+- Added a `WITH_EDITOR` P5-003 harness that proves legal fixed damage/single resolve plus non-current, invalid-target, duplicate, and deliberately missing-Effect rejection without HP or turn mutation.
 
 ### Build verification
 
 - Command: `Build.bat HSREditor Win64 Development -Project=E:\\work\\unreal_projects\\HSR\\HSR.uproject -WaitMutex -FromMsBuild -architecture=x64`
-- Result: **Succeeded**, exit code `0`; C++ and Link completed in 4 actions.
+- Result: **Succeeded**, exit code `0`; C++ and Link completed in 4 actions after the harness was added.
 - Warning: Visual Studio 2022 compiler `14.51.36248` is not UE's preferred version. No P5-003 compile/link errors remain.
 
 ### Required user Editor handoff
 
-Create one Blueprint GameplayEffect asset exactly at `Content/GameplayEffects/GE_P5_BasicAttackDamage` with: Duration Policy `Instant`; one modifier: Attribute `HSRCoreAttributeSet.Health`, Modifier Op `Add`, Magnitude `Scalable Float`, value `-10.0`. Do not configure execution calculations, tags, costs, cooldowns, cues, UI, or networking. Save only this asset, commit it as a user Editor commit, then provide the commit hash before PIE verification.
+Completed by the user in commit `b643877`: `Content/GameplayEffects/BP_GE_P5_BasicAttackDamage.uasset`. Its exact runtime path is `/Game/GameplayEffects/BP_GE_P5_BasicAttackDamage.BP_GE_P5_BasicAttackDamage_C`.
 
 ### Commit status
 
 - Implementation Agent code/report commit: `427d4da` (`Implementation Agent+P5-003+add basic attack GAS command seam`).
+- Pending: commit the Development harness and this updated report after allowlist review, then obtain user-provided two-run PIE evidence.
 
 ## Basic Info
 

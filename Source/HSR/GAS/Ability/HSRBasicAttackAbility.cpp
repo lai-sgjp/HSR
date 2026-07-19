@@ -6,7 +6,7 @@
 UHSRBasicAttackAbility::UHSRBasicAttackAbility()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	DamageEffectClass = TSoftClassPtr<UGameplayEffect>(FSoftObjectPath(TEXT("/Game/GameplayEffects/GE_P5_BasicAttackDamage.GE_P5_BasicAttackDamage_C")));
+	DamageEffectClass = TSoftClassPtr<UGameplayEffect>(FSoftObjectPath(TEXT("/Game/GameplayEffects/BP_GE_P5_BasicAttackDamage.BP_GE_P5_BasicAttackDamage_C")));
 }
 
 bool UHSRBasicAttackAbility::SetPendingTarget(UAbilitySystemComponent* InTargetAbilitySystem)

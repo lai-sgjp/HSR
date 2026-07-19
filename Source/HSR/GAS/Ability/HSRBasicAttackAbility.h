@@ -22,6 +22,12 @@ public:
 	bool SetPendingTarget(UAbilitySystemComponent* InTargetAbilitySystem);
 	bool DidLastActivationSucceed() const { return bLastActivationSucceeded; }
 
+#if WITH_EDITOR
+	/** Development-only seam for proving that a missing effect cannot resolve a turn. */
+	void SetDamageEffectClassForDevelopmentTest(TSoftClassPtr<UGameplayEffect> InDamageEffectClass) { DamageEffectClass = MoveTemp(InDamageEffectClass); }
+	TSoftClassPtr<UGameplayEffect> GetDamageEffectClassForDevelopmentTest() const { return DamageEffectClass; }
+#endif
+
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
