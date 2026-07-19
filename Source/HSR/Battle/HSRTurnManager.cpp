@@ -58,6 +58,13 @@ bool UHSRTurnManager::ResolveAction(FName ResolvingParticipantId)
 	return true;
 }
 
+void UHSRTurnManager::FinishBattle()
+{
+	State = EHSRTurnManagerState::Finished;
+	CurrentTurnIndex = INDEX_NONE;
+	UE_LOG(LogTemp, Log, TEXT("UHSRTurnManager::FinishBattle - Turn progression stopped"));
+}
+
 void UHSRTurnManager::Reset()
 {
 	OrderedParticipants.Empty();

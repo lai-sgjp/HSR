@@ -14,6 +14,7 @@ struct FHSRBattleParticipant
 
 	/** Snapshot when the turn order is built. TurnManager never polls this every frame. */
 	float InitiativeSpeed = 0.0f;
+	bool bDefeated = false;
 
 	TWeakObjectPtr<AActor> Actor;
 	TWeakObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;

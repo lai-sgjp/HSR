@@ -224,6 +224,8 @@ void AHSRBattleGameMode::BeginPlay()
 		return;
 	}
 
+	Coordinator->OnBattleResultReady().AddUObject(this, &AHSRBattleGameMode::HandleBattleResultReady);
+
 	// Log final state summary
 	const int32 NumParticipants = Coordinator->GetParticipants().Num();
 	const FName ExplorationMap = Coordinator->GetReturnContext().ExplorationMapPath;
@@ -252,11 +254,105 @@ void AHSRBattleGameMode::BeginPlay()
 
 #if WITH_EDITOR
 	HSRBattleDevelopmentTest::Run(Coordinator);
+	RunTerminalScenarioForDevelopment();
 #endif
 }
 
 void AHSRBattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (Coordinator)
+	{
+		Coordinator->Reset();
+	}
 	Coordinator = nullptr;
 	Super::EndPlay(EndPlayReason);
+}
+
+void AHSRBattleGameMode::HandleBattleResultReady(const FHSRBattleResult& Result)
+{
+	if (!Coordinator || !Result.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultReady - REJECTED invalid result"));
+		return;
+	}
+
+	FHSRBattleResult ConsumedResult;
+	if (!Coordinator->ConsumeBattleResult(ConsumedResult))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultReady - REJECTED duplicate result RequestId=%s"), *Result.RequestId.ToString());
+		return;
+	}
+
+	UHSRBattleTransitionSubsystem* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>() : nullptr;
+	if (!Subsystem)
+	{
+		UE_LOG(LogTemp, Error, TEXT("AHSRBattleGameMode::HandleBattleResultReady - FAILED missing transition subsystem"));
+		return;
+	}
+
+	const FHSRExplorationReturnResult ReturnResult = Subsystem->RequestBattleReturn(ConsumedResult.ReturnContext);
+	if (ReturnResult.ResultType == EHSREncounterReturnResultType::Success)
+	{
+		UE_LOG(LogTemp, Log, TEXT("AHSRBattleGameMode::HandleBattleResultReady - Return request type=%d Outcome=%d RequestId=%s"),
+			static_cast<int32>(ReturnResult.ResultType), static_cast<int32>(ConsumedResult.Outcome), *ConsumedResult.RequestId.ToString());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultReady - Return request type=%d Outcome=%d RequestId=%s"),
+			static_cast<int32>(ReturnResult.ResultType), static_cast<int32>(ConsumedResult.Outcome), *ConsumedResult.RequestId.ToString());
+	}
+}
+
+void AHSRBattleGameMode::RunTerminalScenarioForDevelopment()
+{
+#if WITH_EDITOR
+	if (TerminalTestScenario == EHSRP5TerminalTestScenario::None || !Coordinator || Coordinator->GetParticipants().Num() != 2)
+	{
+		return;
+	}
+
+	const TArray<FHSRBattleParticipant>& Participants = Coordinator->GetParticipants();
+	const FHSRBattleParticipant* Player = Participants.FindByPredicate([](const FHSRBattleParticipant& Participant) { return Participant.Team == EHSRBattleParticipantTeam::Player; });
+	const FHSRBattleParticipant* Enemy = Participants.FindByPredicate([](const FHSRBattleParticipant& Participant) { return Participant.Team == EHSRBattleParticipantTeam::Enemy; });
+	if (!Player || !Enemy || !Player->AbilitySystemComponent.IsValid() || !Enemy->AbilitySystemComponent.IsValid() || !Coordinator->GetTurnManager())
+	{
+		UE_LOG(LogTemp, Error, TEXT("P5-004 DeathTest Harness=SKIPPED reason=missing-valid-participants"));
+		return;
+	}
+
+	Player->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(), 100.0f);
+	Player->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 100.0f);
+	Enemy->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(), 100.0f);
+	Enemy->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 100.0f);
+	Player->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), 120.0f);
+	Enemy->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), 80.0f);
+	Coordinator->GetTurnManager()->Initialize(Participants);
+
+	if (TerminalTestScenario == EHSRP5TerminalTestScenario::PlayerVictory)
+	{
+		Enemy->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 10.0f);
+		const bool bAttackSucceeded = Coordinator->RequestBasicAttack(Player->ParticipantId, Enemy->ParticipantId);
+		if (bAttackSucceeded)
+		{
+			UE_LOG(LogTemp, Log, TEXT("P5-004 DeathTest Case=PlayerVictory Result=PASS"));
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("P5-004 DeathTest Case=PlayerVictory Result=FAIL"));
+		}
+	}
+	else
+	{
+		Player->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 0.0f);
+		const bool bFinished = Coordinator->GetCurrentState() == EHSRBattleCoordinatorState::Finished;
+		if (bFinished)
+		{
+			UE_LOG(LogTemp, Log, TEXT("P5-004 DeathTest Case=PlayerDefeat Result=PASS"));
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("P5-004 DeathTest Case=PlayerDefeat Result=FAIL"));
+		}
+	}
+#endif
 }

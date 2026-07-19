@@ -5,6 +5,15 @@
 #include "HSRBattleGameMode.generated.h"
 
 class UHSRBattleCoordinator;
+struct FHSRBattleResult;
+
+UENUM(BlueprintType)
+enum class EHSRP5TerminalTestScenario : uint8
+{
+	None UMETA(DisplayName = "None"),
+	PlayerVictory UMETA(DisplayName = "Player Victory"),
+	PlayerDefeat UMETA(DisplayName = "Player Defeat")
+};
 
 /**
  * GameMode for the standalone Battle World.
@@ -26,6 +35,13 @@ public:
 	UHSRBattleCoordinator* GetCoordinator() const { return Coordinator; }
 
 protected:
+	/** Editor-only test selector. Set on BP_HSRBattleGameMode; no runtime UI is added. */
+	UPROPERTY(EditDefaultsOnly, Category = "Development", meta = (DisplayName = "P5 Terminal Test Scenario"))
+	EHSRP5TerminalTestScenario TerminalTestScenario = EHSRP5TerminalTestScenario::None;
+
 	UPROPERTY()
 	TObjectPtr<UHSRBattleCoordinator> Coordinator;
+
+	void HandleBattleResultReady(const FHSRBattleResult& Result);
+	void RunTerminalScenarioForDevelopment();
 };

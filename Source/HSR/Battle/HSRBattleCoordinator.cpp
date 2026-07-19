@@ -9,6 +9,7 @@
 #include "Engine/World.h"
 #include "AbilitySystemComponent.h"
 #include "AttributeSet.h"
+#include "GameplayEffectTypes.h"
 
 bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRequest)
 {
@@ -161,6 +162,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to grant BasicAttack ability.")), Def.DefinitionId);
 		}
 		Participants.Add(Participant);
+		BindHealthObserver(Participant);
 
 		UE_LOG(LogTemp, Log,
 			TEXT("UHSRBattleCoordinator::BuildParticipants - Spawned ParticipantId=%s DefId=%s Team=%d Actor=%s ASC=%s"),
@@ -221,6 +223,14 @@ bool UHSRBattleCoordinator::RequestBasicAttack(FName AttackerParticipantId, FNam
 		return false;
 	}
 
+	// The instant effect may synchronously produce a terminal result through the
+	// health observer. A completed battle must not advance another turn.
+	if (bBattleResultProduced)
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::RequestBasicAttack - SUCCESS terminal attack Attacker=%s Target=%s"), *AttackerParticipantId.ToString(), *TargetParticipantId.ToString());
+		return true;
+	}
+
 	const bool bResolved = TurnManager->ResolveAction(AttackerParticipantId);
 	if (bResolved)
 	{
@@ -231,6 +241,20 @@ bool UHSRBattleCoordinator::RequestBasicAttack(FName AttackerParticipantId, FNam
 		UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::RequestBasicAttack - FAILED ResolveAction Attacker=%s Target=%s"), *AttackerParticipantId.ToString(), *TargetParticipantId.ToString());
 	}
 	return bResolved;
+}
+
+bool UHSRBattleCoordinator::ConsumeBattleResult(FHSRBattleResult& OutResult)
+{
+	if (!bBattleResultProduced || bBattleResultConsumed)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::ConsumeBattleResult - REJECTED produced=%d consumed=%d"), bBattleResultProduced ? 1 : 0, bBattleResultConsumed ? 1 : 0);
+		return false;
+	}
+
+	OutResult = BattleResult;
+	bBattleResultConsumed = true;
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::ConsumeBattleResult - SUCCESS RequestId=%s Outcome=%d"), *OutResult.RequestId.ToString(), static_cast<int32>(OutResult.Outcome));
+	return true;
 }
 
 FHSRBattleInitResult UHSRBattleCoordinator::BuildAndValidateParticipantDefinitions()
@@ -321,6 +345,7 @@ void UHSRBattleCoordinator::Reset()
 		TEXT("UHSRBattleCoordinator::Reset - Clearing state. Previous state=%d RequestId=%s"),
 		static_cast<int32>(CurrentState), *CurrentRequestId.ToString());
 
+	ClearRuntimeDelegates();
 	CurrentState = EHSRBattleCoordinatorState::Idle;
 	CurrentRequestId = FGuid();
 	CurrentEncounterId = NAME_None;
@@ -328,11 +353,83 @@ void UHSRBattleCoordinator::Reset()
 	ReturnContext = FHSRBattleReturnContext();
 	Participants.Empty();
 	ParticipantDefinitions.Empty();
+	BattleResult = FHSRBattleResult();
+	bBattleResultProduced = false;
+	bBattleResultConsumed = false;
 	if (TurnManager)
 	{
 		TurnManager->Reset();
 		TurnManager = nullptr;
 	}
+}
+
+void UHSRBattleCoordinator::BindHealthObserver(const FHSRBattleParticipant& Participant)
+{
+	if (!Participant.AbilitySystemComponent.IsValid())
+	{
+		return;
+	}
+
+	FDelegateHandle& Handle = HealthChangedHandles.FindOrAdd(Participant.ParticipantId);
+	Handle = Participant.AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetHealthAttribute()).AddUObject(
+		this, &UHSRBattleCoordinator::HandleHealthChanged, Participant.ParticipantId);
+}
+
+void UHSRBattleCoordinator::HandleHealthChanged(const FOnAttributeChangeData& ChangeData, FName ParticipantId)
+{
+	if (ChangeData.NewValue <= 0.0f)
+	{
+		ResolveDefeat(ParticipantId);
+	}
+}
+
+void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
+{
+	if (bBattleResultProduced || CurrentState != EHSRBattleCoordinatorState::Spawned)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::ResolveDefeat - REJECTED duplicate/inactive Defeated=%s"), *DefeatedParticipantId.ToString());
+		return;
+	}
+
+	FHSRBattleParticipant* Defeated = Participants.FindByPredicate([DefeatedParticipantId](const FHSRBattleParticipant& Participant)
+	{
+		return Participant.ParticipantId == DefeatedParticipantId;
+	});
+	if (!Defeated)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::ResolveDefeat - REJECTED unknown participant=%s"), *DefeatedParticipantId.ToString());
+		return;
+	}
+
+	Defeated->bDefeated = true;
+	BattleResult.RequestId = CurrentRequestId;
+	BattleResult.DefeatedParticipantId = DefeatedParticipantId;
+	BattleResult.ReturnContext = ReturnContext;
+	BattleResult.Outcome = Defeated->Team == EHSRBattleParticipantTeam::Enemy ? EHSRBattleOutcome::PlayerVictory : EHSRBattleOutcome::PlayerDefeat;
+	bBattleResultProduced = true;
+	CurrentState = EHSRBattleCoordinatorState::Finished;
+	if (TurnManager)
+	{
+		TurnManager->FinishBattle();
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::ResolveDefeat - SUCCESS RequestId=%s Defeated=%s Outcome=%d"), *BattleResult.RequestId.ToString(), *DefeatedParticipantId.ToString(), static_cast<int32>(BattleResult.Outcome));
+	BattleResultReady.Broadcast(BattleResult);
+}
+
+void UHSRBattleCoordinator::ClearRuntimeDelegates()
+{
+	for (const FHSRBattleParticipant& Participant : Participants)
+	{
+		if (Participant.AbilitySystemComponent.IsValid())
+		{
+			if (const FDelegateHandle* Handle = HealthChangedHandles.Find(Participant.ParticipantId))
+			{
+				Participant.AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetHealthAttribute()).Remove(*Handle);
+			}
+		}
+	}
+	HealthChangedHandles.Empty();
 }
 
 AActor* UHSRBattleCoordinator::SpawnParticipantActor(UWorld* World, const FHSRBattleParticipantDefinition& Definition)

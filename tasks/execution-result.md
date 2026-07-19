@@ -1,5 +1,37 @@
 # TASK-P5-001 Execution Report
 
+## TASK-P5-004 Implementation Handoff (2026-07-19)
+
+### Implemented
+
+- Added `FHSRBattleResult`, a pure-value DTO containing only request ID, terminal outcome, defeated participant ID, and the existing pure-value return context. It contains no Actor, ASC, Widget, or GameplayEffect handle.
+- `UHSRBattleCoordinator` observes each participant's `Health` GAS attribute with an attribute-change delegate. When Health reaches zero, it produces exactly one terminal result, marks the participant defeated, stops `UHSRTurnManager`, and rejects subsequent terminal resolution.
+- `ConsumeBattleResult` is an exactly-once handoff: it rejects missing and duplicate reads.
+- `AHSRBattleGameMode` consumes the result once and delegates return travel to `UHSRBattleTransitionSubsystem::RequestBattleReturn`.
+- Return travel now accepts the battle return DTO directly, validates the exploration map before entering a pending state, and preserves the existing exploration-side exactly-once transform consumer.
+- Added a Development/Editor-only `P5 Terminal Test Scenario` selector on `AHSRBattleGameMode`. It has `None`, `Player Victory`, and `Player Defeat` values and creates no UI, Tick, SaveGame, network, reward, or new asset.
+- Coordinator reset removes all health delegates before releasing runtime participant references; GameMode reset runs on world teardown.
+
+### Fresh build
+
+- Command: `Build.bat HSREditor Win64 Development -Project=E:\\work\\unreal_projects\\HSR\\HSR.uproject -WaitMutex -FromMsBuild -architecture=x64`
+- Result: **Succeeded**, exit code `0`.
+- UHT wrote 3 reflection outputs; C++, link, and metadata completed in 5 actions.
+- Non-blocking warnings: Visual Studio `14.51.36248` is not UE's preferred compiler; existing `AISystem.h` C4996 warning.
+
+### User Editor verification required
+
+1. Open `BP_HSRBattleGameMode` and set **P5 Terminal Test Scenario** to `Player Victory`; save the Blueprint and commit that user asset change separately.
+2. Run Phase5 Encounter -> `Map_Battle`. Verify `P5-004 DeathTest Case=PlayerVictory Result=PASS`, `ResolveDefeat - SUCCESS`, `ConsumeBattleResult - SUCCESS`, `RequestBattleReturn - SUCCESS`, exploration-map load, and `AHSRExplorationReturnConsumer ... Teleported pawn`.
+3. Stop PIE. Set the same property to `Player Defeat`; save and commit that user asset change separately.
+4. Repeat PIE and verify the same result/return chain with `Outcome=PlayerDefeat` and `P5-004 DeathTest Case=PlayerDefeat Result=PASS`.
+5. For each scenario, confirm the return pawn transform equals the encounter-entry transform, then run the same scenario a second time. Verify no `Result=FAIL`, duplicate consumption, stale world reference, Ensure, or crash.
+6. Restore the selector to `None`, save, and commit the restoration separately. Do not alter the GameplayEffect or create additional assets.
+
+### Evidence boundary
+
+No PIE run was launched by this implementation agent. Terminal success, duplicate result rejection, travel failure, and continuous-PIE behavior remain awaiting user-provided runtime logs and independent review.
+
 ## TASK-P5-003 Implementation Handoff (2026-07-19)
 
 ### Implemented C++ seam

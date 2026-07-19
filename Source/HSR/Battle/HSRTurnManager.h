@@ -24,6 +24,8 @@ class HSR_API UHSRTurnManager : public UObject
 public:
 	bool Initialize(const TArray<FHSRBattleParticipant>& InParticipants);
 	bool ResolveAction(FName ResolvingParticipantId);
+	/** Stops turn progression after a terminal battle result. */
+	void FinishBattle();
 	void Reset();
 
 	EHSRTurnManagerState GetState() const { return State; }

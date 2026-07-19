@@ -16,7 +16,16 @@ enum class EHSRBattleCoordinatorState : uint8
 	Idle UMETA(DisplayName = "Idle"),
 	Consuming UMETA(DisplayName = "Consuming"),
 	Spawned UMETA(DisplayName = "Spawned"),
+	Finished UMETA(DisplayName = "Finished"),
 	Failed UMETA(DisplayName = "Failed")
+};
+
+UENUM(BlueprintType)
+enum class EHSRBattleOutcome : uint8
+{
+	None UMETA(DisplayName = "None"),
+	PlayerVictory UMETA(DisplayName = "Player Victory"),
+	PlayerDefeat UMETA(DisplayName = "Player Defeat")
 };
 
 UENUM(BlueprintType)
@@ -122,4 +131,25 @@ struct FHSRBattleInitResult
 		Result.TargetDefinitionId = InDefId;
 		return Result;
 	}
+};
+
+/** Pure battle completion DTO. It deliberately contains no runtime object references. */
+USTRUCT(BlueprintType)
+struct FHSRBattleResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FGuid RequestId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	EHSRBattleOutcome Outcome = EHSRBattleOutcome::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FName DefeatedParticipantId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FHSRBattleReturnContext ReturnContext;
+
+	bool IsValid() const { return RequestId.IsValid() && Outcome != EHSRBattleOutcome::None; }
 };

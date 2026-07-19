@@ -298,6 +298,15 @@ void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravel
 
 FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestTestReturn(const FHSREncounterRequest& FromConsumedRequest)
 {
+	FHSRBattleReturnContext BattleReturnContext;
+	BattleReturnContext.RequestId = FromConsumedRequest.RequestId;
+	BattleReturnContext.ExplorationMapPath = FromConsumedRequest.ExplorationMapPath;
+	BattleReturnContext.ReturnTransform = FromConsumedRequest.ReturnTransform;
+	return RequestBattleReturn(BattleReturnContext);
+}
+
+FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(const FHSRBattleReturnContext& BattleReturnContext)
+{
 	// Validate BEFORE writing (must not pollute Pending)
 	if (bReturnPending)
 	{
@@ -307,7 +316,7 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestTestReturn(con
 			FText::FromString(TEXT("A return is already pending.")));
 	}
 
-	if (FromConsumedRequest.ExplorationMapPath.IsNone())
+	if (BattleReturnContext.ExplorationMapPath.IsNone())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - FAILED InvalidReturnContext (no path)"));
 		return FHSRExplorationReturnResult::MakeFailure(
@@ -316,7 +325,7 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestTestReturn(con
 	}
 
 	// Also reject invalid RequestId
-	if (!FromConsumedRequest.RequestId.IsValid())
+	if (!BattleReturnContext.RequestId.IsValid())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - FAILED InvalidReturnContext (invalid RequestId)"));
 		return FHSRExplorationReturnResult::MakeFailure(
@@ -326,9 +335,15 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestTestReturn(con
 
 	// Build pure-data return context from consumed request
 	FHSRExplorationReturnContext ReturnCtx;
-	ReturnCtx.RequestId = FromConsumedRequest.RequestId;
-	ReturnCtx.ExplorationMapPath = FromConsumedRequest.ExplorationMapPath;
-	ReturnCtx.ReturnTransform = FromConsumedRequest.ReturnTransform;
+	ReturnCtx.RequestId = BattleReturnContext.RequestId;
+	ReturnCtx.ExplorationMapPath = BattleReturnContext.ExplorationMapPath;
+	ReturnCtx.ReturnTransform = BattleReturnContext.ReturnTransform;
+
+	if (!FPackageName::DoesPackageExist(ReturnCtx.ExplorationMapPath.ToString()))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestBattleReturn - FAILED invalid map=%s"), *ReturnCtx.ExplorationMapPath.ToString());
+		return FHSRExplorationReturnResult::MakeFailure(EHSREncounterReturnResultType::InvalidReturnContext, FText::FromString(TEXT("Exploration map package does not exist.")));
+	}
 
 	// Check World availability BEFORE writing Pending
 	UWorld* World = GetWorld();

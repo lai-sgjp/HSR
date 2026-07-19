@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "HSREncounterTypes.h"
+#include "HSRBattleTypes.h"
 #include "Engine/EngineBaseTypes.h"
 #include "HSRBattleTransitionSubsystem.generated.h"
 
@@ -42,6 +43,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Return")
 	FHSRExplorationReturnResult RequestTestReturn(const FHSREncounterRequest& FromConsumedRequest);
+	/** Starts return travel from a pure battle result context. */
+	FHSRExplorationReturnResult RequestBattleReturn(const FHSRBattleReturnContext& ReturnContext);
 
 	UFUNCTION(BlueprintCallable, Category = "Return")
 	FHSRExplorationReturnResult ConsumeReturnContext();

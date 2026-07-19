@@ -8,6 +8,9 @@
 class UWorld;
 class AActor;
 class UHSRTurnManager;
+struct FOnAttributeChangeData;
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleResultReadyDelegate, const FHSRBattleResult&);
 
 /**
  * State machine for battle initialization.
@@ -41,6 +44,10 @@ public:
 	/** Requests one synchronous basic attack. Only a current participant may attack an opposing valid target. */
 	bool RequestBasicAttack(FName AttackerParticipantId, FName TargetParticipantId);
 
+	/** Exactly-once read of the terminal pure-value result. */
+	bool ConsumeBattleResult(FHSRBattleResult& OutResult);
+	FHSRBattleResultReadyDelegate& OnBattleResultReady() { return BattleResultReady; }
+
 	/** Reset to Idle for a fresh battle session. */
 	void Reset();
 
@@ -52,6 +59,11 @@ private:
 	FHSRBattleReturnContext ReturnContext;
 	TArray<FHSRBattleParticipant> Participants;
 	TArray<FHSRBattleParticipantDefinition> ParticipantDefinitions;
+	TMap<FName, FDelegateHandle> HealthChangedHandles;
+	FHSRBattleResult BattleResult;
+	bool bBattleResultProduced = false;
+	bool bBattleResultConsumed = false;
+	FHSRBattleResultReadyDelegate BattleResultReady;
 
 	UPROPERTY()
 	TObjectPtr<UHSRTurnManager> TurnManager;
@@ -60,4 +72,8 @@ private:
 	bool InitParticipantASC(AActor* TargetActor);
 	bool GrantBasicAttackAbility(const FHSRBattleParticipant& Participant);
 	FHSRBattleInitResult BuildAndValidateParticipantDefinitions();
+	void BindHealthObserver(const FHSRBattleParticipant& Participant);
+	void HandleHealthChanged(const FOnAttributeChangeData& ChangeData, FName ParticipantId);
+	void ResolveDefeat(FName DefeatedParticipantId);
+	void ClearRuntimeDelegates();
 };
