@@ -255,7 +255,7 @@ bool UHSRBattleCoordinator::InitParticipantASC(AActor* TargetActor)
 	// Configure ASC: single-player, no tick
 	ASC->SetIsReplicated(false);
 	ASC->SetComponentTickEnabled(false);
-	ASC->RegisterComponent();
+	// ASC->RegisterComponent() ?? auto-registered by AddComponentByClass
 
 	// Register CoreAttributeSet via InitStats
 	const UAttributeSet* AttrSet = ASC->InitStats(UHSRCoreAttributeSet::StaticClass(), nullptr);
@@ -264,7 +264,7 @@ bool UHSRBattleCoordinator::InitParticipantASC(AActor* TargetActor)
 		UE_LOG(LogTemp, Warning,
 			TEXT("UHSRBattleCoordinator::InitParticipantASC - InitStats failed for Actor=%s"),
 			*TargetActor->GetName());
-		ASC->DestroyComponent(false);
+		ASC->DestroyComponent(true);
 		return false;
 	}
 
@@ -276,7 +276,7 @@ bool UHSRBattleCoordinator::InitParticipantASC(AActor* TargetActor)
 		UE_LOG(LogTemp, Warning,
 			TEXT("UHSRBattleCoordinator::InitParticipantASC - ActorInfo invalid after Init for Actor=%s"),
 			*TargetActor->GetName());
-		ASC->DestroyComponent(false);
+		ASC->DestroyComponent(true);
 		return false;
 	}
 
