@@ -7,6 +7,7 @@
 
 class UWorld;
 class AActor;
+class UHSRTurnManager;
 
 /**
  * State machine for battle initialization.
@@ -35,6 +36,7 @@ public:
 
 	/** Access spawned participants (valid only in current Battle World). */
 	const TArray<FHSRBattleParticipant>& GetParticipants() const { return Participants; }
+	UHSRTurnManager* GetTurnManager() const { return TurnManager; }
 
 	/** Reset to Idle for a fresh battle session. */
 	void Reset();
@@ -47,6 +49,9 @@ private:
 	FHSRBattleReturnContext ReturnContext;
 	TArray<FHSRBattleParticipant> Participants;
 	TArray<FHSRBattleParticipantDefinition> ParticipantDefinitions;
+
+	UPROPERTY()
+	TObjectPtr<UHSRTurnManager> TurnManager;
 
 	AActor* SpawnParticipantActor(UWorld* World, const FHSRBattleParticipantDefinition& Definition);
 	bool InitParticipantASC(AActor* TargetActor);

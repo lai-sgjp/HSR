@@ -7,7 +7,7 @@
 
 - **Phase 1 与 Phase 2 均为 `Ready`。P2-003 最终处置为 `USER ACCEPTED`：Reviewer 的唯一结论仍为 `REVISE`，用户明确接受未完全掌握的学习项作为非阻断复习项。**
 - **Phase 3 为 `Ready`：P3-003 最终 Reviewer commit `3b3fbeb` 为 `PASS WITH FOLLOW-UP`，且用户已明确接受三个工程证据缺口；所有 follow-up 原样保留。**
-- **Phase 4 为 `Ready with inherited follow-ups`：P4-004 Teacher、Verification、Reviewer 与 Coordinator 收尾链已闭合；所有用户接受、延期、报告级和未验证边界原样保留。Phase 5 尚未实施，必须等本次收尾 commit 与 push 结果记录后才能开始。**
+- **Phase 4 为 `Ready with inherited follow-ups`：P4-004 Teacher、Verification、Reviewer 与 Coordinator 收尾链已闭合；所有用户接受、延期、报告级和未验证边界原样保留。收尾 commits `cdb1f00`、`4404e25` 已存在且 `HEAD == origin/main`。Phase 5 尚未实施；P5-000 正在进行文档校准与计划归档。**
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
@@ -19,7 +19,7 @@
 - `TASK-P4-001` 已归档：Reviewer 最终结论 `PASS WITH FOLLOW-UP`；commits `7056f72`、`a4fd762`、`b3c26b6`、`af64e661` 与当前可读执行报告均保留。A2 后 Editor/PIE 未验证，由用户明确接受为非阻断风险。
 - `TASK-P4-002` 已归档：A1 源码与用户 02:07 PIE 支持主路径；A1 Build 完整日志已被用户删除，只保留报告级证据。BP 路径、Map 误保存撤回、mixed commit/同身份/Git 偏差及生命周期专项 follow-up 全部保留。
 - `TASK-P4-003` 已归档：三种 initiative、Return 单次消费、Transform 恢复和多轮 PIE 主路径有证据；A4c 一次可定位 Build、1/4 P4-002 组合动态，其余用户接受/延期 follow-up 保留。
-- `TASK-P4-004` 已归档，最终 Reviewer commit `a3e37575` 为 `PASS WITH FOLLOW-UP`；Coordinator 收尾 commit 待创建。
+- `TASK-P4-004` 已归档，最终 Reviewer commit `a3e37575` 为 `PASS WITH FOLLOW-UP`；Coordinator 收尾 commits 为 `cdb1f00`、`4404e25`，已同步 `origin/main`。
 - `TASK-P2-003` 已以 `USER ACCEPTED` 归档；其 Reviewer `REVISE` 结论未改写。
 - `TASK-P2-002` 经 A1/A2/A3 修订与用户最终补证后由 Reviewer 判定 `PASS`：最终 `HSREditor Win64 Development` 成功，五 GE 配置、Editor 重开、Clamp、Re-Possess、HUD 单 snapshot/teardown 和两轮连续 PIE 均有用户证据并经 Reviewer 只读核验。历史 `REVISE` 链保留。
 - `TASK-P2-001` 最终处置为 `USER ACCEPTED`：独立 Reviewer 结论仍为 `REVISE`，用户明确接受剩余证据边界并授权进入 P2-002；未伪造 Reviewer `PASS`。
@@ -97,7 +97,7 @@
 
 ## 下一个推荐任务
 
-- **当前下一步：** 核对并创建 Phase 4 收尾 commit，随后按长期授权非强制 push 并记录 remote/branch/结果；在此之前不进入 Phase 5。
+- **当前下一步：** TASK-P5-001 Independent Reviewer 已复审为 `PASS WITH FOLLOW-UP`。仍需补修复后的 fresh Build/UHT/C++/Link 与 invalid-but-nonempty DefinitionId 运行时失败证据；完成前不得归档或创建 P5-002。
 
 ## 2026-07-19 TASK-P4-004 最终收尾
 
@@ -469,3 +469,8 @@
 - 用户需补齐五 GE 配置/作者、Editor 重开、逐用例前后值与各层增量、Re-Possess、Widget 销毁重建及至少两轮连续 PIE 证据；GE 变化与 snapshot 计数必须分开。
 - `BP_GE_InitializeCoreAttributes.uasset` 修改已由用户确认并接受，不再是审查问题。
 - 当前交接为 Coordinator → Implementation Agent A3 首次只读复述；必须以 `等待用户确认执行 TASK-P2-002-A3。` 结束，用户再次确认前不得实施。
+## 2026-07-19 TASK-P5-001 最终放行与 P5-002 启动
+
+- 用户确认 invalid-but-nonempty DefinitionId 失败路径正常，证据等级为 `USER PROVIDED`。
+- TASK-P5-001 最终状态为 `PASS`，活动卡已归档至 `tasks/archive/TASK-P5-001-active-task.md`。
+- 已创建唯一 `TASK-P5-002` 活动卡，目标为无 Tick、Speed 稳定排序和一次性 ActionResolved 的 TurnManager；等待用户确认执行。

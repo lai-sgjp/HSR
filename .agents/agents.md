@@ -1426,3 +1426,14 @@ Teacher 可读取 `learning-journal.md`、`worklog.md`、`todo_plan.md`、`READM
 - 每次提交记录 commit hash；Phase 推送记录远端、分支和 push 结果。push 前再次检查工作树和远端目标，不执行强制推送。
 - 角色提交或 Phase push 失败时保留第一处真实错误，停止扩权，不使用 reset、clean 或删除缓存掩盖问题。
 - Phase 收尾时可按 19.1 清理已归档且不再承担唯一证据责任的 Build 派生产物；清理前必须保留结构化摘要并完成 diff/范围核对。
+## 42. Reviewer Result Persistence / 审查结果落盘规则
+
+- Reviewer 每次给出 `PASS`、`PASS WITH FOLLOW-UP`、`REVISE` 或 `BLOCKED` 后，必须先将完整结论、证据等级、阻断项与下一步写入 `tasks/final-review.md`。
+- Coordinator 随后同步 `tasks/active-task.md`、`PROJECT_STATE.md`、`worklog.md` 及真实进度对应的 todo；聊天中的审查结论不能替代文件化审查产物。
+- 审查结论未落盘前，不得归档当前任务、创建下一张活动任务卡或推进下一子任务。
+## 43. Clean Handoff / 干净交接规则
+
+- 每个子任务在从 Implementation/Debugger 交给 Coordinator、Teacher 或 Reviewer 前，必须先完成 `git status`、`git diff`、allowlist 和派生产物核对。
+- 角色必须提交自己本轮的实际产物并记录 commit hash；未提交、未记录 hash 或工作树仍有未分类变更时，不得宣称任务已交接或进入下一角色。
+- 用户 Editor 资产必须先由用户完成并提供证据；执行者不得代替用户提交未知资产。用户资产、代码、文档和审查结果必须按作者/角色分开记录。
+- 交接时若发现工作树不干净，必须先分类：归属当前角色则提交，归属用户则记录并等待用户确认，越权或未知变更则停止请求处置；不得用 reset、clean、删除或覆盖掩盖问题。

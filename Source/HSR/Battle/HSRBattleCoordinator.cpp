@@ -1,4 +1,5 @@
 #include "HSRBattleCoordinator.h"
+#include "HSRTurnManager.h"
 #include "HSREncounterTypes.h"
 #include "../GAS/HSRAbilitySystemComponent.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
@@ -80,7 +81,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			static_cast<int32>(CurrentState), *CurrentRequestId.ToString());
 		return FHSRBattleInitResult::MakeFailure(
 			EHSRBattleInitFailureType::DefinitionNotFound,
-			FText::FromString(TEXT("Coordinator is not in Consuming state.")),
+			FText::FromString(TEXT("Coordinator is not in Consuming state."))
 		);
 	}
 
@@ -92,7 +93,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		CurrentState = EHSRBattleCoordinatorState::Failed;
 		return FHSRBattleInitResult::MakeFailure(
 			EHSRBattleInitFailureType::SpawnFailed,
-			FText::FromString(TEXT("Battle World is null.")),
+			FText::FromString(TEXT("Battle World is null."))
 		);
 	}
 
@@ -158,6 +159,17 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			Participant.AbilitySystemComponent.IsValid() ? *Participant.AbilitySystemComponent->GetName() : TEXT("null"));
 	}
 
+	TurnManager = NewObject<UHSRTurnManager>(this);
+	if (!TurnManager || !TurnManager->Initialize(Participants))
+	{
+		UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED to initialize TurnManager RequestId=%s"), *CurrentRequestId.ToString());
+		for (FHSRBattleParticipant& Participant : Participants) { if (Participant.Actor.IsValid()) Participant.Actor->Destroy(); }
+		Participants.Empty();
+		TurnManager = nullptr;
+		CurrentState = EHSRBattleCoordinatorState::Failed;
+		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to initialize TurnManager.")));
+	}
+
 	// Atomically transition to Spawned
 	CurrentState = EHSRBattleCoordinatorState::Spawned;
 
@@ -178,7 +190,11 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildAndValidateParticipantDefinitio
 	PlayerDef.DefinitionId = FName(TEXT("PlayerCharacter"));
 	PlayerDef.Team = EHSRBattleParticipantTeam::Player;
 	PlayerDef.PawnClass = nullptr;
-	ParticipantDefinitions.Add(PlayerDef);
+	if (PlayerDef.DefinitionId != FName(TEXT("PlayerCharacter")))
+	{
+		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::DefinitionNotFound,
+			FText::FromString(TEXT("Player definition is not registered.")), PlayerDef.DefinitionId);
+	}
 
 	// Enemy Definition: uses CurrentEnemyDefinitionId from the encounter request
 	FHSRBattleParticipantDefinition EnemyDef;
@@ -186,6 +202,22 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildAndValidateParticipantDefinitio
 	EnemyDef.DefinitionId = CurrentEnemyDefinitionId;
 	EnemyDef.Team = EHSRBattleParticipantTeam::Enemy;
 	EnemyDef.PawnClass = nullptr;
+	// The phase-5 runtime currently exposes one intentionally small, explicit
+	// definition registry. Unknown non-empty IDs must fail deterministically.
+	if (EnemyDef.DefinitionId != FName(TEXT("Enemy_TestGoblin")))
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("UHSRBattleCoordinator::BuildAndValidateParticipantDefinitions - DefinitionNotFound DefId=%s RequestId=%s"),
+			*EnemyDef.DefinitionId.ToString(), *CurrentRequestId.ToString());
+		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::DefinitionNotFound,
+			FText::FromString(TEXT("Enemy definition is not registered.")), EnemyDef.DefinitionId);
+	}
+	// Resolve the registered definitions to their controlled runtime class.
+	// The prototype intentionally uses the native APawn shell for both entries;
+	// SpawnParticipantActor never falls back for a validated definition.
+	PlayerDef.PawnClass = APawn::StaticClass();
+	EnemyDef.PawnClass = APawn::StaticClass();
+	ParticipantDefinitions.Add(PlayerDef);
 	ParticipantDefinitions.Add(EnemyDef);
 
 	// Validate each definition
@@ -242,6 +274,12 @@ void UHSRBattleCoordinator::Reset()
 	CurrentEnemyDefinitionId = NAME_None;
 	ReturnContext = FHSRBattleReturnContext();
 	Participants.Empty();
+	ParticipantDefinitions.Empty();
+	if (TurnManager)
+	{
+		TurnManager->Reset();
+		TurnManager = nullptr;
+	}
 }
 
 AActor* UHSRBattleCoordinator::SpawnParticipantActor(UWorld* World, const FHSRBattleParticipantDefinition& Definition)

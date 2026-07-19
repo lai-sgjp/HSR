@@ -1442,3 +1442,34 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - P4-003 A4c Build/PIE 摘要已在归档 execution/final-review 中保存：仅一次可定位 Build、三种 initiative/Return 主路径和 UnPossess/Re-Possess 用户证据；其余 failure/生命周期 follow-up 保留。
 - 根目录 `Build-Log-P4-003*` raw txt/json/uba 已摘要归档，按规则可清理；不删除 Saved/Logs、其他 Build logs、Source 或资产。
 - Phase 4 收尾 commit 与 push 仍需本轮完成并记录真实 remote/branch/结果；在此之前不得开始 Phase 5。
+## 2026-07-19｜Coordinator：P5-000 门禁复核
+
+- 只读核对确认 Phase 4 收尾 commits `cdb1f00`、`4404e25` 已存在，且 `HEAD == origin/main`；Reviewer `a3e37575` 仍为 `PASS WITH FOLLOW-UP`。
+- P4 的 inherited follow-ups 未升级为动态通过：A4c 仅一次可定位 Build，部分 PIE/失败/生命周期证据仍为用户、报告级或延期证据。
+- 工作树保留已知 `Source/HSR/Player/HSRPlayerController.cpp` stat/index 噪声，不修改、不回退、不纳入本轮计划提交；`docs/phase-5-execution-plan.md` 是本轮新增规划文档。
+- 已校准 `PROJECT_STATE.md` 的陈旧“待创建收尾 commit”表述。P5-001 仍未开始；下一步是完成 P5 计划归档并创建唯一 P5-001 活动任务卡。
+
+## 2026-07-19｜Coordinator：创建 TASK-P5-001 活动卡
+
+- 创建唯一活动任务卡 `tasks/active-task.md`，锁定 P5-001“战斗运行时骨架与 Encounter Context 重建”。
+- 允许范围仅为 Battle runtime 骨架文件与执行报告；禁止修改 Transition、PlayerController stat/index 噪声、Config、Content、Build.cs、Turn、Ability、Result、UI、SaveGame 和网络。
+- 任务状态为 `PLANNED — 等待用户确认执行`；低级执行模型必须先复述活动卡并等待用户对 TASK-P5-001 的独立确认。
+
+## 2026-07-19｜Independent Reviewer：TASK-P5-001 REVISE 落盘
+
+- 用户提供的 Editor 重开、Phase4/Phase5 Encounter 切换和 PIE 回归证据已纳入，资产分流与 P4 回归不再阻断；证据等级保持 `USER PROVIDED`。
+- Reviewer 结论为 `REVISE`：当前实现未解析/验证真实 Definition，固定生成裸 `APawn`，Player DefinitionId 错用 EncounterId，且缺少结构化失败结果。
+- 完整结论与最小修订要求已写入 `tasks/final-review.md`，活动卡同步为 `IMPLEMENTATION REVISION REQUIRED`。P5-001 不归档，不创建 P5-002。
+- 全局规则补充：所有 Reviewer 结论必须先写入 `tasks/final-review.md`；聊天结论不能替代文件化产物。
+
+## 2026-07-19｜Debugger/Reviewer：TASK-P5-001 修订复审
+
+- Debugger 修复 `HSRBattleGameMode.cpp` 的未声明 `BuildResult` 编译错误，并在 Coordinator 中加入 DefinitionNotFound 验证、稳定 Player DefinitionId 和显式 PawnClass。
+- Reviewer 静态复审结论为 `PASS WITH FOLLOW-UP`；源码层 Reviewer 缺口闭合。
+- Follow-up 保留：修复后 fresh UBT/UHT/C++/Link 未运行（环境找不到 UnrealBuildTool），且尚无 invalid-but-nonempty DefinitionId 的独立 PIE/日志失败轨迹。
+- 在两个 follow-up 完成前，不归档 P5-001，不创建 P5-002。
+## 2026-07-19｜Coordinator：TASK-P5-001 归档与 P5-002 规划
+
+- 用户确认 invalid-but-nonempty DefinitionId 失败路径正常，作为 `USER PROVIDED` 证据记录。
+- TASK-P5-001 最终 Reviewer 结论更新为 `PASS`，活动卡已归档。
+- 创建唯一 `TASK-P5-002` 活动卡：TurnManager、Speed 降序稳定同速裁决、一次性 ActionResolved、无 Tick；等待用户独立确认。

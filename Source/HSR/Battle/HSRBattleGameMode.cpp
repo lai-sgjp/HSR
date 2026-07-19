@@ -2,6 +2,7 @@
 #include "HSRBattleCoordinator.h"
 #include "HSRBattleTransitionSubsystem.h"
 #include "Engine/World.h"
+#include "AbilitySystemComponent.h"
 
 AHSRBattleGameMode::AHSRBattleGameMode()
 {
@@ -45,8 +46,8 @@ void AHSRBattleGameMode::BeginPlay()
 	if (!bSubmitResult)
 	{
 		UE_LOG(LogTemp, Error,
-			TEXT("AHSRBattleGameMode::BeginPlay - SubmitBattleRequest FAILED: %s (RequestId=%s)"),
-			*BuildResult.Message.ToString(), static_cast<int32>(BuildResult.FailureType), *BuildResult.TargetDefinitionId.ToString());
+			TEXT("AHSRBattleGameMode::BeginPlay - SubmitBattleRequest FAILED (RequestId=%s)"),
+			*ConsumeResult.RequestId.ToString());
 		return;
 	}
 

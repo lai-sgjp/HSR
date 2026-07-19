@@ -12,6 +12,9 @@ struct FHSRBattleParticipant
 	FName DefinitionId;
 	EHSRBattleParticipantTeam Team = EHSRBattleParticipantTeam::Player;
 
+	/** Snapshot when the turn order is built. TurnManager never polls this every frame. */
+	float InitiativeSpeed = 0.0f;
+
 	TWeakObjectPtr<AActor> Actor;
 	TWeakObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 
