@@ -8,7 +8,7 @@
 #include "AbilitySystemComponent.h"
 #include "AttributeSet.h"
 
-bool SubmitBattleRequest(const FHSREncounterRequest& InRequest)
+bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRequest)
 {
 	if (CurrentState != EHSRBattleCoordinatorState::Idle)
 	{
@@ -16,6 +16,7 @@ bool SubmitBattleRequest(const FHSREncounterRequest& InRequest)
 			TEXT("UHSRBattleCoordinator::SubmitBattleRequest - REJECTED state=%d RequestId=%s (expected Idle)"),
 			static_cast<int32>(CurrentState), *InRequest.RequestId.ToString());
 		return false;
+	}
 
 	if (!InRequest.RequestId.IsValid())
 	{
@@ -70,7 +71,7 @@ bool SubmitBattleRequest(const FHSREncounterRequest& InRequest)
 	return true;
 }
 
-bool BuildParticipants(UWorld* BattleWorld)
+bool UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
 {
 	if (CurrentState != EHSRBattleCoordinatorState::Consuming)
 	{
@@ -78,13 +79,6 @@ bool BuildParticipants(UWorld* BattleWorld)
 			TEXT("UHSRBattleCoordinator::BuildParticipants - REJECTED state=%d RequestId=%s (expected Consuming)"),
 			static_cast<int32>(CurrentState), *CurrentRequestId.ToString());
 		return false;
-	}
-
-	if (!BattleWorld)
-	{
-		UE_LOG(LogTemp, Error,
-			TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED BattleWorld=null RequestId=%s EncounterId=%s"),
-			*CurrentRequestId.ToString(), *CurrentEncounterId.ToString());
 		CurrentState = EHSRBattleCoordinatorState::Failed;
 		return false;
 	}

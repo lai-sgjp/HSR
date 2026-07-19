@@ -46,7 +46,7 @@ void AHSRBattleGameMode::BeginPlay()
 	{
 		UE_LOG(LogTemp, Error,
 			TEXT("AHSRBattleGameMode::BeginPlay - SubmitBattleRequest FAILED: %s (RequestId=%s)"),
-			"see Coordinator log above", *Coordinator->GetCurrentRequestId().ToString());
+			TEXT("see Coordinator log (above)"), *Coordinator->GetCurrentRequestId().ToString());
 		return;
 	}
 
@@ -60,7 +60,7 @@ void AHSRBattleGameMode::BeginPlay()
 	{
 		UE_LOG(LogTemp, Error,
 			TEXT("AHSRBattleGameMode::BeginPlay - BuildParticipants FAILED: %s (RequestId=%s)"),
-			"see Coordinator log above", *Coordinator->GetCurrentRequestId().ToString());
+			TEXT("see Coordinator log (above)"), *Coordinator->GetCurrentRequestId().ToString());
 		return;
 	}
 

@@ -75,5 +75,3 @@ struct FHSRBattleRequestContext
 
 	FHSRBattleRequestContext() = default;
 };
-
-};
