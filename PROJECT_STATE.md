@@ -485,3 +485,16 @@
 - 两轮用户 PIE 均完成 9 项 TurnTest、Harness=COMPLETE 和 Map_Battle teardown；fresh Build exit 0/UHT/C++/Link 5 actions。
 - 证据等级为 `USER PROVIDED`；后续 Ability/伤害/胜负/UI/网络不属于 P5-002。
 - P5-002 活动卡已归档；P5-003 需用户另行确认后创建。
+## 2026-07-19 P5-003 规划
+
+- 已创建唯一 `TASK-P5-003` 活动卡，目标为 GAS 最小普攻与固定伤害。
+- 不包含复杂技能、Cost/Cooldown、死亡/胜负、UI、网络或 SaveGame；等待用户确认执行。
+## 2026-07-19 P5-004 规划
+
+- P5-003 已完成 Reviewer `PASS WITH FOLLOW-UP` 并归档。
+- 已创建唯一 `TASK-P5-004` 活动卡，目标为死亡、胜负、BattleResult 单次消费与返回探索；等待用户确认执行。
+## 2026-07-19 P5-004 最终审查
+
+- P5-004 Reviewer 结论为 `PASS WITH FOLLOW-UP`。
+- Victory/Defeat 各两轮、Result/Return exactly-once、Transform 恢复和 resolved 防重入均已由用户验证。
+- 已创建阶段收尾方向的 P5-005；不再新增战斗规则。

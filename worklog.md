@@ -1483,3 +1483,18 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 两轮用户 PIE 日志均显示 9 项 TurnTest 全部 PASS、Harness=COMPLETE、Map_Battle teardown 正常；Build 已 exit 0。
 - Reviewer 结论为 `PASS WITH FOLLOW-UP`，证据等级保持 `USER PROVIDED`。
 - P5-002 可归档；P5-003 需新的活动卡和用户确认，不自动创建。
+## 2026-07-19｜Coordinator：创建 TASK-P5-003
+
+- P5-002 资产、审查结果和归档卡已完成提交；用户资产 commit `268318d`，协调归档 commit `e259441`。
+- 创建唯一 P5-003 活动卡，范围锁定为 GAS 基础普攻、固定伤害、ActionResolved 接线和失败路径。
+- 当前等待用户独立确认执行，不提前修改代码或资产。
+## 2026-07-19｜Coordinator：归档 P5-003 并创建 TASK-P5-004
+
+- P5-003 两轮用户 PIE 与固定伤害测试通过，Reviewer 结论为 `PASS WITH FOLLOW-UP`；最终审查已落盘。
+- 创建唯一 P5-004 活动卡：死亡/胜负、纯值 BattleResult、exactly-once 消费和原始 Transform 返回。
+- P5-004 等待用户独立确认，不提前实施。
+## 2026-07-19｜Coordinator：P5-004 最终审查与收尾准备
+
+- 用户已提供 PlayerVictory/PlayerDefeat 各两轮证据；Reviewer 结论为 `PASS WITH FOLLOW-UP`。
+- 防重复旅行修复 `d58f17b`、Return Transform、BattleResult exactly-once 均已记录。
+- P5-004 可归档，下一步创建 P5-005 阶段收尾任务。
