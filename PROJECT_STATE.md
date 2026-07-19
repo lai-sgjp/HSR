@@ -7,7 +7,7 @@
 
 - **Phase 1 与 Phase 2 均为 `Ready`。P2-003 最终处置为 `USER ACCEPTED`：Reviewer 的唯一结论仍为 `REVISE`，用户明确接受未完全掌握的学习项作为非阻断复习项。**
 - **Phase 3 为 `Ready`：P3-003 最终 Reviewer commit `3b3fbeb` 为 `PASS WITH FOLLOW-UP`，且用户已明确接受三个工程证据缺口；所有 follow-up 原样保留。**
-- **Phase 4 为 `Ready with inherited follow-ups`：P4-004 Teacher、Verification、Reviewer 与 Coordinator 收尾链已闭合；所有用户接受、延期、报告级和未验证边界原样保留。收尾 commits `cdb1f00`、`4404e25` 已存在且 `HEAD == origin/main`。Phase 5 尚未实施；P5-000 正在进行文档校准与计划归档。**
+- **Phase 4 为 `Ready with inherited follow-ups`；Phase 5 的 P5-001～P5-004 已实施并完成各自 Reviewer 审查，当前执行 P5-005 阶段收尾。Phase 5 尚未最终标记 Ready，等待归档链和文档一致性复核。**
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
