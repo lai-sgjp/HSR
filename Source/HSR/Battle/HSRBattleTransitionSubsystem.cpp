@@ -204,10 +204,17 @@ bool UHSRBattleTransitionSubsystem::HasPending() const
 	return CurrentState == EHSREncounterState::Pending || CurrentState == EHSREncounterState::Traveling;
 }
 
+void UHSRBattleTransitionSubsystem::ClearReturn()
+{
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ClearReturn - Clearing Return context"));
+	PendingReturnContext = FHSRExplorationReturnContext();
+	bReturnPending = false;
+}
+
 void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravelFailure::Type FailureType, const FString& ErrorString)
 {
-	UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - type=%d World=%s"),
-		static_cast<int32>(FailureType), InWorld ? *InWorld->GetName() : TEXT("null"));
+	UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - type=%d Error=%s World=%s"),
+		static_cast<int32>(FailureType), *ErrorString, InWorld ? *InWorld->GetName() : TEXT("null"));
 
 	// Clean up Encounter state if we were Traveling
 	if (CurrentState == EHSREncounterState::Traveling)

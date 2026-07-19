@@ -38,6 +38,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Return")
 	FHSRExplorationReturnResult ConsumeReturnContext();
 
+	UFUNCTION(BlueprintCallable, Category = "Return")
+	void ClearReturn();
+
 	UFUNCTION(BlueprintPure, Category = "Return")
 	bool HasReturnPending() const { return bReturnPending; }
 

@@ -19,7 +19,11 @@ void AHSRExplorationReturnConsumer::BeginPlay()
 
 void AHSRExplorationReturnConsumer::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	GetWorld()->GetTimerManager().ClearTimer(ReturnTimerHandle);
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		World->GetTimerManager().ClearTimer(ReturnTimerHandle);
+	}
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -53,7 +57,7 @@ void AHSRExplorationReturnConsumer::TryConsumeAndReturn()
 	if (!PlayerPawn)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AHSRExplorationReturnConsumer::TryConsumeAndReturn - FAILED: no player pawn after %d retries"), MaxRetries);
-		Subsystem->ClearPending();
+		Subsystem->ClearReturn();
 		return;
 	}
 
