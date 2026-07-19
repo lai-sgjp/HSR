@@ -13,6 +13,7 @@ void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collect
 	bReturnConsumed = false;
 	TravelKind = EHSRTravelKind::None;
 	TravelRequestId = FGuid();
+	TravelCompletedEncounterId = NAME_None;
 
 	if (GEngine)
 	{
@@ -50,6 +51,13 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 		return FHSREncounterResult::MakeFailure(
 			EHSREncounterResultType::InvalidRequest,
 			FText::FromString(TEXT("EncounterId is not set.")));
+	}
+
+	if (ResolvedEncounterIds.Contains(Definition->EncounterId))
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - REJECTED resolved EncounterId=%s"), *Definition->EncounterId.ToString());
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::AlreadyConsumed,
+			FText::FromString(TEXT("This encounter was already resolved in the current game session.")));
 	}
 
 	if (Definition->EnemyDefinitionId.IsNone())
@@ -282,6 +290,10 @@ void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravel
 	}
 	else if (TravelKind == EHSRTravelKind::Return)
 	{
+		if (!TravelCompletedEncounterId.IsNone())
+		{
+			ResolvedEncounterIds.Remove(TravelCompletedEncounterId);
+		}
 		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - Clearing Return context (RequestId=%s, now clean, retry available)"),
 			*TravelRequestId.ToString());
 		ClearReturn();
@@ -291,6 +303,7 @@ void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravel
 	TravelKind = EHSRTravelKind::None;
 	TravelRequestId = FGuid();
 	TravelTargetMap = NAME_None;
+	TravelCompletedEncounterId = NAME_None;
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - State clean. New requests can proceed."));
 	return;
 }
@@ -302,11 +315,15 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestTestReturn(con
 	BattleReturnContext.RequestId = FromConsumedRequest.RequestId;
 	BattleReturnContext.ExplorationMapPath = FromConsumedRequest.ExplorationMapPath;
 	BattleReturnContext.ReturnTransform = FromConsumedRequest.ReturnTransform;
-	return RequestBattleReturn(BattleReturnContext);
+	FHSRBattleResult TestResult;
+	TestResult.RequestId = BattleReturnContext.RequestId;
+	TestResult.ReturnContext = BattleReturnContext;
+	return RequestBattleReturn(TestResult);
 }
 
-FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(const FHSRBattleReturnContext& BattleReturnContext)
+FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(const FHSRBattleResult& BattleResult)
 {
+	const FHSRBattleReturnContext& BattleReturnContext = BattleResult.ReturnContext;
 	// Validate BEFORE writing (must not pollute Pending)
 	if (bReturnPending)
 	{
@@ -362,6 +379,11 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(c
 	TravelKind = EHSRTravelKind::Return;
 	TravelRequestId = ReturnCtx.RequestId;
 	TravelTargetMap = ReturnCtx.ExplorationMapPath;
+	TravelCompletedEncounterId = BattleResult.EncounterId;
+	if (!TravelCompletedEncounterId.IsNone())
+	{
+		ResolvedEncounterIds.Add(TravelCompletedEncounterId);
+	}
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - SUCCESS RequestId=%s ExplorationMap=%s (kind=Return)"),
 		*ReturnCtx.RequestId.ToString(), *ReturnCtx.ExplorationMapPath.ToString());
@@ -398,6 +420,7 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::ConsumeReturnContext(
 	TravelKind = EHSRTravelKind::None;
 	TravelRequestId = FGuid();
 	TravelTargetMap = NAME_None;
+	TravelCompletedEncounterId = NAME_None;
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ConsumeReturnContext - SUCCESS RequestId=%s ReturnLoc=%s"),
 		*Consumed.RequestId.ToString(), *Consumed.ReturnTransform.GetLocation().ToString());

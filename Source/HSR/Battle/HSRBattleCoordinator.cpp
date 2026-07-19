@@ -404,6 +404,7 @@ void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
 	Defeated->bDefeated = true;
 	BattleResult.RequestId = CurrentRequestId;
 	BattleResult.DefeatedParticipantId = DefeatedParticipantId;
+	BattleResult.EncounterId = CurrentEncounterId;
 	BattleResult.ReturnContext = ReturnContext;
 	BattleResult.Outcome = Defeated->Team == EHSRBattleParticipantTeam::Enemy ? EHSRBattleOutcome::PlayerVictory : EHSRBattleOutcome::PlayerDefeat;
 	bBattleResultProduced = true;

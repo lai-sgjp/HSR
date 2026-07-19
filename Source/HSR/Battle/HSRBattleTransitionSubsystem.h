@@ -43,8 +43,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Return")
 	FHSRExplorationReturnResult RequestTestReturn(const FHSREncounterRequest& FromConsumedRequest);
-	/** Starts return travel from a pure battle result context. */
-	FHSRExplorationReturnResult RequestBattleReturn(const FHSRBattleReturnContext& ReturnContext);
+	/** Starts return travel from a pure battle result and resolves its encounter on success. */
+	FHSRExplorationReturnResult RequestBattleReturn(const FHSRBattleResult& BattleResult);
 
 	UFUNCTION(BlueprintCallable, Category = "Return")
 	FHSRExplorationReturnResult ConsumeReturnContext();
@@ -66,4 +66,6 @@ private:
 	EHSRTravelKind TravelKind;
 	FGuid TravelRequestId;
 	FName TravelTargetMap;
+	FName TravelCompletedEncounterId;
+	TSet<FName> ResolvedEncounterIds;
 };

@@ -290,7 +290,7 @@ void AHSRBattleGameMode::HandleBattleResultReady(const FHSRBattleResult& Result)
 		return;
 	}
 
-	const FHSRExplorationReturnResult ReturnResult = Subsystem->RequestBattleReturn(ConsumedResult.ReturnContext);
+	const FHSRExplorationReturnResult ReturnResult = Subsystem->RequestBattleReturn(ConsumedResult);
 	if (ReturnResult.ResultType == EHSREncounterReturnResultType::Success)
 	{
 		UE_LOG(LogTemp, Log, TEXT("AHSRBattleGameMode::HandleBattleResultReady - Return request type=%d Outcome=%d RequestId=%s"),

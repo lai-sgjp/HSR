@@ -149,6 +149,9 @@ struct FHSRBattleResult
 	FName DefeatedParticipantId;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FName EncounterId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
 	FHSRBattleReturnContext ReturnContext;
 
 	bool IsValid() const { return RequestId.IsValid() && Outcome != EHSRBattleOutcome::None; }

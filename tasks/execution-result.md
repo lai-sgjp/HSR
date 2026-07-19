@@ -32,6 +32,13 @@
 
 No PIE run was launched by this implementation agent. Terminal success, duplicate result rejection, travel failure, and continuous-PIE behavior remain awaiting user-provided runtime logs and independent review.
 
+### P5-004 Return Re-entry Revision (2026-07-19)
+
+- Root cause from user-provided runtime log: return itself succeeded, then the restored exploration pawn immediately overlapped the still-active encounter enemy and its controller issued a new `RequestEncounter`.
+- The minimal fix is contained in `UHSRBattleTransitionSubsystem`: a successful result-return transaction records the pure `EncounterId` as resolved for the current GameInstance. A later request for the same ID returns `AlreadyConsumed` before creating a pending request or opening `Map_Battle`.
+- A return travel failure removes that ID from the resolved set, preserving retry behavior and avoiding a false permanent completion.
+- No Enemy, PlayerController, AI behavior, reward, UI, asset, Tick, network, or SaveGame file was changed.
+
 ## TASK-P5-003 Implementation Handoff (2026-07-19)
 
 ### Implemented C++ seam
