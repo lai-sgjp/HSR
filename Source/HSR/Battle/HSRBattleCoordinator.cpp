@@ -79,6 +79,14 @@ bool UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
 			TEXT("UHSRBattleCoordinator::BuildParticipants - REJECTED state=%d RequestId=%s (expected Consuming)"),
 			static_cast<int32>(CurrentState), *CurrentRequestId.ToString());
 		return false;
+	}
+
+
+	if (!BattleWorld)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED BattleWorld=null RequestId=%s EncounterId=%s"),
+			*CurrentRequestId.ToString(), *CurrentEncounterId.ToString());
 		CurrentState = EHSRBattleCoordinatorState::Failed;
 		return false;
 	}
