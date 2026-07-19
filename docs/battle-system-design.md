@@ -2,7 +2,7 @@
 
 ## 设计目标
 
-第一阶段使用独立 Battle Map 实现确定性 1v1 回合战斗。探索地图通过 `UHSRBattleTransitionSubsystem` 保存仅含稳定 ID、地图和 Transform 的 Encounter/Return Context；Battle Map 重建参与者 Actor 与 ASC。系统应在没有正式动画、VFX 或网络的情况下独立完成规则验证。
+第一阶段使用独立 Battle Map 实现确定性 1v1 回合战斗。探索地图通过 `UHSRBattleTransitionSubsystem` 保存仅含稳定 ID、地图和 Transform 的 Encounter/Return Context；这些纯值只有在 GameInstanceSubsystem 等跨 World 服务中托管时才能跨 `OpenLevel` 暂存，不能把旧 World Actor 当作跨图状态。Battle Map 重建参与者 Actor 与 ASC。系统应在没有正式动画、VFX 或网络的情况下独立完成规则验证。
 
 ## 职责边界
 

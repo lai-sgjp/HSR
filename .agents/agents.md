@@ -394,6 +394,10 @@ docs/
 - `DataTable` 用于大量结构一致的扁平数据；`CurveTable` 用于成长曲线。
 - Gameplay Tags 用于可组合语义，不替代所有数据字段。
 - 运行时状态与静态定义分离。
+- `DataAsset` 是跨关卡可解析的静态定义，不是当前 World 的运行实例；它可以被多个关卡引用，但不得保存临时 Actor 或本局进度。
+- `Runtime Request` 与 `ReturnContext` 是一次旅行的纯值快照；它们只有放在 `GameInstanceSubsystem` 等跨 World 生命周期容器中，才可跨 `OpenLevel` 暂存，不因自身是结构体就自动跨关卡存活。
+- `SaveGame` 面向退出游戏后的跨会话持久化；不把临时 Pending Request、ReturnContext、Actor、ASC、Widget 或 Active GameplayEffect Handle 当作存档字段。
+- `OpenLevel` 会销毁旧 World 中的 Actor、Character、AIController 和 Widget；跨图协议只能携带稳定 ID、软地图路径、`FTransform`、`FGuid`、枚举等纯值，并在新 World 重建运行实例。
 - UI 从定义和运行时数据接口读取，不直接硬编码数值。
 - 资产之间避免无边界的硬引用链。
 - 数据结构变更必须评估旧资产和 SaveGame 兼容性。
@@ -431,6 +435,22 @@ docs/
 10. 检查第三方资源许可证和未提交的大型二进制。
 11. 记录未完成项、技术债和下一阶段入口。
 12. Git commit、push 或创建远程仓库前征求用户许可。
+
+### 19.1 Build 日志与派生产物保留策略
+
+- `Build-Log-*`、`.uba`、`.json` 以及其他 UBT/UHT 派生产物是验证证据，不是项目运行时资产；默认不得提交到项目源码树。
+- 在当前工作包和 Phase 尚未完成审查、用户处置和归档前，不得删除原始 Build/PIE 日志；它们可能是唯一可追溯的证据。
+- Phase 收尾时，Coordinator 必须先把每份关键日志的 Target、UHT/C++/Link、退出码、首个错误/警告和证据来源摘要写入执行报告，再清理冗余 raw `Build-Log-*`/`.uba` 文件。
+- 清理只允许针对已核对、已归档且不再承担唯一证据责任的派生产物；不得删除 `Saved/Logs` 历史错误、用户提供的原始证据或通过删除日志掩盖失败。
+- 若用户明确删除 Build 日志，必须记录“日志已删除、剩余证据等级、是否可独立复核”，不得把报告级证据升级为 Reviewer 动态证据。
+- 推荐使用 `.gitignore`/构建输出目录隔离 raw 日志，仓库只保留结构化执行摘要、关键错误片段和可复现命令。
+
+### 19.2 通用 Phase 交接前 Git 门
+
+- 对任何 `Phase N → Phase N+1` 交接，一个 Phase 的所有子任务必须完成、审查、归档，且所有 `USER ACCEPTED`/未验证 follow-up 已写入状态文档，才能进入下一 Phase。
+- 每次阶段交接前，Coordinator 必须执行工作树、diff、派生产物、允许文件清单和远端目标检查，创建该阶段的收尾 commit。
+- 阶段收尾 commit 成功后，按用户长期授权推送到远端；分别记录本地 commit hash、Reviewer 结论和远程 push 结果（branch、remote、退出码/错误），不执行强制推送。
+- 未完成阶段 Gate、存在未解释越权或仍需本阶段 Implementation 修订时，不得以“准备下一 Phase”为由提交或推送。
 
 ## 20. 默认回答结构
 
@@ -1405,3 +1425,4 @@ Teacher 可读取 `learning-journal.md`、`worklog.md`、`todo_plan.md`、`READM
 - 一个 Phase 的所有子任务必须完成、审查、归档并完成角色提交后，由高级协调者创建阶段收尾 commit，并推送到远端仓库。
 - 每次提交记录 commit hash；Phase 推送记录远端、分支和 push 结果。push 前再次检查工作树和远端目标，不执行强制推送。
 - 角色提交或 Phase push 失败时保留第一处真实错误，停止扩权，不使用 reset、clean 或删除缓存掩盖问题。
+- Phase 收尾时可按 19.1 清理已归档且不再承担唯一证据责任的 Build 派生产物；清理前必须保留结构化摘要并完成 diff/范围核对。

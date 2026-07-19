@@ -7,6 +7,17 @@
 - 显示名称使用 `FText`，不得作为主键。
 - 不复制商业游戏的专有命名、数值表或成长曲线。
 
+## 四层数据与生命周期边界
+
+| 层 | 作用 | 生命周期 | 可以保存 | 禁止保存 |
+|---|---|---|---|---|
+| `DataAsset` / `PrimaryDataAsset` | 静态定义，描述“是什么” | 资产生命周期，可被多个 World 引用 | 稳定 ID、静态参数、软资源/地图引用 | 当前 Actor、当前 HP、临时请求、Widget、ASC、GE Handle |
+| `Runtime Request` | 本次操作的纯值快照，描述“这一次做什么” | 当前运行会话；需由 `GameInstanceSubsystem` 等跨 World 容器托管才可跨 `OpenLevel` | ID、枚举、`FGuid`、软地图路径、`FTransform` | Actor/Pawn/Controller/ASC/Widget/UObject 实例指针 |
+| `ReturnContext` | 本次旅行的回程纯值，描述“回来哪里” | 当前运行会话；由跨 World Runtime 服务托管 | 原地图路径、返回 Transform、Request ID、旅行匹配信息 | 旧 World Actor、旧 ASC、旧 Widget、GE Handle |
+| `SaveGame` | 跨游戏会话持久快照，描述“下次启动恢复什么” | 磁盘/存档会话 | 可迁移的 Profile、进度、ID、等级、背包等 DTO | 临时 Pending、ReturnContext、Actor、ASC、Widget、GE Handle |
+
+`OpenLevel` 后旧 World 的 Actor 实例会销毁；纯值结构体不会自动存活，必须由 `GameInstance`/`GameInstanceSubsystem` 持有。新 World 应依据稳定 ID 和定义重新解析/创建运行实例。
+
 ## 类型选择
 
 ### PrimaryDataAsset
