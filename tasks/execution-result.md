@@ -138,6 +138,12 @@ Implementation Agent has completed TASK-P5-001 C++ implementation, build verific
 - Fixes: added `#include "AbilitySystemComponent.h"`; removed the two trailing commas.
 - Command: `E:\programs\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat HSREditor Win64 Development -Project="E:\work\unreal_projects\HSR\HSR.uproject" -WaitMutex -FromMsBuild -architecture=x64`
 - Result: **Succeeded, exit code 0**. UHT/C++/link completed (4 actions). First warning: Visual Studio 2022 compiler is not a preferred version. No compile/link errors remain. AISystem C4996 remains a known non-blocking warning if emitted in broader builds.
+
+## P5-002 Harness Compile Fix (2026-07-19)
+
+- Fixed `HSRBattleGameMode.cpp` test harness `LogCase`: `UE_LOG` verbosity is now selected with compile-time `Log`/`Error` branches instead of the invalid runtime conditional verbosity expression.
+- Fresh Build result: **Succeeded, exit code 0** (5 actions). Log: `C:\Users\Lai\AppData\Local\UnrealBuildTool\Log.txt`.
+- Warnings: preferred Visual Studio compiler warning and known `AISystem.h` C4996; no compile/link errors.
 # TASK-P5-002 Implementation Handoff (2026-07-19)
 
 ## Implemented

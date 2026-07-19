@@ -11,7 +11,14 @@ namespace HSRBattleDevelopmentTest
 {
 	static void LogCase(const TCHAR* CaseName, bool bPassed)
 	{
-		UE_LOG(LogTemp, bPassed ? Log : Error, TEXT("P5-002 TurnTest Case=%s Result=%s"), CaseName, bPassed ? TEXT("PASS") : TEXT("FAIL"));
+		if (bPassed)
+		{
+			UE_LOG(LogTemp, Log, TEXT("P5-002 TurnTest Case=%s Result=PASS"), CaseName);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("P5-002 TurnTest Case=%s Result=FAIL"), CaseName);
+		}
 	}
 
 	static bool SetSpeed(const FHSRBattleParticipant& Participant, float Speed)
