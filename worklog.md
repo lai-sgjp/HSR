@@ -1409,3 +1409,28 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 已归档 P4-002 active/execution/final-review，并创建唯一 `TASK-P4-003`：显式 Player/Enemy/Neutral initiative、重复请求/地图/travel failure 恢复、纯值 Return Context 单次消费、空 Battle Map 测试返回和连续两轮往返。
 - P4-003 明确禁止 Phase 5 BattleResult、胜负/奖励、Battle Actor/TurnManager 和正式战后返回；当前只等待首次只读复述与用户二次确认，不自动实施。
 - 本轮未修改 Source/Content/Config，未运行 Build/Editor/PIE，未删除日志，未执行 Git。
+
+## 2026-07-19｜Coordinator：TASK-P4-003 归档与 TASK-P4-004 收尾卡
+
+- P4-003 Reviewer 最终结论为 `PASS WITH FOLLOW-UP`；归档前已校准 execution report，删除“4/4 resolved”表述，改为静态 guards/1 of 4 dynamic。HandleTravelFailure、AlreadyPending、invalid RequestId、World=null、失败重试及目标销毁/重复 perception/MoveTo Failed 为用户接受/延期未验证。
+- A4c Build 仅一份可定位成功日志；报告曾描述两次 Build，差异按 follow-up 保留。最新 PIE 支持三种 initiative、Encounter/Return 单次消费、Transform 恢复、多轮往返和 UnPossess/Re-Possess。
+- P4-001～003 active/execution/final-review 已归档，保留 REVISE 链、USER ACCEPTED、日志缺失/删除、mixed commit、同 Git 身份和历史 Git 偏差；未把 P4 工作包放行写成 Phase 4 Ready。
+- 创建唯一 `TASK-P4-004`：只读核对 P4-001～003 证据、Teacher 原始作答/纠正、Independent Reviewer、文档一致性和阶段判定；精确允许 Markdown，无 Source/Content/Config、Build/Editor/PIE 或 Git。
+
+## 2026-07-19｜Implementation/Verification：TASK-P4-004 只读证据核对
+
+- 仅读取 P4-001～003 归档、现存 P4 Build 证据及允许 Markdown；未运行 Build、Editor、PIE、Automation、网络或 Git，未改动 Source/Content/Config。
+- 三个工作包的 active/execution/final-review 归档链完整，且各自 Reviewer 结论仍为 `PASS WITH FOLLOW-UP`。
+- P4-001 A2 后 Editor/PIE、P4-002 完整 A1 Build 日志及生命周期专项、P4-003 failure/retry 与三项 P4-002 场景仍按原记录分别为 `USER ACCEPTED`、报告级或延期未验证；没有将其提升为动态通过。
+- P4-003 当前可定位证据仅支持一次 A4c Build；执行报告不得重写为“4/4 resolved”，保留“静态 guards / 1 of 4 dynamic”。
+- Teacher 原始作答/纠正记录与 Independent Reviewer 的 P4-004 独立结论尚未产生。故本次只读收尾结果为 Phase 4 `Not verified`，不判 `Ready`，不归档活动卡。
+- 当前 Gate：Implementation/Verification Agent 首次只读复述并等待用户二次确认；确认前不得调用工具、实施或自动进入 Phase 5。
+
+## 2026-07-19｜Coordinator：TASK-P4-004 Reviewer REVISE 同步
+
+- Teacher 产物已真实存在于 learning journal，包含用户原始答案、纠正、掌握与复习项；执行报告和长期状态中“Teacher 尚未产生”的描述已同步修正。
+- Independent Reviewer 当前结论为 `REVISE`，Phase 4 保持 `Not verified`。阻断是文档一致性与独立角色提交链，不是新增 Gameplay 工程失败；P4-001～003 follow-up 全部保留。
+- `Source/HSR/Player/HSRPlayerController.cpp` 被 porcelain 标为 `.M`，但 index/worktree blob hash 完全相同，普通 diff/raw/numstat 为空且 mode 一致；分类为 stat/index 噪声，不修改、不回退、不暂存、不归属 P4-004。
+- 合规交付顺序：Verification 提交 `tasks/execution-result.md`；Teacher 独立提交 learning/规则/专项教学文档；Reviewer 提交当前 `tasks/final-review.md`；随后 Coordinator 只提交 P4-003 归档、P4-004 活动卡和状态协调文档；最后交 Reviewer 复审。
+- 当前没有执行 commit：Coordinator 不代替前三个角色提交，且它们尚未闭合。最终 Reviewer 放行和全部角色 commit 完成前不归档 P4-004、不创建阶段收尾 commit、不 push、不进入 Phase 5。
+- 本轮未修改 Source/Content/Config，未运行 Build/Editor/PIE，未删除日志。

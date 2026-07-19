@@ -7,7 +7,7 @@
 
 - **Phase 1 与 Phase 2 均为 `Ready`。P2-003 最终处置为 `USER ACCEPTED`：Reviewer 的唯一结论仍为 `REVISE`，用户明确接受未完全掌握的学习项作为非阻断复习项。**
 - **Phase 3 为 `Ready`：P3-003 最终 Reviewer commit `3b3fbeb` 为 `PASS WITH FOLLOW-UP`，且用户已明确接受三个工程证据缺口；所有 follow-up 原样保留。**
-- **Phase 4 正在执行：P4-001、P4-002 均已以 Reviewer `PASS WITH FOLLOW-UP` 归档；当前唯一活动任务为 `TASK-P4-003`，等待首次只读复述与二次确认。**
+- **Phase 4 收尾为 `Not verified`：P4-004 Teacher 原始作答/纠正记录已完成；Independent Reviewer 当前结论为 `REVISE`，角色提交、Coordinator 归档和最终复审尚未闭合。**
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
@@ -18,7 +18,8 @@
 - `TASK-P3-003` 已以 Reviewer `PASS WITH FOLLOW-UP` 归档；最终复审 commit `3b3fbeb79cad4a8d3826fd7a13bc140aaf6d4d43`。
 - `TASK-P4-001` 已归档：Reviewer 最终结论 `PASS WITH FOLLOW-UP`；commits `7056f72`、`a4fd762`、`b3c26b6`、`af64e661` 与当前可读执行报告均保留。A2 后 Editor/PIE 未验证，由用户明确接受为非阻断风险。
 - `TASK-P4-002` 已归档：A1 源码与用户 02:07 PIE 支持主路径；A1 Build 完整日志已被用户删除，只保留报告级证据。BP 路径、Map 误保存撤回、mixed commit/同身份/Git 偏差及生命周期专项 follow-up 全部保留。
-- 当前唯一活动任务为 `TASK-P4-003`：三种 initiative、重复触发/失败恢复/生命周期与空 Battle Map 测试返回；尚未实施。
+- `TASK-P4-003` 已归档：三种 initiative、Return 单次消费、Transform 恢复和多轮 PIE 主路径有证据；A4c 一次可定位 Build、1/4 P4-002 组合动态，其余用户接受/延期 follow-up 保留。
+- 当前唯一活动任务为 `TASK-P4-004`：Verification 与 Teacher 真实产物已存在，Reviewer 当前为 `REVISE`；等待独立角色提交、Coordinator 状态提交与 Reviewer 复审，阶段保持 `Not verified`。
 - `TASK-P2-003` 已以 `USER ACCEPTED` 归档；其 Reviewer `REVISE` 结论未改写。
 - `TASK-P2-002` 经 A1/A2/A3 修订与用户最终补证后由 Reviewer 判定 `PASS`：最终 `HSREditor Win64 Development` 成功，五 GE 配置、Editor 重开、Clamp、Re-Possess、HUD 单 snapshot/teardown 和两轮连续 PIE 均有用户证据并经 Reviewer 只读核验。历史 `REVISE` 链保留。
 - `TASK-P2-001` 最终处置为 `USER ACCEPTED`：独立 Reviewer 结论仍为 `REVISE`，用户明确接受剩余证据边界并授权进入 P2-002；未伪造 Reviewer `PASS`。
@@ -96,7 +97,22 @@
 
 ## 下一个推荐任务
 
-- **当前下一步：** Implementation Agent 首次只读复述 `TASK-P4-003`，逐字等待用户二次确认；确认前不得调用工具或实施。
+- **当前下一步：** 按角色依次提交 Verification 报告、Teacher 教学产物和 Reviewer `REVISE`；随后 Coordinator 仅提交自己的协调/归档产物，再交 Independent Reviewer 复审。最终放行前不归档 P4-004、不 push、不进入 Phase 5。
+
+## 2026-07-19 TASK-P4-004 Reviewer REVISE 协调同步
+
+- Teacher 已在 `learning-journal.md` 保存用户原始答案、纠正、掌握项与复习项；状态文档此前称“尚未产生”已修正。
+- Independent Reviewer 当前结论为 `REVISE`，Phase 4 保持 `Not verified`；原因是执行报告/状态矛盾及角色提交链未闭合，不是新增工程失败。
+- `HSRPlayerController.cpp` porcelain 显示 `.M`，但 index/worktree blob hash 均为 `58ec996...`，普通 diff/raw/numstat 为空、mode 一致，分类为索引/文件系统 stat 噪声；严禁纳入任何文档提交或回退。
+- 当前必须先由 Verification、Teacher、Reviewer 分别提交各自产物。Coordinator 不代交；待这些 hash 存在后，Coordinator 才提交 P4-003 归档、P4-004 活动卡和状态协调文件，再交 Reviewer 复审。
+- Phase push 仅在最终 Reviewer 放行、P4-004 归档和全部角色/阶段收尾 commit 闭合后执行；当前不得 push。
+
+## 2026-07-19 TASK-P4-003 归档与 P4-004 收尾
+
+- P4-003 Reviewer 最终结论 `PASS WITH FOLLOW-UP`。A4c 实现三种 initiative、纯值 Return、单次 Return Consume、地图 preflight、travel transaction matching 与多轮往返。
+- 执行报告已校准：A4c 只保留一份可定位 Build 日志支持；P4-002 组合为静态 guards/1 of 4 dynamic，目标销毁、重复 perception、MoveTo Failed/Aborted 为用户接受/延期未验证。HandleTravelFailure、AlreadyPending、invalid RequestId、World=null、失败重试同样保留。
+- P4-001～003 已归档，历史 REVISE、USER ACCEPTED、Build 日志缺失/删除、同 Git 身份和 mixed commit 偏差均保留。Phase 4 尚未自动判 Ready。
+- 已创建唯一 `TASK-P4-004`，仅允许 Markdown/只读证据、Teacher 原始作答链和 Independent Reviewer 收尾；不新增 Gameplay/Content/Config，不进入 Phase 5。
 
 ## 2026-07-19 TASK-P4-002 最终归档与 P4-003 规划
 

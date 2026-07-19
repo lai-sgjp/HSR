@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0～3 均为 `Ready`。Phase 4 的 P4-001、P4-002 已以 `PASS WITH FOLLOW-UP` 归档，证据 follow-up 保留；P4-003 活动卡等待首次只读复述与二次确认，尚未实施。
+> 当前状态：Phase 0～3 均为 `Ready`。Phase 4 P4-001～003 已归档；P4-004 Verification/Teacher 已完成，Reviewer 当前 `REVISE`，角色提交与最终复审未闭合，Phase 4 为 `Not verified`。
 
 ## 已完成的规划工作
 
@@ -167,7 +167,8 @@
 
 - [x] P4-001：稳定 Encounter 合同、Transition Subsystem、灰盒触发与空 Battle Map 单次消费（Reviewer `PASS WITH FOLLOW-UP`；A2 后 Editor/PIE 缺失由用户 `USER ACCEPTED`，历史 Git/同身份偏差保留）。
 - [x] P4-002：数据驱动探索敌人、AI Perception/NavMesh 事件驱动巡逻/发现/追击并只复用 `RequestEncounter`（Reviewer `PASS WITH FOLLOW-UP`；A1 Build 为报告级、02:07 PIE 为用户证据，范围/Git/生命周期 follow-up 保留）。
-- [ ] P4-003：Player/Enemy/Neutral 三种 initiative、重复触发/旅行失败恢复、纯值 Return Context、空 Battle Map 测试返回及 P4-002 组合回归（活动卡已创建，等待首次只读复述与二次确认；未实施）。
+- [x] P4-003：Player/Enemy/Neutral 三种 initiative、重复触发/旅行失败恢复、纯值 Return Context、空 Battle Map 测试返回及 P4-002 组合回归（Reviewer `PASS WITH FOLLOW-UP`；A4c 一次可定位 Build，1/4 组合动态，其余用户接受/延期）。
+- [ ] P4-004：Phase 4 最终回归、Teacher、Independent Reviewer 与阶段文档归档（Verification/Teacher 已完成；Reviewer `REVISE`；等待独立角色提交、Coordinator 同步提交和 Reviewer 复审）。
 - [ ] 创建 EnemyCharacter、AIController、Enemy/Encounter DataAsset。
 - [ ] 实现巡逻占位、AI Perception、发现和追击。
 - [ ] 创建 EncounterRequest 和先手类型。
