@@ -46,7 +46,7 @@ void AHSRBattleGameMode::BeginPlay()
 	{
 		UE_LOG(LogTemp, Error,
 			TEXT("AHSRBattleGameMode::BeginPlay - SubmitBattleRequest FAILED: %s (RequestId=%s)"),
-			TEXT("see Coordinator log (above)"), *Coordinator->GetCurrentRequestId().ToString());
+			*BuildResult.Message.ToString(), static_cast<int32>(BuildResult.FailureType), *BuildResult.TargetDefinitionId.ToString());
 		return;
 	}
 
@@ -55,12 +55,12 @@ void AHSRBattleGameMode::BeginPlay()
 		*Coordinator->GetCurrentRequestId().ToString());
 
 	// Build participants in the Battle World
-	bool bBuildResult = Coordinator->BuildParticipants(GetWorld());
-	if (!bBuildResult)
+	FHSRBattleInitResult BuildResult = Coordinator->BuildParticipants(GetWorld());
+	if (!BuildResult.IsSuccess())
 	{
 		UE_LOG(LogTemp, Error,
-			TEXT("AHSRBattleGameMode::BeginPlay - BuildParticipants FAILED: %s (RequestId=%s)"),
-			TEXT("see Coordinator log (above)"), *Coordinator->GetCurrentRequestId().ToString());
+			TEXT("AHSRBattleGameMode::BeginPlay - BuildParticipants FAILED: %s (Type=%d DefId=%s)"),
+			*BuildResult.Message.ToString(), static_cast<int32>(BuildResult.FailureType), *BuildResult.TargetDefinitionId.ToString());
 		return;
 	}
 

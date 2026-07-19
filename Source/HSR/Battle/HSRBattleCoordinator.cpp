@@ -71,16 +71,18 @@ bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRe
 	return true;
 }
 
-bool UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
+FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
 {
 	if (CurrentState != EHSRBattleCoordinatorState::Consuming)
 	{
 		UE_LOG(LogTemp, Warning,
 			TEXT("UHSRBattleCoordinator::BuildParticipants - REJECTED state=%d RequestId=%s (expected Consuming)"),
 			static_cast<int32>(CurrentState), *CurrentRequestId.ToString());
-		return false;
+		return FHSRBattleInitResult::MakeFailure(
+			EHSRBattleInitFailureType::DefinitionNotFound,
+			FText::FromString(TEXT("Coordinator is not in Consuming state.")),
+			CurrentRequestId);
 	}
-
 
 	if (!BattleWorld)
 	{
@@ -88,92 +90,144 @@ bool UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
 			TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED BattleWorld=null RequestId=%s EncounterId=%s"),
 			*CurrentRequestId.ToString(), *CurrentEncounterId.ToString());
 		CurrentState = EHSRBattleCoordinatorState::Failed;
-		return false;
+		return FHSRBattleInitResult::MakeFailure(
+			EHSRBattleInitFailureType::SpawnFailed,
+			FText::FromString(TEXT("Battle World is null.")),
+			CurrentRequestId);
 	}
 
-	// Clear previous participants
+	// Build and validate participant definitions from request
+	FHSRBattleInitResult DefResult = BuildAndValidateParticipantDefinitions();
+	if (!DefResult.IsSuccess())
+	{
+		CurrentState = EHSRBattleCoordinatorState::Failed;
+		return DefResult;
+	}
+
 	Participants.Empty();
 
-	// --- Spawn player participant ---
-	AActor* PlayerActor = SpawnParticipantActor(BattleWorld, EHSRBattleParticipantTeam::Player);
-	if (!PlayerActor)
+	// Spawn each participant from its definition
+	for (const auto& Def : ParticipantDefinitions)
 	{
-		UE_LOG(LogTemp, Error,
-			TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED spawn PlayerActor RequestId=%s EncounterId=%s"),
-			*CurrentRequestId.ToString(), *CurrentEncounterId.ToString());
-		CurrentState = EHSRBattleCoordinatorState::Failed;
-		return false;
+		AActor* SpawnedActor = SpawnParticipantActor(BattleWorld, Def);
+		if (!SpawnedActor)
+		{
+			UE_LOG(LogTemp, Error,
+				TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED spawn ParticipantId=%s DefId=%s RequestId=%s"),
+				*Def.ParticipantId.ToString(), *Def.DefinitionId.ToString(), *CurrentRequestId.ToString());
+			// Cleanup previously spawned
+			for (auto& P : Participants) { if (P.Actor.IsValid()) P.Actor->Destroy(); }
+			Participants.Empty();
+			ParticipantDefinitions.Empty();
+			CurrentState = EHSRBattleCoordinatorState::Failed;
+			return FHSRBattleInitResult::MakeFailure(
+				EHSRBattleInitFailureType::SpawnFailed,
+				FText::FromString(TEXT("Failed to spawn participant actor.")),
+				Def.DefinitionId);
+		}
+
+		if (!InitParticipantASC(SpawnedActor))
+		{
+			UE_LOG(LogTemp, Error,
+				TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED InitASC ParticipantId=%s DefId=%s RequestId=%s"),
+				*Def.ParticipantId.ToString(), *Def.DefinitionId.ToString(), *CurrentRequestId.ToString());
+			SpawnedActor->Destroy();
+			for (auto& P : Participants) { if (P.Actor.IsValid()) P.Actor->Destroy(); }
+			Participants.Empty();
+			ParticipantDefinitions.Empty();
+			CurrentState = EHSRBattleCoordinatorState::Failed;
+			return FHSRBattleInitResult::MakeFailure(
+				EHSRBattleInitFailureType::InitFailed,
+				FText::FromString(TEXT("Failed to initialize ASC on participant.")),
+				Def.DefinitionId);
+		}
+
+		FHSRBattleParticipant Participant;
+		Participant.ParticipantId = Def.ParticipantId;
+		Participant.DefinitionId = Def.DefinitionId;
+		Participant.Team = Def.Team;
+		Participant.Actor = SpawnedActor;
+		Participant.AbilitySystemComponent = SpawnedActor->FindComponentByClass<UAbilitySystemComponent>();
+		Participants.Add(Participant);
+
+		UE_LOG(LogTemp, Log,
+			TEXT("UHSRBattleCoordinator::BuildParticipants - Spawned ParticipantId=%s DefId=%s Team=%d Actor=%s ASC=%s"),
+			*Def.ParticipantId.ToString(), *Def.DefinitionId.ToString(),
+			static_cast<int32>(Def.Team),
+			*SpawnedActor->GetName(),
+			Participant.AbilitySystemComponent.IsValid() ? *Participant.AbilitySystemComponent->GetName() : TEXT("null"));
 	}
-
-	if (!InitParticipantASC(PlayerActor))
-	{
-		UE_LOG(LogTemp, Error,
-			TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED InitASC PlayerActor RequestId=%s EncounterId=%s"),
-			*CurrentRequestId.ToString(), *CurrentEncounterId.ToString());
-		PlayerActor->Destroy();
-		CurrentState = EHSRBattleCoordinatorState::Failed;
-		return false;
-	}
-
-	FHSRBattleParticipant PlayerParticipant;
-	PlayerParticipant.ParticipantId = FName(TEXT("Player"));
-	PlayerParticipant.DefinitionId = CurrentEncounterId; // Player uses EncounterId as definition anchor
-	PlayerParticipant.Team = EHSRBattleParticipantTeam::Player;
-	PlayerParticipant.Actor = PlayerActor;
-	PlayerParticipant.AbilitySystemComponent = PlayerActor->FindComponentByClass<UAbilitySystemComponent>();
-	Participants.Add(PlayerParticipant);
-
-	UE_LOG(LogTemp, Log,
-		TEXT("UHSRBattleCoordinator::BuildParticipants - Player spawned Actor=%s ASC=%s"),
-		*PlayerActor->GetName(), PlayerParticipant.AbilitySystemComponent.IsValid() ? *PlayerParticipant.AbilitySystemComponent->GetName() : TEXT("null"));
-
-	// --- Spawn enemy participant ---
-	AActor* EnemyActor = SpawnParticipantActor(BattleWorld, EHSRBattleParticipantTeam::Enemy);
-	if (!EnemyActor)
-	{
-		UE_LOG(LogTemp, Error,
-			TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED spawn EnemyActor RequestId=%s EncounterId=%s EnemyDefId=%s"),
-			*CurrentRequestId.ToString(), *CurrentEncounterId.ToString(), *CurrentEnemyDefinitionId.ToString());
-		// Cleanup player
-		PlayerActor->Destroy();
-		Participants.Empty();
-		CurrentState = EHSRBattleCoordinatorState::Failed;
-		return false;
-	}
-
-	if (!InitParticipantASC(EnemyActor))
-	{
-		UE_LOG(LogTemp, Error,
-			TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED InitASC EnemyActor RequestId=%s EncounterId=%s EnemyDefId=%s"),
-			*CurrentRequestId.ToString(), *CurrentEncounterId.ToString(), *CurrentEnemyDefinitionId.ToString());
-		EnemyActor->Destroy();
-		PlayerActor->Destroy();
-		Participants.Empty();
-		CurrentState = EHSRBattleCoordinatorState::Failed;
-		return false;
-	}
-
-	FHSRBattleParticipant EnemyParticipant;
-	EnemyParticipant.ParticipantId = FName(TEXT("Enemy"));
-	EnemyParticipant.DefinitionId = CurrentEnemyDefinitionId;
-	EnemyParticipant.Team = EHSRBattleParticipantTeam::Enemy;
-	EnemyParticipant.Actor = EnemyActor;
-	EnemyParticipant.AbilitySystemComponent = EnemyActor->FindComponentByClass<UAbilitySystemComponent>();
-	Participants.Add(EnemyParticipant);
-
-	UE_LOG(LogTemp, Log,
-		TEXT("UHSRBattleCoordinator::BuildParticipants - Enemy spawned Actor=%s ASC=%s"),
-		*EnemyActor->GetName(), EnemyParticipant.AbilitySystemComponent.IsValid() ? *EnemyParticipant.AbilitySystemComponent->GetName() : TEXT("null"));
 
 	// Atomically transition to Spawned
 	CurrentState = EHSRBattleCoordinatorState::Spawned;
 
 	UE_LOG(LogTemp, Log,
-		TEXT("UHSRBattleCoordinator::BuildParticipants - SUCCESS RequestId=%s EncounterId=%s EnemyDefId=%s Participants=%d"),
-		*CurrentRequestId.ToString(), *CurrentEncounterId.ToString(),
-		*CurrentEnemyDefinitionId.ToString(), Participants.Num());
+		TEXT("UHSRBattleCoordinator::BuildParticipants - SUCCESS RequestId=%s Participants=%d Definitions=%d"),
+		*CurrentRequestId.ToString(), Participants.Num(), ParticipantDefinitions.Num());
 
-	return true;
+	return FHSRBattleInitResult::MakeSuccess();
+}
+
+FHSRBattleInitResult UHSRBattleCoordinator::BuildAndValidateParticipantDefinitions()
+{
+	ParticipantDefinitions.Empty();
+
+	// Player Definition: uses a well-known constant, not EncounterId
+	FHSRBattleParticipantDefinition PlayerDef;
+	PlayerDef.ParticipantId = FName(TEXT("Player"));
+	PlayerDef.DefinitionId = FName(TEXT("PlayerCharacter"));
+	PlayerDef.Team = EHSRBattleParticipantTeam::Player;
+	PlayerDef.PawnClass = nullptr;
+	ParticipantDefinitions.Add(PlayerDef);
+
+	// Enemy Definition: uses CurrentEnemyDefinitionId from the encounter request
+	FHSRBattleParticipantDefinition EnemyDef;
+	EnemyDef.ParticipantId = FName(TEXT("Enemy"));
+	EnemyDef.DefinitionId = CurrentEnemyDefinitionId;
+	EnemyDef.Team = EHSRBattleParticipantTeam::Enemy;
+	EnemyDef.PawnClass = nullptr;
+	ParticipantDefinitions.Add(EnemyDef);
+
+	// Validate each definition
+	for (const auto& Def : ParticipantDefinitions)
+	{
+		if (Def.DefinitionId.IsNone())
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("UHSRBattleCoordinator::BuildAndValidateParticipantDefinitions - DefinitionNotFound ParticipantId=%s"),
+				*Def.ParticipantId.ToString());
+			ParticipantDefinitions.Empty();
+			return FHSRBattleInitResult::MakeFailure(
+				EHSRBattleInitFailureType::DefinitionNotFound,
+				FText::FromString(TEXT("Definition ID is empty.")),
+				Def.ParticipantId);
+		}
+
+		// If a specific PawnClass is set, validate it is a valid APawn subclass
+		if (Def.PawnClass != nullptr)
+		{
+			UClass* ResolvedClass = Def.PawnClass.Get();
+			if (!ResolvedClass || !ResolvedClass->IsChildOf<APawn>())
+			{
+				UE_LOG(LogTemp, Warning,
+					TEXT("UHSRBattleCoordinator::BuildAndValidateParticipantDefinitions - ClassLoadFailed ParticipantId=%s DefId=%s"),
+					*Def.ParticipantId.ToString(), *Def.DefinitionId.ToString());
+				ParticipantDefinitions.Empty();
+				return FHSRBattleInitResult::MakeFailure(
+					EHSRBattleInitFailureType::ClassLoadFailed,
+					FText::FromString(TEXT("PawnClass is not a valid APawn subclass.")),
+					Def.DefinitionId);
+			}
+		}
+	}
+
+	UE_LOG(LogTemp, Log,
+		TEXT("UHSRBattleCoordinator::BuildAndValidateParticipantDefinitions - SUCCESS Definitions=%d PlayerDefId=%s EnemyDefId=%s"),
+		ParticipantDefinitions.Num(),
+		*ParticipantDefinitions[0].DefinitionId.ToString(),
+		*ParticipantDefinitions[1].DefinitionId.ToString());
+
+	return FHSRBattleInitResult::MakeSuccess();
 }
 
 void UHSRBattleCoordinator::Reset()
@@ -190,7 +244,7 @@ void UHSRBattleCoordinator::Reset()
 	Participants.Empty();
 }
 
-AActor* UHSRBattleCoordinator::SpawnParticipantActor(UWorld* World, EHSRBattleParticipantTeam Team)
+AActor* UHSRBattleCoordinator::SpawnParticipantActor(UWorld* World, const FHSRBattleParticipantDefinition& Definition)
 {
 	if (!World)
 	{
@@ -201,20 +255,20 @@ AActor* UHSRBattleCoordinator::SpawnParticipantActor(UWorld* World, EHSRBattlePa
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	APawn* Pawn = World->SpawnActor<APawn>(APawn::StaticClass(), FTransform::Identity, Params);
+	APawn* Pawn = World->SpawnActor<APawn>(Definition.PawnClass ? Definition.PawnClass.Get() : APawn::StaticClass(), FTransform::Identity, Params);
 	if (!Pawn)
 	{
 		UE_LOG(LogTemp, Warning,
 			TEXT("UHSRBattleCoordinator::SpawnParticipantActor - FAILED to spawn APawn for team=%d"),
-			static_cast<int32>(Team));
+			static_cast<int32>(Definition.Team));
 		return nullptr;
 	}
 
-	Pawn->SetActorLabel(Team == EHSRBattleParticipantTeam::Player ? TEXT("BattlePlayerPawn") : TEXT("BattleEnemyPawn"));
+	Pawn->SetActorLabel(Definition.Team == EHSRBattleParticipantTeam::Player ? TEXT("BattlePlayerPawn") : TEXT("BattleEnemyPawn"));
 
 	UE_LOG(LogTemp, Log,
-		TEXT("UHSRBattleCoordinator::SpawnParticipantActor - SUCCESS Actor=%s Team=%d"),
-		*Pawn->GetName(), static_cast<int32>(Team));
+`t`tTEXT("UHSRBattleCoordinator::SpawnParticipantActor - SUCCESS Actor=%s Team=%d DefId=%s"),
+		*Pawn->GetName(), static_cast<int32>(Definition.Team), *Definition.DefinitionId.ToString());
 
 	return Pawn;
 }

@@ -46,7 +46,9 @@ private:
 	FName CurrentEnemyDefinitionId;
 	FHSRBattleReturnContext ReturnContext;
 	TArray<FHSRBattleParticipant> Participants;
+	TArray<FHSRBattleParticipantDefinition> ParticipantDefinitions;
 
-	AActor* SpawnParticipantActor(UWorld* World, EHSRBattleParticipantTeam Team);
+	AActor* SpawnParticipantActor(UWorld* World, const FHSRBattleParticipantDefinition& Definition);
 	bool InitParticipantASC(AActor* TargetActor);
+	FHSRBattleInitResult BuildAndValidateParticipantDefinitions();
 };
