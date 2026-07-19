@@ -28,7 +28,7 @@ public:
 	bool SubmitBattleRequest(const struct FHSREncounterRequest& InRequest);
 
 	/** Spawn player + enemy actors and initialize their ASC in the Battle World. */
-	bool BuildParticipants(UWorld* BattleWorld);
+	FHSRBattleInitResult BuildParticipants(UWorld* BattleWorld);
 
 	/** Pure-value return context for later travel back to exploration. */
 	const FHSRBattleReturnContext& GetReturnContext() const { return ReturnContext; }

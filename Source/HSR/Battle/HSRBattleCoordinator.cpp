@@ -81,7 +81,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		return FHSRBattleInitResult::MakeFailure(
 			EHSRBattleInitFailureType::DefinitionNotFound,
 			FText::FromString(TEXT("Coordinator is not in Consuming state.")),
-			CurrentRequestId);
+		);
 	}
 
 	if (!BattleWorld)
@@ -93,7 +93,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		return FHSRBattleInitResult::MakeFailure(
 			EHSRBattleInitFailureType::SpawnFailed,
 			FText::FromString(TEXT("Battle World is null.")),
-			CurrentRequestId);
+		);
 	}
 
 	// Build and validate participant definitions from request
@@ -267,7 +267,7 @@ AActor* UHSRBattleCoordinator::SpawnParticipantActor(UWorld* World, const FHSRBa
 	Pawn->SetActorLabel(Definition.Team == EHSRBattleParticipantTeam::Player ? TEXT("BattlePlayerPawn") : TEXT("BattleEnemyPawn"));
 
 	UE_LOG(LogTemp, Log,
-`t`tTEXT("UHSRBattleCoordinator::SpawnParticipantActor - SUCCESS Actor=%s Team=%d DefId=%s"),
+		TEXT("UHSRBattleCoordinator::SpawnParticipantActor - SUCCESS Actor=%s Team=%d DefId=%s"),
 		*Pawn->GetName(), static_cast<int32>(Definition.Team), *Definition.DefinitionId.ToString());
 
 	return Pawn;
