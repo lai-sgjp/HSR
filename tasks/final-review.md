@@ -1,60 +1,50 @@
-# TASK-P7-002 Independent Reviewer 最终复审
+# TASK-P7-003 Independent Reviewer 最终审查
 
 ## 结论
 
 `PASS WITH FOLLOW-UP`
 
-TASK-P7-002 已完成 Development/Editor 专用的统一 Execution Damage 垂直切片。上一轮的 Spec 前错误消费 RNG 已修正；两轮完整矩阵证明主要前置失败零副作用、公式与 Crit 边界、同 seed 确定性、terminal 隔离、成功结算及重复 Action exactly-once；P5/P6 正式路径无回归。允许 Coordinator 将 P7-002 标记为 `Ready for archive with follow-ups` 并准备 P7-003，但本结论不授权直接实施 P7-003。
-
-技能点和回能的新需求不属于 P7-002 合同，不影响本次结论，应由后续任务单独规划。
+P7-003 已完成 Basic、Skill、Ultimate 到统一 `BP_GE_P7_DamageExecution` 的正式迁移，并通过最终两轮全绿证据。Coordinator-owned prepared transaction、stream-copy RNG、Action cache、SP rollback、Ultimate GAS Cost/Refund、terminal 延迟与旧 GE 运行时隔离均成立。允许 Coordinator 归档 P7-003 并规划 P7-004；本结论不表示 follow-up 已验证，也不授权 Reviewer 实施 P7-004。
 
 ## 证据等级
 
-- `REVIEWER INSPECTED`：活动卡、执行报告、P7-001 归档、最终 Source/Config diff、未跟踪 Damage/Globals 文件、allowlist 与 `git diff --check`。
-- `USER PROVIDED / LOG INSPECTED BY REVIEWER`：fresh Rebuild、初次失败与隔离诊断、最终连续两轮 PIE/Matrix 日志及 Editor 资产绑定。
-- Reviewer 未独立启动 Editor/PIE，也未解析二进制 `.uasset` 内部字段；资产内容按用户与运行结果证据记录。
+- `REVIEWER INSPECTED`：TASK-P7-003 活动卡、执行报告、P7-001/P7-002 归档、最终 Source/Content/Config diff、allowlist 与 `git diff --check`。
+- `USER PROVIDED / LOG INSPECTED BY REVIEWER`：fresh Rebuild、早期失败诊断、Basic/Skill 阶段、三项 Formal 修复前后证据及最终两轮全绿日志。
+- Reviewer 未独立启动 Editor/PIE，也未解析二进制资产内部字段；DataAsset/GE 绑定按用户证据和运行时 GE 标签记录。
 
-## 最终实现审查
+## 实现与范围审查
 
-- 改动符合 P7-002 allowlist：CoreAttributeSet、Damage Context/Execution、AbilitySystemGlobals、BattleCoordinator 与 Editor-only BattleGameMode Harness。未改正式 Ability、TurnManager、UI、Build.cs、旧伤害 GE 或 Skill DataAsset。
-- `FHSRDamageEffectContext` 实现 `GetScriptStruct`、`Duplicate`、`NetSerialize` 与 traits，只承载 ActionId、Tag、规则/roll 数值和纯值 Result/Breakdown；无 Actor、ASC、UObject 裸指针。
-- `UHSRAbilitySystemGlobals` 仅分配自定义 Context；`DefaultGame.ini` 只增加对应 AbilitySystemGlobals override。
-- Capture 方向与时机正确：Attack/CritRate/CritDamage 为 Source，Defense 为 Target，四者均 `bSnapshot=false`；Execution 与 Globals 不保存单次 Action 可变状态。
-- Execution 使用冻结公式、CritDamage 额外倍率与 `RoundHalfFromZero`，只向 `IncomingDamage` 输出有限非负值。
-- CoreAttributeSet 在 `PostGameplayEffectExecute` 立即读取并归零 `IncomingDamage`，随后唯一扣减并 Clamp Health；FinalDamage 与 AppliedDamage 可对账且未混写。
-- Coordinator 是 development battle-local seed、`FRandomStream`、consume count 和 ActionId cache 的唯一所有者；BuildParticipants/Reset/显式 development 初始化清理缓存并重建 RNG。
-- RNG 顺序已修正：Source/Target/Rule/业务 Tag/四个 SetByCaller Tag/Context/GE Spec 全部成功后，才调用一次 `GetFraction()` 并递增 consume count；随后立即写 Context/SetByCaller 并 Apply。所有可前置失败均位于唯一消费点之前。
-- 重复 ActionId 在任何验证与 RNG 前返回缓存 Result，不重掷、不重伤；Apply 失败如实返回 `EffectApplicationFailed`，代码没有伪造 RNG 回滚。
-- Harness 使用 Editor-only 配置面，不调用正式 `RequestAction`，不 Reserve/Commit SP、不 Commit Energy、不推进 Turn 或终局。
+- Source 修改落在 P7-003 allowlist：Ability Base/Basic/Skill/Ultimate、Ability/Resolution 与 DamageTypes、SkillDefinition、Coordinator、Editor-only GameMode Harness。未修改 Heal、AttributeSet、Execution、EffectContext、Globals、Rule、TurnManager、UI 或 Build.cs。
+- `FHSRFormalDamageRequest`、Prepare/ExecutionResult 为纯值边界；Prepared Spec/弱 Target 引用仅存于 Ability Base 单次 activation 临时状态，并在成功、失败、取消、EndAbility/reset 路径清理，不进入 cache、UI 或跨 World 数据。
+- Coordinator 预检 Battle/Action/Turn/Definition/Target/Rule/Tag/GE/Spec 后，复制 battle-local RNG 预览 CritRoll；只有正式 Ability 成功、单次 Apply 成功后才提交 stream、consume count、SP 和 resolution/damage cache。失败与 duplicate 不推进正式 RNG。
+- Basic/Skill/Ultimate 不再自行 MakeContext/MakeSpec/Apply；仅消耗 Coordinator 准备的 Spec，并通过唯一 `ApplyPreparedFormalDamage` 应用一次。Heal 保持既有 `BP_GE_P6_Heal` 路径。
+- Basic 成功 `+1 SP`，Skill 成功 `-1 SP`；失败、duplicate、invalid target 无 SP 副作用。Coordinator 继续使用 Reserve→Commit/Rollback。
+- Ultimate 使用 GAS Cost GE 扣 Energy；Refund GE 在 Cost 前预构建并验证，只有 Cost 已提交且 Damage Apply 失败时由 Ultimate 自身 GAS self-apply 一次。Coordinator 未直接写 Energy；成功日志显示 CostCommitted=1、RefundApplied=0、Energy 100→0。
+- Health delegate 在 formal transaction open 时只记录 pending defeat；SP/RNG/cache/resolution 提交后才关闭事务并最多 ResolveDefeat 一次。终局后不再推进 Turn、扣 Cost、重掷、重伤或重复 BattleResult。
+- 旧 `BP_GE_P5_BasicAttackDamage`、`BP_GE_P6_SkillAttackDamage`、`BP_GE_P6_UltimateDamage` 资产保留但无正式运行时引用；最终日志 `OldDamageGE=NoFormalRuntimeReference`。未迁移 Heal GE。
+- Config/Content 变化符合用户资产 allowlist：三 Skill DataAsset 绑定 P7 GE/Rule/Physical/倍率，Ultimate 绑定 Energy Refund GE；无不允许的 Config、旧 GE、Heal 或 UI 修改。
 
-## Config、Content 与迁移边界
+## Build 与最终运行证据
 
-- Gameplay Tags 保留原根 Tag 和 `Damage.Type.Physical`，只新增四个 P7 SetByCaller Tag；其余 metadata/default settings 为 UE5.6 Editor canonical serialization，语义可接受。
-- `Config/DefaultGame.ini` 仅设置 `AbilitySystemGlobalsClassName="/Script/HSR.HSRAbilitySystemGlobals"`。
-- 新资产 `BP_GE_P7_DamageExecution` 和 BattleGameMode development 绑定在用户白名单内；运行结果证明 Execution GE/Rule/Tag/Globals 链路有效。
-- `BP_GE_P5_BasicAttackDamage`、`BP_GE_P6_SkillAttackDamage`、`BP_GE_P6_UltimateDamage` 未修改、未迁移；正式 Basic/Skill/Ultimate 仍使用旧固定 Health Modifier，测试入口未叠加到正式 Action。P7-003 未偷跑。
-- `BP_GE_InitializeCoreAttributes` 与 P7-001 Damage Rule 资产属于前序用户变更，不是 P7-002 Implementation 越界。
+- 附件 `8679d31a...` 的 fresh Rebuild 完成 UHT、C++、Link，exit `0`；后续修订构建报告同样保持成功。仅有既有 UE AIModule/MSVC toolchain warning，无 HSR 源码错误。
+- 最终两轮均显示：
+  - `P7-003 Formal Case=Basic_NonLethal_Duplicate Result=PASS`，HP 100→85，SP 2→3，Energy 不变，duplicate 不变；
+  - `Skill_NonLethal_Duplicate Result=PASS`，HP 100→85，SP 2→1，Energy 不变；
+  - `Ultimate_NonLethal_Duplicate Result=PASS`，HP 1000→900，Energy 100→0，SP 不变，duplicate 不变，GE=`BP_GE_P7_DamageExecution`；
+  - `P7-002 PASS`、P5/P6 Harness 各两轮 `COMPLETE`、P6-001 legal PASS、participants/Actor/ASC 有效；
+  - `OldDamageGE=NoFormalRuntimeReference`、Heal 仍旧路径、Ultimate `RefundApplied=0`；
+  - 未见 `Result=FAIL`、Error、Ensure、Blueprint Runtime Error 或 ActorNone。
+- P6-001 旧断言曾因读取缓存 `ReportedAppliedDamage=0` 而误报，修订后改为断言真实 HP delta；最终日志为 `HPBefore=100 HPAfter=85 HPDelta=15 ... Result=PASS`。这关闭了误报，但暴露出诊断 Breakdown 的 Applied 字段尚未与真实 HP delta 完全一致。
 
-## Build 与最终两轮验证
+## Follow-up（不阻断本次归档）
 
-- Fresh Rebuild 已实际运行 UHT、编译 Damage Context/Execution、Globals、CoreAttributeSet、Coordinator/GameMode 与 Module.HSR，并链接 `UnrealEditor-HSR.lib/.dll`，exit `0`。
-- 两轮共 26 条 P7 Matrix：InvalidSource、InvalidTarget、MissingRule、InvalidTag、InvalidMultiplier、MissingGE 的 Result 均匹配 Expected，`NoMutation=1`，HP 与 RNG 不变。
-- 两轮 MinDamage/AttackZero、DefenseZero、DefenseHigh、CritRate=0、CritRate=1 + CritDamage=0.5 全部 PASS；Raw/Final/Applied 与期望一致，成功 Action 各消费一次 RNG。
-- 两轮 SameSeedDeterminism 均 PASS：Final、Critical 与 reset 后 consume count 一致；BattleTerminalIsolated 均 PASS，主 Coordinator state/RNG 不变。
-- 两次 happy + duplicate Harness 均 PASS：HP `85→75→75`，Raw/Final/Applied=`10`，RNG `1→2→2`，State `2→2`，ResultMatch/ExactlyOnce/DamageBalanced/NoBattleSideEffects 全为 `1`。
-- P5-002、P5-003、P6-002、P6-003、P6-004 各两轮 `Harness=COMPLETE`；participants、Actor/ASC 有效，Widget 正常 teardown。
-- 最终附件未发现 `Result=FAIL`、Error、Ensure、Blueprint Runtime Error、Accessed None 或 ActorNone。
-
-## Follow-up
-
-- `CaptureFailed`、`InvalidCapturedValue` 与 `EffectApplicationFailed` 尚无真实动态分支证据。前两者在 CoreAttributeSet clamp 和正常 GAS capture 下不易由 Editor 安全构造；Apply 失败发生在 RNG commit point 后，必须如实记录 RNG 已消费。P7-003 迁移正式入口前，应增加受控自动化测试或 development 注入点验证这些结果及 HP/资源/Turn 不变量。
-- 当前公式矩阵未单独记录 overkill（FinalDamage > remaining Health、AppliedDamage < FinalDamage）。P7-003 前应补一例，证明 Context Final 与 Coordinator Applied 的分离在低 HP 下仍正确。
-- SameSeed 测试通过显式 `InitializeDevelopmentDamageRng()` 验证 RNG/cache 重建，但未用同一 ActionId 明确证明生产 `Reset()` 后旧 cache 不再命中。生命周期代码已检查会 Empty cache 并重置 consume count；建议后续自动化测试补上同 ActionId across Reset。
-- 当前 Harness 的公式 case 即使失败也使用 Log verbosity，但文本会输出 `Result=FAIL`；现有证据可检测。后续建议失败分支使用 Error verbosity，避免日志筛选漏报。
-- 单机/Editor 测试不证明 Context NetSerialize、网络复制或 Prediction 已验证；这些仍不在当前范围。
+1. **Capture/InvalidValue 动态注入**：最终 Harness 明确记录 `CaptureFailed/InvalidCapturedValue` 需要修改只读 Execution/AttributeSet capture 或新增受控注入点，当前 allowlist 未授权；本轮未声称这些分支已验证。P7-004 或专门测试任务应在不污染正式路径的前提下覆盖 HP/Energy/SP/RNG/Turn/Result 不变量。
+2. **Post-Cost ApplyFailure/Refund 动态注入**：Refund 资产、Cost 前预建和成功路径已通过，但没有受控 Coordinator Spec-Apply failure seam，未动态证明“Cost committed → Apply fail → Refund exactly once → Energy before==after”。后续必须补测试；若发现 HP 已变而 Refund 失败，应立即按事务阻断处理，不得静默恢复。
+3. **Damage Breakdown 诊断一致性**：正式 Basic 的缓存 `ReportedAppliedDamage` 曾为 0，而真实 `HPBefore-HPAfter=15` 正确。当前 Harness 已改用可观察 HP delta 判定 PASS，但最终 DamageResult/Breakdown 的 AppliedDamage 应在后续修复为与实际应用值一致，避免 UI/日志误导；在修复前不得把该字段当作权威已验证数据。
+4. **终局/overkill/Reset**：本轮覆盖非致死 Ultimate 与终局延迟修复；仍建议补充三技能致死、overkill（Final > Applied）、同 ActionId across 真正 `Coordinator::Reset()` 的自动化证据。
 
 ## 最终处置
 
-TASK-P7-002：`Ready for archive with follow-ups`。Coordinator 可同步任务/进度文档并准备 P7-003 活动卡；P7-003 实施仍需独立任务卡、执行确认，并继承上述失败/overkill/Reset 覆盖要求。
+TASK-P7-003：`Ready for archive with follow-ups`。Coordinator 可同步归档并准备 P7-004 活动卡；P7-004 必须继承上述 Capture、post-Cost Refund、Breakdown consistency 与终局/Reset 测试要求。技能点/回能需求另立任务，不纳入本审查。
 
-本次 Reviewer 除本文件外未修改 Source、Config、Content、协调文档或 Git 状态，未开始 P7-003。
+本次 Reviewer 除本文件外未修改 Source、Config、Content、协调文档或 Git 状态，未开始 P7-004。
