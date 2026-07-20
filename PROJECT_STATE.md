@@ -7,7 +7,7 @@
 
 - **Phase 1 与 Phase 2 均为 `Ready`。P2-003 最终处置为 `USER ACCEPTED`：Reviewer 的唯一结论仍为 `REVISE`，用户明确接受未完全掌握的学习项作为非阻断复习项。**
 - **Phase 3 为 `Ready`：P3-003 最终 Reviewer commit `3b3fbeb` 为 `PASS WITH FOLLOW-UP`，且用户已明确接受三个工程证据缺口；所有 follow-up 原样保留。**
-- **Phase 4、Phase 5 与 Phase 6 均为 `Ready with inherited follow-ups`。Phase 7 的 P7-001、P7-002 均以 Reviewer `PASS WITH FOLLOW-UP` 归档；唯一活动任务为 `TASK-P7-003`，状态 `PLANNED — 等待用户独立确认执行`。P7-003 尚未实施。**
+- **Phase 4、Phase 5 与 Phase 6 均为 `Ready with inherited follow-ups`。Phase 7 的 P7-001、P7-002、P7-003 均以 Reviewer `PASS WITH FOLLOW-UP` 归档；唯一活动任务为 `TASK-P7-004`，状态 `PLANNED — 等待用户独立确认执行`，仅处理 follow-up 闭环。**
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
@@ -15,7 +15,8 @@
 
 - `TASK-P7-001` 已归档：Reviewer `PASS WITH FOLLOW-UP`；fresh Rebuild、canonical Config、资产与烟雾 PIE follow-up 已如实保留。
 - `TASK-P7-002` 已归档：Reviewer commit `f916fd7` 为 `PASS WITH FOLLOW-UP`；用户资产 `d35fdff`、Implementation `288932c` 与完整矩阵证据保留。
-- `TASK-P7-003` 已由 Coordinator 创建：Basic/Skill/Ultimate 迁移统一 Execution，Heal 保持旧路径；当前只允许首次只读复述，用户独立确认前不得调用工具或实施。
+- `TASK-P7-003` 已归档：用户资产 `f1687d3`、Implementation `cf0d9b4`、Reviewer `56e89d1`；最终结论 `PASS WITH FOLLOW-UP`。Follow-up 原样保留，不改写为无风险完成。
+- `TASK-P7-004` 已由 Coordinator 创建：只闭环 Breakdown 对账、失败注入、overkill/lethal/真实 Reset；不得扩展资源系统或进入 P7-005。
 
 ## Phase 7 资源延期需求
 

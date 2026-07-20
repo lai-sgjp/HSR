@@ -1,14 +1,14 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～6 均为 `Ready with inherited follow-ups`。Phase 7 的 P7-001、P7-002 均以 Reviewer `PASS WITH FOLLOW-UP` 归档；唯一 `TASK-P7-003` 已规划并等待用户独立确认，尚未实施正式技能迁移。
+> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～6 均为 `Ready with inherited follow-ups`。Phase 7 的 P7-001、P7-002、P7-003 均以 Reviewer `PASS WITH FOLLOW-UP` 归档；唯一 `TASK-P7-004` 已规划并等待用户独立确认，尚未实施 follow-up。
 
 ## 已完成的规划工作
 
 - [x] P7-000：只读校准 Phase 6→7 门禁，冻结 CoreAttributeSet 原位扩展、原创公式、CritDamage/Capture/RNG/单一伤害入口和结构化失败协议。
 - [x] P7-001：战斗属性、原创规则与初始化基线（Reviewer `PASS WITH FOLLOW-UP`，已归档，follow-up 保留）。
 - [x] P7-002：Attribute Capture、统一 Execution 与确定性暴击（Reviewer `PASS WITH FOLLOW-UP`，已归档）。
-- [ ] P7-003：普攻、战技、终结技迁移到统一伤害管线（已规划，等待用户独立确认执行）。
-- [ ] P7-004：Damage Breakdown 观察层与回归 Harness。
+- [x] P7-003：普攻、战技、终结技迁移到统一伤害管线（Reviewer `PASS WITH FOLLOW-UP`，已归档）。
+- [ ] P7-004：P7-003 follow-up 闭环：Breakdown 对账、失败注入、overkill/lethal/真实 Reset（已规划，等待用户独立确认执行）。
 - [ ] P7-005：阶段收尾、教学、独立审查与归档。
 - [ ] 独立资源后续：Wait/Pass、Basic/Skill/受击回能，以及按 Team 拆分共享 SP 池（敌方独立或无池，禁止误做每角色 SP）；不得塞入 P7-003。
 

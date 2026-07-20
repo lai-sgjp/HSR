@@ -4,10 +4,10 @@
 
 Phase 6 已由 Independent Reviewer 判定为 `PASS WITH FOLLOW-UP`，当前状态是 `Ready with inherited follow-ups`；P6-001～P6-004A 与 P6-005 已归档，当前没有活动工程任务。因此 Phase 7 当前状态为：
 
-- **Gate：`P7-001/P7-002 archived PASS WITH FOLLOW-UP / TASK-P7-003 planned / awaiting independent user confirmation`**。
-- **已完成：** P7-001、P7-002 已通过 Reviewer 并归档；统一 Execution 测试入口、确定性矩阵与 P5/P6 smoke 有真实证据。
-- **当前可以做：** Implementation Agent 首次只读复述 `TASK-P7-003`。
-- **当前不可以做：** 用户独立确认 TASK-P7-003 前实施、修改 Source/Content/Config、运行 Build/Editor/PIE 或进入 P7-004/Phase 8。
+- **Gate：`P7-001/P7-002/P7-003 archived PASS WITH FOLLOW-UP / TASK-P7-004 planned / awaiting independent user confirmation`**。
+- **已完成：** P7-003 三技能迁移、事务与旧 GE 隔离已通过 Reviewer；follow-up 仍未验证。
+- **当前可以做：** Implementation Agent 首次只读复述 `TASK-P7-004`。
+- **当前不可以做：** 用户独立确认 TASK-P7-004 前实施、修改 Source/Content/Config、运行 Build/Editor/PIE 或进入 P7-005/Phase 8。
 
 Phase 6 的同步 post-GE、真实 Rollback/并发、SingleAlly 动态路径、目标销毁、Ability/GE 失败、终局异步、Save/网络等 inherited follow-ups 继续保留。它们不全部阻断 Phase 7 规划，但与新伤害管线直接相关的失败、目标生命周期、终局和 exactly-once 路径必须进入 Phase 7 回归矩阵，且不得被升级为已验证。
 

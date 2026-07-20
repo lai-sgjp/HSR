@@ -1564,3 +1564,19 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 新资源需求延期：当前 Basic +1 SP、Skill -1 SP、无 Wait/Pass；Energy 仅 Ultimate Cost，无 Basic/Skill/受击回能；未来 SP 正确边界为每 Team 共享池、敌方独立或无池，不是每角色独立。全部另立任务，不塞入 P7-003。
 - 已创建唯一 `TASK-P7-003`，只迁移 Basic/Skill/Ultimate 到统一 Execution；Heal 保持旧路径，旧固定 GE 只解除引用不删除。事务门禁包含 RNG stream-copy、SP rollback、Ultimate GAS refund、失败零副作用、duplicate/terminal/overkill/Reset。
 - 本轮未实施 Source/Content/Config，未运行 Build/Editor/PIE，不 push；等待执行者首次只读复述和用户独立确认。
+
+## 2026-07-20｜Coordinator：TASK-P7-003 prepared transaction seam 修订
+
+- Implementation 在用户确认后的首次只读审计发现 `BLOCKING TRANSACTION GAP`，未修改 P7-003 Source/Content/Config：现有三个伤害 Ability 内部创建并 Apply GE，Coordinator 只能事后读取 bool，无法统一 ActionId/RNG stream-copy/Context/Result 与资源/Turn/terminal 事务；Ultimate 也没有 Refund GE 引用合同。
+- 修订冻结调用方向：Coordinator preflight、复制 RNG、创建 Context/Spec、调用 Ability Prepare；Ability activation 只 Apply prepared Spec，Ultimate 仅在已 Commit Cost 且伤害失败时 GAS self-apply Refund；Ability 返回纯值结果；Coordinator 成功才提交 RNG/SP/cache、延迟 defeat，并按终局决定是否推进 Turn。
+- Refund 唯一静态引用归 `UHSRSkillDefinition::EnergyRefundGameplayEffectClass`，只由 Ultimate Definition 绑定；Ability 持有/应用，Coordinator 禁止直接写 Energy。Cost/Refund 必须反向等值且 Refund Spec 在 Cost 前预构建。
+- 原 P7-003 C++ allowlist 足够，不新增 Source 文件；P7-002 Context/AttributeSet/Execution 继续只读。用户资产白名单继续包含 Ultimate Refund GE、三伤害 Skill Definition 与 GameMode Harness，必要时只新增一个 EnergyRefund SetByCaller Tag。
+- 活动卡状态改为 `REVISION PLANNED`，等待执行者重新复述及用户再次确认修订边界。本轮未 Build、Editor、PIE、Git，不处理 Team SP 池、Wait/Pass、回能或 P7-004。
+
+## 2026-07-20｜Coordinator：P7-003 归档与 TASK-P7-004 规划
+
+- 三提交范围核对：用户资产 `f1687d3` 仅含三 Skill DataAsset 与 Ultimate Refund GE；Implementation `cf0d9b4` 仅含 P7-003 allowlist 源码与执行报告；Reviewer `56e89d1` 仅含最终审查。
+- Reviewer 结论为 `PASS WITH FOLLOW-UP`；prepared transaction、stream-copy RNG、SP rollback、Ultimate GAS Cost/Refund、terminal 延迟、三技能正式统一 Execution、Heal 旧路径与旧 GE 运行时隔离均放行。
+- P7-003 follow-up 原样保留：CaptureFailed/InvalidCapturedValue 未动态注入；post-Cost ApplyFailure→Refund 未动态注入；ReportedAppliedDamage 与 HP delta 不一致；lethal/overkill/真实 Reset 未覆盖。技能点/回能需求继续延期。
+- P7-003 active/execution/final-review 已归档；创建唯一 `TASK-P7-004`，按 Breakdown 对账 → 失败注入 → overkill/lethal/Reset 串行闭环，仅规划未实施。
+- 本轮未修改 Source/Content/Config，未 Build/Editor/PIE；后续 follow-up 需用户独立确认，不自动进入 P7-005。
