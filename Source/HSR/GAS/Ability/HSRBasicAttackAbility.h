@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Abilities/GameplayAbility.h"
+#include "HSRGameplayAbilityBase.h"
 #include "HSRBasicAttackAbility.generated.h"
 
 class UAbilitySystemComponent;
@@ -11,7 +11,7 @@ class UAbilitySystemComponent;
  * in UHSRBattleCoordinator; this ability only applies the configured GAS effect.
  */
 UCLASS()
-class HSR_API UHSRBasicAttackAbility : public UGameplayAbility
+class HSR_API UHSRBasicAttackAbility : public UHSRGameplayAbilityBase
 {
 	GENERATED_BODY()
 
@@ -19,8 +19,9 @@ public:
 	UHSRBasicAttackAbility();
 
 	/** Must be supplied by the coordinator immediately before activation. */
-	bool SetPendingTarget(UAbilitySystemComponent* InTargetAbilitySystem);
-	bool DidLastActivationSucceed() const { return bLastActivationSucceeded; }
+	virtual bool SetPendingTarget(UAbilitySystemComponent* InTargetAbilitySystem) override;
+	virtual void ClearPendingTarget() override;
+	virtual bool DidLastActivationSucceed() const override { return bLastActivationSucceeded; }
 
 #if WITH_EDITOR
 	/** Development-only seam for proving that a missing effect cannot resolve a turn. */

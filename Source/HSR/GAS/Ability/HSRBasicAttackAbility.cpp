@@ -5,7 +5,7 @@
 
 UHSRBasicAttackAbility::UHSRBasicAttackAbility()
 {
-	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+	SetActionContext(FGuid(), FName(TEXT("BasicAttack")));
 	DamageEffectClass = TSoftClassPtr<UGameplayEffect>(FSoftObjectPath(TEXT("/Game/GameplayEffects/BP_GE_P5_BasicAttackDamage.BP_GE_P5_BasicAttackDamage_C")));
 }
 
@@ -19,6 +19,11 @@ bool UHSRBasicAttackAbility::SetPendingTarget(UAbilitySystemComponent* InTargetA
 
 	PendingTargetAbilitySystem = InTargetAbilitySystem;
 	return true;
+}
+
+void UHSRBasicAttackAbility::ClearPendingTarget()
+{
+	PendingTargetAbilitySystem.Reset();
 }
 
 void UHSRBasicAttackAbility::ActivateAbility(
@@ -39,7 +44,7 @@ void UHSRBasicAttackAbility::ActivateAbility(
 			SourceASC ? *SourceASC->GetName() : TEXT("null"),
 			TargetASC ? *TargetASC->GetName() : TEXT("null"),
 			LoadedEffect ? *LoadedEffect->GetName() : TEXT("missing"));
-		PendingTargetAbilitySystem.Reset();
+		ClearPendingTarget();
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -50,7 +55,7 @@ void UHSRBasicAttackAbility::ActivateAbility(
 	if (!EffectSpec.IsValid())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UHSRBasicAttackAbility::ActivateAbility - REJECTED MakeOutgoingSpec failed"));
-		PendingTargetAbilitySystem.Reset();
+		ClearPendingTarget();
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -66,6 +71,6 @@ void UHSRBasicAttackAbility::ActivateAbility(
 		UE_LOG(LogTemp, Warning, TEXT("UHSRBasicAttackAbility::ActivateAbility - FAILED Source=%s Target=%s Effect=%s"), *SourceASC->GetName(), *TargetASC->GetName(), *LoadedEffect->GetName());
 	}
 
-	PendingTargetAbilitySystem.Reset();
+	ClearPendingTarget();
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, !bLastActivationSucceeded);
 }

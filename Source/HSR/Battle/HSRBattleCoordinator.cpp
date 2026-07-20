@@ -1,7 +1,8 @@
 #include "HSRBattleCoordinator.h"
 #include "HSRTurnManager.h"
 #include "HSREncounterTypes.h"
-#include "../GAS/Ability/HSRBasicAttackAbility.h"
+#include "HSRTargetingPolicy.h"
+#include "../GAS/Ability/HSRGameplayAbilityBase.h"
 #include "../GAS/HSRAbilitySystemComponent.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "GameFramework/Actor.h"
@@ -10,6 +11,7 @@
 #include "AbilitySystemComponent.h"
 #include "AttributeSet.h"
 #include "GameplayEffectTypes.h"
+#include "../Data/HSRSkillDefinition.h"
 
 bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRequest)
 {
@@ -161,6 +163,25 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			CurrentState = EHSRBattleCoordinatorState::Failed;
 			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to grant BasicAttack ability.")), Def.DefinitionId);
 		}
+		if (UltimateDefinition && !GrantUltimateAbility(Participant))
+		{
+			UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED to grant Ultimate ParticipantId=%s"), *Participant.ParticipantId.ToString());
+			SpawnedActor->Destroy();
+			for (FHSRBattleParticipant& ExistingParticipant : Participants) { if (ExistingParticipant.Actor.IsValid()) ExistingParticipant.Actor->Destroy(); }
+			Participants.Empty();
+			ParticipantDefinitions.Empty();
+			CurrentState = EHSRBattleCoordinatorState::Failed;
+			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to grant Ultimate ability.")), Def.DefinitionId);
+		}
+		if (SkillDefinition && !GrantSkillAbility(Participant))
+		{
+			UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED to grant Skill ParticipantId=%s"), *Participant.ParticipantId.ToString());
+			SpawnedActor->Destroy();
+			for (FHSRBattleParticipant& ExistingParticipant : Participants) { if (ExistingParticipant.Actor.IsValid()) ExistingParticipant.Actor->Destroy(); }
+			Participants.Empty(); ParticipantDefinitions.Empty(); CurrentState = EHSRBattleCoordinatorState::Failed;
+			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to grant Skill ability.")), Def.DefinitionId);
+		}
+		if (HealDefinition && !GrantHealAbility(Participant)) { SpawnedActor->Destroy(); CurrentState=EHSRBattleCoordinatorState::Failed; return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed,FText::FromString(TEXT("Failed to grant Heal ability.")),Def.DefinitionId); }
 		Participants.Add(Participant);
 		BindHealthObserver(Participant);
 
@@ -185,6 +206,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 
 	// Atomically transition to Spawned
 	CurrentState = EHSRBattleCoordinatorState::Spawned;
+	PublishCommandViewState();
 
 	UE_LOG(LogTemp, Log,
 		TEXT("UHSRBattleCoordinator::BuildParticipants - SUCCESS RequestId=%s Participants=%d Definitions=%d"),
@@ -195,52 +217,186 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 
 bool UHSRBattleCoordinator::RequestBasicAttack(FName AttackerParticipantId, FName TargetParticipantId)
 {
-	if (CurrentState != EHSRBattleCoordinatorState::Spawned || !TurnManager || TurnManager->GetCurrentParticipantId() != AttackerParticipantId)
+	FHSRBattleActionCommand Command;
+	Command.ActionId = FGuid::NewGuid();
+	Command.BattleId = CurrentRequestId;
+	Command.ActorParticipantId = AttackerParticipantId;
+	Command.SkillId = FName(TEXT("BasicAttack"));
+	Command.TargetParticipantIds.Add(TargetParticipantId);
+	return RequestAction(Command).Succeeded();
+}
+
+FHSRAbilityResolution UHSRBattleCoordinator::RequestAction(const FHSRBattleActionCommand& Command)
+{
+	FHSRAbilityResolution Resolution;
+	Resolution.ActionId = Command.ActionId;
+	Resolution.ActorParticipantId = Command.ActorParticipantId;
+	Resolution.SkillId = Command.SkillId;
+	const auto Finalize = [this, &Command](FHSRAbilityResolution InResolution)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::RequestBasicAttack - REJECTED non-current or inactive Attacker=%s Current=%s"), *AttackerParticipantId.ToString(), TurnManager ? *TurnManager->GetCurrentParticipantId().ToString() : TEXT("None"));
-		return false;
+		if (Command.ActionId.IsValid())
+		{
+			ProcessedActionResolutions.Add(Command.ActionId, InResolution);
+		}
+		LastActionResolution = InResolution;
+		PublishCommandViewState();
+		return InResolution;
+	};
+	const auto Reject = [&Resolution, &Finalize](EHSRAbilityFailureReason Reason)
+	{
+		Resolution.Status = EHSRAbilityResolutionStatus::Rejected;
+		Resolution.FailureReason = Reason;
+		return Finalize(Resolution);
+	};
+	if (Command.ActionId.IsValid())
+	{
+		if (const FHSRAbilityResolution* ExistingResolution = ProcessedActionResolutions.Find(Command.ActionId))
+		{
+			return *ExistingResolution;
+		}
 	}
 
-	const FHSRBattleParticipant* Attacker = Participants.FindByPredicate([AttackerParticipantId](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == AttackerParticipantId; });
-	const FHSRBattleParticipant* Target = Participants.FindByPredicate([TargetParticipantId](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == TargetParticipantId; });
-	if (!Attacker || !Target || !Attacker->IsValid() || !Target->IsValid() || Attacker->Team == Target->Team)
+	if (CurrentState != EHSRBattleCoordinatorState::Spawned || !TurnManager || Command.BattleId != CurrentRequestId)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::RequestBasicAttack - REJECTED invalid target Attacker=%s Target=%s"), *AttackerParticipantId.ToString(), *TargetParticipantId.ToString());
-		return false;
+		return Reject(EHSRAbilityFailureReason::InvalidBattle);
+	}
+	if (!Command.ActionId.IsValid())
+	{
+		return Reject(EHSRAbilityFailureReason::DuplicateAction);
+	}
+	if (TurnManager->GetCurrentParticipantId() != Command.ActorParticipantId)
+	{
+		return Reject(EHSRAbilityFailureReason::NotCurrentActor);
+	}
+	const UHSRSkillDefinition* ResolvedSkillDefinition = FindSkillDefinition(Command.SkillId);
+	if (!ResolvedSkillDefinition || !ResolvedSkillDefinition->IsValidDefinition())
+	{
+		return Reject(EHSRAbilityFailureReason::DefinitionMissing);
 	}
 
-	FGameplayAbilitySpec* AbilitySpec = Attacker->AbilitySystemComponent->FindAbilitySpecFromClass(UHSRBasicAttackAbility::StaticClass());
-	UHSRBasicAttackAbility* Ability = AbilitySpec ? Cast<UHSRBasicAttackAbility>(AbilitySpec->GetPrimaryInstance()) : nullptr;
+	const FHSRBattleParticipant* Attacker = Participants.FindByPredicate([&Command](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == Command.ActorParticipantId; });
+	if (!Attacker || !Attacker->IsValid() || Attacker->bDefeated
+		|| !FHSRTargetingPolicy::ValidateTargetIds(*ResolvedSkillDefinition, *Attacker, Participants, Command.TargetParticipantIds))
+	{
+		return Reject(EHSRAbilityFailureReason::InvalidTarget);
+	}
+	const FHSRBattleParticipant* Target = Participants.FindByPredicate([&Command](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == Command.TargetParticipantIds[0]; });
+	if (!Target || !Target->AbilitySystemComponent.IsValid())
+	{
+		return Reject(EHSRAbilityFailureReason::InvalidTarget);
+	}
+	if (ResolvedSkillDefinition->Category == EHSRSkillCategory::Heal && Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) >= Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxHealthAttribute())) return Reject(EHSRAbilityFailureReason::AlreadyAtFullHealth);
+
+	// This is the synchronous preflight for the only mutating P6-001 ability.
+	// ResolveAction can reject only if its current participant is absent/invalid or
+	// changes. The current id and the TurnManager's own weak participant copy are
+	// both checked before GE activation; no Tick, delegate, or asynchronous work
+	// runs between this check and the immediate ResolveAction below.
+	const FHSRBattleParticipant* TurnParticipant = TurnManager->GetOrderedParticipants().FindByPredicate([&Command](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == Command.ActorParticipantId; });
+	if (!TurnParticipant || !TurnParticipant->IsValid())
+	{
+		return Reject(EHSRAbilityFailureReason::NotCurrentActor);
+	}
+
+	FGameplayAbilitySpec* AbilitySpec = Attacker->AbilitySystemComponent->FindAbilitySpecFromClass(ResolvedSkillDefinition->AbilityClass);
+	UHSRGameplayAbilityBase* Ability = AbilitySpec ? Cast<UHSRGameplayAbilityBase>(AbilitySpec->GetPrimaryInstance()) : nullptr;
 	if (!Ability || !Ability->SetPendingTarget(Target->AbilitySystemComponent.Get()))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::RequestBasicAttack - REJECTED missing BasicAttack ability Attacker=%s"), *AttackerParticipantId.ToString());
-		return false;
+		return Reject(EHSRAbilityFailureReason::AbilityUnavailable);
 	}
-
+	const EHSRAbilityFailureReason PreActivationFailure = Ability->GetPreActivationFailureReason(AbilitySpec->Handle, Attacker->AbilitySystemComponent->AbilityActorInfo.Get());
+	if (PreActivationFailure != EHSRAbilityFailureReason::None)
+	{
+		Ability->ClearPendingTarget();
+		return Reject(PreActivationFailure);
+	}
+	const int32 SkillPointDelta = ResolvedSkillDefinition->Category == EHSRSkillCategory::BasicAttack ? 1 : (ResolvedSkillDefinition->Category == EHSRSkillCategory::Skill ? -1 : 0);
+	if (!ReserveSkillPoints(Command.ActionId, SkillPointDelta))
+	{
+		return Reject(EHSRAbilityFailureReason::InsufficientSkillPoint);
+	}
+	Ability->SetActionContext(Command.ActionId, Command.SkillId);
 	if (!Attacker->AbilitySystemComponent->TryActivateAbility(AbilitySpec->Handle) || !Ability->DidLastActivationSucceed())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::RequestBasicAttack - REJECTED activation failed Attacker=%s Target=%s"), *AttackerParticipantId.ToString(), *TargetParticipantId.ToString());
-		return false;
+		Ability->ClearPendingTarget();
+		RollbackSkillPoints(Command.ActionId);
+		return Reject(Ability->GetLastFailureReason());
 	}
 
-	// The instant effect may synchronously produce a terminal result through the
-	// health observer. A completed battle must not advance another turn.
-	if (bBattleResultProduced)
+	if (!bBattleResultProduced && !TurnManager->ResolveAction(Command.ActorParticipantId))
 	{
-		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::RequestBasicAttack - SUCCESS terminal attack Attacker=%s Target=%s"), *AttackerParticipantId.ToString(), *TargetParticipantId.ToString());
-		return true;
+		ensureMsgf(false, TEXT("UHSRBattleCoordinator::RequestAction post-GE ResolveAction failure violates the synchronous preflight invariant. ActionId=%s"), *Command.ActionId.ToString());
+		UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::RequestAction - FAILED post-GE turn resolve ActionId=%s; GE side effect already occurred and this branch is contractually unreachable after preflight"), *Command.ActionId.ToString());
+		RollbackSkillPoints(Command.ActionId);
+		return Reject(EHSRAbilityFailureReason::EffectFailed);
+	}
+	CommitSkillPoints(Command.ActionId);
+	Resolution.Status = EHSRAbilityResolutionStatus::Succeeded;
+	Resolution.FailureReason = EHSRAbilityFailureReason::None;
+	Finalize(Resolution);
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::RequestAction - SUCCESS ActionId=%s Skill=%s Actor=%s Target=%s"), *Command.ActionId.ToString(), *Command.SkillId.ToString(), *Command.ActorParticipantId.ToString(), *Command.TargetParticipantIds[0].ToString());
+	return Resolution;
+}
+
+FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
+{
+	FHSRBattleCommandViewState State;
+	State.BattleId = CurrentRequestId;
+	State.SkillPoints = TeamResourceState.CurrentSkillPoints;
+	State.MaxSkillPoints = TeamResourceState.MaxSkillPoints;
+	State.LastResolution = LastActionResolution;
+	if (!TurnManager || CurrentState != EHSRBattleCoordinatorState::Spawned)
+	{
+		return State;
 	}
 
-	const bool bResolved = TurnManager->ResolveAction(AttackerParticipantId);
-	if (bResolved)
+	State.CurrentActorId = TurnManager->GetCurrentParticipantId();
+	const FHSRBattleParticipant* Actor = Participants.FindByPredicate([&State](const FHSRBattleParticipant& P) { return P.ParticipantId == State.CurrentActorId; });
+	if (!Actor || !Actor->AbilitySystemComponent.IsValid())
 	{
-		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::RequestBasicAttack - SUCCESS Attacker=%s Target=%s"), *AttackerParticipantId.ToString(), *TargetParticipantId.ToString());
+		return State;
 	}
-	else
+	State.Energy = Actor->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
+	State.MaxEnergy = Actor->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxEnergyAttribute());
+	const UHSRSkillDefinition* Definitions[] = { BasicAttackDefinition, SkillDefinition, UltimateDefinition, HealDefinition };
+	for (const UHSRSkillDefinition* Definition : Definitions)
 	{
-		UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::RequestBasicAttack - FAILED ResolveAction Attacker=%s Target=%s"), *AttackerParticipantId.ToString(), *TargetParticipantId.ToString());
+		if (!Definition)
+		{
+			continue;
+		}
+		FHSRBattleCommandSkillView View;
+		View.SkillId = Definition->SkillId;
+		View.Category = Definition->Category;
+		View.TargetType = Definition->TargetType;
+		View.CandidateTargetIds = FHSRTargetingPolicy::BuildCandidateTargetIds(*Definition, *Actor, Participants);
+		View.bAvailable = Definition->IsValidDefinition() && View.CandidateTargetIds.Num() > 0;
+		if (!Definition->IsValidDefinition()) View.DisabledReason = EHSRAbilityFailureReason::DefinitionMissing;
+		else if (View.CandidateTargetIds.Num() == 0) View.DisabledReason = EHSRAbilityFailureReason::InvalidTarget;
+		else if (Definition->Category == EHSRSkillCategory::Skill && TeamResourceState.CurrentSkillPoints <= 0) View.DisabledReason = EHSRAbilityFailureReason::InsufficientSkillPoint;
+		else
+		{
+			FGameplayAbilitySpec* Spec = Actor->AbilitySystemComponent->FindAbilitySpecFromClass(Definition->AbilityClass);
+			UHSRGameplayAbilityBase* Ability = Spec ? Cast<UHSRGameplayAbilityBase>(Spec->GetPrimaryInstance()) : nullptr;
+			if (!Ability || !Ability->SetPendingTarget(Participants.FindByPredicate([&View](const FHSRBattleParticipant& P) { return P.ParticipantId == View.CandidateTargetIds[0]; })->AbilitySystemComponent.Get()))
+			{
+				View.bAvailable = false; View.DisabledReason = EHSRAbilityFailureReason::AbilityUnavailable;
+			}
+			else
+			{
+				View.DisabledReason = Ability->GetPreActivationFailureReason(Spec->Handle, Actor->AbilitySystemComponent->AbilityActorInfo.Get());
+				View.bAvailable = View.DisabledReason == EHSRAbilityFailureReason::None;
+				Ability->ClearPendingTarget();
+			}
+		}
+		State.Skills.Add(View);
 	}
-	return bResolved;
+	return State;
+}
+
+void UHSRBattleCoordinator::PublishCommandViewState()
+{
+	CommandStateReady.Broadcast(GetCommandViewState());
 }
 
 bool UHSRBattleCoordinator::ConsumeBattleResult(FHSRBattleResult& OutResult)
@@ -356,11 +512,16 @@ void UHSRBattleCoordinator::Reset()
 	BattleResult = FHSRBattleResult();
 	bBattleResultProduced = false;
 	bBattleResultConsumed = false;
+	ProcessedActionResolutions.Empty();
+	LastActionResolution = FHSRAbilityResolution();
+	SkillPointReservations.Empty();
+	TeamResourceState = FHSRTeamResourceState();
 	if (TurnManager)
 	{
 		TurnManager->Reset();
 		TurnManager = nullptr;
 	}
+	PublishCommandViewState();
 }
 
 void UHSRBattleCoordinator::BindHealthObserver(const FHSRBattleParticipant& Participant)
@@ -519,12 +680,13 @@ bool UHSRBattleCoordinator::InitParticipantASC(AActor* TargetActor)
 
 bool UHSRBattleCoordinator::GrantBasicAttackAbility(const FHSRBattleParticipant& Participant)
 {
-	if (!Participant.AbilitySystemComponent.IsValid())
+	if (!Participant.AbilitySystemComponent.IsValid() || !BasicAttackDefinition || !BasicAttackDefinition->IsValidDefinition() || BasicAttackDefinition->Category != EHSRSkillCategory::BasicAttack || BasicAttackDefinition->TargetType != EHSRTargetType::SingleEnemy)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantBasicAttackAbility - REJECTED missing/invalid BasicAttack SkillDefinition Participant=%s"), *Participant.ParticipantId.ToString());
 		return false;
 	}
 
-	const FGameplayAbilitySpecHandle AbilityHandle = Participant.AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(UHSRBasicAttackAbility::StaticClass(), 1, INDEX_NONE, this));
+	const FGameplayAbilitySpecHandle AbilityHandle = Participant.AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(BasicAttackDefinition->AbilityClass, 1, INDEX_NONE, this));
 	const bool bGranted = AbilityHandle.IsValid();
 	if (bGranted)
 	{
@@ -535,4 +697,93 @@ bool UHSRBattleCoordinator::GrantBasicAttackAbility(const FHSRBattleParticipant&
 		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantBasicAttackAbility - FAILED Participant=%s"), *Participant.ParticipantId.ToString());
 	}
 	return bGranted;
+}
+
+bool UHSRBattleCoordinator::GrantUltimateAbility(const FHSRBattleParticipant& Participant)
+{
+	if (!Participant.AbilitySystemComponent.IsValid() || !UltimateDefinition || !UltimateDefinition->IsValidUltimateDefinition())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantUltimateAbility - REJECTED missing/invalid Ultimate SkillDefinition Participant=%s"), *Participant.ParticipantId.ToString());
+		return false;
+	}
+
+	const FGameplayAbilitySpecHandle AbilityHandle = Participant.AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(UltimateDefinition->AbilityClass, 1, INDEX_NONE, this));
+	FGameplayAbilitySpec* AbilitySpec = AbilityHandle.IsValid() ? Participant.AbilitySystemComponent->FindAbilitySpecFromClass(UltimateDefinition->AbilityClass) : nullptr;
+	UHSRGameplayAbilityBase* Ability = AbilitySpec ? Cast<UHSRGameplayAbilityBase>(AbilitySpec->GetPrimaryInstance()) : nullptr;
+	if (!Ability || !Ability->ConfigureFromSkillDefinition(*UltimateDefinition))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantUltimateAbility - FAILED configuration Participant=%s"), *Participant.ParticipantId.ToString());
+		return false;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::GrantUltimateAbility - SUCCESS Participant=%s"), *Participant.ParticipantId.ToString());
+	return true;
+}
+
+bool UHSRBattleCoordinator::GrantSkillAbility(const FHSRBattleParticipant& Participant)
+{
+	if (!Participant.AbilitySystemComponent.IsValid() || !SkillDefinition || !SkillDefinition->IsValidSkillDefinition()) return false;
+	const FGameplayAbilitySpecHandle Handle = Participant.AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(SkillDefinition->AbilityClass, 1, INDEX_NONE, this));
+	FGameplayAbilitySpec* Spec = Handle.IsValid() ? Participant.AbilitySystemComponent->FindAbilitySpecFromClass(SkillDefinition->AbilityClass) : nullptr;
+	UHSRGameplayAbilityBase* Ability = Spec ? Cast<UHSRGameplayAbilityBase>(Spec->GetPrimaryInstance()) : nullptr;
+	const bool bSuccess = Ability && Ability->ConfigureFromSkillDefinition(*SkillDefinition);
+	if (bSuccess)
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::GrantSkillAbility - SUCCESS Participant=%s"), *Participant.ParticipantId.ToString());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantSkillAbility - FAILED Participant=%s"), *Participant.ParticipantId.ToString());
+	}
+	return bSuccess;
+}
+bool UHSRBattleCoordinator::GrantHealAbility(const FHSRBattleParticipant& Participant)
+{
+	if(!Participant.AbilitySystemComponent.IsValid()||!HealDefinition||!HealDefinition->IsValidHealDefinition())return false;
+	auto H=Participant.AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(HealDefinition->AbilityClass,1,INDEX_NONE,this)); auto* S=H.IsValid()?Participant.AbilitySystemComponent->FindAbilitySpecFromClass(HealDefinition->AbilityClass):nullptr; auto* A=S?Cast<UHSRGameplayAbilityBase>(S->GetPrimaryInstance()):nullptr; return A&&A->ConfigureFromSkillDefinition(*HealDefinition);
+}
+
+const UHSRSkillDefinition* UHSRBattleCoordinator::FindSkillDefinition(FName SkillId) const
+{
+	if (BasicAttackDefinition && BasicAttackDefinition->SkillId == SkillId)
+	{
+		return BasicAttackDefinition;
+	}
+	if (UltimateDefinition && UltimateDefinition->SkillId == SkillId)
+	{
+		return UltimateDefinition;
+	}
+	if (SkillDefinition && SkillDefinition->SkillId == SkillId)
+	{
+		return SkillDefinition;
+	}
+	if (HealDefinition && HealDefinition->SkillId == SkillId) return HealDefinition;
+	return nullptr;
+}
+
+bool UHSRBattleCoordinator::ReserveSkillPoints(const FGuid& ActionId, int32 Delta)
+{
+	if (SkillPointReservations.Contains(ActionId)) return false;
+	if (Delta < 0 && TeamResourceState.CurrentSkillPoints < -Delta) return false;
+	FHSRSkillPointReservation Reservation; Reservation.ActionId = ActionId;
+	// A capped BasicAttack is still a valid action; it commits a zero delta.
+	Reservation.Delta = Delta > 0 ? FMath::Min(Delta, TeamResourceState.MaxSkillPoints - TeamResourceState.CurrentSkillPoints) : Delta;
+	SkillPointReservations.Add(ActionId, Reservation);
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::ReserveSkillPoints - ActionId=%s Delta=%d Current=%d Max=%d"), *ActionId.ToString(), Reservation.Delta, TeamResourceState.CurrentSkillPoints, TeamResourceState.MaxSkillPoints);
+	return true;
+}
+
+void UHSRBattleCoordinator::RollbackSkillPoints(const FGuid& ActionId)
+{
+	if (SkillPointReservations.Remove(ActionId) > 0) UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::RollbackSkillPoints - ActionId=%s"), *ActionId.ToString());
+}
+
+void UHSRBattleCoordinator::CommitSkillPoints(const FGuid& ActionId)
+{
+	if (FHSRSkillPointReservation* Reservation = SkillPointReservations.Find(ActionId))
+	{
+		TeamResourceState.CurrentSkillPoints = FMath::Clamp(TeamResourceState.CurrentSkillPoints + Reservation->Delta, 0, TeamResourceState.MaxSkillPoints);
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::CommitSkillPoints - ActionId=%s Delta=%d Current=%d"), *ActionId.ToString(), Reservation->Delta, TeamResourceState.CurrentSkillPoints);
+		SkillPointReservations.Remove(ActionId);
+	}
 }

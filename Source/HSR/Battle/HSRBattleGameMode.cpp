@@ -6,7 +6,12 @@
 #include "AbilitySystemComponent.h"
 #include "GameplayAbilitySpec.h"
 #include "../GAS/Ability/HSRBasicAttackAbility.h"
+#include "../GAS/Ability/HSRSkillAbility.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
+#include "../Data/HSRSkillDefinition.h"
+#include "../UI/HSRBattleCommandViewModel.h"
+#include "../UI/HSRBattleCommandWidget.h"
+#include "Blueprint/UserWidget.h"
 
 #if WITH_EDITOR
 namespace HSRBattleDevelopmentTest
@@ -47,6 +52,37 @@ namespace HSRBattleDevelopmentTest
 	static float GetHealth(const FHSRBattleParticipant& Participant)
 	{
 		return Participant.AbilitySystemComponent.IsValid() ? Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) : -1.0f;
+	}
+
+	static bool SetEnergy(const FHSRBattleParticipant& Participant, float Energy, float MaxEnergy)
+	{
+		if (!Participant.AbilitySystemComponent.IsValid())
+		{
+			return false;
+		}
+		Participant.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxEnergyAttribute(), MaxEnergy);
+		Participant.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetEnergyAttribute(), Energy);
+		return true;
+	}
+
+	static float GetEnergy(const FHSRBattleParticipant& Participant)
+	{
+		return Participant.AbilitySystemComponent.IsValid() ? Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute()) : -1.0f;
+	}
+
+	static void LogP6UltimateCase(const TCHAR* CaseName, bool bPassed, const FGuid& ActionId, const FHSRAbilityResolution& Resolution,
+		float EnergyBefore, float EnergyAfter, float HealthBefore, float HealthAfter, FName TurnBefore, FName TurnAfter)
+	{
+		if (bPassed)
+		{
+			UE_LOG(LogTemp, Log, TEXT("P6-002 Case=%s Result=PASS ActionId=%s ResolutionStatus=%d FailureReason=%d EnergyBefore=%.2f EnergyAfter=%.2f HealthBefore=%.2f HealthAfter=%.2f TurnBefore=%s TurnAfter=%s"),
+				CaseName, *ActionId.ToString(), static_cast<int32>(Resolution.Status), static_cast<int32>(Resolution.FailureReason), EnergyBefore, EnergyAfter, HealthBefore, HealthAfter, *TurnBefore.ToString(), *TurnAfter.ToString());
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("P6-002 Case=%s Result=FAIL ActionId=%s ResolutionStatus=%d FailureReason=%d EnergyBefore=%.2f EnergyAfter=%.2f HealthBefore=%.2f HealthAfter=%.2f TurnBefore=%s TurnAfter=%s"),
+				CaseName, *ActionId.ToString(), static_cast<int32>(Resolution.Status), static_cast<int32>(Resolution.FailureReason), EnergyBefore, EnergyAfter, HealthBefore, HealthAfter, *TurnBefore.ToString(), *TurnAfter.ToString());
+		}
 	}
 
 	static UHSRBasicAttackAbility* FindBasicAttackAbility(const FHSRBattleParticipant& Participant)
@@ -157,8 +193,240 @@ namespace HSRBattleDevelopmentTest
 			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Enemy"))
 			&& ActionResolvedCount == 1;
 		LogCase(TEXT("P5-003_DuplicateRejected_NoExtraMutation"), bAttackDuplicateRejected);
+
+		// P6-001 command-idempotence seam. It calls RequestAction directly so the
+		// same stable ActionId is submitted twice rather than generating a new ID
+		// through the legacy RequestBasicAttack convenience wrapper.
+		const auto MakeBasicAttackCommand = [Coordinator](const FGuid& ActionId, FName TargetId)
+		{
+			FHSRBattleActionCommand Command;
+			Command.ActionId = ActionId;
+			Command.BattleId = Coordinator->GetCurrentRequestId();
+			Command.ActorParticipantId = FName(TEXT("Player"));
+			Command.SkillId = FName(TEXT("BasicAttack"));
+			Command.TargetParticipantIds.Add(TargetId);
+			return Command;
+		};
+
+		const bool bP6Setup = SetHealth(Participants[0], 100.0f, 100.0f)
+			&& SetHealth(Participants[1], 100.0f, 100.0f)
+			&& MainTurnManager->Initialize(Participants)
+			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Player"));
+		ActionResolvedCount = 0;
+
+		const float P6PlayerHealthBefore = GetHealth(Participants[0]);
+		const float P6EnemyHealthBefore = GetHealth(Participants[1]);
+		const FHSRBattleActionCommand InvalidTargetCommand = MakeBasicAttackCommand(FGuid::NewGuid(), FName(TEXT("Player")));
+		const FHSRAbilityResolution InvalidTargetFirst = Coordinator->RequestAction(InvalidTargetCommand);
+		const FHSRAbilityResolution InvalidTargetReplay = Coordinator->RequestAction(InvalidTargetCommand);
+		const bool bP6InvalidTargetCachedNoMutation = bP6Setup
+			&& InvalidTargetFirst.Status == EHSRAbilityResolutionStatus::Rejected
+			&& InvalidTargetFirst.FailureReason == EHSRAbilityFailureReason::InvalidTarget
+			&& InvalidTargetReplay.Status == InvalidTargetFirst.Status
+			&& InvalidTargetReplay.FailureReason == InvalidTargetFirst.FailureReason
+			&& FMath::IsNearlyEqual(P6PlayerHealthBefore, GetHealth(Participants[0]))
+			&& FMath::IsNearlyEqual(P6EnemyHealthBefore, GetHealth(Participants[1]))
+			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Player"))
+			&& ActionResolvedCount == 0;
+		LogCase(TEXT("P6-001_InvalidTargetCached_NoMutation"), bP6InvalidTargetCachedNoMutation);
+
+		if (PlayerAttack)
+		{
+			PlayerAttack->SetDamageEffectClassForDevelopmentTest(TSoftClassPtr<UGameplayEffect>(FSoftObjectPath(TEXT("/Game/GameplayEffects/GE_P6_MissingDamageEffect.GE_P6_MissingDamageEffect_C"))));
+		}
+		const FHSRBattleActionCommand MissingEffectCommand = MakeBasicAttackCommand(FGuid::NewGuid(), FName(TEXT("Enemy")));
+		const FHSRAbilityResolution MissingEffectFirst = PlayerAttack ? Coordinator->RequestAction(MissingEffectCommand) : FHSRAbilityResolution();
+		const FHSRAbilityResolution MissingEffectReplay = PlayerAttack ? Coordinator->RequestAction(MissingEffectCommand) : FHSRAbilityResolution();
+		if (PlayerAttack)
+		{
+			PlayerAttack->SetDamageEffectClassForDevelopmentTest(OriginalEffectClass);
+		}
+		const bool bP6MissingEffectCachedNoMutation = PlayerAttack
+			&& MissingEffectFirst.Status == EHSRAbilityResolutionStatus::Rejected
+			&& MissingEffectFirst.FailureReason == EHSRAbilityFailureReason::EffectFailed
+			&& MissingEffectReplay.Status == MissingEffectFirst.Status
+			&& MissingEffectReplay.FailureReason == MissingEffectFirst.FailureReason
+			&& FMath::IsNearlyEqual(P6PlayerHealthBefore, GetHealth(Participants[0]))
+			&& FMath::IsNearlyEqual(P6EnemyHealthBefore, GetHealth(Participants[1]))
+			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Player"))
+			&& ActionResolvedCount == 0;
+		LogCase(TEXT("P6-001_MissingEffectCached_NoMutation"), bP6MissingEffectCachedNoMutation);
+
+		const FHSRBattleActionCommand LegalCommand = MakeBasicAttackCommand(FGuid::NewGuid(), FName(TEXT("Enemy")));
+		const FHSRAbilityResolution LegalFirst = Coordinator->RequestAction(LegalCommand);
+		const float P6EnemyHealthAfterLegal = GetHealth(Participants[1]);
+		const FHSRAbilityResolution LegalReplay = Coordinator->RequestAction(LegalCommand);
+		const bool bP6LegalCachedSingleMutation = LegalFirst.Status == EHSRAbilityResolutionStatus::Succeeded
+			&& LegalReplay.Status == LegalFirst.Status
+			&& LegalReplay.FailureReason == LegalFirst.FailureReason
+			&& FMath::IsNearlyEqual(P6EnemyHealthAfterLegal, 90.0f)
+			&& FMath::IsNearlyEqual(P6EnemyHealthAfterLegal, GetHealth(Participants[1]))
+			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Enemy"))
+			&& ActionResolvedCount == 1;
+		LogCase(TEXT("P6-001_LegalActionCached_SingleGEAndTurn"), bP6LegalCachedSingleMutation);
 		MainTurnManager->OnActionResolved().Remove(ActionResolvedHandle);
 		UE_LOG(LogTemp, Log, TEXT("P5-003 AttackTest Harness=COMPLETE"));
+	}
+
+	static void RunP6Ultimate(UHSRBattleCoordinator* Coordinator, const UHSRSkillDefinition* UltimateDefinition)
+	{
+		if (!Coordinator || !UltimateDefinition || !UltimateDefinition->IsValidUltimateDefinition() || Coordinator->GetParticipants().Num() != 2)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("P6-002 Harness=SKIPPED reason=missing-coordinator-valid-ultimate-definition-or-participants"));
+			UE_LOG(LogTemp, Log, TEXT("P6-002 Harness=COMPLETE"));
+			return;
+		}
+
+		const TArray<FHSRBattleParticipant>& Participants = Coordinator->GetParticipants();
+		const FHSRBattleParticipant* Player = Participants.FindByPredicate([](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == FName(TEXT("Player")); });
+		const FHSRBattleParticipant* Enemy = Participants.FindByPredicate([](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == FName(TEXT("Enemy")); });
+		UHSRTurnManager* TurnManager = Coordinator->GetTurnManager();
+		if (!Player || !Enemy || !TurnManager)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("P6-002 Harness=SKIPPED reason=missing-player-enemy-or-turn-manager"));
+			UE_LOG(LogTemp, Log, TEXT("P6-002 Harness=COMPLETE"));
+			return;
+		}
+
+		const auto ResetCase = [&Participants, Player, Enemy, TurnManager](float PlayerEnergy)
+		{
+			return SetSpeed(*Player, 120.0f) && SetSpeed(*Enemy, 80.0f)
+				&& SetHealth(*Player, 1000.0f, 1000.0f) && SetHealth(*Enemy, 1000.0f, 1000.0f)
+				&& SetEnergy(*Player, PlayerEnergy, 100.0f) && SetEnergy(*Enemy, 0.0f, 100.0f)
+				&& TurnManager->Initialize(Participants) && TurnManager->GetCurrentParticipantId() == FName(TEXT("Player"));
+		};
+		const auto MakeUltimateCommand = [Coordinator, UltimateDefinition](const FGuid& ActionId, FName TargetId)
+		{
+			FHSRBattleActionCommand Command;
+			Command.ActionId = ActionId;
+			Command.BattleId = Coordinator->GetCurrentRequestId();
+			Command.ActorParticipantId = FName(TEXT("Player"));
+			Command.SkillId = UltimateDefinition->SkillId;
+			Command.TargetParticipantIds.Add(TargetId);
+			return Command;
+		};
+
+		// First a full-Energy success determines the configured GAS Cost without
+		// duplicating that authored value in C++.
+		const bool bFullSetup = ResetCase(100.0f);
+		const FGuid FullActionId = FGuid::NewGuid();
+		const FName FullTurnBefore = TurnManager->GetCurrentParticipantId();
+		const float FullEnergyBefore = GetEnergy(*Player);
+		const float FullHealthBefore = GetHealth(*Enemy);
+		const FHSRAbilityResolution FullResolution = Coordinator->RequestAction(MakeUltimateCommand(FullActionId, Enemy->ParticipantId));
+		const float FullEnergyAfter = GetEnergy(*Player);
+		const float FullHealthAfter = GetHealth(*Enemy);
+		const FName FullTurnAfter = TurnManager->GetCurrentParticipantId();
+		const float MeasuredCost = FullEnergyBefore - FullEnergyAfter;
+		const bool bFullPassed = bFullSetup && FullResolution.Succeeded() && MeasuredCost > 0.0f
+			&& FullHealthAfter < FullHealthBefore && FullTurnAfter == Enemy->ParticipantId;
+		LogP6UltimateCase(TEXT("EnergyFull_LegalUltimate"), bFullPassed, FullActionId, FullResolution, FullEnergyBefore, FullEnergyAfter, FullHealthBefore, FullHealthAfter, FullTurnBefore, FullTurnAfter);
+
+		const FHSRAbilityResolution FullReplayResolution = Coordinator->RequestAction(MakeUltimateCommand(FullActionId, Enemy->ParticipantId));
+		const bool bReplayPassed = bFullPassed && FullReplayResolution.Status == FullResolution.Status && FullReplayResolution.FailureReason == FullResolution.FailureReason
+			&& FMath::IsNearlyEqual(FullEnergyAfter, GetEnergy(*Player)) && FMath::IsNearlyEqual(FullHealthAfter, GetHealth(*Enemy))
+			&& TurnManager->GetCurrentParticipantId() == FullTurnAfter;
+		LogP6UltimateCase(TEXT("LegalUltimate_ReplayCached"), bReplayPassed, FullActionId, FullReplayResolution, FullEnergyAfter, GetEnergy(*Player), FullHealthAfter, GetHealth(*Enemy), FullTurnAfter, TurnManager->GetCurrentParticipantId());
+
+		const auto RunInsufficientCase = [&ResetCase, &MakeUltimateCommand, Coordinator, Player, Enemy, TurnManager](const TCHAR* CaseName, float StartingEnergy)
+		{
+			const bool bSetup = ResetCase(StartingEnergy);
+			const FGuid ActionId = FGuid::NewGuid();
+			const FName TurnBefore = TurnManager->GetCurrentParticipantId();
+			const float EnergyBefore = GetEnergy(*Player);
+			const float HealthBefore = GetHealth(*Enemy);
+			const FHSRAbilityResolution Resolution = Coordinator->RequestAction(MakeUltimateCommand(ActionId, Enemy->ParticipantId));
+			const float EnergyAfter = GetEnergy(*Player);
+			const float HealthAfter = GetHealth(*Enemy);
+			const FName TurnAfter = TurnManager->GetCurrentParticipantId();
+			const bool bPassed = bSetup && Resolution.Status == EHSRAbilityResolutionStatus::Rejected
+				&& Resolution.FailureReason == EHSRAbilityFailureReason::InsufficientEnergy
+				&& FMath::IsNearlyEqual(EnergyBefore, EnergyAfter) && FMath::IsNearlyEqual(HealthBefore, HealthAfter) && TurnBefore == TurnAfter;
+			LogP6UltimateCase(CaseName, bPassed, ActionId, Resolution, EnergyBefore, EnergyAfter, HealthBefore, HealthAfter, TurnBefore, TurnAfter);
+		};
+
+		RunInsufficientCase(TEXT("EnergyZero_RejectNoMutation"), 0.0f);
+		RunInsufficientCase(TEXT("EnergyBelowCost_RejectNoMutation"), FMath::Max(0.0f, MeasuredCost - 1.0f));
+
+		const bool bExactSetup = ResetCase(MeasuredCost);
+		const FGuid ExactActionId = FGuid::NewGuid();
+		const FName ExactTurnBefore = TurnManager->GetCurrentParticipantId();
+		const float ExactEnergyBefore = GetEnergy(*Player);
+		const float ExactHealthBefore = GetHealth(*Enemy);
+		const FHSRAbilityResolution ExactResolution = Coordinator->RequestAction(MakeUltimateCommand(ExactActionId, Enemy->ParticipantId));
+		const float ExactEnergyAfter = GetEnergy(*Player);
+		const float ExactHealthAfter = GetHealth(*Enemy);
+		const FName ExactTurnAfter = TurnManager->GetCurrentParticipantId();
+		const bool bExactPassed = bExactSetup && MeasuredCost > 0.0f && ExactResolution.Succeeded()
+			&& FMath::IsNearlyZero(ExactEnergyAfter) && ExactHealthAfter < ExactHealthBefore && ExactTurnAfter == Enemy->ParticipantId;
+		LogP6UltimateCase(TEXT("EnergyExactCost_LegalUltimate"), bExactPassed, ExactActionId, ExactResolution, ExactEnergyBefore, ExactEnergyAfter, ExactHealthBefore, ExactHealthAfter, ExactTurnBefore, ExactTurnAfter);
+
+		const bool bInvalidSetup = ResetCase(100.0f);
+		const FGuid InvalidActionId = FGuid::NewGuid();
+		const FName InvalidTurnBefore = TurnManager->GetCurrentParticipantId();
+		const float InvalidEnergyBefore = GetEnergy(*Player);
+		const float InvalidHealthBefore = GetHealth(*Enemy);
+		const FHSRAbilityResolution InvalidResolution = Coordinator->RequestAction(MakeUltimateCommand(InvalidActionId, Player->ParticipantId));
+		const float InvalidEnergyAfter = GetEnergy(*Player);
+		const float InvalidHealthAfter = GetHealth(*Enemy);
+		const FName InvalidTurnAfter = TurnManager->GetCurrentParticipantId();
+		const bool bInvalidPassed = bInvalidSetup && InvalidResolution.Status == EHSRAbilityResolutionStatus::Rejected
+			&& InvalidResolution.FailureReason == EHSRAbilityFailureReason::InvalidTarget
+			&& FMath::IsNearlyEqual(InvalidEnergyBefore, InvalidEnergyAfter) && FMath::IsNearlyEqual(InvalidHealthBefore, InvalidHealthAfter) && InvalidTurnBefore == InvalidTurnAfter;
+		LogP6UltimateCase(TEXT("InvalidTarget_RejectNoMutation"), bInvalidPassed, InvalidActionId, InvalidResolution, InvalidEnergyBefore, InvalidEnergyAfter, InvalidHealthBefore, InvalidHealthAfter, InvalidTurnBefore, InvalidTurnAfter);
+
+	UE_LOG(LogTemp, Log, TEXT("P6-002 Harness=COMPLETE"));
+	}
+
+	static void RunP6SkillPoints(UHSRBattleCoordinator* Coordinator, const UHSRSkillDefinition* SkillDefinition)
+	{
+		if (!Coordinator || !SkillDefinition || !SkillDefinition->IsValidSkillDefinition() || Coordinator->GetParticipants().Num() != 2)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("P6-003 Harness=SKIPPED reason=missing-valid-skill-definition-or-participants")); UE_LOG(LogTemp, Log, TEXT("P6-003 Harness=COMPLETE")); return;
+		}
+		const TArray<FHSRBattleParticipant>& P = Coordinator->GetParticipants(); const FHSRBattleParticipant* Player = P.FindByPredicate([](const FHSRBattleParticipant& X){return X.ParticipantId==FName(TEXT("Player"));}); const FHSRBattleParticipant* Enemy = P.FindByPredicate([](const FHSRBattleParticipant& X){return X.ParticipantId==FName(TEXT("Enemy"));}); UHSRTurnManager* TM=Coordinator->GetTurnManager();
+		if (!Player || !Enemy || !TM) { UE_LOG(LogTemp, Warning, TEXT("P6-003 Harness=SKIPPED reason=missing-runtime")); UE_LOG(LogTemp, Log, TEXT("P6-003 Harness=COMPLETE")); return; }
+		const auto Setup=[&](int32 SP){ SetSpeed(*Player,120);SetSpeed(*Enemy,80);SetHealth(*Player,1000,1000);SetHealth(*Enemy,1000,1000);SetEnergy(*Player,100,100);Coordinator->SetTeamSkillPointsForDevelopmentTest(SP,3);return TM->Initialize(P)&&TM->GetCurrentParticipantId()==Player->ParticipantId;};
+		const auto Cmd=[&](FName Skill,FName Target){FHSRBattleActionCommand C;C.ActionId=FGuid::NewGuid();C.BattleId=Coordinator->GetCurrentRequestId();C.ActorParticipantId=Player->ParticipantId;C.SkillId=Skill;C.TargetParticipantIds.Add(Target);return C;};
+		const auto Log=[&](const TCHAR* N,bool OK,const FHSRBattleActionCommand& C,float EB,float EA,float HB,float HA,FName TB,FName TA,int32 SB,int32 SA){if(OK){UE_LOG(LogTemp,Log,TEXT("P6-003 Case=%s Result=PASS ActionId=%s SPBefore=%d SPAfter=%d EnergyBefore=%.0f EnergyAfter=%.0f HPBefore=%.0f HPAfter=%.0f TurnBefore=%s TurnAfter=%s"),N,*C.ActionId.ToString(),SB,SA,EB,EA,HB,HA,*TB.ToString(),*TA.ToString());}else{UE_LOG(LogTemp,Error,TEXT("P6-003 Case=%s Result=FAIL ActionId=%s SPBefore=%d SPAfter=%d EnergyBefore=%.0f EnergyAfter=%.0f HPBefore=%.0f HPAfter=%.0f TurnBefore=%s TurnAfter=%s"),N,*C.ActionId.ToString(),SB,SA,EB,EA,HB,HA,*TB.ToString(),*TA.ToString());}};
+		// Zero SP Skill reject.
+		Setup(0); auto Z=Cmd(SkillDefinition->SkillId,Enemy->ParticipantId);float ze=GetEnergy(*Player),zh=GetHealth(*Enemy);FName zt=TM->GetCurrentParticipantId();auto zr=Coordinator->RequestAction(Z);Log(TEXT("ZeroSP_SkillReject"),zr.FailureReason==EHSRAbilityFailureReason::InsufficientSkillPoint&&Coordinator->GetTeamResourceState().CurrentSkillPoints==0&&GetEnergy(*Player)==ze&&GetHealth(*Enemy)==zh&&TM->GetCurrentParticipantId()==zt,Z,ze,GetEnergy(*Player),zh,GetHealth(*Enemy),zt,TM->GetCurrentParticipantId(),0,Coordinator->GetTeamResourceState().CurrentSkillPoints);
+		// Cap Basic succeeds but cannot exceed cap.
+		Setup(3);auto C=Cmd(FName(TEXT("BasicAttack")),Enemy->ParticipantId);float ch=GetHealth(*Enemy);auto cr=Coordinator->RequestAction(C);Log(TEXT("CapBasic_NoOverflow"),cr.Succeeded()&&Coordinator->GetTeamResourceState().CurrentSkillPoints==3,C,100,GetEnergy(*Player),ch,GetHealth(*Enemy),Player->ParticipantId,TM->GetCurrentParticipantId(),3,Coordinator->GetTeamResourceState().CurrentSkillPoints);
+		// Basic +1 then Skill -1.
+		Setup(1);auto B=Cmd(FName(TEXT("BasicAttack")),Enemy->ParticipantId);auto br=Coordinator->RequestAction(B);Log(TEXT("BasicCommitPlusOne"),br.Succeeded()&&Coordinator->GetTeamResourceState().CurrentSkillPoints==2,B,100,GetEnergy(*Player),1000,GetHealth(*Enemy),Player->ParticipantId,TM->GetCurrentParticipantId(),1,Coordinator->GetTeamResourceState().CurrentSkillPoints);
+		Setup(2);auto S=Cmd(SkillDefinition->SkillId,Enemy->ParticipantId);float sh=GetHealth(*Enemy);auto sr=Coordinator->RequestAction(S);int32 sa=Coordinator->GetTeamResourceState().CurrentSkillPoints;auto replay=Coordinator->RequestAction(S);Log(TEXT("SkillCommitMinusOne_ReplayCached"),sr.Succeeded()&&replay.Succeeded()&&sa==1&&Coordinator->GetTeamResourceState().CurrentSkillPoints==1,S,100,GetEnergy(*Player),sh,GetHealth(*Enemy),Player->ParticipantId,TM->GetCurrentParticipantId(),2,Coordinator->GetTeamResourceState().CurrentSkillPoints);
+		// Invalid target proves no reserve/commit.
+		Setup(2);auto I=Cmd(SkillDefinition->SkillId,Player->ParticipantId);auto ir=Coordinator->RequestAction(I);Log(TEXT("SkillInvalidTarget_Rollback"),ir.FailureReason==EHSRAbilityFailureReason::InvalidTarget&&Coordinator->GetTeamResourceState().CurrentSkillPoints==2,I,100,GetEnergy(*Player),1000,GetHealth(*Enemy),Player->ParticipantId,TM->GetCurrentParticipantId(),2,Coordinator->GetTeamResourceState().CurrentSkillPoints);
+		UE_LOG(LogTemp, Log, TEXT("P6-003 Harness=COMPLETE"));
+	}
+
+	static void RunP6HealAndViewState(UHSRBattleCoordinator* Coordinator, const UHSRSkillDefinition* HealDefinition)
+	{
+		if (!Coordinator || !HealDefinition || !HealDefinition->IsValidHealDefinition() || HealDefinition->TargetType != EHSRTargetType::Self || Coordinator->GetParticipants().Num() != 2)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("P6-004 Harness=SKIPPED reason=requires-valid-Self-Heal-definition-and-two-participants"));
+			UE_LOG(LogTemp, Log, TEXT("P6-004 Harness=COMPLETE"));
+			return;
+		}
+		const TArray<FHSRBattleParticipant>& Participants = Coordinator->GetParticipants();
+		const FHSRBattleParticipant* Player = Participants.FindByPredicate([](const FHSRBattleParticipant& P){ return P.ParticipantId == FName(TEXT("Player")); });
+		const FHSRBattleParticipant* Enemy = Participants.FindByPredicate([](const FHSRBattleParticipant& P){ return P.ParticipantId == FName(TEXT("Enemy")); });
+		UHSRTurnManager* Manager = Coordinator->GetTurnManager();
+		if (!Player || !Enemy || !Player->AbilitySystemComponent.IsValid() || !Manager) { UE_LOG(LogTemp, Error, TEXT("P6-004 Case=Setup Result=FAIL")); UE_LOG(LogTemp, Log, TEXT("P6-004 Harness=COMPLETE")); return; }
+		SetSpeed(*Player, 120.f); SetSpeed(*Enemy, 80.f); SetHealth(*Player, 50.f, 100.f); SetHealth(*Enemy, 100.f, 100.f); Manager->Initialize(Participants);
+		auto Make = [Coordinator, HealDefinition](const FGuid& Id, FName Target){ FHSRBattleActionCommand C; C.ActionId=Id; C.BattleId=Coordinator->GetCurrentRequestId(); C.ActorParticipantId=FName(TEXT("Player")); C.SkillId=HealDefinition->SkillId; C.TargetParticipantIds.Add(Target); return C; };
+		const FGuid LegalId=FGuid::NewGuid(); const float HpBefore=GetHealth(*Player); const FName TurnBefore=Manager->GetCurrentParticipantId(); const FHSRAbilityResolution Legal=Coordinator->RequestAction(Make(LegalId, FName(TEXT("Player")))); const float HpAfter=GetHealth(*Player); const FName TurnAfter=Manager->GetCurrentParticipantId();
+		const FHSRAbilityResolution Replay=Coordinator->RequestAction(Make(LegalId, FName(TEXT("Player"))));
+		const bool bLegal=Legal.Succeeded() && HpAfter>HpBefore && HpAfter<=100.f && TurnBefore!=TurnAfter && Replay.Succeeded() && FMath::IsNearlyEqual(HpAfter,GetHealth(*Player));
+		UE_LOG(LogTemp,Log,TEXT("P6-004 Case=HealSuccess_ReplayCached Result=%s HPBefore=%.2f HPAfter=%.2f TurnBefore=%s TurnAfter=%s"),bLegal?TEXT("PASS"):TEXT("FAIL"),HpBefore,HpAfter,*TurnBefore.ToString(),*TurnAfter.ToString());
+		SetHealth(*Player,100.f,100.f); Manager->Initialize(Participants); const float FullHp=GetHealth(*Player); const FName FullTurn=Manager->GetCurrentParticipantId(); const FHSRAbilityResolution Full=Coordinator->RequestAction(Make(FGuid::NewGuid(),FName(TEXT("Player")))); const bool bFull=Full.Status==EHSRAbilityResolutionStatus::Rejected&&Full.FailureReason==EHSRAbilityFailureReason::AlreadyAtFullHealth&&FMath::IsNearlyEqual(FullHp,GetHealth(*Player))&&FullTurn==Manager->GetCurrentParticipantId();
+		UE_LOG(LogTemp,Log,TEXT("P6-004 Case=FullHealth_ZeroMutation Result=%s"),bFull?TEXT("PASS"):TEXT("FAIL"));
+		const FHSRAbilityResolution Forged=Coordinator->RequestAction(Make(FGuid::NewGuid(),FName(TEXT("Enemy")))); const bool bForged=Forged.FailureReason==EHSRAbilityFailureReason::InvalidTarget&&FMath::IsNearlyEqual(FullHp,GetHealth(*Player))&&FullTurn==Manager->GetCurrentParticipantId();
+		UE_LOG(LogTemp,Log,TEXT("P6-004 Case=ForgedTarget_ZeroMutation Result=%s"),bForged?TEXT("PASS"):TEXT("FAIL"));
+		UHSRBattleCommandViewModel* TestVm=NewObject<UHSRBattleCommandViewModel>(Coordinator); int32 First=0,Second=0; const FDelegateHandle FirstHandle=TestVm->OnChanged().AddLambda([&First](const FHSRBattleCommandViewState&){++First;}); TestVm->SetState(Coordinator->GetCommandViewState()); TestVm->OnChanged().Remove(FirstHandle); const FDelegateHandle SecondHandle=TestVm->OnChanged().AddLambda([&Second](const FHSRBattleCommandViewState&){++Second;}); TestVm->SetState(Coordinator->GetCommandViewState()); TestVm->OnChanged().Remove(SecondHandle); const bool bRebuild=First==1&&Second==1;
+		UE_LOG(LogTemp,Log,TEXT("P6-004 Case=ViewModelRebuild_DelegateUnbound Result=%s First=%d Second=%d"),bRebuild?TEXT("PASS"):TEXT("FAIL"),First,Second);
+		UE_LOG(LogTemp,Log,TEXT("P6-004 Harness=COMPLETE"));
 	}
 }
 #endif
@@ -209,6 +477,13 @@ void AHSRBattleGameMode::BeginPlay()
 			*ConsumeResult.RequestId.ToString());
 		return;
 	}
+	Coordinator->SetBasicAttackDefinition(BasicAttackSkillDefinition);
+	Coordinator->SetUltimateDefinition(UltimateSkillDefinition);
+	Coordinator->SetSkillDefinition(SkillSkillDefinition);
+	Coordinator->SetHealDefinition(HealSkillDefinition);
+	UE_LOG(LogTemp, Log, TEXT("AHSRBattleGameMode::BeginPlay - BasicAttackSkillDefinition=%s UltimateSkillDefinition=%s SkillSkillDefinition=%s"),
+		BasicAttackSkillDefinition ? *BasicAttackSkillDefinition->GetName() : TEXT("null"),
+		UltimateSkillDefinition ? *UltimateSkillDefinition->GetName() : TEXT("null"), SkillSkillDefinition ? *SkillSkillDefinition->GetName() : TEXT("null"));
 
 	UE_LOG(LogTemp, Log,
 		TEXT("AHSRBattleGameMode::BeginPlay - SubmitBattleRequest SUCCESS RequestId=%s"),
@@ -225,6 +500,26 @@ void AHSRBattleGameMode::BeginPlay()
 	}
 
 	Coordinator->OnBattleResultReady().AddUObject(this, &AHSRBattleGameMode::HandleBattleResultReady);
+	CommandViewModel = NewObject<UHSRBattleCommandViewModel>(this);
+	CommandStateReadyHandle = Coordinator->OnCommandStateReady().AddUObject(this, &AHSRBattleGameMode::HandleCommandStateReady);
+	HandleCommandStateReady(Coordinator->GetCommandViewState());
+	if (BattleCommandWidgetClass)
+	{
+		BattleCommandWidget = CreateWidget<UHSRBattleCommandWidget>(GetWorld(), BattleCommandWidgetClass);
+		if (BattleCommandWidget)
+		{
+			BattleCommandWidget->AddToViewport();
+			UE_LOG(LogTemp, Log, TEXT("P6-004A GameMode WidgetCreate Result=SUCCESS Class=%s Widget=%s"), *BattleCommandWidgetClass->GetName(), *BattleCommandWidget->GetName());
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("P6-004A GameMode WidgetCreate Result=FAIL Class=%s"), *BattleCommandWidgetClass->GetName());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("P6-004A GameMode WidgetCreate Result=SKIPPED Reason=BattleCommandWidgetClassNotConfigured"));
+	}
 
 	// Log final state summary
 	const int32 NumParticipants = Coordinator->GetParticipants().Num();
@@ -254,18 +549,40 @@ void AHSRBattleGameMode::BeginPlay()
 
 #if WITH_EDITOR
 	HSRBattleDevelopmentTest::Run(Coordinator);
+	HSRBattleDevelopmentTest::RunP6Ultimate(Coordinator, UltimateSkillDefinition);
+	HSRBattleDevelopmentTest::RunP6SkillPoints(Coordinator, SkillSkillDefinition);
+	HSRBattleDevelopmentTest::RunP6HealAndViewState(Coordinator, HealSkillDefinition);
 	RunTerminalScenarioForDevelopment();
 #endif
 }
 
 void AHSRBattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (BattleCommandWidget)
+	{
+		BattleCommandWidget->RemoveFromParent();
+		BattleCommandWidget = nullptr;
+	}
 	if (Coordinator)
 	{
+		if (CommandStateReadyHandle.IsValid())
+		{
+			Coordinator->OnCommandStateReady().Remove(CommandStateReadyHandle);
+			CommandStateReadyHandle.Reset();
+		}
 		Coordinator->Reset();
 	}
 	Coordinator = nullptr;
+	CommandViewModel = nullptr;
 	Super::EndPlay(EndPlayReason);
+}
+
+void AHSRBattleGameMode::HandleCommandStateReady(const FHSRBattleCommandViewState& State)
+{
+	if (CommandViewModel)
+	{
+		CommandViewModel->SetState(State);
+	}
 }
 
 void AHSRBattleGameMode::HandleBattleResultReady(const FHSRBattleResult& Result)

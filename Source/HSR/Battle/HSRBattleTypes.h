@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "../GAS/Ability/HSRAbilityTypes.h"
 #include "HSRBattleTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -131,6 +132,22 @@ struct FHSRBattleInitResult
 		Result.TargetDefinitionId = InDefId;
 		return Result;
 	}
+};
+
+USTRUCT(BlueprintType)
+struct FHSRTeamResourceState
+{
+	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Resources") int32 CurrentSkillPoints = 0;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Resources") int32 MaxSkillPoints = 3;
+};
+
+USTRUCT()
+struct FHSRSkillPointReservation
+{
+	GENERATED_BODY()
+	FGuid ActionId;
+	int32 Delta = 0;
 };
 
 /** Pure battle completion DTO. It deliberately contains no runtime object references. */
