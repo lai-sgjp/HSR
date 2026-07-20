@@ -21,6 +21,14 @@ void UHSRCoreAttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attr
 	{
 		NewValue = FMath::Max(NewValue, 0.0f);
 	}
+	else if (Attribute == GetAttackAttribute() || Attribute == GetDefenseAttribute() || Attribute == GetCritDamageAttribute())
+	{
+		NewValue = FMath::IsFinite(NewValue) ? FMath::Max(NewValue, 0.0f) : 0.0f;
+	}
+	else if (Attribute == GetCritRateAttribute())
+	{
+		NewValue = FMath::IsFinite(NewValue) ? FMath::Clamp(NewValue, 0.0f, 1.0f) : 0.0f;
+	}
 	else if (Attribute == GetHealthAttribute())
 	{
 		NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxHealth());
@@ -34,6 +42,16 @@ void UHSRCoreAttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attr
 void UHSRCoreAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
 {
 	Super::PostGameplayEffectExecute(Data);
+	if (Data.EvaluatedData.Attribute == GetIncomingDamageAttribute())
+	{
+		const float Damage = FMath::IsFinite(GetIncomingDamage()) ? FMath::Max(0.0f, GetIncomingDamage()) : 0.0f;
+		SetIncomingDamage(0.0f);
+		if (Damage > 0.0f)
+		{
+			SetHealth(FMath::Clamp(GetHealth() - Damage, 0.0f, GetMaxHealth()));
+		}
+		return;
+	}
 
 	// When MaxHealth changes, clamp Health to [0, new MaxHealth]
 	if (Data.EvaluatedData.Attribute == GetMaxHealthAttribute())
@@ -100,6 +118,14 @@ void UHSRCoreAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
 	else if (Attribute == GetSpeedAttribute())
 	{
 		NewValue = FMath::Max(NewValue, 0.0f);
+	}
+	else if (Attribute == GetAttackAttribute() || Attribute == GetDefenseAttribute() || Attribute == GetCritDamageAttribute())
+	{
+		NewValue = FMath::IsFinite(NewValue) ? FMath::Max(NewValue, 0.0f) : 0.0f;
+	}
+	else if (Attribute == GetCritRateAttribute())
+	{
+		NewValue = FMath::IsFinite(NewValue) ? FMath::Clamp(NewValue, 0.0f, 1.0f) : 0.0f;
 	}
 	else if (Attribute == GetHealthAttribute())
 	{

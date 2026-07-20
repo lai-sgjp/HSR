@@ -2,12 +2,15 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "GameplayTagContainer.h"
 #include "HSRBattleGameMode.generated.h"
 
 class UHSRBattleCoordinator;
 class UHSRSkillDefinition;
 class UHSRBattleCommandViewModel;
 class UHSRBattleCommandWidget;
+class UHSRDamageRuleDefinition;
+class UGameplayEffect;
 struct FHSRBattleResult;
 
 UENUM(BlueprintType)
@@ -59,6 +62,21 @@ protected:
 	/** User-owned /Game/UI/Battle/WBP_BattleCommandPanel class. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|UI")
 	TSubclassOf<UHSRBattleCommandWidget> BattleCommandWidgetClass;
+
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P7")
+	TObjectPtr<UHSRDamageRuleDefinition> DevelopmentDamageRule;
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P7")
+	TSubclassOf<UGameplayEffect> DevelopmentDamageExecutionGameplayEffect;
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P7")
+	int32 DevelopmentDamageSeed = 1337;
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P7")
+	bool bRunP7DamageHarness = false;
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P7")
+	FGameplayTag DevelopmentDamageType;
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P7", meta = (ClampMin = "0.000001", ClampMax = "100.0"))
+	float DevelopmentAbilityMultiplier = 1.0f;
+#endif
 
 	UPROPERTY()
 	TObjectPtr<UHSRBattleCoordinator> Coordinator;

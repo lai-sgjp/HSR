@@ -24,6 +24,11 @@ public:
 	ATTRIBUTE_ACCESSORS(UHSRCoreAttributeSet, Energy);
 	ATTRIBUTE_ACCESSORS(UHSRCoreAttributeSet, MaxEnergy);
 	ATTRIBUTE_ACCESSORS(UHSRCoreAttributeSet, Speed);
+	ATTRIBUTE_ACCESSORS(UHSRCoreAttributeSet, Attack);
+	ATTRIBUTE_ACCESSORS(UHSRCoreAttributeSet, Defense);
+	ATTRIBUTE_ACCESSORS(UHSRCoreAttributeSet, CritRate);
+	ATTRIBUTE_ACCESSORS(UHSRCoreAttributeSet, CritDamage);
+	ATTRIBUTE_ACCESSORS(UHSRCoreAttributeSet, IncomingDamage);
 
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 	virtual void PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const override;
@@ -39,4 +44,15 @@ public:
 	FGameplayAttributeData MaxEnergy;
 	UPROPERTY(BlueprintReadOnly, Category = "Attributes")
 	FGameplayAttributeData Speed;
+	UPROPERTY(BlueprintReadOnly, Category = "Attributes|Combat")
+	FGameplayAttributeData Attack;
+	UPROPERTY(BlueprintReadOnly, Category = "Attributes|Combat")
+	FGameplayAttributeData Defense;
+	UPROPERTY(BlueprintReadOnly, Category = "Attributes|Combat")
+	FGameplayAttributeData CritRate;
+	UPROPERTY(BlueprintReadOnly, Category = "Attributes|Combat")
+	FGameplayAttributeData CritDamage;
+	/** Meta attribute: written only by P7 damage executions and consumed immediately. */
+	UPROPERTY(BlueprintReadOnly, Category = "Attributes|Meta")
+	FGameplayAttributeData IncomingDamage;
 };

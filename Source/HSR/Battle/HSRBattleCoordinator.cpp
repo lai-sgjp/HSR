@@ -12,6 +12,9 @@
 #include "AttributeSet.h"
 #include "GameplayEffectTypes.h"
 #include "../Data/HSRSkillDefinition.h"
+#include "../GAS/Damage/HSRDamageEffectContext.h"
+#include "../GAS/Damage/HSRDamageRuleDefinition.h"
+#include "GameplayEffect.h"
 
 bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRequest)
 {
@@ -206,6 +209,9 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 
 	// Atomically transition to Spawned
 	CurrentState = EHSRBattleCoordinatorState::Spawned;
+	DevelopmentDamageRandomStream.Initialize(DevelopmentDamageSeed);
+	DevelopmentDamageConsumeCount = 0;
+	DevelopmentDamageResults.Empty();
 	PublishCommandViewState();
 
 	UE_LOG(LogTemp, Log,
@@ -513,6 +519,9 @@ void UHSRBattleCoordinator::Reset()
 	bBattleResultProduced = false;
 	bBattleResultConsumed = false;
 	ProcessedActionResolutions.Empty();
+	DevelopmentDamageResults.Empty();
+	DevelopmentDamageRandomStream.Initialize(DevelopmentDamageSeed);
+	DevelopmentDamageConsumeCount = 0;
 	LastActionResolution = FHSRAbilityResolution();
 	SkillPointReservations.Empty();
 	TeamResourceState = FHSRTeamResourceState();
@@ -523,6 +532,67 @@ void UHSRBattleCoordinator::Reset()
 	}
 	PublishCommandViewState();
 }
+
+#if WITH_EDITOR
+void UHSRBattleCoordinator::InitializeDevelopmentDamageRng(int32 InSeed)
+{
+	DevelopmentDamageSeed = InSeed;
+	DevelopmentDamageRandomStream.Initialize(DevelopmentDamageSeed);
+	DevelopmentDamageConsumeCount = 0;
+	DevelopmentDamageResults.Empty();
+}
+
+FHSRDamageResult UHSRBattleCoordinator::ResolveDevelopmentExecutionDamage(FName SourceParticipantId, FName TargetParticipantId, const FGuid& ActionId, const FGameplayTag& DamageType, float AbilityMultiplier, const UHSRDamageRuleDefinition* Rule, TSubclassOf<UGameplayEffect> DamageEffectClass)
+{
+	FHSRDamageResult Failure;
+	Failure.ActionId = ActionId;
+	Failure.DamageType = DamageType;
+	if (const FHSRDamageResult* Existing = DevelopmentDamageResults.Find(ActionId)) { return *Existing; }
+	const auto CacheFailure = [this, &ActionId](FHSRDamageResult Result) { if (ActionId.IsValid()) { DevelopmentDamageResults.Add(ActionId, Result); } return Result; };
+	if (CurrentState != EHSRBattleCoordinatorState::Spawned) { Failure.Result = EHSRDamageResultType::BattleTerminal; return CacheFailure(Failure); }
+	if (!ActionId.IsValid()) { Failure.Result = EHSRDamageResultType::DuplicateAction; return Failure; }
+	const FHSRBattleParticipant* Source = Participants.FindByPredicate([SourceParticipantId](const FHSRBattleParticipant& P) { return P.ParticipantId == SourceParticipantId; });
+	if (!Source || !Source->AbilitySystemComponent.IsValid()) { Failure.Result = EHSRDamageResultType::InvalidSource; return CacheFailure(Failure); }
+	const FHSRBattleParticipant* Target = Participants.FindByPredicate([TargetParticipantId](const FHSRBattleParticipant& P) { return P.ParticipantId == TargetParticipantId; });
+	if (!Target || !Target->AbilitySystemComponent.IsValid()) { Failure.Result = EHSRDamageResultType::InvalidTarget; return CacheFailure(Failure); }
+	if (!Rule || !Rule->IsValidRuleDefinition()) { Failure.Result = EHSRDamageResultType::MissingDamageRule; return CacheFailure(Failure); }
+	if (!DamageType.IsValid() || !FMath::IsFinite(AbilityMultiplier) || AbilityMultiplier <= 0.0f || AbilityMultiplier > 100.0f) { Failure.Result = EHSRDamageResultType::InvalidDamageType; return CacheFailure(Failure); }
+	if (!DamageEffectClass) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return CacheFailure(Failure); }
+	const FGameplayTag AbilityMultiplierTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.AbilityMultiplier")), false);
+	const FGameplayTag DefenseCoefficientTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.DefenseCoefficient")), false);
+	const FGameplayTag MinDamageTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.MinDamage")), false);
+	const FGameplayTag CritRollTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.CritRoll")), false);
+	if (!AbilityMultiplierTag.IsValid() || !DefenseCoefficientTag.IsValid() || !MinDamageTag.IsValid() || !CritRollTag.IsValid()) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return CacheFailure(Failure); }
+	FGameplayEffectContextHandle ContextHandle = Source->AbilitySystemComponent->MakeEffectContext();
+	FHSRDamageEffectContext* DamageContext = static_cast<FHSRDamageEffectContext*>(ContextHandle.Get());
+	if (!DamageContext || DamageContext->GetScriptStruct() != FHSRDamageEffectContext::StaticStruct()) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return CacheFailure(Failure); }
+	DamageContext->DamageContext.ActionId = ActionId;
+	DamageContext->DamageContext.DamageType = DamageType;
+	DamageContext->DamageContext.AbilityMultiplier = AbilityMultiplier;
+	// Build the Spec before consuming RNG. All failures above this point are side-effect free.
+	DamageContext->DamageContext.CritRoll = 0.0f;
+	DamageContext->DefenseCoefficient = Rule->DefenseCoefficient;
+	DamageContext->MinDamage = Rule->MinDamage;
+	FGameplayEffectSpecHandle Spec = Source->AbilitySystemComponent->MakeOutgoingSpec(DamageEffectClass, 1.0f, ContextHandle);
+	if (!Spec.IsValid()) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return CacheFailure(Failure); }
+	// The unique commit point: Spec is valid and Apply is immediately next.
+	DamageContext->DamageContext.CritRoll = DevelopmentDamageRandomStream.GetFraction();
+	++DevelopmentDamageConsumeCount;
+	Spec.Data->SetSetByCallerMagnitude(AbilityMultiplierTag, AbilityMultiplier);
+	Spec.Data->SetSetByCallerMagnitude(DefenseCoefficientTag, Rule->DefenseCoefficient);
+	Spec.Data->SetSetByCallerMagnitude(MinDamageTag, Rule->MinDamage);
+	Spec.Data->SetSetByCallerMagnitude(CritRollTag, DamageContext->DamageContext.CritRoll);
+	const float HealthBefore = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+	const FActiveGameplayEffectHandle Applied = Source->AbilitySystemComponent->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), Target->AbilitySystemComponent.Get());
+	if (!Applied.WasSuccessfullyApplied()) { Failure.Result = EHSRDamageResultType::EffectApplicationFailed; return CacheFailure(Failure); }
+	FHSRDamageResult Result = DamageContext->DamageResult;
+	const float HealthAfter = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+	Result.Breakdown.AppliedDamage = FMath::Max(0.0f, HealthBefore - HealthAfter);
+	DevelopmentDamageResults.Add(ActionId, Result);
+	UE_LOG(LogTemp, Log, TEXT("P7-002 Damage Result=%d ActionId=%s Seed=%d ConsumeIndex=%d Raw=%f Final=%f Applied=%f"), static_cast<int32>(Result.Result), *ActionId.ToString(), DevelopmentDamageSeed, DevelopmentDamageConsumeCount, Result.Breakdown.RawDamage, Result.Breakdown.FinalDamage, Result.Breakdown.AppliedDamage);
+	return Result;
+}
+#endif
 
 void UHSRBattleCoordinator::BindHealthObserver(const FHSRBattleParticipant& Participant)
 {

@@ -481,6 +481,9 @@ void AHSRBattleGameMode::BeginPlay()
 	Coordinator->SetUltimateDefinition(UltimateSkillDefinition);
 	Coordinator->SetSkillDefinition(SkillSkillDefinition);
 	Coordinator->SetHealDefinition(HealSkillDefinition);
+#if WITH_EDITOR
+	Coordinator->InitializeDevelopmentDamageRng(DevelopmentDamageSeed);
+#endif
 	UE_LOG(LogTemp, Log, TEXT("AHSRBattleGameMode::BeginPlay - BasicAttackSkillDefinition=%s UltimateSkillDefinition=%s SkillSkillDefinition=%s"),
 		BasicAttackSkillDefinition ? *BasicAttackSkillDefinition->GetName() : TEXT("null"),
 		UltimateSkillDefinition ? *UltimateSkillDefinition->GetName() : TEXT("null"), SkillSkillDefinition ? *SkillSkillDefinition->GetName() : TEXT("null"));
@@ -498,6 +501,140 @@ void AHSRBattleGameMode::BeginPlay()
 			*BuildResult.Message.ToString(), static_cast<int32>(BuildResult.FailureType), *BuildResult.TargetDefinitionId.ToString());
 		return;
 	}
+
+#if WITH_EDITOR
+	if (bRunP7DamageHarness && Coordinator->GetParticipants().Num() >= 2)
+	{
+		const FHSRBattleParticipant& Source = Coordinator->GetParticipants()[0];
+		const FHSRBattleParticipant& Target = Coordinator->GetParticipants()[1];
+		const bool bValidParticipants = Source.AbilitySystemComponent.IsValid() && Target.AbilitySystemComponent.IsValid();
+		if (!bValidParticipants)
+		{
+			UE_LOG(LogTemp, Error, TEXT("P7-002 Harness Result=FAIL Reason=InvalidParticipantASC"));
+		}
+		else
+		{
+			// Isolated non-lethal baseline: P7 must not depend on uninitialized P7-001 assets.
+			Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(), 100.0f);
+			Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 100.0f);
+			Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(), 100.0f);
+			Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 100.0f);
+			Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetAttackAttribute(), 10.0f);
+			Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetCritRateAttribute(), 0.0f);
+			Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetCritDamageAttribute(), 0.0f);
+			Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetDefenseAttribute(), 0.0f);
+			const auto RunPreflightCase = [this, &Source, &Target](const TCHAR* CaseName, FName CaseSource, FName CaseTarget, const FGameplayTag& CaseTag, float CaseMultiplier, const UHSRDamageRuleDefinition* CaseRule, TSubclassOf<UGameplayEffect> CaseEffect, EHSRDamageResultType Expected)
+			{
+				const float HPBefore = Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+				const float SourceEnergyBefore = Source.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
+				const float TargetEnergyBefore = Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
+				const int32 RNGBefore = Coordinator->GetDevelopmentDamageConsumeCount();
+				const FName TurnBefore = Coordinator->GetTurnManager() ? Coordinator->GetTurnManager()->GetCurrentParticipantId() : NAME_None;
+				const FHSRTeamResourceState ResourcesBefore = Coordinator->GetTeamResourceState();
+				const FHSRDamageResult Result = Coordinator->ResolveDevelopmentExecutionDamage(CaseSource, CaseTarget, FGuid::NewGuid(), CaseTag, CaseMultiplier, CaseRule, CaseEffect);
+				const FHSRTeamResourceState& ResourcesAfter = Coordinator->GetTeamResourceState();
+				const bool bNoMutation = FMath::IsNearlyEqual(HPBefore, Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()))
+					&& RNGBefore == Coordinator->GetDevelopmentDamageConsumeCount()
+					&& TurnBefore == (Coordinator->GetTurnManager() ? Coordinator->GetTurnManager()->GetCurrentParticipantId() : NAME_None)
+					&& ResourcesBefore.CurrentSkillPoints == ResourcesAfter.CurrentSkillPoints && ResourcesBefore.MaxSkillPoints == ResourcesAfter.MaxSkillPoints
+					&& FMath::IsNearlyEqual(SourceEnergyBefore, Source.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute()))
+					&& FMath::IsNearlyEqual(TargetEnergyBefore, Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute()));
+				if (Result.Result == Expected && bNoMutation)
+				{
+					UE_LOG(LogTemp, Log, TEXT("P7-002 Matrix Case=%s Result=%d Expected=%d HPBefore=%.2f HPAfter=%.2f RNGBefore=%d RNGAfter=%d NoMutation=%d"), CaseName, static_cast<int32>(Result.Result), static_cast<int32>(Expected), HPBefore, Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()), RNGBefore, Coordinator->GetDevelopmentDamageConsumeCount(), bNoMutation);
+				}
+				else
+				{
+					UE_LOG(LogTemp, Error, TEXT("P7-002 Matrix Case=%s Result=%d Expected=%d HPBefore=%.2f HPAfter=%.2f RNGBefore=%d RNGAfter=%d NoMutation=%d"), CaseName, static_cast<int32>(Result.Result), static_cast<int32>(Expected), HPBefore, Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()), RNGBefore, Coordinator->GetDevelopmentDamageConsumeCount(), bNoMutation);
+				}
+			};
+			RunPreflightCase(TEXT("InvalidSource"), NAME_None, Target.ParticipantId, DevelopmentDamageType, DevelopmentAbilityMultiplier, DevelopmentDamageRule, DevelopmentDamageExecutionGameplayEffect, EHSRDamageResultType::InvalidSource);
+			RunPreflightCase(TEXT("InvalidTarget"), Source.ParticipantId, NAME_None, DevelopmentDamageType, DevelopmentAbilityMultiplier, DevelopmentDamageRule, DevelopmentDamageExecutionGameplayEffect, EHSRDamageResultType::InvalidTarget);
+			RunPreflightCase(TEXT("MissingRule"), Source.ParticipantId, Target.ParticipantId, DevelopmentDamageType, DevelopmentAbilityMultiplier, nullptr, DevelopmentDamageExecutionGameplayEffect, EHSRDamageResultType::MissingDamageRule);
+			RunPreflightCase(TEXT("InvalidTag"), Source.ParticipantId, Target.ParticipantId, FGameplayTag(), DevelopmentAbilityMultiplier, DevelopmentDamageRule, DevelopmentDamageExecutionGameplayEffect, EHSRDamageResultType::InvalidDamageType);
+			RunPreflightCase(TEXT("InvalidMultiplier"), Source.ParticipantId, Target.ParticipantId, DevelopmentDamageType, 0.0f, DevelopmentDamageRule, DevelopmentDamageExecutionGameplayEffect, EHSRDamageResultType::InvalidDamageType);
+			RunPreflightCase(TEXT("MissingGE"), Source.ParticipantId, Target.ParticipantId, DevelopmentDamageType, DevelopmentAbilityMultiplier, DevelopmentDamageRule, nullptr, EHSRDamageResultType::SpecCreationFailed);
+			const auto RunFormulaCase = [this, &Source, &Target](const TCHAR* CaseName, float Attack, float Defense, float CritRate, float CritDamage, float ExpectedFinal)
+			{
+				Coordinator->InitializeDevelopmentDamageRng(DevelopmentDamageSeed);
+				Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetAttackAttribute(), Attack);
+				Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetCritRateAttribute(), CritRate);
+				Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetCritDamageAttribute(), CritDamage);
+				Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetDefenseAttribute(), Defense);
+				Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 100.0f);
+				const int32 RNGBefore = Coordinator->GetDevelopmentDamageConsumeCount();
+				const FHSRDamageResult Result = Coordinator->ResolveDevelopmentExecutionDamage(Source.ParticipantId, Target.ParticipantId, FGuid::NewGuid(), DevelopmentDamageType, DevelopmentAbilityMultiplier, DevelopmentDamageRule, DevelopmentDamageExecutionGameplayEffect);
+				const float HPAfter = Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+				const bool bPass = Result.Result == EHSRDamageResultType::DamageResolved && FMath::IsNearlyEqual(Result.Breakdown.FinalDamage, ExpectedFinal)
+					&& FMath::IsNearlyEqual(Result.Breakdown.AppliedDamage, ExpectedFinal) && FMath::IsNearlyEqual(100.0f - HPAfter, ExpectedFinal)
+					&& Coordinator->GetDevelopmentDamageConsumeCount() == RNGBefore + 1 && Coordinator->GetCurrentState() == EHSRBattleCoordinatorState::Spawned;
+				UE_LOG(LogTemp, Log, TEXT("P7-002 Matrix Case=%s Result=%s Raw=%.2f Final=%.2f Applied=%.2f ExpectedFinal=%.2f HPBefore=100.00 HPAfter=%.2f RNGBefore=%d RNGAfter=%d"), CaseName, bPass ? TEXT("PASS") : TEXT("FAIL"), Result.Breakdown.RawDamage, Result.Breakdown.FinalDamage, Result.Breakdown.AppliedDamage, ExpectedFinal, HPAfter, RNGBefore, Coordinator->GetDevelopmentDamageConsumeCount());
+			};
+			RunFormulaCase(TEXT("MinDamage_AttackZero"), 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+			RunFormulaCase(TEXT("DefenseZero"), 10.0f, 0.0f, 0.0f, 0.0f, 10.0f);
+			RunFormulaCase(TEXT("DefenseHigh_MinDamage"), 10.0f, 100.0f, 0.0f, 0.0f, 1.0f);
+			RunFormulaCase(TEXT("CritRateZero"), 10.0f, 0.0f, 0.0f, 0.5f, 10.0f);
+			RunFormulaCase(TEXT("CritRateOne_CritDamageHalf"), 10.0f, 0.0f, 1.0f, 0.5f, 15.0f);
+
+			// Reinitialization is the safe P7 development reset boundary: it clears cache and resets RNG to the supplied seed.
+			Coordinator->InitializeDevelopmentDamageRng(DevelopmentDamageSeed);
+			Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetAttackAttribute(), 10.0f);
+			Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetCritRateAttribute(), 0.5f);
+			Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetCritDamageAttribute(), 0.5f);
+			Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetDefenseAttribute(), 0.0f);
+			Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 100.0f);
+			const FHSRDamageResult DeterminismA = Coordinator->ResolveDevelopmentExecutionDamage(Source.ParticipantId, Target.ParticipantId, FGuid::NewGuid(), DevelopmentDamageType, DevelopmentAbilityMultiplier, DevelopmentDamageRule, DevelopmentDamageExecutionGameplayEffect);
+			Coordinator->InitializeDevelopmentDamageRng(DevelopmentDamageSeed);
+			Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 100.0f);
+			const FHSRDamageResult DeterminismB = Coordinator->ResolveDevelopmentExecutionDamage(Source.ParticipantId, Target.ParticipantId, FGuid::NewGuid(), DevelopmentDamageType, DevelopmentAbilityMultiplier, DevelopmentDamageRule, DevelopmentDamageExecutionGameplayEffect);
+			const bool bDeterministic = DeterminismA.Result == DeterminismB.Result && FMath::IsNearlyEqual(DeterminismA.Breakdown.RawDamage, DeterminismB.Breakdown.RawDamage) && FMath::IsNearlyEqual(DeterminismA.Breakdown.FinalDamage, DeterminismB.Breakdown.FinalDamage) && DeterminismA.Breakdown.bCritical == DeterminismB.Breakdown.bCritical && Coordinator->GetDevelopmentDamageConsumeCount() == 1;
+			UE_LOG(LogTemp, Log, TEXT("P7-002 Matrix Case=SameSeedDeterminism Result=%s FirstFinal=%.2f SecondFinal=%.2f FirstCritical=%d SecondCritical=%d RNGAfterResetRun=%d"), bDeterministic ? TEXT("PASS") : TEXT("FAIL"), DeterminismA.Breakdown.FinalDamage, DeterminismB.Breakdown.FinalDamage, DeterminismA.Breakdown.bCritical, DeterminismB.Breakdown.bCritical, Coordinator->GetDevelopmentDamageConsumeCount());
+			UHSRBattleCoordinator* TerminalCoordinator = NewObject<UHSRBattleCoordinator>(this);
+			const int32 MainRNGBeforeTerminal = Coordinator->GetDevelopmentDamageConsumeCount();
+			const FHSRDamageResult TerminalResult = TerminalCoordinator->ResolveDevelopmentExecutionDamage(Source.ParticipantId, Target.ParticipantId, FGuid::NewGuid(), DevelopmentDamageType, DevelopmentAbilityMultiplier, DevelopmentDamageRule, DevelopmentDamageExecutionGameplayEffect);
+			const bool bTerminalPass = TerminalResult.Result == EHSRDamageResultType::BattleTerminal && Coordinator->GetDevelopmentDamageConsumeCount() == MainRNGBeforeTerminal && Coordinator->GetCurrentState() == EHSRBattleCoordinatorState::Spawned;
+			UE_LOG(LogTemp, Log, TEXT("P7-002 Matrix Case=BattleTerminalIsolated Result=%s DamageResult=%d MainRNGBefore=%d MainRNGAfter=%d"), bTerminalPass ? TEXT("PASS") : TEXT("FAIL"), static_cast<int32>(TerminalResult.Result), MainRNGBeforeTerminal, Coordinator->GetDevelopmentDamageConsumeCount());
+
+			const FGuid ActionId = FGuid::NewGuid();
+			const float HealthBefore = Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+			const float SourceEnergyBefore = Source.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
+			const float TargetEnergyBefore = Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
+			const FName TurnBefore = Coordinator->GetTurnManager() ? Coordinator->GetTurnManager()->GetCurrentParticipantId() : NAME_None;
+			const FHSRTeamResourceState ResourcesBefore = Coordinator->GetTeamResourceState();
+			const int32 RngBefore = Coordinator->GetDevelopmentDamageConsumeCount();
+			const EHSRBattleCoordinatorState StateBefore = Coordinator->GetCurrentState();
+			const FHSRDamageResult First = Coordinator->ResolveDevelopmentExecutionDamage(Source.ParticipantId, Target.ParticipantId, ActionId, DevelopmentDamageType, DevelopmentAbilityMultiplier, DevelopmentDamageRule, DevelopmentDamageExecutionGameplayEffect);
+			const float HealthAfterFirst = Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+			const int32 RngAfterFirst = Coordinator->GetDevelopmentDamageConsumeCount();
+			const FHSRDamageResult Second = Coordinator->ResolveDevelopmentExecutionDamage(Source.ParticipantId, Target.ParticipantId, ActionId, DevelopmentDamageType, DevelopmentAbilityMultiplier, DevelopmentDamageRule, DevelopmentDamageExecutionGameplayEffect);
+			const float HealthAfterSecond = Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+			const int32 RngAfterSecond = Coordinator->GetDevelopmentDamageConsumeCount();
+			const bool bResultMatch = First.Result == Second.Result
+				&& FMath::IsNearlyEqual(First.Breakdown.RawDamage, Second.Breakdown.RawDamage)
+				&& FMath::IsNearlyEqual(First.Breakdown.FinalDamage, Second.Breakdown.FinalDamage)
+				&& FMath::IsNearlyEqual(First.Breakdown.AppliedDamage, Second.Breakdown.AppliedDamage);
+			const bool bExactlyOnce = RngAfterFirst == RngBefore + 1 && RngAfterSecond == RngAfterFirst && FMath::IsNearlyEqual(HealthAfterFirst, HealthAfterSecond);
+			const bool bDamageBalanced = First.Result == EHSRDamageResultType::DamageResolved && First.Breakdown.FinalDamage > 0.0f
+				&& FMath::IsNearlyEqual(First.Breakdown.AppliedDamage, First.Breakdown.FinalDamage)
+				&& FMath::IsNearlyEqual(HealthBefore - HealthAfterFirst, First.Breakdown.FinalDamage);
+			const FHSRTeamResourceState& ResourcesAfter = Coordinator->GetTeamResourceState();
+			const bool bNoBattleSideEffects = StateBefore == EHSRBattleCoordinatorState::Spawned && Coordinator->GetCurrentState() == EHSRBattleCoordinatorState::Spawned
+				&& TurnBefore == (Coordinator->GetTurnManager() ? Coordinator->GetTurnManager()->GetCurrentParticipantId() : NAME_None)
+				&& ResourcesBefore.CurrentSkillPoints == ResourcesAfter.CurrentSkillPoints && ResourcesBefore.MaxSkillPoints == ResourcesAfter.MaxSkillPoints
+				&& FMath::IsNearlyEqual(SourceEnergyBefore, Source.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute()))
+				&& FMath::IsNearlyEqual(TargetEnergyBefore, Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute()));
+			const bool bPassed = bResultMatch && bExactlyOnce && bDamageBalanced && bNoBattleSideEffects;
+			if (bPassed)
+			{
+				UE_LOG(LogTemp, Log, TEXT("P7-002 Harness Result=PASS ActionId=%s FirstResult=%d SecondResult=%d HPBefore=%.2f HPAfterFirst=%.2f HPAfterSecond=%.2f Raw=%.2f Final=%.2f Applied=%.2f RNGBefore=%d RNGAfterFirst=%d RNGAfterSecond=%d StateBefore=%d StateAfter=%d ResultMatch=%d ExactlyOnce=%d DamageBalanced=%d NoBattleSideEffects=%d"), *ActionId.ToString(), static_cast<int32>(First.Result), static_cast<int32>(Second.Result), HealthBefore, HealthAfterFirst, HealthAfterSecond, First.Breakdown.RawDamage, First.Breakdown.FinalDamage, First.Breakdown.AppliedDamage, RngBefore, RngAfterFirst, RngAfterSecond, static_cast<int32>(StateBefore), static_cast<int32>(Coordinator->GetCurrentState()), bResultMatch, bExactlyOnce, bDamageBalanced, bNoBattleSideEffects);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("P7-002 Harness Result=FAIL ActionId=%s FirstResult=%d SecondResult=%d HPBefore=%.2f HPAfterFirst=%.2f HPAfterSecond=%.2f Raw=%.2f Final=%.2f Applied=%.2f RNGBefore=%d RNGAfterFirst=%d RNGAfterSecond=%d StateBefore=%d StateAfter=%d ResultMatch=%d ExactlyOnce=%d DamageBalanced=%d NoBattleSideEffects=%d"), *ActionId.ToString(), static_cast<int32>(First.Result), static_cast<int32>(Second.Result), HealthBefore, HealthAfterFirst, HealthAfterSecond, First.Breakdown.RawDamage, First.Breakdown.FinalDamage, First.Breakdown.AppliedDamage, RngBefore, RngAfterFirst, RngAfterSecond, static_cast<int32>(StateBefore), static_cast<int32>(Coordinator->GetCurrentState()), bResultMatch, bExactlyOnce, bDamageBalanced, bNoBattleSideEffects);
+			}
+		}
+	}
+#endif
 
 	Coordinator->OnBattleResultReady().AddUObject(this, &AHSRBattleGameMode::HandleBattleResultReady);
 	CommandViewModel = NewObject<UHSRBattleCommandViewModel>(this);

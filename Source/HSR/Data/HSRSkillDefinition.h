@@ -4,6 +4,7 @@
 #include "Abilities/GameplayAbility.h"
 #include "Engine/DataAsset.h"
 #include "GameplayEffect.h"
+#include "GameplayTagContainer.h"
 #include "../GAS/Ability/HSRAbilityTypes.h"
 #include "HSRSkillDefinition.generated.h"
 
@@ -32,6 +33,14 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects", meta = (DisplayName = "Gameplay Effect Class", ToolTip = "Primary effect shared by Basic/Skill/Ultimate definitions. Bind the P6-003 Skill Damage Gameplay Effect here."))
 	TSoftClassPtr<UGameplayEffect> EffectGameplayEffectClass;
+
+	/** Static damage classification consumed by the Phase 7 damage execution. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage")
+	FGameplayTag DamageType;
+
+	/** Static damage multiplier. The default preserves existing P6 asset validity. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage", meta = (ClampMin = "0.000001", ClampMax = "100.0"))
+	float AbilityMultiplier = 1.0f;
 
 	bool IsValidDefinition() const
 	{

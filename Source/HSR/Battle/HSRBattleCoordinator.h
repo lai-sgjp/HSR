@@ -4,12 +4,15 @@
 #include "HSRBattleTypes.h"
 #include "HSRBattleParticipant.h"
 #include "../UI/HSRBattleCommandTypes.h"
+#include "../GAS/Damage/HSRDamageTypes.h"
 #include "HSRBattleCoordinator.generated.h"
 
 class UWorld;
 class AActor;
 class UHSRTurnManager;
 class UHSRSkillDefinition;
+class UHSRDamageRuleDefinition;
+class UGameplayEffect;
 struct FOnAttributeChangeData;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleResultReadyDelegate, const FHSRBattleResult&);
@@ -57,6 +60,9 @@ public:
 	FHSRBattleCommandViewState GetCommandViewState() const;
 #if WITH_EDITOR
 	void SetTeamSkillPointsForDevelopmentTest(int32 Current, int32 Max) { TeamResourceState.MaxSkillPoints = FMath::Max(0, Max); TeamResourceState.CurrentSkillPoints = FMath::Clamp(Current, 0, TeamResourceState.MaxSkillPoints); }
+	void InitializeDevelopmentDamageRng(int32 InSeed);
+	int32 GetDevelopmentDamageConsumeCount() const { return DevelopmentDamageConsumeCount; }
+	FHSRDamageResult ResolveDevelopmentExecutionDamage(FName SourceParticipantId, FName TargetParticipantId, const FGuid& ActionId, const FGameplayTag& DamageType, float AbilityMultiplier, const UHSRDamageRuleDefinition* Rule, TSubclassOf<UGameplayEffect> DamageEffectClass);
 #endif
 
 	/** Exactly-once read of the terminal pure-value result. */
@@ -93,6 +99,10 @@ private:
 	UPROPERTY() TObjectPtr<UHSRSkillDefinition> HealDefinition;
 	FHSRBattleResultReadyDelegate BattleResultReady;
 	FHSRBattleCommandStateReadyDelegate CommandStateReady;
+	FRandomStream DevelopmentDamageRandomStream;
+	int32 DevelopmentDamageSeed = 1337;
+	int32 DevelopmentDamageConsumeCount = 0;
+	TMap<FGuid, FHSRDamageResult> DevelopmentDamageResults;
 
 	UPROPERTY()
 	TObjectPtr<UHSRTurnManager> TurnManager;
