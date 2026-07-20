@@ -1537,3 +1537,30 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - inherited follow-ups：同步 post-GE、真实 Rollback/并发、SingleAlly 动态路径、目标销毁、Heal/Ability GE 失败、终局异步、Phase 10 完整 UI、Save/网络、多队伍和用户独立复述。
 - 当前无活动工程任务。Phase 7 只允许先规划；未经授权不实现、不执行 Git。
 - 后续 Git 必须按用户 Editor 资产、Implementation 源码、Reviewer/Teacher/Coordinator Markdown 与其他历史 dirty 项拆分，逐组核对作者、allowlist、diff 和派生产物；本轮未 stage/commit/push。
+
+## 2026-07-20｜Coordinator：P7-000 门禁校准与 TASK-P7-001 规划
+
+- 用户明确授权正式进入 Phase 7；本轮只执行 P7-000 协调门禁，没有修改 Source/Content/Config，没有运行 Build、Editor 或 PIE。
+- 只读源码确认探索 Character 与 Battle runtime 均注册 `UHSRCoreAttributeSet`；决定 P7-001 原位扩展四项战斗属性，不拆分第二 AttributeSet，不提前加入 IncomingDamage。
+- 冻结原创公式与语义：CritDamage 为额外倍率，默认 AbilityMultiplier 1.0、DefenseCoefficient 0.5、MinDamage 1.0；非法/NaN/Inf 结构化拒绝；最终只舍入一次。
+- Capture 冻结为 Source Attack/CritRate/CritDamage、Target Defense，均 non-snapshot；未来 Execution 执行时读取当前值。BattleCoordinator 是 battle-local RNG 唯一所有者，失败/重复不消费随机。
+- 旧伤害入口定位 Basic `BP_GE_P5_BasicAttackDamage`、Skill `BP_GE_P6_SkillAttackDamage`、Ultimate `BP_GE_P6_UltimateDamage`；P7-001 保持旧入口，P7-002 先建测试入口，P7-003 再统一迁移，禁止双扣 Health。
+- 审计前 dirty tree 只有未跟踪 `docs/phase-7-execution-plan.md`，无 Source/Content/Config 修改；该文件属于 Coordinator 规划产物，保留且不夹带用户资产。
+- 已创建唯一 `TASK-P7-001` 活动卡并精确区分 Implementation C++、用户 Editor 资产与禁止范围。当前等待低级执行模型首次只读复述及用户对任务编号的独立确认；不自动开始实施或 P7-002。
+
+## 2026-07-20｜Coordinator：P7-001 归档与 TASK-P7-002 规划
+
+- Independent Reviewer 最终结论为 `PASS WITH FOLLOW-UP / Ready for archive`；P7-001 active/execution/final-review 三件套已归档。
+- 最终 fresh Rebuild、Config canonical serialization、用户初始化 GE/Rule/Tag、重启后烟雾 PIE 与作者/dirty tree 分类均已核对；证据等级不升级，用户 Editor/PIE 仍为 `USER PROVIDED`。
+- P7-001 follow-up 原样保留：四项属性动态值主要为用户观察、MSVC preferred-version 与 deprecated API 警告债务；旧固定伤害仍为唯一正式入口。
+- 已创建唯一 `TASK-P7-002`：四项 non-snapshot Capture、无状态 Execution、IncomingDamage meta、BattleCoordinator battle-local RNG/cache 与 Development-only 测试入口；不得迁移 Basic/Skill/Ultimate 或修改旧伤害 GE。
+- 本轮未修改 Source/Content/Config，未运行 Build/Editor/PIE，未 stage/commit/push；当前等待执行者只读复述与用户独立确认。
+
+## 2026-07-20｜Coordinator：P7-002 归档与 TASK-P7-003 规划
+
+- 三提交范围已核对：用户资产 `d35fdff` 仅含允许 Config/Content；Implementation `288932c` 含 P7-001/002 允许源码与执行报告；Reviewer `f916fd7` 仅修改最终审查。
+- P7-002 Reviewer 为 `PASS WITH FOLLOW-UP`；fresh Rebuild、两轮 26 条 Matrix、same-seed、terminal isolation、happy+duplicate 与 P5/P6 smoke 证据成立，Editor/PIE 等级保持 `USER PROVIDED / LOG INSPECTED BY REVIEWER`。
+- P7-001 与 P7-002 active/execution/final-review 三件套均已归档；follow-up 保留 Capture/InvalidValue/ApplyFailure、overkill、same Action across Reset、FAIL Error verbosity 与网络未验证。
+- 新资源需求延期：当前 Basic +1 SP、Skill -1 SP、无 Wait/Pass；Energy 仅 Ultimate Cost，无 Basic/Skill/受击回能；未来 SP 正确边界为每 Team 共享池、敌方独立或无池，不是每角色独立。全部另立任务，不塞入 P7-003。
+- 已创建唯一 `TASK-P7-003`，只迁移 Basic/Skill/Ultimate 到统一 Execution；Heal 保持旧路径，旧固定 GE 只解除引用不删除。事务门禁包含 RNG stream-copy、SP rollback、Ultimate GAS refund、失败零副作用、duplicate/terminal/overkill/Reset。
+- 本轮未实施 Source/Content/Config，未运行 Build/Editor/PIE，不 push；等待执行者首次只读复述和用户独立确认。

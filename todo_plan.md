@@ -1,8 +1,16 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～6 均为 `Ready with inherited follow-ups`。Phase 6 的 P6-001～P6-005 已归档，最终 Reviewer 为 `PASS WITH FOLLOW-UP`；动态证据主要为 `USER PROVIDED`，当前无活动工程任务。
+> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～6 均为 `Ready with inherited follow-ups`。Phase 7 的 P7-001、P7-002 均以 Reviewer `PASS WITH FOLLOW-UP` 归档；唯一 `TASK-P7-003` 已规划并等待用户独立确认，尚未实施正式技能迁移。
 
 ## 已完成的规划工作
+
+- [x] P7-000：只读校准 Phase 6→7 门禁，冻结 CoreAttributeSet 原位扩展、原创公式、CritDamage/Capture/RNG/单一伤害入口和结构化失败协议。
+- [x] P7-001：战斗属性、原创规则与初始化基线（Reviewer `PASS WITH FOLLOW-UP`，已归档，follow-up 保留）。
+- [x] P7-002：Attribute Capture、统一 Execution 与确定性暴击（Reviewer `PASS WITH FOLLOW-UP`，已归档）。
+- [ ] P7-003：普攻、战技、终结技迁移到统一伤害管线（已规划，等待用户独立确认执行）。
+- [ ] P7-004：Damage Breakdown 观察层与回归 Harness。
+- [ ] P7-005：阶段收尾、教学、独立审查与归档。
+- [ ] 独立资源后续：Wait/Pass、Basic/Skill/受击回能，以及按 Team 拆分共享 SP 池（敌方独立或无池，禁止误做每角色 SP）；不得塞入 P7-003。
 
 - [x] 迁移 ChatBot SNS 的文档协作经验。
 - [x] 迁移 Blaster 的 UE5.6 C++ 工程规范，排除多人射击业务。
