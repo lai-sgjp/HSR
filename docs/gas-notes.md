@@ -101,3 +101,13 @@ P2-001 保持 `USER ACCEPTED` 和历史 Reviewer `REVISE`；P2-002 为 Reviewer 
 Reviewer 要求进一步确认后，用户通过最小纠正完成以下闭环：Add 型初始化 GE 在 Health 初值 100 时重复成功应用会得到 200；Re-Possess 后初始化 GE 成功应用次数仍必须为 1；Owner 有效、Avatar 为空不代表依赖 Avatar 的运行行为可靠；HUD 全 0 时先读 AttributeSet/ASC 的 Health 等最终真源，真源也为 0 才向上查 Actor Info 与初始化 GE，真源已变则向下查 `Delegate → ViewModel → Widget`。
 
 用户最初曾将 Add 重复结果答为“不变”，并把 HUD 全 0 的第一检查点答为 Actor Info；最终答案已纠正且明确保留这条学习轨迹。Reviewer 仍判定完整 Debug、Override/C++ `override` 与 Owner/Avatar 边界的独立掌握证据不足。用户已明确接受这些学习缺口作为非阻断复习项，并授权 Coordinator 以 `USER ACCEPTED` 完成 Phase 2；这不是 Reviewer `PASS`。
+
+## Phase 6 收尾草案：Ability、Cost 与资源所有权
+
+- `SkillDefinition` 是静态配置；运行时 Command 只携带稳定 ID，Coordinator 在执行时重新解析行动者、技能和目标。
+- Energy 是角色 ASC/AttributeSet 的属性，只能由 GAS Cost/GE 修改；队伍战技点是 BattleCoordinator 的 battle-local Runtime State，不进入 AttributeSet、DataAsset 或 SaveGame。
+- ActionId 提供幂等缓存；失败或重复命令不得再次修改 HP、Energy、战技点或 Turn。
+- 当前验证采用同步 post-GE 路径。真实 Rollback、异步回调、并发提交、目标销毁与终局竞态仍是 follow-up，不能从同步 Harness 外推。
+- Heal 使用 Instant Healing GE 并 Clamp 到 MaxHealth；满血治疗是结构化拒绝而不是“成功治疗 0”。SingleAlly 当前只有静态边界证据。
+- P6-001～004A 的动态证据主要为 `USER PROVIDED`；P6-005 阶段 Reviewer 最终为 `PASS WITH FOLLOW-UP`，Phase 6 为 `Ready with inherited follow-ups`。
+- inherited follow-ups 包括同步 post-GE、真实 Rollback/并发、SingleAlly 动态路径、目标销毁/终局异步，以及 Save/网络边界；这些不能由当前单机同步 Harness 外推为已验证。

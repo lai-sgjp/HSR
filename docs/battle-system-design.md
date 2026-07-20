@@ -82,3 +82,13 @@ MVP 明确推迟 Attack、Defense、Crit、ExecutionCalculation、Skill、Ultima
 - UI 和表现对象不是战斗状态真源。
 - 跨地图 Context 不保存 Actor、Widget、ASC 或 Active GameplayEffect Handle。
 - Encounter 和 BattleResult 最多各消费一次。
+
+## Phase 6 战斗命令与资源边界（收尾草案）
+
+- Battle UI/ViewState 是事件驱动只读观察层；Widget 不 Tick、不持有权威 ASC/Actor，也不直接写 HP、Energy、战技点或 Turn。
+- UI 提交稳定 ID Command；BattleCoordinator 重验当前行动者、SkillDefinition、目标和资源，并发布结构化 Resolution。
+- TurnManager 只在成功 Resolution 后推进。Ability/GE 不直接拥有全局回合状态。
+- Energy 属于单个 ASC，由 GAS Cost GE 管理；队伍战技点由 Coordinator battle-local 事务管理，使用 ActionId 保证幂等。
+- 当前四类占位路径为 BasicAttack、Skill、Ultimate、Heal。SingleEnemy、Self 已有动态 Harness；SingleAlly 仅静态支持。
+- P6-004A 已用真实 `WBP_BattleCommandPanel` 闭合构造、stable-ID 提交、NativeDestruct/解绑和重建无重复 Delegate 的阻断。
+- 真实 Rollback/并发、SingleAlly 动态路径、Heal/Ability GE 失败、目标销毁、终局与异步路径仍未完整动态验证，继续作为 Phase 6 inherited follow-ups；最小 WBP 不代表 Phase 10 完整 UI。

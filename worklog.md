@@ -1502,3 +1502,38 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 
 - 为 P5-001～P5-004 补齐 archive active/execution/final-review 可审计指针；根目录 final-review 保留原始审查产物，archive 文件明确指向其路径。
 - 这些是归档索引，不改写历史证据等级或角色提交归属。
+
+## 2026-07-19｜P5-005 收尾与 P6-001 教学交接
+
+- Independent Reviewer 对 P5-005 的最终结论为 `PASS WITH FOLLOW-UP`；P5-001～P5-004 的工程与用户证据、证据等级、历史 mixed commit 和 `Map_Battle.umap` 归属 follow-up 均保留。
+- Teacher 先完成 Phase 5→6 微课，再接收用户回答。用户已掌握主要边界；Coordinator/TurnManager/Ability 的“推进执行 vs 决定授权”与 TargetPolicy 继续作为 Phase 6 复习项。
+- 用户确认 P5 主路径和 7/8 运行测试无问题，按 `USER PROVIDED / USER ACCEPTED` 记录，不再重复阻断。
+- 当前 `HSREditor Win64 Development` 命令 exit 0，但目标 up-to-date；不宣称新的 fresh UHT/C++/Link actions。
+- P5-005 三件套已归档，唯一活动卡切换为 `TASK-P6-001`，等待用户独立确认执行；本轮未修改 Gameplay、Config 或 Content。
+
+## 2026-07-20｜Coordinator：TASK-P6-005 收尾审计草案
+
+- P6-001～P6-004 active/execution/final-review 归档指针已齐全，各包 Reviewer 均为 `PASS WITH FOLLOW-UP`；两轮 PIE 等动态证据保持 `USER PROVIDED`。
+- P6-001 汇总 Command/Target/Resolution、ActionId 和普攻迁移；保留 Harness 命名 carryover、非致死/非 UI 与同步 post-GE follow-up。
+- P6-002 汇总 GAS Energy Cost/Ultimate/InvalidTarget/teardown；保留 UI、终局、异步与目标失效独立路径 follow-up。
+- P6-003 汇总 battle-local SP、普攻 +1、战技 -1 与幂等 ActionId；真实 Rollback、并发、Actor 销毁及 Save/网络未动态覆盖。
+- P6-004 汇总 Heal/满血拒绝/伪造目标/ViewState；WBP 实际重建未动态验证，SingleAlly 仅静态，Heal GE 失败/目标销毁/终局/异步继续保留。
+- 当前工作树包含已修改/未跟踪的 P6 Source、UI、SkillDefinition、GameplayEffect、Battle GameMode/初始化资产和 Markdown。Coordinator 仅分类记录，不回退、不 stage/commit/push，也不认领用户资产作者身份。
+- 本轮校准 PROJECT_STATE、todo、README、Phase 6 plan、gas-notes、battle design 和执行草案；Teacher 与 Independent Reviewer 尚未独立落盘，Phase 6 保持 `Not verified / closeout pending`。
+
+## 2026-07-20｜Coordinator：P6-004A 归档并恢复 P6-005 最终 Gate
+
+- P6-004A Reviewer 最终为 `PASS WITH FOLLOW-UP`；真实 WBP 构造、四类按钮、stable-ID Command、NativeDestruct/Unbind、重建和连续 PIE 阻断已闭合。
+- 用户 Editor 资产实际路径为 `Content/UI/WBP_BattleCommandPanel.uasset`（`/Game/UI/WBP_BattleCommandPanel`），GameMode 绑定资产为 `Content/Blueprints/Framework/BP_HSRBattleGameMode.uasset`；证据等级为 `USER PROVIDED`。
+- P6-001～P6-004A active/execution/final-review 归档指针已固化；execution 真源仍为根报告对应章节，archive 文件不改写历史证据。
+- 工作树按用户 Editor 资产、Implementation 源码、Coordinator Markdown 和其他待归属修改分类；本轮不回退、不 stage/commit/push。
+- Coordinator 候选状态为 `Ready with inherited follow-ups`，但不代写 Reviewer 结论；P6-005 已恢复为唯一活动卡并等待 Independent Reviewer 最终 Gate，Phase 6 当前仍为 `Not verified / final review pending`。
+
+## 2026-07-20｜TASK-P6-005 最终 Gate 与 Phase 6 归档
+
+- Independent Reviewer 最终结论为 `PASS WITH FOLLOW-UP`；P6-001～P6-004A 与 P6-005 active/execution/final-review 三件套已冻结归档。
+- Phase 6 最终状态为 `Ready with inherited follow-ups`。Editor、PIE、Harness、WBP 和生命周期动态证据主要保持 `USER PROVIDED`。
+- P6-004A 已闭合真实 WBP 阻断；实际用户资产为 `Content/UI/WBP_BattleCommandPanel.uasset` 与 `Content/Blueprints/Framework/BP_HSRBattleGameMode.uasset`。
+- inherited follow-ups：同步 post-GE、真实 Rollback/并发、SingleAlly 动态路径、目标销毁、Heal/Ability GE 失败、终局异步、Phase 10 完整 UI、Save/网络、多队伍和用户独立复述。
+- 当前无活动工程任务。Phase 7 只允许先规划；未经授权不实现、不执行 Git。
+- 后续 Git 必须按用户 Editor 资产、Implementation 源码、Reviewer/Teacher/Coordinator Markdown 与其他历史 dirty 项拆分，逐组核对作者、allowlist、diff 和派生产物；本轮未 stage/commit/push。

@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0～3 均为 `Ready`。Phase 4 P4-001～004 已完成角色审查与归档，最终为 `Ready with inherited follow-ups`；等待本次收尾 commit/push 结果记录后才可进入 Phase 5。
+> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～6 均为 `Ready with inherited follow-ups`。Phase 6 的 P6-001～P6-005 已归档，最终 Reviewer 为 `PASS WITH FOLLOW-UP`；动态证据主要为 `USER PROVIDED`，当前无活动工程任务。
 
 ## 已完成的规划工作
 
@@ -175,22 +175,24 @@
 - [ ] 创建 BattleTransitionSubsystem，Context 只保存稳定 ID、Map 和 Transform。
 - [ ] 验证进入空 Battle Map 和返回流程。
 
-## Phase 5：回合制战斗最小闭环
+## Phase 5：回合制战斗最小闭环（Ready with inherited follow-ups）
 
-- [ ] 创建 BattleCoordinator、BattleParticipant、BattleGameMode 和 TurnManager。
-- [ ] 在 Battle Map 根据 Context 重建玩家/敌人 Actor 与 ASC。
-- [ ] 实现 Speed 排序和稳定同速裁决。
-- [ ] 实现最小普攻 GameplayAbility 和固定伤害 GE。
-- [ ] 实现 ActionResolved、死亡、胜负和单次 BattleResult。
-- [ ] 返回探索地图和原 Transform。
+- [x] 创建 BattleCoordinator、BattleParticipant、BattleGameMode 和 TurnManager（P5-001/P5-002；Reviewer PASS/PASS WITH FOLLOW-UP）。
+- [x] 在 Battle Map 根据 Context 重建玩家/敌人 Actor 与 ASC（P5-001；用户 PIE 证据）。
+- [x] 实现 Speed 排序和稳定同速裁决（P5-002；两轮用户 PIE）。
+- [x] 实现最小普攻 GameplayAbility 和固定伤害 GE（P5-003；两轮用户 PIE）。
+- [x] 实现 ActionResolved、死亡、胜负和单次 BattleResult（P5-004；两轮 Victory/Defeat 用户 PIE）。
+- [x] 返回探索地图和原 Transform（P5-004；exactly-once 与防重入证据）。
 
-## Phase 6：GAS 技能系统基础
+## Phase 6：GAS 技能系统基础（P6-005 收尾审计中）
 
-- [ ] 建立 GameplayAbilityBase、普攻、战技、终结技占位和治疗。
-- [ ] 建立 SkillDataAsset 和目标类型。
-- [ ] 使用 GAS GE 处理 Energy/HP Cost、伤害和治疗。
-- [ ] 使用 BattleCoordinator 原子管理共享战技点。
-- [ ] 区分 Ability 成功、取消和失败 Resolution。
+- [x] 建立 GameplayAbilityBase、普攻、战技、终结技占位和治疗（P6-001～004；各包 Reviewer `PASS WITH FOLLOW-UP`）。
+- [x] 建立 SkillDefinition DataAsset 和 SingleEnemy/SingleAlly/Self 目标类型（SingleAlly 仅静态验证）。
+- [x] 使用 GAS GE 处理 Energy Cost、伤害和治疗（Heal GE 失败与异步路径未动态验证）。
+- [x] 使用 BattleCoordinator battle-local 事务管理共享战技点（真实 Rollback 分支未动态覆盖）。
+- [x] 区分 Ability 成功、取消、拒绝和失败 Resolution（动态证据主要为 `USER PROVIDED`）。
+- [x] P6-004A：创建并验证真实 `WBP_BattleCommandPanel`、GameMode 绑定、stable-ID Command、NativeDestruct/重建与无重复 Delegate（Reviewer `PASS WITH FOLLOW-UP`；动态证据 `USER PROVIDED`）。
+- [x] P6-005：完成 Coordinator/Teacher/Independent Reviewer、canonical 文档和阶段证据收尾；最终 Reviewer `PASS WITH FOLLOW-UP`，Phase 6 为 `Ready with inherited follow-ups`。
 
 ## Phase 7：属性、伤害公式与暴击
 

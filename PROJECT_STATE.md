@@ -7,7 +7,7 @@
 
 - **Phase 1 与 Phase 2 均为 `Ready`。P2-003 最终处置为 `USER ACCEPTED`：Reviewer 的唯一结论仍为 `REVISE`，用户明确接受未完全掌握的学习项作为非阻断复习项。**
 - **Phase 3 为 `Ready`：P3-003 最终 Reviewer commit `3b3fbeb` 为 `PASS WITH FOLLOW-UP`，且用户已明确接受三个工程证据缺口；所有 follow-up 原样保留。**
-- **Phase 4 为 `Ready with inherited follow-ups`；Phase 5 的 P5-001～P5-004 已实施并完成各自 Reviewer 审查，当前执行 P5-005 阶段收尾。Phase 5 尚未最终标记 Ready，等待归档链和文档一致性复核。**
+- **Phase 4、Phase 5 与 Phase 6 均为 `Ready with inherited follow-ups`。Phase 6 的 P6-001～P6-004A 与 P6-005 已归档，阶段 Independent Reviewer 最终 Gate 为 `PASS WITH FOLLOW-UP`；动态 Editor/PIE/WBP 证据主要为 `USER PROVIDED`，全部 inherited follow-ups 原样保留。当前无活动工程任务，Phase 7 仅可先规划。**
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
@@ -498,3 +498,10 @@
 - P5-004 Reviewer 结论为 `PASS WITH FOLLOW-UP`。
 - Victory/Defeat 各两轮、Result/Return exactly-once、Transform 恢复和 resolved 防重入均已由用户验证。
 - 已创建阶段收尾方向的 P5-005；不再新增战斗规则。
+
+## 2026-07-19 P5-005 收尾与 P6-001 交接
+
+- P5-005 active/execution/final-review 已归档至 `tasks/archive/`，Independent Reviewer 为 `PASS WITH FOLLOW-UP`，Teacher 为 `PASS WITH FOLLOW-UP`。
+- 用户完成 Coordinator/TurnManager/GameplayAbility、激活与结算、稳定排序、跨 World DTO、终局幂等和通用 Ability 管线教学问答；职责边界和 TargetPolicy 继续作为 Phase 6 复习项。
+- 当前 Build 命令 exit 0 但目标 up-to-date，未虚报新的 fresh UHT/C++/Link actions；P5-002～004 PIE 证据主要为用户提供。
+- 唯一活动任务已切换为 `TASK-P6-001`，状态为 `PLANNED — 等待用户确认执行`；本轮不修改 Gameplay。
