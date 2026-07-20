@@ -934,3 +934,69 @@ Phase 4 不负责真正的战斗规则。以下属于 Phase 5：
 - 进入 Phase 5 前，项目必须完成当前阶段的 commit 并 push；阶段完成、Reviewer/Coordinator 结论和远端状态仍需分别记录，不能把本地 commit 或用户授权误写成 push 已成功。
 
 本轮 Teacher 教学完成；不代表 Phase 4 工程 Gate 已 Ready。P4-004 当前仍为 `Not verified`，须由 Reviewer 独立结论和 Coordinator 最终归档后才能决定阶段状态。未修改 Source/Content/Config，未运行 Build/Editor/PIE。
+
+### Phase 5→6 教学复盘（2026-07-19）
+
+Teacher 先讲解后提问，覆盖 Coordinator/TurnManager/GameplayAbility 职责、激活与结算、稳定排序、跨 World 纯值 DTO、终局 exactly-once 和通用 Ability 管线。
+
+#### 用户原始回答
+
+1. Coordinator 管控输赢和技能能否实行；TurnManager 推动回合；GameplayAbility 规定技能。
+2. GE 缺失时都不变。
+3. Actor 是不同 World 中可能不同的实例，不是真源。
+4. `RequestId`、`FTransform`、`Outcome`。
+5. 拒绝执行。
+6. 为统一执行、避免多个结果；`TargetType → ActionCommand → Resolution`。
+
+#### 教师纠正与掌握记录
+
+- 已掌握失败行动零副作用、稳定身份优于 Actor 实例、纯值 ReturnContext、终局拒绝重复执行和统一管线的必要性。
+- 纠正：TurnManager 执行回合推进，但是否允许推进由 Coordinator 在成功 Resolution 后授权；GameplayAbility 负责执行具体能力效果；统一管线第二步是 `TargetPolicy`，而 `TargetType` 是 Definition 的配置字段。
+- 当前学习 Gate：`PASS WITH FOLLOW-UP`。Phase 6 持续复习“激活不等于结算成功”“Coordinator 授权与 TurnManager 执行的边界”“TargetPolicy 的权威复核”。
+- 用户确认 P5 运行测试无问题；相关动态证据按 `USER PROVIDED / USER ACCEPTED` 记录，不冒充 Reviewer 亲验。
+
+## 2026-07-20｜Phase 6 教学收尾（TASK-P6-005）
+
+### 从定义到回合的一条责任链
+
+Phase 6 把普攻、战技、终结技和治疗收敛到同一条管线：
+
+```text
+SkillDefinition → TargetPolicy → ActionCommand → GameplayAbility → Resolution → Turn
+```
+
+- `SkillDefinition` 是静态配置：稳定 `SkillId`、类别、目标类型、Ability Class 与 Cost/Effect GE；它不是一次按键的运行状态。
+- `TargetPolicy` 既生成候选稳定 ID，也在命令执行时由 Coordinator 重新解析和权威校验；UI 传入的候选不是权限证明。
+- `ActionCommand` 是一次运行请求，只携带 Battle/Actor/Skill/Target 稳定 ID 和 `ActionId`，不把 Actor/ASC 引用传进 UI 合同。
+- `GameplayAbility` 执行具体 Cost/Effect，但“激活成功”不等于“战斗行动成功”；只有 Coordinator 收到成功的结构化 `Resolution` 后，才能授权 TurnManager 推进一次回合。
+- `Resolution` 是统一结果合同，应能说明 ActionId、状态、失败原因、资源前后与 Turn 是否推进，不用互不兼容的 bool 和日志拼凑事实。
+
+### 资源所有权与事务语义
+
+- **Energy 归 GAS。** Energy/MaxEnergy 是 ASC Attribute，Ultimate 通过 Cost GE 的 `CheckCost/CommitAbility` 路径唯一扣费。Coordinator 和 UI 不应手改 Energy，否则会产生双真源。“先扣再手工加回”不是原子性，尤其无法安全外推到异步和并发路径。
+- **战技点归 Coordinator battle-local 事务。** 普攻成功 `+1`、战技成功 `-1`；战技使用 `Reserve → Commit | Rollback`。Reserve 保护当前 ActionId 的配额，成功 Resolution 才 Commit，失败/取消/teardown 应 Rollback。这条资源不写回 DataAsset，不归 Widget，也不冒充 GAS Attribute。
+- **`ActionId` 是幂等键。** 同一 ActionId 重放返回已有 Resolution，不能第二次应用 GE、扣 Energy/SP、治疗/伤害或推进 Turn。“按钮禁用”不能替代这一运行时保证。
+
+### 治疗与只读展示边界
+
+- 满血治疗不是有效行动：返回 `Rejected/AlreadyAtFullHealth`，不应用 Healing GE，不消耗资源，不推进 Turn。有效治疗不超过 MaxHealth，且 Phase 6 不支持复活。
+- Battle Command ViewState 是 Coordinator 发布的纯值、只读快照：技能、候选目标、Energy/SP、可用性和禁用原因都用稳定 ID/值表达。Widget 只订阅事件并提交 Command，不持有规则真源、不写 Attribute、不用 Tick 轮询。
+- 委托必须按精确 handle 成对解绑；但当前动态证据只覆盖测试 ViewModel 的移除/重建路径，不能写成实际 WBP 销毁后重建已动态通过。
+
+### 阶段总门禁与证据等级
+
+一次无效行动必须使 **HP、Energy、战技点和 Turn 全部不变**。原因不是“测试方便”，而是这四者共同构成一次行动的可观测事实；任一项偷偷变化都会留下“失败但半结算”状态，破坏 ActionId 重放、资源账本与回合顺序的一致性。
+
+P6-001～P6-004 的两轮 PIE 日志均是用户提供，证据等级保持 `USER PROVIDED`，不冒充 Teacher/Reviewer 亲自运行。静态源码检查能支持责任边界，Build 能证明特定版本可编译，PIE 只能证明已实际命中的路径；三者不能相互冒充。
+
+### Teacher 结论与复习项
+
+- **Teacher 结论：`PASS WITH FOLLOW-UP`。** Phase 6 的责任模型、资源真源、ActionId 幂等、满血零副作用和事件驱动只读 UI 边界已形成可复习的教学闭环。
+- **用户独立作答边界：** 本次 P6-005 用户只确认执行收尾，未对“无效行动为什么必须使 HP/Energy/SP/Turn 全部不变”提供新的独立回答。上述解释是 Teacher 复盘，不记为用户已独立掌握。
+- **复习/后续补证：** 用户独立复述阶段总门禁；真实 Rollback 动态路径；实际 WBP 销毁/重建与零重复回调；`SingleAlly` 在至少两名存活友方中的动态路径；Healing GE 失败、目标销毁、终局竞态、异步/并发语义。
+- Teacher 结论本身不替代 Independent Reviewer 的 Phase 6 工程 Gate，也不把 inherited follow-up 写成已验证。随后 Independent Reviewer 已给出 `PASS WITH FOLLOW-UP`，Phase 6 最终为 `Ready with inherited follow-ups`。
+
+### P6-004A 与最终 Gate 更正
+
+- P6-004A 后续以真实 `WBP_BattleCommandPanel` 的 WidgetCreate、stable-ID 按钮提交、NativeDestruct/解绑、重建后单次绑定和连续 PIE 闭合了原“实际 WBP 销毁/重建未验证”阻断；证据等级为 `USER PROVIDED`。
+- 当前仍需复习/补证：用户独立复述；同步 post-GE 到异步语义的边界；真实 Rollback/并发；`SingleAlly` 动态路径；目标销毁、Healing GE 失败和终局异步；Phase 10 完整 UI；SaveGame/网络。
