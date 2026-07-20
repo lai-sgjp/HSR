@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "../Damage/HSRDamageTypes.h"
 #include "HSRAbilityTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -86,6 +87,12 @@ struct FHSRAbilityResolution
 
 	UPROPERTY(BlueprintReadOnly, Category = "Battle")
 	FName SkillId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	bool bHasDamageResult = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FHSRDamageResult DamageResult;
 
 	bool Succeeded() const { return Status == EHSRAbilityResolutionStatus::Succeeded; }
 };

@@ -51,6 +51,7 @@ public:
 	bool RequestBasicAttack(FName AttackerParticipantId, FName TargetParticipantId);
 	FHSRAbilityResolution RequestAction(const FHSRBattleActionCommand& Command);
 	void SetBasicAttackDefinition(UHSRSkillDefinition* InDefinition) { BasicAttackDefinition = InDefinition; }
+	const UHSRSkillDefinition* GetBasicAttackDefinition() const { return BasicAttackDefinition; }
 	void SetUltimateDefinition(UHSRSkillDefinition* InDefinition) { UltimateDefinition = InDefinition; }
 	void SetSkillDefinition(UHSRSkillDefinition* InDefinition) { SkillDefinition = InDefinition; }
 	void SetHealDefinition(UHSRSkillDefinition* InDefinition) { HealDefinition = InDefinition; }
@@ -103,6 +104,10 @@ private:
 	int32 DevelopmentDamageSeed = 1337;
 	int32 DevelopmentDamageConsumeCount = 0;
 	TMap<FGuid, FHSRDamageResult> DevelopmentDamageResults;
+	/** Health observers defer terminal publication while the one synchronous
+	 * formal-damage application is still transactional. */
+	bool bFormalDamageTransactionOpen = false;
+	FName PendingDefeatedParticipantId;
 
 	UPROPERTY()
 	TObjectPtr<UHSRTurnManager> TurnManager;

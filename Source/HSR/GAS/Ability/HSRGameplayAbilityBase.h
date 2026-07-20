@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbility.h"
 #include "HSRAbilityTypes.h"
+#include "../Damage/HSRDamageTypes.h"
+#include "GameplayEffectTypes.h"
 #include "HSRGameplayAbilityBase.generated.h"
 
 class UAbilitySystemComponent;
@@ -33,8 +35,24 @@ public:
 	virtual EHSRAbilityFailureReason GetLastFailureReason() const;
 	virtual EHSRAbilityFailureReason GetPreActivationFailureReason(const FGameplayAbilitySpecHandle& Handle, const FGameplayAbilityActorInfo* ActorInfo) const;
 	virtual bool ConfigureFromSkillDefinition(const UHSRSkillDefinition& Definition);
+	bool PrepareFormalDamage(const FHSRFormalDamageRequest& Request, const FGameplayEffectSpecHandle& Spec, UAbilitySystemComponent* TargetAbilitySystem, FHSRFormalDamagePrepareResult& OutResult);
+	const FHSRFormalDamageExecutionResult& GetLastFormalDamageExecutionResult() const { return LastFormalDamageExecutionResult; }
+	void ClearPreparedFormalDamage();
+	bool ApplyPreparedFormalDamage(UAbilitySystemComponent* SourceAbilitySystem);
+
+protected:
+	FHSRFormalDamageExecutionResult& GetMutableFormalDamageExecutionResult() { return LastFormalDamageExecutionResult; }
 
 private:
 	FGuid ActionId;
 	FName SkillId;
+	struct FHSRPreparedFormalDamage
+	{
+		FHSRFormalDamageRequest Request;
+		FGameplayEffectSpecHandle Spec;
+		TWeakObjectPtr<UAbilitySystemComponent> Target;
+		bool bPrepared = false;
+	};
+	FHSRPreparedFormalDamage PreparedFormalDamage;
+	FHSRFormalDamageExecutionResult LastFormalDamageExecutionResult;
 };

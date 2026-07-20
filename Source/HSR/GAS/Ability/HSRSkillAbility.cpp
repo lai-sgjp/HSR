@@ -1,6 +1,5 @@
 #include "HSRSkillAbility.h"
 #include "AbilitySystemComponent.h"
-#include "GameplayEffect.h"
 #include "../../Data/HSRSkillDefinition.h"
 
 UHSRSkillAbility::UHSRSkillAbility() { SetActionContext(FGuid(), FName(TEXT("Skill"))); }
@@ -11,11 +10,7 @@ void UHSRSkillAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 {
 	bLastActivationSucceeded = false;
 	UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
-	UAbilitySystemComponent* TargetASC = PendingTargetAbilitySystem.Get();
-	TSubclassOf<UGameplayEffect> LoadedEffect = EffectClass.LoadSynchronous();
-	if (!SourceASC || !TargetASC || !LoadedEffect) { ClearPendingTarget(); EndAbility(Handle, ActorInfo, ActivationInfo, true, true); return; }
-	FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext(); Context.AddSourceObject(GetAvatarActorFromActorInfo());
-	FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(LoadedEffect, 1.0f, Context);
-	if (Spec.IsValid()) bLastActivationSucceeded = SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC).WasSuccessfullyApplied();
+	if (!SourceASC) { ClearPendingTarget(); EndAbility(Handle, ActorInfo, ActivationInfo, true, true); return; }
+	bLastActivationSucceeded = ApplyPreparedFormalDamage(SourceASC);
 	ClearPendingTarget(); EndAbility(Handle, ActorInfo, ActivationInfo, true, !bLastActivationSucceeded);
 }

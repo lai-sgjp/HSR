@@ -85,3 +85,41 @@ struct HSR_API FHSRDamageResult
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Damage")
 	FHSRDamageBreakdown Breakdown;
 };
+
+/** Coordinator-owned, pointer-free formal damage input prepared before any cost or RNG commit. */
+USTRUCT(BlueprintType)
+struct HSR_API FHSRFormalDamageRequest
+{
+	GENERATED_BODY()
+	FGuid BattleId;
+	FGuid ActionId;
+	FName SkillId;
+	FName SourceParticipantId;
+	FName TargetParticipantId;
+	FGameplayTag DamageType;
+	float AbilityMultiplier = 1.0f;
+	float DefenseCoefficient = 0.5f;
+	float MinDamage = 1.0f;
+	float CritRoll = 0.0f;
+};
+
+USTRUCT(BlueprintType)
+struct HSR_API FHSRFormalDamagePrepareResult
+{
+	GENERATED_BODY()
+	EHSRDamageResultType Result = EHSRDamageResultType::SpecCreationFailed;
+	FGuid ActionId;
+	bool bPrepared = false;
+};
+
+USTRUCT(BlueprintType)
+struct HSR_API FHSRFormalDamageExecutionResult
+{
+	GENERATED_BODY()
+	FHSRDamageResult DamageResult;
+	bool bCostCommitted = false;
+	bool bRefundApplied = false;
+	float EnergyBefore = 0.0f;
+	float EnergyAfter = 0.0f;
+	bool bSucceeded = false;
+};

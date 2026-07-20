@@ -35,6 +35,7 @@ public:
 
 private:
 	TSoftClassPtr<UGameplayEffect> UltimateEffectClass;
+	TSoftClassPtr<UGameplayEffect> EnergyRefundEffectClass;
 	TWeakObjectPtr<UAbilitySystemComponent> PendingTargetAbilitySystem;
 	bool bLastActivationSucceeded = false;
 	EHSRAbilityFailureReason LastFailureReason = EHSRAbilityFailureReason::EffectFailed;

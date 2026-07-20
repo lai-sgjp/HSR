@@ -164,28 +164,22 @@ namespace HSRBattleDevelopmentTest
 			&& ActionResolvedCount == 0;
 		LogCase(TEXT("P5-003_InvalidTargetRejected_NoMutation"), bInvalidTargetRejected);
 
-		UHSRBasicAttackAbility* PlayerAttack = FindBasicAttackAbility(Participants[0]);
-		const TSoftClassPtr<UGameplayEffect> OriginalEffectClass = PlayerAttack ? PlayerAttack->GetDamageEffectClassForDevelopmentTest() : nullptr;
-		if (PlayerAttack)
-		{
-			PlayerAttack->SetDamageEffectClassForDevelopmentTest(TSoftClassPtr<UGameplayEffect>(FSoftObjectPath(TEXT("/Game/GameplayEffects/GE_P5_MissingDamageEffect.GE_P5_MissingDamageEffect_C"))));
-		}
-		const bool bMissingEffectRejected = PlayerAttack && !Coordinator->RequestBasicAttack(FName(TEXT("Player")), FName(TEXT("Enemy")))
+		UHSRSkillDefinition* BasicDefinition = const_cast<UHSRSkillDefinition*>(Coordinator->GetBasicAttackDefinition());
+		const TSoftClassPtr<UGameplayEffect> OriginalEffectClass = BasicDefinition ? BasicDefinition->EffectGameplayEffectClass : nullptr;
+		if (BasicDefinition) { BasicDefinition->EffectGameplayEffectClass.Reset(); }
+		const bool bMissingEffectRejected = BasicDefinition && !Coordinator->RequestBasicAttack(FName(TEXT("Player")), FName(TEXT("Enemy")))
 			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Player"))
 			&& FMath::IsNearlyEqual(PlayerHealthBeforeRejected, GetHealth(Participants[0]))
 			&& FMath::IsNearlyEqual(EnemyHealthBeforeRejected, GetHealth(Participants[1]))
 			&& ActionResolvedCount == 0;
-		if (PlayerAttack)
-		{
-			PlayerAttack->SetDamageEffectClassForDevelopmentTest(OriginalEffectClass);
-		}
-		LogCase(TEXT("P5-003_MissingEffectRejected_NoMutation"), bMissingEffectRejected);
+		if (BasicDefinition) { BasicDefinition->EffectGameplayEffectClass = OriginalEffectClass; }
+		LogCase(TEXT("P5-003_FormalMissingExecutionRejected_NoMutation"), bMissingEffectRejected);
 
 		const bool bLegalAttack = Coordinator->RequestBasicAttack(FName(TEXT("Player")), FName(TEXT("Enemy")))
-			&& FMath::IsNearlyEqual(GetHealth(Participants[1]), 90.0f)
+			&& GetHealth(Participants[1]) < 100.0f
 			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Enemy"))
 			&& ActionResolvedCount == 1;
-		LogCase(TEXT("P5-003_LegalFixedDamageAndSingleResolve"), bLegalAttack);
+		LogCase(TEXT("P5-003_LegalFormalDamageAndSingleResolve"), bLegalAttack);
 
 		const float EnemyHealthAfterLegal = GetHealth(Participants[1]);
 		const bool bAttackDuplicateRejected = !Coordinator->RequestBasicAttack(FName(TEXT("Player")), FName(TEXT("Enemy")))
@@ -230,39 +224,43 @@ namespace HSRBattleDevelopmentTest
 			&& ActionResolvedCount == 0;
 		LogCase(TEXT("P6-001_InvalidTargetCached_NoMutation"), bP6InvalidTargetCachedNoMutation);
 
-		if (PlayerAttack)
-		{
-			PlayerAttack->SetDamageEffectClassForDevelopmentTest(TSoftClassPtr<UGameplayEffect>(FSoftObjectPath(TEXT("/Game/GameplayEffects/GE_P6_MissingDamageEffect.GE_P6_MissingDamageEffect_C"))));
-		}
+		if (BasicDefinition) { BasicDefinition->EffectGameplayEffectClass.Reset(); }
 		const FHSRBattleActionCommand MissingEffectCommand = MakeBasicAttackCommand(FGuid::NewGuid(), FName(TEXT("Enemy")));
-		const FHSRAbilityResolution MissingEffectFirst = PlayerAttack ? Coordinator->RequestAction(MissingEffectCommand) : FHSRAbilityResolution();
-		const FHSRAbilityResolution MissingEffectReplay = PlayerAttack ? Coordinator->RequestAction(MissingEffectCommand) : FHSRAbilityResolution();
-		if (PlayerAttack)
-		{
-			PlayerAttack->SetDamageEffectClassForDevelopmentTest(OriginalEffectClass);
-		}
-		const bool bP6MissingEffectCachedNoMutation = PlayerAttack
+		const FHSRAbilityResolution MissingEffectFirst = BasicDefinition ? Coordinator->RequestAction(MissingEffectCommand) : FHSRAbilityResolution();
+		const FHSRAbilityResolution MissingEffectReplay = BasicDefinition ? Coordinator->RequestAction(MissingEffectCommand) : FHSRAbilityResolution();
+		if (BasicDefinition) { BasicDefinition->EffectGameplayEffectClass = OriginalEffectClass; }
+		const bool bP6MissingEffectCachedNoMutation = BasicDefinition
 			&& MissingEffectFirst.Status == EHSRAbilityResolutionStatus::Rejected
-			&& MissingEffectFirst.FailureReason == EHSRAbilityFailureReason::EffectFailed
+			&& MissingEffectFirst.FailureReason == EHSRAbilityFailureReason::DefinitionMissing
 			&& MissingEffectReplay.Status == MissingEffectFirst.Status
 			&& MissingEffectReplay.FailureReason == MissingEffectFirst.FailureReason
 			&& FMath::IsNearlyEqual(P6PlayerHealthBefore, GetHealth(Participants[0]))
 			&& FMath::IsNearlyEqual(P6EnemyHealthBefore, GetHealth(Participants[1]))
 			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Player"))
 			&& ActionResolvedCount == 0;
-		LogCase(TEXT("P6-001_MissingEffectCached_NoMutation"), bP6MissingEffectCachedNoMutation);
+		LogCase(TEXT("P6-001_FormalMissingExecutionCached_NoMutation"), bP6MissingEffectCachedNoMutation);
 
+		Coordinator->InitializeDevelopmentDamageRng(1337);
+		SetHealth(Participants[0], 100.0f, 100.0f);
+		SetHealth(Participants[1], 100.0f, 100.0f);
+		Coordinator->SetTeamSkillPointsForDevelopmentTest(1, 3);
+		MainTurnManager->Initialize(Participants);
 		const FHSRBattleActionCommand LegalCommand = MakeBasicAttackCommand(FGuid::NewGuid(), FName(TEXT("Enemy")));
+		const float P6EnemyHealthBeforeLegal = GetHealth(Participants[1]);
+		const int32 P6SkillPointsBeforeLegal = Coordinator->GetTeamResourceState().CurrentSkillPoints;
 		const FHSRAbilityResolution LegalFirst = Coordinator->RequestAction(LegalCommand);
 		const float P6EnemyHealthAfterLegal = GetHealth(Participants[1]);
 		const FHSRAbilityResolution LegalReplay = Coordinator->RequestAction(LegalCommand);
 		const bool bP6LegalCachedSingleMutation = LegalFirst.Status == EHSRAbilityResolutionStatus::Succeeded
 			&& LegalReplay.Status == LegalFirst.Status
 			&& LegalReplay.FailureReason == LegalFirst.FailureReason
-			&& FMath::IsNearlyEqual(P6EnemyHealthAfterLegal, 90.0f)
+			&& LegalFirst.bHasDamageResult
+			&& P6EnemyHealthAfterLegal < P6EnemyHealthBeforeLegal
 			&& FMath::IsNearlyEqual(P6EnemyHealthAfterLegal, GetHealth(Participants[1]))
+			&& Coordinator->GetTeamResourceState().CurrentSkillPoints == P6SkillPointsBeforeLegal + 1
 			&& MainTurnManager->GetCurrentParticipantId() == FName(TEXT("Enemy"))
 			&& ActionResolvedCount == 1;
+		UE_LOG(LogTemp, Log, TEXT("P6-001 Formal Legal Status=%d Reason=%d HasDamage=%d ReportedApplied=%.2f HPBefore=%.2f HPAfter=%.2f HPDelta=%.2f SPBefore=%d SPAfter=%d Turn=%s Resolved=%d"), static_cast<int32>(LegalFirst.Status), static_cast<int32>(LegalFirst.FailureReason), LegalFirst.bHasDamageResult ? 1 : 0, LegalFirst.DamageResult.Breakdown.AppliedDamage, P6EnemyHealthBeforeLegal, P6EnemyHealthAfterLegal, P6EnemyHealthBeforeLegal - P6EnemyHealthAfterLegal, P6SkillPointsBeforeLegal, Coordinator->GetTeamResourceState().CurrentSkillPoints, *MainTurnManager->GetCurrentParticipantId().ToString(), ActionResolvedCount);
 		LogCase(TEXT("P6-001_LegalActionCached_SingleGEAndTurn"), bP6LegalCachedSingleMutation);
 		MainTurnManager->OnActionResolved().Remove(ActionResolvedHandle);
 		UE_LOG(LogTemp, Log, TEXT("P5-003 AttackTest Harness=COMPLETE"));
@@ -523,6 +521,10 @@ void AHSRBattleGameMode::BeginPlay()
 			Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetCritRateAttribute(), 0.0f);
 			Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetCritDamageAttribute(), 0.0f);
 			Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetDefenseAttribute(), 0.0f);
+			// Formal cards always submit Player. Make the current actor explicit;
+			// P7-002's direct helper does not require turn ownership.
+			Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), 120.0f);
+			Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), 80.0f);
 			const auto RunPreflightCase = [this, &Source, &Target](const TCHAR* CaseName, FName CaseSource, FName CaseTarget, const FGameplayTag& CaseTag, float CaseMultiplier, const UHSRDamageRuleDefinition* CaseRule, TSubclassOf<UGameplayEffect> CaseEffect, EHSRDamageResultType Expected)
 			{
 				const float HPBefore = Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
@@ -632,6 +634,53 @@ void AHSRBattleGameMode::BeginPlay()
 			{
 				UE_LOG(LogTemp, Error, TEXT("P7-002 Harness Result=FAIL ActionId=%s FirstResult=%d SecondResult=%d HPBefore=%.2f HPAfterFirst=%.2f HPAfterSecond=%.2f Raw=%.2f Final=%.2f Applied=%.2f RNGBefore=%d RNGAfterFirst=%d RNGAfterSecond=%d StateBefore=%d StateAfter=%d ResultMatch=%d ExactlyOnce=%d DamageBalanced=%d NoBattleSideEffects=%d"), *ActionId.ToString(), static_cast<int32>(First.Result), static_cast<int32>(Second.Result), HealthBefore, HealthAfterFirst, HealthAfterSecond, First.Breakdown.RawDamage, First.Breakdown.FinalDamage, First.Breakdown.AppliedDamage, RngBefore, RngAfterFirst, RngAfterSecond, static_cast<int32>(StateBefore), static_cast<int32>(Coordinator->GetCurrentState()), bResultMatch, bExactlyOnce, bDamageBalanced, bNoBattleSideEffects);
 			}
+
+			// P7-003 formal path: do not substitute the direct P7-002 helper.
+			// Every card below invokes RequestAction and therefore verifies the
+			// Coordinator -> prepared ability -> unique Apply seam.
+			const auto RunFormalCard = [this, &Source, &Target](const TCHAR* CaseName, const UHSRSkillDefinition* Definition, int32 ExpectedSPDelta, bool bUltimate)
+			{
+				if (!Definition || !Definition->DamageRule.IsValid() || Definition->EffectGameplayEffectClass.IsNull() || (bUltimate && Definition->EnergyRefundGameplayEffectClass.IsNull()))
+				{
+					UE_LOG(LogTemp, Warning, TEXT("P7-003 Formal Case=%s Result=SKIPPED Reason=MissingP7AssetBinding"), CaseName); return;
+				}
+				Coordinator->InitializeDevelopmentDamageRng(DevelopmentDamageSeed);
+				Coordinator->SetTeamSkillPointsForDevelopmentTest(2, 3);
+				Coordinator->GetTurnManager()->Initialize(Coordinator->GetParticipants());
+				// Ultimate's configured formal damage can exceed the old 100 HP
+				// Harness baseline. Keep every card non-lethal so it cannot publish a
+				// BattleResult and poison subsequent P5/P6 smoke tests.
+				const float TargetBaselineHealth = bUltimate ? 1000.0f : 100.0f;
+				Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(), TargetBaselineHealth);
+				Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), TargetBaselineHealth);
+				Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxEnergyAttribute(), 100.0f);
+				Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetEnergyAttribute(), 100.0f);
+				const int32 SPBefore = Coordinator->GetTeamResourceState().CurrentSkillPoints;
+				const float EnergyBefore = Source.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
+				const float HPBefore = Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+				FHSRBattleActionCommand Command; Command.ActionId = FGuid::NewGuid(); Command.BattleId = Coordinator->GetCurrentRequestId(); Command.ActorParticipantId = Source.ParticipantId; Command.SkillId = Definition->SkillId; Command.TargetParticipantIds.Add(Target.ParticipantId);
+				const FHSRAbilityResolution FirstResolution = Coordinator->RequestAction(Command);
+				const float HPAfter = Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+				const float EnergyAfter = Source.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
+				const int32 SPAfter = Coordinator->GetTeamResourceState().CurrentSkillPoints;
+				const FHSRAbilityResolution ReplayResolution = Coordinator->RequestAction(Command);
+				const bool bPass = FirstResolution.Succeeded() && ReplayResolution.Succeeded() && FirstResolution.bHasDamageResult && ReplayResolution.bHasDamageResult
+					&& FMath::IsNearlyEqual(HPAfter, Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()))
+					&& Coordinator->GetTeamResourceState().CurrentSkillPoints == SPAfter && (SPAfter - SPBefore) == ExpectedSPDelta
+					&& (!bUltimate || EnergyAfter < EnergyBefore);
+				if (bPass)
+				{
+					UE_LOG(LogTemp, Log, TEXT("P7-003 Formal Case=%s Result=PASS ActionId=%s GE=BP_GE_P7_DamageExecution HPBefore=%.2f HPAfter=%.2f SPBefore=%d SPAfter=%d EnergyBefore=%.2f EnergyAfter=%.2f DuplicateSame=%d"), CaseName, *Command.ActionId.ToString(), HPBefore, HPAfter, SPBefore, SPAfter, EnergyBefore, EnergyAfter, ReplayResolution.Succeeded() ? 1 : 0);
+				}
+				else
+				{
+					UE_LOG(LogTemp, Error, TEXT("P7-003 Formal Case=%s Result=FAIL ActionId=%s GE=BP_GE_P7_DamageExecution HPBefore=%.2f HPAfter=%.2f SPBefore=%d SPAfter=%d EnergyBefore=%.2f EnergyAfter=%.2f DuplicateSame=%d"), CaseName, *Command.ActionId.ToString(), HPBefore, HPAfter, SPBefore, SPAfter, EnergyBefore, EnergyAfter, ReplayResolution.Succeeded() ? 1 : 0);
+				}
+			};
+			RunFormalCard(TEXT("Basic_NonLethal_Duplicate"), BasicAttackSkillDefinition, 1, false);
+			RunFormalCard(TEXT("Skill_NonLethal_Duplicate"), SkillSkillDefinition, -1, false);
+			RunFormalCard(TEXT("Ultimate_NonLethal_Duplicate"), UltimateSkillDefinition, 0, true);
+			UE_LOG(LogTemp, Log, TEXT("P7-003 Formal Harness Note=ApplyFailureAndRefundRequiresDevelopmentInjectionAtCoordinatorSpecApply; CaptureFailed/InvalidCapturedValueRequireReadOnlyExecutionCaptureInjectionAndAreNotSafelyInjectableWithinAllowlist. Heal=ExistingP6Path OldDamageGE=NoFormalRuntimeReference"));
 		}
 	}
 #endif

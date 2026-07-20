@@ -6,6 +6,7 @@
 #include "GameplayEffect.h"
 #include "GameplayTagContainer.h"
 #include "../GAS/Ability/HSRAbilityTypes.h"
+#include "../GAS/Damage/HSRDamageRuleDefinition.h"
 #include "HSRSkillDefinition.generated.h"
 
 UCLASS(BlueprintType)
@@ -31,6 +32,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Costs", meta = (DisplayName = "Cost Gameplay Effect Class", ToolTip = "Ultimate Energy Cost only. GAS applies this Gameplay Effect; BattleCoordinator never writes Energy."))
 	TSoftClassPtr<UGameplayEffect> CostGameplayEffectClass;
 
+	/** Instant positive-Energy GAS compensation used only when an Ultimate
+	 * cost committed but its prepared damage application failed. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Costs")
+	TSoftClassPtr<UGameplayEffect> EnergyRefundGameplayEffectClass;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects", meta = (DisplayName = "Gameplay Effect Class", ToolTip = "Primary effect shared by Basic/Skill/Ultimate definitions. Bind the P6-003 Skill Damage Gameplay Effect here."))
 	TSoftClassPtr<UGameplayEffect> EffectGameplayEffectClass;
 
@@ -41,6 +47,10 @@ public:
 	/** Static damage multiplier. The default preserves existing P6 asset validity. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage", meta = (ClampMin = "0.000001", ClampMax = "100.0"))
 	float AbilityMultiplier = 1.0f;
+
+	/** Frozen Phase 7 rule used by formal Basic/Skill damage. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage")
+	TSoftObjectPtr<UHSRDamageRuleDefinition> DamageRule;
 
 	bool IsValidDefinition() const
 	{
@@ -53,6 +63,7 @@ public:
 			&& Category == EHSRSkillCategory::Ultimate
 			&& TargetType == EHSRTargetType::SingleEnemy
 			&& !CostGameplayEffectClass.IsNull()
+			&& !EnergyRefundGameplayEffectClass.IsNull()
 			&& !EffectGameplayEffectClass.IsNull();
 	}
 

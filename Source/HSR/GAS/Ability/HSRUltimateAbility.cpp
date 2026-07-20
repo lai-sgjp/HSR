@@ -43,15 +43,20 @@ bool UHSRUltimateAbility::ConfigureFromSkillDefinition(const UHSRSkillDefinition
 
 	CostGameplayEffectClass = Definition.CostGameplayEffectClass.LoadSynchronous();
 	UltimateEffectClass = Definition.EffectGameplayEffectClass;
-	const TSubclassOf<UGameplayEffect> LoadedEffect = UltimateEffectClass.LoadSynchronous();
+	EnergyRefundEffectClass = Definition.EnergyRefundGameplayEffectClass;
+	const TSubclassOf<UGameplayEffect> LoadedRefund = EnergyRefundEffectClass.LoadSynchronous();
 	float CostMagnitude = 0.0f;
-	float DamageMagnitude = 0.0f;
 	const bool bValidCost = CostGameplayEffectClass && HasNegativeAttributeModifier(CostGameplayEffectClass->GetDefaultObject<UGameplayEffect>(), UHSRCoreAttributeSet::GetEnergyAttribute(), CostMagnitude);
-	const bool bValidDamage = LoadedEffect && HasNegativeAttributeModifier(LoadedEffect->GetDefaultObject<UGameplayEffect>(), UHSRCoreAttributeSet::GetHealthAttribute(), DamageMagnitude);
-	UE_LOG(LogTemp, Log, TEXT("UHSRUltimateAbility::ConfigureFromSkillDefinition - CostGE=%s CostEnergyMagnitude=%.2f ValidCost=%d EffectGE=%s DamageHealthMagnitude=%.2f ValidDamage=%d"),
+	float RefundMagnitude = 0.0f;
+	const bool bValidRefund = LoadedRefund && LoadedRefund->GetDefaultObject<UGameplayEffect>()->DurationPolicy == EGameplayEffectDurationType::Instant
+		&& HasNegativeAttributeModifier(LoadedRefund->GetDefaultObject<UGameplayEffect>(), UHSRCoreAttributeSet::GetEnergyAttribute(), RefundMagnitude) == false;
+	// Refund must be a positive additive Energy modifier equal to the Cost.
+	bool bPositiveRefund = false;
+	if (LoadedRefund) { for (const FGameplayModifierInfo& Modifier : LoadedRefund->GetDefaultObject<UGameplayEffect>()->Modifiers) { float Magnitude = 0.0f; if (Modifier.Attribute == UHSRCoreAttributeSet::GetEnergyAttribute() && Modifier.ModifierOp == EGameplayModOp::Additive && Modifier.ModifierMagnitude.GetStaticMagnitudeIfPossible(1.0f, Magnitude) && FMath::IsNearlyEqual(Magnitude, -CostMagnitude)) { bPositiveRefund = true; break; } } }
+	UE_LOG(LogTemp, Log, TEXT("UHSRUltimateAbility::ConfigureFromSkillDefinition - CostGE=%s CostEnergyMagnitude=%.2f ValidCost=%d RefundGE=%s ValidRefund=%d"),
 		CostGameplayEffectClass ? *CostGameplayEffectClass->GetName() : TEXT("null"), CostMagnitude, bValidCost ? 1 : 0,
-		LoadedEffect ? *LoadedEffect->GetName() : TEXT("null"), DamageMagnitude, bValidDamage ? 1 : 0);
-	return bValidCost && bValidDamage;
+		LoadedRefund ? *LoadedRefund->GetName() : TEXT("null"), (bValidRefund && bPositiveRefund) ? 1 : 0);
+	return bValidCost && bValidRefund && bPositiveRefund;
 }
 
 EHSRAbilityFailureReason UHSRUltimateAbility::GetPreActivationFailureReason(const FGameplayAbilitySpecHandle& Handle, const FGameplayAbilityActorInfo* ActorInfo) const
@@ -83,28 +88,17 @@ void UHSRUltimateAbility::ActivateAbility(
 	bLastActivationSucceeded = false;
 	LastFailureReason = EHSRAbilityFailureReason::EffectFailed;
 	UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
-	UAbilitySystemComponent* TargetASC = PendingTargetAbilitySystem.Get();
-	TSubclassOf<UGameplayEffect> LoadedEffect = UltimateEffectClass.LoadSynchronous();
-	if (!SourceASC || !TargetASC || !CostGameplayEffectClass || !LoadedEffect)
+	const TSubclassOf<UGameplayEffect> LoadedRefund = EnergyRefundEffectClass.LoadSynchronous();
+	if (!SourceASC || !CostGameplayEffectClass || !LoadedRefund)
 	{
 		ClearPendingTarget();
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 	const float EnergyBeforeCommit = SourceASC->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
-	const float TargetHealthBeforeApply = TargetASC->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
-
-	// Construct the damage spec before CommitAbility. Once Cost commits, this
-	// synchronous prototype has no ordinary failure point before application.
-	FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
-	EffectContext.AddSourceObject(GetAvatarActorFromActorInfo());
-	FGameplayEffectSpecHandle EffectSpec = SourceASC->MakeOutgoingSpec(LoadedEffect, 1.0f, EffectContext);
-	if (!EffectSpec.IsValid())
-	{
-		ClearPendingTarget();
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
+	FGameplayEffectContextHandle RefundContext = SourceASC->MakeEffectContext();
+	FGameplayEffectSpecHandle RefundSpec = SourceASC->MakeOutgoingSpec(LoadedRefund, 1.0f, RefundContext);
+	if (!RefundSpec.IsValid()) { ClearPendingTarget(); EndAbility(Handle, ActorInfo, ActivationInfo, true, true); return; }
 
 	if (!CheckCost(Handle, ActorInfo, nullptr))
 	{
@@ -120,18 +114,19 @@ void UHSRUltimateAbility::ActivateAbility(
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
-
-	const FActiveGameplayEffectHandle AppliedHandle = SourceASC->ApplyGameplayEffectSpecToTarget(*EffectSpec.Data.Get(), TargetASC);
-	bLastActivationSucceeded = AppliedHandle.WasSuccessfullyApplied();
+	bLastActivationSucceeded = ApplyPreparedFormalDamage(SourceASC);
+	FHSRFormalDamageExecutionResult& ExecutionResult = GetMutableFormalDamageExecutionResult();
+	ExecutionResult.bCostCommitted = true;
+	ExecutionResult.EnergyBefore = EnergyBeforeCommit;
 	const float EnergyAfterCommit = SourceASC->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
-	const float TargetHealthAfterApply = TargetASC->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
-	UE_LOG(LogTemp, Log, TEXT("UHSRUltimateAbility::ActivateAbility - CostCommitted=%d EffectApplied=%d CostGE=%s EffectGE=%s EnergyBefore=%.2f EnergyAfter=%.2f TargetHealthBefore=%.2f TargetHealthAfter=%.2f"),
-		1, bLastActivationSucceeded ? 1 : 0, *CostGameplayEffectClass->GetName(), *LoadedEffect->GetName(), EnergyBeforeCommit, EnergyAfterCommit, TargetHealthBeforeApply, TargetHealthAfterApply);
 	if (!bLastActivationSucceeded)
 	{
-		ensureMsgf(false, TEXT("UHSRUltimateAbility effect application failed after a successful Cost commit; preflight invariant violated."));
+		const FActiveGameplayEffectHandle RefundApplied = SourceASC->ApplyGameplayEffectSpecToSelf(*RefundSpec.Data.Get());
+		ExecutionResult.bRefundApplied = RefundApplied.WasSuccessfullyApplied();
 		LastFailureReason = EHSRAbilityFailureReason::EffectFailed;
 	}
+	ExecutionResult.EnergyAfter = SourceASC->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
+	UE_LOG(LogTemp, Log, TEXT("UHSRUltimateAbility::ActivateAbility - CostCommitted=1 DamageApplied=%d RefundApplied=%d EnergyBefore=%.2f EnergyAfterCost=%.2f EnergyFinal=%.2f"), bLastActivationSucceeded ? 1 : 0, ExecutionResult.bRefundApplied ? 1 : 0, EnergyBeforeCommit, EnergyAfterCommit, ExecutionResult.EnergyAfter);
 
 	ClearPendingTarget();
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, !bLastActivationSucceeded);

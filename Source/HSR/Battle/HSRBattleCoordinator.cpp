@@ -310,6 +310,79 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestAction(const FHSRBattleActio
 	{
 		return Reject(EHSRAbilityFailureReason::AbilityUnavailable);
 	}
+	// Basic and Skill use the formal prepared-damage seam.  Heal and Ultimate
+	// intentionally retain their existing paths until their dedicated migration.
+	if (ResolvedSkillDefinition->Category == EHSRSkillCategory::BasicAttack || ResolvedSkillDefinition->Category == EHSRSkillCategory::Skill || ResolvedSkillDefinition->Category == EHSRSkillCategory::Ultimate)
+	{
+		const EHSRAbilityFailureReason FormalPreActivationFailure = Ability->GetPreActivationFailureReason(AbilitySpec->Handle, Attacker->AbilitySystemComponent->AbilityActorInfo.Get());
+		if (FormalPreActivationFailure != EHSRAbilityFailureReason::None)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("P7-003 Formal Stage=PreActivation Result=REJECT ActionId=%s Skill=%s Reason=%d RNG=%d SP=%d"), *Command.ActionId.ToString(), *Command.SkillId.ToString(), static_cast<int32>(FormalPreActivationFailure), DevelopmentDamageConsumeCount, TeamResourceState.CurrentSkillPoints);
+			Ability->ClearPendingTarget();
+			return Reject(FormalPreActivationFailure);
+		}
+		const UHSRDamageRuleDefinition* Rule = ResolvedSkillDefinition->DamageRule.LoadSynchronous();
+		const TSubclassOf<UGameplayEffect> DamageEffect = ResolvedSkillDefinition->EffectGameplayEffectClass.LoadSynchronous();
+		const FGameplayTag AbilityMultiplierTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.AbilityMultiplier")), false);
+		const FGameplayTag DefenseCoefficientTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.DefenseCoefficient")), false);
+		const FGameplayTag MinDamageTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.MinDamage")), false);
+		const FGameplayTag CritRollTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.CritRoll")), false);
+		if (!Rule || !Rule->IsValidRuleDefinition() || !DamageEffect || !ResolvedSkillDefinition->DamageType.IsValid()
+			|| !FMath::IsFinite(ResolvedSkillDefinition->AbilityMultiplier) || ResolvedSkillDefinition->AbilityMultiplier <= 0.0f
+			|| !AbilityMultiplierTag.IsValid() || !DefenseCoefficientTag.IsValid() || !MinDamageTag.IsValid() || !CritRollTag.IsValid())
+		{
+			Ability->ClearPendingTarget();
+			return Reject(EHSRAbilityFailureReason::DefinitionMissing);
+		}
+		FRandomStream PreviewStream = DevelopmentDamageRandomStream;
+		FHSRFormalDamageRequest Request;
+		Request.BattleId = CurrentRequestId; Request.ActionId = Command.ActionId; Request.SkillId = Command.SkillId;
+		Request.SourceParticipantId = Attacker->ParticipantId; Request.TargetParticipantId = Target->ParticipantId;
+		Request.DamageType = ResolvedSkillDefinition->DamageType; Request.AbilityMultiplier = ResolvedSkillDefinition->AbilityMultiplier;
+		Request.DefenseCoefficient = Rule->DefenseCoefficient; Request.MinDamage = Rule->MinDamage; Request.CritRoll = PreviewStream.GetFraction();
+		FGameplayEffectContextHandle ContextHandle = Attacker->AbilitySystemComponent->MakeEffectContext();
+		FHSRDamageEffectContext* DamageContext = ContextHandle.IsValid() ? static_cast<FHSRDamageEffectContext*>(ContextHandle.Get()) : nullptr;
+		if (!DamageContext || DamageContext->GetScriptStruct() != FHSRDamageEffectContext::StaticStruct()) { Ability->ClearPendingTarget(); return Reject(EHSRAbilityFailureReason::EffectFailed); }
+		ContextHandle.AddSourceObject(Attacker->Actor.Get());
+		DamageContext->DamageContext.ActionId = Request.ActionId; DamageContext->DamageContext.DamageType = Request.DamageType;
+		DamageContext->DamageContext.AbilityMultiplier = Request.AbilityMultiplier; DamageContext->DamageContext.CritRoll = Request.CritRoll;
+		DamageContext->DefenseCoefficient = Request.DefenseCoefficient; DamageContext->MinDamage = Request.MinDamage;
+		FGameplayEffectSpecHandle DamageSpec = Attacker->AbilitySystemComponent->MakeOutgoingSpec(DamageEffect, 1.0f, ContextHandle);
+		if (!DamageSpec.IsValid()) { UE_LOG(LogTemp, Warning, TEXT("P7-003 Formal Stage=MakeSpec Result=FAIL ActionId=%s Skill=%s"), *Command.ActionId.ToString(), *Command.SkillId.ToString()); Ability->ClearPendingTarget(); return Reject(EHSRAbilityFailureReason::EffectFailed); }
+		DamageSpec.Data->SetSetByCallerMagnitude(AbilityMultiplierTag, Request.AbilityMultiplier);
+		DamageSpec.Data->SetSetByCallerMagnitude(DefenseCoefficientTag, Request.DefenseCoefficient);
+		DamageSpec.Data->SetSetByCallerMagnitude(MinDamageTag, Request.MinDamage);
+		DamageSpec.Data->SetSetByCallerMagnitude(CritRollTag, Request.CritRoll);
+		FHSRFormalDamagePrepareResult PrepareResult;
+		if (!Ability->PrepareFormalDamage(Request, DamageSpec, Target->AbilitySystemComponent.Get(), PrepareResult)) { UE_LOG(LogTemp, Warning, TEXT("P7-003 Formal Stage=Prepare Result=FAIL ActionId=%s Skill=%s DamageResult=%d"), *Command.ActionId.ToString(), *Command.SkillId.ToString(), static_cast<int32>(PrepareResult.Result)); Ability->ClearPendingTarget(); return Reject(EHSRAbilityFailureReason::EffectFailed); }
+		const int32 SkillPointDelta = ResolvedSkillDefinition->Category == EHSRSkillCategory::BasicAttack ? 1 : (ResolvedSkillDefinition->Category == EHSRSkillCategory::Skill ? -1 : 0);
+		if (!ReserveSkillPoints(Command.ActionId, SkillPointDelta)) { Ability->ClearPreparedFormalDamage(); Ability->ClearPendingTarget(); return Reject(EHSRAbilityFailureReason::InsufficientSkillPoint); }
+		Ability->SetActionContext(Command.ActionId, Command.SkillId);
+		bFormalDamageTransactionOpen = true;
+		PendingDefeatedParticipantId = NAME_None;
+		const bool bActivated = Attacker->AbilitySystemComponent->TryActivateAbility(AbilitySpec->Handle);
+		const FHSRFormalDamageExecutionResult ExecutionResult = Ability->GetLastFormalDamageExecutionResult();
+		bFormalDamageTransactionOpen = false;
+		Ability->ClearPreparedFormalDamage(); Ability->ClearPendingTarget();
+		if (!bActivated || !Ability->DidLastActivationSucceed() || !ExecutionResult.bSucceeded)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("P7-003 Formal Stage=Activate Result=FAIL ActionId=%s Skill=%s TryActivate=%d AbilitySuccess=%d ExecutionSuccess=%d DamageResult=%d CostCommitted=%d Refund=%d EnergyBefore=%.2f EnergyAfter=%.2f"), *Command.ActionId.ToString(), *Command.SkillId.ToString(), bActivated ? 1 : 0, Ability->DidLastActivationSucceed() ? 1 : 0, ExecutionResult.bSucceeded ? 1 : 0, static_cast<int32>(ExecutionResult.DamageResult.Result), ExecutionResult.bCostCommitted ? 1 : 0, ExecutionResult.bRefundApplied ? 1 : 0, ExecutionResult.EnergyBefore, ExecutionResult.EnergyAfter);
+			PendingDefeatedParticipantId = NAME_None;
+			RollbackSkillPoints(Command.ActionId);
+			return Reject(EHSRAbilityFailureReason::EffectFailed);
+		}
+		DevelopmentDamageRandomStream = PreviewStream;
+		++DevelopmentDamageConsumeCount;
+		CommitSkillPoints(Command.ActionId);
+		Resolution.Status = EHSRAbilityResolutionStatus::Succeeded;
+		Resolution.FailureReason = EHSRAbilityFailureReason::None;
+		Resolution.bHasDamageResult = true;
+		Resolution.DamageResult = ExecutionResult.DamageResult;
+		Finalize(Resolution);
+		if (!PendingDefeatedParticipantId.IsNone()) { const FName Defeated = PendingDefeatedParticipantId; PendingDefeatedParticipantId = NAME_None; ResolveDefeat(Defeated); }
+		else if (!bBattleResultProduced && !TurnManager->ResolveAction(Command.ActorParticipantId)) { UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::RequestAction - turn resolve failed after formal commit ActionId=%s"), *Command.ActionId.ToString()); }
+		return Resolution;
+	}
 	const EHSRAbilityFailureReason PreActivationFailure = Ability->GetPreActivationFailureReason(AbilitySpec->Handle, Attacker->AbilitySystemComponent->AbilityActorInfo.Get());
 	if (PreActivationFailure != EHSRAbilityFailureReason::None)
 	{
@@ -610,6 +683,11 @@ void UHSRBattleCoordinator::HandleHealthChanged(const FOnAttributeChangeData& Ch
 {
 	if (ChangeData.NewValue <= 0.0f)
 	{
+		if (bFormalDamageTransactionOpen)
+		{
+			PendingDefeatedParticipantId = ParticipantId;
+			return;
+		}
 		ResolveDefeat(ParticipantId);
 	}
 }
