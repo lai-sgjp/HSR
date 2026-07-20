@@ -1,57 +1,35 @@
-# TASK-P5-001 Independent Reviewer 最终审查
+# TASK-P6-005 Independent Reviewer 最终阶段审查
 
 ## 结论
 
 `PASS WITH FOLLOW-UP`
 
-源码层修订已闭合原 Reviewer 缺口，但 TASK-P5-001 仍保留构建和运行时失败路径 follow-up；在 follow-up 完成前不得归档或创建 P5-002。
+Phase 6 的 P6-001～P6-004A 已形成可运行的通用 Ability/Target/Command/Resolution、Energy Ultimate、battle-local 战技点、Heal/ViewState 与真实最小 WBP 闭环。P6-004A 已闭合原“无真实 WBP”阻断。允许 Coordinator 将 Phase 6 标记为 `Ready with inherited follow-ups`。
 
-## 已闭合事项
+## 证据等级
 
-- Editor 重开、Phase4/Phase5 Encounter 切换和 PIE 回归正常；证据等级为 `USER PROVIDED`。
-- `DA_Encounter_Phase4Test` 指向 `Map_BattleTest`，`DA_Encounter_Phase5Test` 指向 `Map_Battle`，两套入口已分离。
-- `FHSRBattleResult` 已从 P5-001 范围移除。
-- 代码可以生成两个原生 `APawn`，动态添加 ASC、初始化 Core AttributeSet 并调用 `InitAbilityActorInfo`。
+- fresh Build 与执行报告按其原始产出角色保留。
+- Editor 资产、两轮/多轮 PIE、Harness、WBP 截图与生命周期日志主要为 `USER PROVIDED`，不冒充 Reviewer 独立运行。
+- `Content/UI/WBP_BattleCommandPanel.uasset` 和 `Content/Blueprints/Framework/BP_HSRBattleGameMode.uasset` 为用户 Editor 资产；实际 WBP 包路径是 `/Game/UI/WBP_BattleCommandPanel`。
 
-## 必须修订的核心问题
+## 已闭合 Gate
 
-1. 只检查 EncounterId/EnemyDefinitionId 非空，没有验证 Definition 是否存在、类型是否正确。
-2. 固定使用 `APawn::StaticClass()`，没有依据稳定 Definition 重建 Actor。
-3. Player 的 `DefinitionId` 错误使用 EncounterId。
-4. 失败接口主要是 `bool + 日志`，没有结构化失败枚举/DTO。
-5. 非空但不存在的 Definition ID 仍可能成功生成参与者。
+- stable-ID Command、目标权威重验、结构化 Resolution 与 ActionId 幂等。
+- Energy 由 GAS Attribute/Cost GE 管理；SP 由 Coordinator battle-local 管理。
+- 普攻、战技、终结技、治疗四类占位路径与资源可见性。
+- 真实 WBP 构造、四类按钮、stable-ID 提交、NativeDestruct/Unbind、销毁重建与连续 PIE 无重复 Delegate。
+- 无 Widget Tick；ViewState 只读，UI 不直接修改 HP/Energy/SP/Turn。
 
-## 最小修订要求
+## Inherited follow-ups
 
-- 引入或解析可验证的 Participant Definition。
-- 校验定义缺失、类型错误和类加载失败，并返回结构化结果。
-- 修正 Player Definition ID 来源。
-- 根据 Definition 提供的受控 Actor/Pawn 类生成参与者。
-- 完成 fresh `HSREditor Win64 Development` Build，记录 UHT/C++/Link、退出码与首个 warning/error。
-- 补一条“非空但不存在的 Definition ID”结构化失败证据。
+- 当前行动完成仍采用同步 post-GE 时序；不得外推到异步 Ability/表现回调。
+- P6-003 的真实运行 Rollback 分支与并发提交未获得完整动态覆盖。
+- `SingleAlly` 仅静态成立；1v1 Harness 主要验证 Self/SingleEnemy。
+- Ability/Heal GE 失败、执行中目标销毁、终局竞态与异步路径需要后续专项。
+- P6-004A 是最小命令面板，不代表 Phase 10 完整战斗 UI、行动条、结果页、美术或完整手柄焦点。
+- SaveGame、网络、多队伍和服务器权威未实现；不得从单机验证外推。
+- 用户对 Phase 6 架构的独立复述仍可作为非阻断学习 follow-up 持续补强。
 
-## 证据边界
+## 最终处置
 
-- Editor 重开、资产引用、Phase4/Phase5 切换和 PIE 回归来自用户，不冒充 Reviewer 独立运行。
-- 当前主路径 Build/PIE 记录不能覆盖上述静态核心缺口。
-- `Map_Battle` GameMode 资产绑定仍属于 Editor 资产配置；运行时 Pawn/ASC 创建由代码完成。
-
-## 修订复审结果
-
-- Debugger 修复了 `BuildResult` 未声明引用，并完成 DefinitionNotFound 验证、稳定 Player DefinitionId 和显式 PawnClass。
-- Reviewer 静态复核为 `PASS WITH FOLLOW-UP`。
-- Follow-up 1：修复后尚未运行 fresh UBT/UHT/C++/Link；当前环境找不到 UnrealBuildTool，不能虚报退出码。
-- Follow-up 2：尚未取得 invalid-but-nonempty DefinitionId 的独立 PIE/日志失败轨迹。
-- 完成上述两项后，Coordinator 才能重新提交最终审查并决定归档/进入 P5-002。
-
-### Latest Review Update (2026-07-19)
-
-## Final User Evidence Update (2026-07-19)
-
-- 用户确认 invalid-but-nonempty DefinitionId 运行失败路径正常，证据等级为 `USER PROVIDED`。
-- Fresh Build follow-up 已闭合，负向运行 follow-up 已由用户处置。
-- TASK-P5-001 最终状态更新为 `PASS`，允许归档并创建 P5-002。
-
-- Fresh `HSREditor Win64 Development` Build 已成功，exit 0，UHT/C++/Link 共 4 actions；Build follow-up 已闭合。
-- 唯一未闭合项：缺少 invalid-but-nonempty DefinitionId 的实际 PIE/日志失败轨迹。
-- 当前结论保持 `PASS WITH FOLLOW-UP`；不得升级为完整 PASS 或创建 P5-002。
+Phase 6：`Ready with inherited follow-ups`。上述 follow-up 必须进入后续任务边界，不得被改写为已验证。Git 交付需按用户 Editor 资产、Implementation 源码、Reviewer/Teacher/Coordinator Markdown 分拆并核对归属；本审查不授权或执行 Git。
