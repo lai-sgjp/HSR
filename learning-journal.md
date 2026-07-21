@@ -1000,3 +1000,321 @@ P6-001～P6-004 的两轮 PIE 日志均是用户提供，证据等级保持 `USE
 
 - P6-004A 后续以真实 `WBP_BattleCommandPanel` 的 WidgetCreate、stable-ID 按钮提交、NativeDestruct/解绑、重建后单次绑定和连续 PIE 闭合了原“实际 WBP 销毁/重建未验证”阻断；证据等级为 `USER PROVIDED`。
 - 当前仍需复习/补证：用户独立复述；同步 post-GE 到异步语义的边界；真实 Rollback/并发；`SingleAlly` 动态路径；目标销毁、Healing GE 失败和终局异步；Phase 10 完整 UI；SaveGame/网络。
+
+## Phase 7 收尾学习主题（2026-07-20）
+
+### 已形成的项目知识
+
+- Attribute Capture 使用 Source Attack/CritRate/CritDamage 与 Target Defense，均为 non-snapshot；Execution CDO 不保存单次状态。
+- `IncomingDamage` 是 meta attribute，Execution 输出它，AttributeSet 唯一消费并将 `FinalDamage` 与实际 `AppliedDamage` 分开；Overkill 证明 Applied 可小于 Final。
+- Coordinator 通过 prepared Spec、RNG stream-copy、ActionId cache、SP Reserve/Commit/Rollback 和 Ultimate GAS Cost/Refund 组织事务；Ability 不拥有全局 RNG/Turn/SP。
+- EffectContext 必须正确 Duplicate/NetSerialize/分配；Editor-only 注入默认 None，不能外推为底层 Aggregator 或自然 GAS ApplyFailure 已验证。
+- 真正 Reset 必须调用生产 Reset→Submit→Build 流程，不能直接写 Spawned 或复用旧 Actor/ASC。
+
+### 必须继续复习/补证
+
+- 用户原始回答、底层 Capture false/真实 NaN、自然 ApplyFailure/Refund 自身失败、Cost 后 HP 已改变异常及多轮 World teardown 尚待阶段 Teacher/Reviewer 收尾。
+- 技能点/回能/Team SP/Wait/Pass 不属于 Phase 7 收尾，另立任务。
+
+## 2026-07-21｜Phase 8 教学（TASK-P8-006，先教学、尚未开始测验）
+
+### 真实触发背景与证据边界
+
+- P8-001～P8-004 的工程审查结论为 `PASS WITH FOLLOW-UP`；P8-005 为 `USER ACCEPTED`，其历史 Reviewer `REVISE` 不改写。
+- P8-006 Rebuild 已真实完成 HSR C++ 编译、`UnrealEditor-HSR.lib/.dll` 链接、metadata writing 并 exit `0`，但该次输出未单列 UHT action，因此 fresh UHT 仍为 `NOT VERIFIED`。
+- 当前 provenance ledger 全部为 `UNRESOLVED`，不能据文件名、allowlist 或二进制 diff 冒认作者，也不能据此安全混合提交。
+- 本节是 Teacher 教学产物，不替代 Reviewer/Coordinator Gate。用户明确要求“教师先教会知识，再出题”；当前尚未开始测验，不能因用户尚未作答而判断为不掌握。
+
+### 精炼教学：从元素命中到只读界面
+
+可以把 Phase 8 想成一条带防重票据的结算流水线：Element/Weakness 是“钥匙与锁的分类标签”，不是伤害公式；匹配后，GE/Execution 把削韧值送入 `IncomingToughnessDamage` 这类 meta attribute，由 AttributeSet 统一消费、Clamp 并判断是否发生“正值跨到零”。只有这次跨零才能生成一次 `BreakResult`，而不是每次看到 Toughness 已为零都再次击破。
+
+`ActionId` 像结算票据编号：同一票据重放只能返回既有结果，不能再次削韧、击破、延后或推进回合。Coordinator 组织这次行动的结构化结果；TurnManager 是行动队列与 Delay 的唯一真源，只消费合法的纯值 Delay 请求。Ability、GE、GameplayCue 和 Widget 都不能直接重排队列。
+
+UI 像银行对账屏：它订阅 Attribute/Resolution 事件并显示 Weakness、Toughness、Break、Delay，但不计算规则、不写属性、不拥有队列，也不用 Tick 轮询。切换目标或 teardown 时必须按 handle 解绑，否则旧目标可能继续回调，造成重复或悬挂观察。
+
+证据也必须分层：源码静态检查只能证明结构；Build 只能证明特定构建动作；用户提供的 PIE 证明其实际命中的运行路径；`USER ACCEPTED` 只是接受风险，不等于 Reviewer 亲验或缺口消失。
+
+### 未来练习题库（当前不要求作答）
+
+以下题目只在完整教学结束、用户表示可以开始测验后使用；本轮不要求回答，也不据此评定掌握度。
+
+1. `Element.*` / `Weakness.*` Tag 负责什么？为什么 Tag 本身不应该拥有削韧或击破公式？
+2. 请按顺序复述匹配攻击的数据流：从技能元素与目标弱点开始，直到 Toughness 变化、BreakResult 和 Turn Delay；同时指出 GE/Execution、AttributeSet、Coordinator、TurnManager 各自的职责。
+3. 目标 Toughness 已经是 `0` 时再次命中，为什么不能再次 Break？“从正值跨到零”和“当前等于零”有何区别？
+4. 同一 `ActionId` 被重复提交时，HP、Toughness、Break、Delay 和 Turn 应分别怎样变化？为什么禁用按钮不足以保证这一点？
+5. Break 后为什么不能由 GameplayAbility、GameplayEffect、GameplayCue 或 Widget 直接重排队列？谁是 Delay 与稳定排序的唯一真源？
+6. Widget 切换观察目标或战斗 teardown 时为什么必须解绑旧 Attribute delegate？如果不解绑，可能出现哪两类现象？
+7. 请分别判断并说明证据等级：源码静态检查、Rebuild 中实际 C++/Link、未出现在日志里的 fresh UHT、用户提供的两轮 PIE、`USER ACCEPTED`。
+8. 当前 P8-006 的 provenance ledger 全为 `UNRESOLVED`。这是否说明文件一定越权或代码一定错误？它真正阻止的是什么？正确处理原则是什么？
+
+### 待评估项
+
+- 用户原始回答：尚未开始测验，无回答。
+- Teacher 纠正：尚未进入答题与纠正环节。
+- 已掌握：尚未测评，不作判断。
+- 需要复习：尚未测评，不作判断。
+- 尚未验证的工程项继续包括 fresh UHT、文件 provenance，以及归档 Reviewer 中保留的 P8-003/P8-004 动态 follow-up；教学作答不能替代这些工程证据。
+
+### 第一批测验启动（用户已明确准备好）
+
+- 测验范围：Element/Weakness Tag 的职责边界；Toughness 首次跨零与 `0 -> 0` 的区别。
+- 测验状态：`IN PROGRESS — WAITING FOR USER ANSWERS`。
+- 用户原始回答：尚未收到。
+- Teacher 评定：尚未评定，不记录已掌握或不掌握。
+- 本批只提出下列两题，不提供答案或结论提示；收到回答后再原样记录并逐题反馈。
+
+1. 在 Phase 8 中，`Element.*` 与 `Weakness.*` Gameplay Tag 分别表达什么？它们应该负责到哪一步，又有哪些计算或运行时状态不应该由 Tag 自己承担？请用 2～4 句话回答。
+2. 假设目标 Toughness 依次发生 `10 -> 0`，随后又发生 `0 -> 0`。哪一次属于“首次跨零候选事件”？请分别说明系统在两次变化中应关注的事实。请用“第一次：……；第二次：……”格式回答，不需要写代码。
+
+### 第一批用户原始回答与 Teacher 评阅
+
+#### 用户原始回答（原样保留）
+
+> 1. 钥匙类型与对应的锁，判断是否匹配，削刃计算与伤害计算
+> 2. 第一次：这一次属于。触发break的各种效果
+>    第二次：不操作防止造成多次伤害
+
+#### Q1：Element / Weakness Tag 职责边界
+
+- 正确点：用“钥匙类型与对应的锁”表达 Element 与 Weakness 的分类关系，并指出二者用于判断是否匹配，核心直觉正确。
+- 表述歧义/缺失：末尾“削刃计算与伤害计算”没有说明是在列举 Tag **不应承担** 的职责，还是认为 Tag 会负责这些计算；也没有明确 Tag 不保存当前 Toughness、Break 或 Delay 等运行时状态。
+- 纠正教学：Gameplay Tag 只表达稳定的分类语义并参与匹配。削韧数值来自 Definition/GE/Execution，当前 Toughness 由 AttributeSet 保存和 Clamp，BreakResult 由结算链生成，Delay 由 TurnManager 消费；普通 HP 伤害公式同样不属于 Tag。
+- 当前判定：`需复习（表述歧义，尚不能认定职责边界已独立掌握）`。
+
+#### Q2：首次跨零与 0 -> 0
+
+- 正确点：识别第一次 `10 -> 0` 是首次跨零候选，并知道第二次不能再次触发相同 Break 副作用，已抓住防重核心。
+- 表述歧义/缺失：“触发 break 的各种效果”过宽，合法结果应由结构化 BreakResult 和后续规则决定；“第二次不操作”也过宽。`0 -> 0` 只表示不能再次生成 BreakResult、登记 Delay 或重复击破副作用，并不自动否定这次攻击本身可能合法造成的 HP 伤害、资源结算或其他非击破结果。
+- 纠正教学：Break 判据关注 `Before > 0 && After == 0`。第一次可产生唯一 BreakResult，再由 Coordinator/TurnManager处理一次 Delay；第二次没有新的跨零，因此 Break/Delay 必须为零新增，但应继续按该行动自己的合法合同处理普通伤害与其他结果。
+- 当前判定：`需复习（跨零防重概念基本正确，但副作用边界尚未表达准确）`。
+
+#### 针对性复答决定
+
+- 需要一次针对性复答；不进入第二批新题。
+- 复答只澄清两点：Q1 的削韧/HP 伤害计算是否属于 Tag；Q2 的 `0 -> 0` 禁止重复哪些结果、哪些合法行动结果仍可能发生。
+- Teacher 尚未将第一批任一题记为“已掌握”。
+
+请用下面固定格式复答：
+
+1. `Tag 负责：……；Tag 不负责：……`
+2. `10 -> 0：……；0 -> 0：不再……，但仍可能……`
+
+### 第一批针对性复答与最终评定
+
+#### 用户原始复答（原样保留）
+
+> 1. Tag 负责：钥匙/锁类比和“判断是否匹配”正确
+>    Tag 不负责：削韧和伤害计算
+> 2. 10 → 0：判断break造成的影响
+>    0 → 0：不能重复产生 BreakResult、Delay 等击破副作用；合法的 HP 伤害或资源结算仍可能发生。
+
+#### Q1 最终评定
+
+- 用户已明确区分：Tag 负责 Element/Weakness 的分类匹配，不负责削韧和 HP 伤害计算。
+- 最小补充：当前 Toughness、BreakResult、Delay 等运行时状态也不由 Tag 保存；这属于职责边界的自然延伸，不需要再次复答。
+- 当前判定：`已掌握（基础职责边界）`。
+
+#### Q2 最终评定
+
+- `0 -> 0` 已准确区分：不重复产生 BreakResult、Delay 等击破副作用，但合法 HP 伤害或资源结算仍可能发生。该边界已掌握。
+- `10 -> 0` 的“判断 break 造成的影响”仍不够精确：应称为“检测到 `Before > 0 && After == 0` 的首次跨零候选，再生成唯一 BreakResult，由后续规则决定具体影响”。结合用户首次回答已明确“第一次属于”，此处按术语表达缺口做最小纠正，不机械要求第三次复答。
+- 当前判定：`已掌握（首次跨零与 0 -> 0 防重基础）；需复习精确表述：先识别跨零并生成结果，再消费结果，不能把判据和影响混为一层`。
+
+#### 第一批结论
+
+- 第一批基础 Gate：`PASS WITH FOLLOW-UP`。
+- 已掌握：Element/Weakness Tag 的匹配职责与公式边界；`10 -> 0` 首次跨零和 `0 -> 0` 不重复 Break/Delay；击破防重不阻止合法 HP/资源结算。
+- 复习项：Tag 不保存运行时状态；用“跨零判据 -> BreakResult -> 后续影响”三层语言精确表达。
+- 不需要再次复答，可以进入第二批；本节不提前提出第二批题目。
+
+### 第二批测验启动
+
+- 测验范围：Element 匹配到 Toughness/BreakResult/Delay 的完整数据流与职责；重复 `ActionId` 的全链不变量及规则层幂等。
+- 测验状态：`IN PROGRESS — WAITING FOR USER ANSWERS`。
+- 用户原始回答：尚未收到。
+- Teacher 评定：尚未评定，不记录已掌握或不掌握。
+- 本批只提出下列两题，不提供答案或结论提示。
+
+1. 请复述一次“元素匹配攻击”从输入到行动延后的完整数据流。必须严格使用以下四行格式，每行只写该角色收到什么、做什么、产出什么：
+   - `GE / Execution：……`
+   - `AttributeSet：……`
+   - `Coordinator：……`
+   - `TurnManager：……`
+2. 同一个 `ActionId` 被重复提交时，请使用以下两行格式回答：
+   - `第二次提交后：HP=……；Toughness=……；Break=……；Delay=……；Turn=……`
+   - `按钮禁用不足，因为：……`
+
+### 第二批用户原始回答与 Teacher 评阅
+
+#### 用户原始回答（原样保留）
+
+> 1. GE / Execution产生incomingtoughnessdamage
+> AttributeSet：消费meta attribute
+> Coordinator： 发布 Resolution，创建 DelayRequest
+> TurnManager：登记并消费一次行动延后
+> 2. 只显示，不修改属性或队列。
+
+#### Q1：完整数据流与职责
+
+- 正确点：四个角色的主骨架顺序正确；知道 GE/Execution 产出 `IncomingToughnessDamage`，AttributeSet 消费 meta attribute，Coordinator 发布 Resolution/创建 DelayRequest，TurnManager 登记并消费一次延后。
+- 缺失/错误：尚未交代 Element/Weakness 匹配发生在削韧入口之前；AttributeSet 还必须 Clamp、记录 Before/After 并用首次跨零判据产生唯一 BreakResult；Coordinator 还要处理 ActionId 幂等、目标/终局校验并从合法结果创建请求；TurnManager 还要校验 replay、Finished、目标有效/存活，并在正常稳定推进中消费延后。以上均可收敛在题目规定的四行内，不要求扩展新的角色。
+- 纠正教学：四行不是四个互不相干的动作，而是一条带门禁的数据链。上一行产出的结构化事实必须成为下一行的输入；任何校验失败都不能让后续层凭空制造 Break 或 Delay。
+- 当前判定：`需复习（主数据流骨架正确，关键校验与唯一结果边界缺失）`。
+
+#### Q2：重复 ActionId 不变量
+
+- 正确点：“只显示，不修改属性或队列”是正确的 UI 只读原则，但不属于本题要求的重复 ActionId 幂等回答。
+- 缺失/错误：未回答第二次提交后 HP、Toughness、Break、Delay、Turn 是否相对第一次结果再次变化，也未说明按钮禁用为什么不能作为规则层防重保证。
+- 纠正教学：重复 ActionId 必须在 Coordinator/规则层命中既有结果，不能再次执行效果或推进；TurnManager 对 Delay 消费还应有自己的 ActionId 防重。按钮只属于表现层，无法覆盖重复事件、输入重入、迟到回调、测试调用或未来的请求重放。
+- 当前判定：`需复习（本题未作答；已回答的是另一项正确但无关的 UI 原则）`。
+
+#### 第二批针对性复答
+
+- 第二批保持 `IN PROGRESS`，需要一次最小针对性复答；不进入第三批。
+- 请只补齐括号，不增加新段落：
+
+1. `GE / Execution：先确认（___），再产出（___）；AttributeSet：消费后做（___），比较（___），首次跨零产生（___）；Coordinator：校验（___）与终局/目标，发布 Resolution 并创建 DelayRequest；TurnManager：校验 replay/Finished/目标后，在（___）中登记并消费一次延后。`
+2. `第二次提交后：HP=（___）；Toughness=（___）；Break=（___）；Delay=（___）；Turn=（___）。按钮禁用不足，因为它只在（___）层，挡不住（列举至少两种：___）。`
+
+### 第二批切换为教学模式（用户要求给出答案）
+
+- 用户明确要求 Teacher 给出标准答案并先教会知识，因此取消本轮强制复答；本轮不再出题。
+- 已讲解内容：Element/Weakness 匹配、`IncomingToughnessDamage`、AttributeSet Clamp/Before-After/唯一 BreakResult、Coordinator ActionId/目标/终局门禁、TurnManager Delay 校验与稳定推进；重复 ActionId 下 HP/Toughness/Break/Delay/Turn 的零新增，以及按钮禁用不能替代规则层幂等。
+- 教学示例：同一 ActionId 首次把 Toughness `10 -> 0` 并登记一次 Delay；第二次重放命中缓存，不再次应用 HP/韧性效果、不新增 Break/Delay、不推进 Turn。
+- 当前判定：`已讲解，待后续不同情境迁移验证`。看到标准答案不记为已掌握；第二批当前不做学习 Gate PASS 判定。
+
+### 第二批迁移验证启动
+
+- 用户反馈：`理解`。
+- Teacher 记录：`已理解讲解，但尚需迁移验证`；不直接记为已掌握。
+- 验证状态：`IN PROGRESS — WAITING FOR USER ANSWER`。
+- 本轮只有一个不同情境题，不附答案或提示。
+
+情境：敌人当前 `HP=70`、`Toughness=0`，一次旧行动 `ActionId=A17` 已经完整结算过，并且它产生的 Break 与 Delay 也已按规则处理。随后系统依次收到：
+
+- 事件①：再次提交完全相同的 `ActionId=A17`；
+- 事件②：提交全新的合法攻击 `ActionId=B24`。该攻击命中目标并按自身合同可以造成 HP 伤害，但目标在攻击前后都保持 `Toughness=0`。
+
+请严格使用下面格式，分别说明每个事件中哪些量“可以变化”或“不可变化”，并各用一句话说明原因：
+
+- `事件① A17 重放：HP___；Break___；Delay___；Turn___。原因：___。`
+- `事件② B24 新攻击：HP___；Break___；Delay___；Turn___。原因：___。`
+
+### 第二批迁移回答与最终评定
+
+#### 用户原始回答（原样保留）
+
+> 事件① A17 重放：HP 70；Break 0；Delay 0；Turn 不变。原因：重复触发，不应该处理。
+> 事件② B24 新攻击：HP 降低；Break 0；Delay 0；Turn +1。原因：0->0不会触发break，但可正常伤害。
+
+#### 事件①评阅
+
+- 正确点：HP 保持 70、Turn 不变，Break/Delay 不新增；已正确迁移同 ActionId 重放的幂等不变量。
+- 最小校准：“不应该处理”不够精确。系统仍应识别该请求并返回缓存的既有 Resolution，只是不重新应用 GE、不新增 Break/Delay、不再次推进 Turn。回答中的 Break 0、Delay 0 应理解为“本次新增量为 0”，不能抹去历史上已经发生的结果。
+- 当前判定：`已掌握（同 ActionId 重放的零新增副作用）；需复习缓存 Resolution 的精确表达`。
+
+#### 事件②评阅
+
+- 正确点：新 ActionId 的合法攻击可以降低 HP；由于 Toughness 是 `0 -> 0`，不新增 BreakResult 或 Delay。已正确区分“零韧性防重复击破”和“新行动仍可合法结算伤害”。
+- 最小校准：Turn 不应抽象为整数 `+1`；应表述为“若该行动成功并满足正常行动合同，则由 Coordinator 授权 TurnManager 按正常 Advance 规则推进一次”。实际下一行动者由队列和稳定排序决定。
+- 当前判定：`已掌握（新 ActionId、零韧性与正常伤害的迁移边界）；需复习 Turn 推进的职责化表达`。
+
+#### 第二批结论
+
+- 第二批学习 Gate：`PASS WITH FOLLOW-UP`。
+- 已掌握：Element 到 Toughness/Break/Delay 的主要责任链；同 ActionId 重放不产生新的 HP/Toughness/Break/Delay/Turn 副作用；新 ActionId 在 `0 -> 0` 时仍可产生合法 HP 伤害但不重复 Break/Delay。
+- Follow-up：重放应“返回缓存 Resolution”而非绝对不处理；Break/Delay 的 `0` 是零新增；Turn 是按合同授权正常 Advance，不是数值 `+1`。
+- 不需要机械复答，可以进入第三批；本节不提前提出第三批题目。
+
+### 第三批测验启动
+
+- 测验范围：Delay/稳定排序的唯一所有权与表现层越权；Widget/ViewModel 的 `FDelegateHandle` 解绑及生命周期后果。
+- 测验状态：`IN PROGRESS — WAITING FOR USER ANSWERS`。
+- 用户原始回答：尚未收到。
+- Teacher 评定：尚未评定，不记录已掌握或不掌握。
+- 本批只提出下列两题，不附答案或结论提示。
+
+1. 情境：一次 Break 已产生，但它的 GameplayCue 动画比预期更早结束。为什么 Ability、GE、GameplayCue 或 Widget 都不能据此直接重排行动队列？请回答“谁拥有 Delay 与稳定排序”，并举出一个表现层越权后可能造成的具体规则错误。限 3～5 句话。
+2. 情境：ViewModel 正在观察敌人 A 的 Toughness，随后切换到敌人 B，之后战斗 teardown。为什么切换目标和 teardown 都必须使用保存的 `FDelegateHandle` 解绑？请严格使用以下格式：
+   - `逻辑后果：……`
+   - `生命周期后果：……`
+
+### 第三批用户原始回答与 Teacher 评阅
+
+#### 用户原始回答（原样保留）
+
+> 1. GameplayCue动画不是真源，只是数据消费者，TurnManager，造成二次伤害。
+> 2. 因为ViewModel只是数据消费者，不能主动操控数据，所以要用FDelegateHandle解绑。
+
+#### Q1：队列所有权与表现层越权
+
+- 正确点：已识别 GameplayCue 动画不是规则真源，只是消费者；也正确指出 TurnManager 是行动顺序所有者。
+- 缺失/错误：“造成二次伤害”不是动画直接重排行动队列最贴切的后果，且没有说明 Delay 与稳定排序均由 TurnManager 独占。更直接的错误是动画提前结束导致提前 Advance、重复推进或跳过参与者，或者相同规则因机器/表现时长不同而得到不同顺序。
+- 纠正教学：表现结束只能发出表现完成事实，不能等同于“规则允许推进”。Coordinator 根据合法 Resolution 授权推进，TurnManager 按同一规则消费 Delay 和稳定排序；否则视觉时间会反向控制权威规则。
+- 当前判定：`需复习（真源与所有者已识别，越权后果及授权链表达不完整）`。
+
+#### Q2：Delegate 解绑
+
+- 正确点：已识别 ViewModel 是数据消费者，不能成为业务数据真源。
+- 缺失/错误：只读职责并不是必须解绑的直接原因。解绑是为了终止旧发布者到当前观察者的订阅关系；未回答切换目标后的逻辑错误，也未回答 teardown 后的生命周期风险。
+- 纠正教学：切换 A 到 B 前若不按保存的 `FDelegateHandle` 解绑 A，A 后续变化仍可能刷新 B 的显示或形成重复回调；teardown 后若订阅仍存，发布者可能继续回调已经失效/待销毁的 ViewModel/Widget，造成悬挂观察、无效对象访问或生命周期错误。
+- 当前判定：`需复习（理解只读边界，但尚未掌握解绑的逻辑与生命周期原因）`。
+
+#### 第三批针对性复答
+
+- 第三批保持 `IN PROGRESS`；只复答以下三行，不进入下一批：
+
+1. `Delay 与稳定排序由（___）拥有；GameplayCue 提前结束若直接推进，可能导致（___）。`
+2. `逻辑后果：未解绑 A，切到 B 后（___）。`
+3. `生命周期后果：teardown 后未解绑，可能（___）。`
+
+### 第三批复答、答案教学与结论
+
+#### 用户原始复答（原样保留）
+
+> 1 TurnManager拥有；GameplayCue提前推进可能导致伤害未结算。
+> 2 未解绑A切B后还操作A。
+> 3 不知道，请给答案然后进入下一个知识点。
+
+#### Teacher 答案与校准
+
+- 所有权：TurnManager 独占 Delay 与稳定排序；Coordinator 根据合法 Resolution 授权正常推进。GameplayCue 提前推进最直接会造成提前/重复 Advance、跳过参与者，或让相同规则因表现时长不同而得到不同顺序。“伤害未结算”可以是时序风险，但不是队列所有权的核心表述。
+- 逻辑后果：未解绑 A 后切到 B，A 的后续 Attribute 变化仍可能触发当前 ViewModel，把 A 的值刷新到 B 的显示，或与 B 的订阅形成重复回调；不是 ViewModel 主动回去“操作 A”。
+- 生命周期后果：teardown 后残留订阅可能继续尝试回调已经失效、待销毁或不再属于当前战斗的 ViewModel/UObject，形成悬挂观察、无效对象访问、重复回调或崩溃风险。UE 的动态/原生 delegate、UObject GC 与弱引用行为取决于具体绑定方式，因此不能一概声称必然发生裸指针 UAF；正确工程做法仍是保存 `FDelegateHandle` 并在切换/teardown 时确定性解绑。
+
+#### 第三批结论
+
+- 当前分类：`部分掌握 / 已讲解，待未来复习`。
+- 已掌握：TurnManager 是 Delay/稳定排序所有者；知道切换目标前应解除旧订阅。
+- 待复习：表现层越权最直接破坏 Advance/稳定顺序；旧 A 回调污染 B/重复回调；teardown 后的 UObject/delegate 生命周期风险。
+- 按用户要求不再复答，进入最后知识点；第三批不记为完全掌握。
+
+### 第四批（最后知识点）测验启动
+
+- 测验范围：证据等级；全 `UNRESOLVED` provenance ledger 的含义、阻断范围与正确处理。
+- 测验状态：`IN PROGRESS — WAITING FOR USER ANSWERS`。
+- 用户原始回答：尚未收到。
+- 本批仅以下两题，不附答案或结论提示。
+
+1. 某次审查同时拥有：源码只读检查、Rebuild 日志中实际 C++ 编译和 Link、日志里没有出现 fresh UHT action、用户提供的两轮 PIE、用户明确 `USER ACCEPTED`，但 Reviewer 历史结论仍为 `REVISE`。请逐项写出每种材料能证明什么、不能证明什么，并说明能否把最终结论写成 Reviewer `PASS`。限 5～7 句话。
+2. 当前 provenance ledger 每个文件都是 `UNRESOLVED`。这是否等于文件一定越权或代码一定错误？它真正阻止哪项交付动作？请说明正确处理原则，并至少明确写出两项禁止操作。限 3～5 句话。
+
+### 第四批处置与 TASK-P8-006 Teacher 最终总结
+
+- 用户明确要求第四批“这个不用管”，并要求若已无后续知识点则结束子任务。
+- 第四批状态：`USER SKIPPED / NOT ASSESSED`。
+- 证据等级与 provenance 题未作答；不记为已掌握，也不记为不掌握或答错。
+
+#### 第一至第三批真实结果
+
+- 第一批：`PASS WITH FOLLOW-UP`。已掌握 Element/Weakness Tag 的匹配职责与公式边界，以及 `10 -> 0` 首次跨零、`0 -> 0` 不重复 Break/Delay 且不阻止合法 HP/资源结算。需复习 Tag 不保存运行时状态，以及“跨零判据 -> BreakResult -> 后续影响”的精确分层表达。
+- 第二批：`PASS WITH FOLLOW-UP`。已掌握主要 Element -> Toughness -> BreakResult -> Delay 责任链、同 ActionId 重放的零新增副作用，以及新 ActionId 在零韧性下仍可正常造成合法 HP 伤害。需复习“返回缓存 Resolution”、零新增语义和“按合同授权正常 Advance”而非 Turn 数值 `+1`。
+- 第三批：`部分掌握 / 已讲解，待未来复习`。已识别 TurnManager 是 Delay/稳定排序所有者，并知道切换目标前需解除旧订阅；表现层越权的 Advance/稳定顺序后果、旧 A 回调污染 B/重复回调，以及 teardown 后 UObject/delegate 生命周期风险已完成教学，但未通过独立迁移验证。
+
+#### Teacher 子任务结论
+
+- Phase 8 课程与本轮小批次测验子任务：`COMPLETE`。
+- 本结论仅说明 Teacher 已完成教学、原始回答保存、纠正与真实掌握度分类；不替代工程 Build、UHT、PIE、provenance 或 Independent Reviewer Gate。
+- P8-006 Build Gate 已由 Reviewer 确认为完整 `PASS`：ForceHeaderGeneration fresh UHT 与 Rebuild C++/Link/metadata 均有证据；全文件 provenance ledger 仍为 `UNRESOLVED`。provenance 仍是 Coordinator/Reviewer 的独立项目阻断，第四批被用户跳过不会关闭、降级或改写该阻断。
+- Teacher 不建议在本子任务中继续出题；未来可在实际 UI teardown、Reset/terminal 或不同队列情境中自然复习第三批 follow-up。
