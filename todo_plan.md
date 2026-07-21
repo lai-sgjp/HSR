@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～6 均为 `Ready with inherited follow-ups`。Phase 7 的 P7-001、P7-002、P7-003 均以 Reviewer `PASS WITH FOLLOW-UP` 归档；唯一 `TASK-P7-004` 已规划并等待用户独立确认，尚未实施 follow-up。
+> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～7 均为 `Ready with inherited follow-ups`。P8-001～P8-004 已以 `PASS WITH FOLLOW-UP` 归档，P8-005 为 `USER ACCEPTED`；P8-006 独立验收与归档已启动，Phase 8 尚未标记为 `Ready`。
 
 ## 已完成的规划工作
 
@@ -8,8 +8,17 @@
 - [x] P7-001：战斗属性、原创规则与初始化基线（Reviewer `PASS WITH FOLLOW-UP`，已归档，follow-up 保留）。
 - [x] P7-002：Attribute Capture、统一 Execution 与确定性暴击（Reviewer `PASS WITH FOLLOW-UP`，已归档）。
 - [x] P7-003：普攻、战技、终结技迁移到统一伤害管线（Reviewer `PASS WITH FOLLOW-UP`，已归档）。
-- [ ] P7-004：P7-003 follow-up 闭环：Breakdown 对账、失败注入、overkill/lethal/真实 Reset（已规划，等待用户独立确认执行）。
-- [ ] P7-005：阶段收尾、教学、独立审查与归档。
+- [x] P7-004：P7-003 follow-up 闭环（Reviewer `PASS WITH FOLLOW-UP`，已归档，底层故障/teardown follow-up 保留）。
+- [x] P7-005：阶段收尾、教学、独立审查与归档（Gate 0 PASSED，归档完成）。
+- [ ] P8-001：Element / Weakness / Toughness 数据契约闭环（已创建活动卡，等待执行确认）。
+- [x] P8-001：Element / Weakness / Toughness 数据契约闭环（Reviewer `PASS WITH FOLLOW-UP`，已归档）。
+- [ ] P8-002：弱点匹配与削韧入口（已创建活动卡，等待执行者复述与用户确认）。
+- [x] P8-002：弱点匹配与削韧入口（Reviewer `PASS WITH FOLLOW-UP`，已归档）。
+- [ ] P8-003：一次性 BreakResult 结算（已创建活动卡，等待执行者复述与用户确认）。
+- [x] P8-003：一次性 BreakResult 结算（Reviewer `PASS WITH FOLLOW-UP`，已归档）。
+- [x] P8-004：Break Turn Delay（Reviewer `PASS WITH FOLLOW-UP`，已归档）。
+- [x] P8-005：只读 Weakness/Toughness/Break/Delay 表现与收尾（`USER ACCEPTED`，已归档）。
+- [x] P8-006：Independent Reviewer 最终 `PASS WITH FOLLOW-UP`；Build、Teacher、64/64 provenance、分角色提交、归档与本地 Phase closeout 已完成。远端 push 尚待执行并记录，不自动进入 Phase 9。
 - [ ] 独立资源后续：Wait/Pass、Basic/Skill/受击回能，以及按 Team 拆分共享 SP 池（敌方独立或无池，禁止误做每角色 SP）；不得塞入 P7-003。
 
 - [x] 迁移 ChatBot SNS 的文档协作经验。

@@ -1580,3 +1580,138 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - P7-003 follow-up 原样保留：CaptureFailed/InvalidCapturedValue 未动态注入；post-Cost ApplyFailure→Refund 未动态注入；ReportedAppliedDamage 与 HP delta 不一致；lethal/overkill/真实 Reset 未覆盖。技能点/回能需求继续延期。
 - P7-003 active/execution/final-review 已归档；创建唯一 `TASK-P7-004`，按 Breakdown 对账 → 失败注入 → overkill/lethal/Reset 串行闭环，仅规划未实施。
 - 本轮未修改 Source/Content/Config，未 Build/Editor/PIE；后续 follow-up 需用户独立确认，不自动进入 P7-005。
+
+## 2026-07-20｜Coordinator：P7-004 B/C/D 测试 seam 修订
+
+- P7-004A 已在实际 meta damage commit 点修复 AppliedDamage 写回并完成 fresh Build；B/C/D 因无安全 Capture/InvalidValue、post-Cost ApplyFailure 和 Reset 后正式重建 seam 停止，没有伪造证据。
+- B 扩权 DamageTypes/EffectContext/Execution：`WITH_EDITOR` Injection 通过 Context 传入，Execution 在正常 Capture 后强制结构化 CaptureFailed/InvalidCapturedValue，不输出 IncomingDamage，Shipping 无入口。
+- C 扩权 AbilityBase/Coordinator Harness：Ultimate 真实 Commit Cost 后、唯一 Apply 前注入 EffectApplicationFailed，不 Apply 伤害，随后真实 Refund GE self-apply；Energy 恢复且 HP/SP/RNG/Turn/Result 不变，否则标记事务阻断。
+- D 增加 Coordinator `ResetAndRebuildForDevelopmentTest`：只保存纯值已提交 Encounter Request，调用真实 Reset→正式 Submit→正式 Build 重建 Spawned；禁止直接写状态或复用旧对象。
+- 活动卡改为 `REVISION PLANNED`，等待执行者重新复述与用户再次确认。未处理回能、Team SP、Wait/UI/P7-005；本轮未实施 Source/Content/Config、Build 或 Git。
+
+## 2026-07-20｜Coordinator：P7-004 归档与 TASK-P7-005 收尾规划
+
+- 用户最终 PIE 日志与 Reviewer 结论确认：正式 Basic/Skill/Ultimate、P6 legal Ultimate、CaptureFailed、InvalidCapturedValue、post-Cost Refund、Overkill、真实 Reset→Submit→Build 五项矩阵全部 PASS；注入默认 None 且不污染正式路径。
+- P7-004 active/execution/final-review 三件套已归档；follow-up 原样保留：注入不证明底层 Aggregator/真实 NaN，自然 GAS ApplyFailure/Refund 自身失败/Cost 后 HP 异常未覆盖，多轮 teardown 引用回归建议。
+- 当前 dirty tree 分类为 P7-004 Implementation Source 与角色 Markdown；Coordinator 收尾不回退、不覆盖、不认领作者，也不修改 Source/Content/Config。
+- 唯一活动任务切换为 `TASK-P7-005`：Teacher 原始作答、阶段 Independent Reviewer、状态文档和学习/设计文档同步；无新资产、无 Build/PIE、无 P8 实施。
+
+## 2026-07-20｜Coordinator：Gate 0 通过与 TASK-P8-001 启动
+
+- P7-005 已完成 Teacher 复盘、Independent Reviewer 审查与 Coordinator 收尾；Phase 7 状态为 `Ready with inherited follow-ups`，原有未验证项继续保留。
+- 已将 P7-005 活动卡归档，并创建唯一活动任务 `TASK-P8-001`。
+- P8-001 仅建立 Element / Weakness / Toughness 数据契约，冻结现有 `UHSRCoreAttributeSet` 原位扩展、静态 Definition 与运行时状态边界；不实现削韧、Break 或 Turn Delay。
+- 本轮仅修改任务/项目文档，未修改 Source/Content/Config，未运行 Build/Editor/PIE；等待执行者复述和用户单独确认。
+
+## 2026-07-21｜Coordinator：P8-005 用户验收归档与 Phase 8 暂停
+
+- 用户明确确认附件 `38f7a6d3-e44e-4021-a701-b0f5b5bec141` 为第二轮 PIE，包含 InitGE、ViewModel Bind/Unbind、目标切换、Toughness、Break 与 Delay 证据。
+- P8-005 最终处置为 `USER ACCEPTED`；Reviewer 历史 `REVISE` 原样保留，不改写为 Reviewer PASS。
+- P8-001～P8-005 已归档。按用户要求暂停，不创建 Phase 9 或其他后续活动任务。
+
+## 2026-07-21｜Coordinator：正式启动 TASK-P8-006 阶段 Gate
+
+- 用户明确授权正式进入 P8-006，并指定 Coordinator、Independent Reviewer、Teacher 使用 `gpt-5.6-sol/light`，Implementation 使用 `gpt-5.6-terra/light`。
+- Coordinator 只读恢复确认：P8-001～P8-004 为 `PASS WITH FOLLOW-UP`，P8-005 为 `USER ACCEPTED` 且历史 Reviewer `REVISE` 保留；Phase 8 尚未完成独立阶段 Gate。
+- 当前 HEAD 为 `299a2b5`，`main` 相对 `origin/main` ahead 8；Phase 8 Source、Config、用户 Content 资产与多角色 Markdown 仍在 dirty tree，必须按作者/角色分组审计，不得回退、混合认领或提前 push。
+- 已创建唯一 `TASK-P8-006` 活动卡。首步仅允许 Implementation 在复述并获用户单独确认后执行只读范围审计、fresh Development Editor Build 和执行报告；发现实现缺陷时停止，不在收尾卡内修复。
+- 本轮未修改 Source、Content 或 Config，未运行 Build、Editor、PIE，未 stage/commit/push；Phase 9 仍禁止进入。
+
+## 2026-07-21｜Coordinator：TASK-P8-006 Reviewer REVISE 修订
+
+- Independent Reviewer 已在 `tasks/final-review.md` 持久化 `REVISE`：执行者的真实 UBT 命令 exit `0`，但只返回 `Target is up to date`，本轮 fresh UHT/C++/Link/metadata 均为 `NOT VERIFIED`。
+- 修订 Build 路径冻结为用户先关闭 UE Editor/Live Coding，执行者再运行 `Build.bat HSREditor Win64 Development <uproject> -Rebuild -NoHotReload -WaitMutex`。该操作只重建忽略的 Binaries/Intermediate 派生产物；禁止 Git reset/clean、手工删除、改写或 touch 源码来强制重编。
+- dirty tree 必须逐文件记录路径、tracked 状态、候选角色、任务、证据来源与 `ATTRIBUTED/UNRESOLVED`。Config/Content 二进制资产只能依据用户声明和归档证据归属，不能凭普通 diff 推定；混有多轮作者内容的 Markdown 保持 unresolved。
+- Teacher 仍需独立产物与用户真实作答；完成 Rebuild、归属清单和 Teacher 后才允许 Reviewer 复审。当前 Phase 8 不得标记 `Ready`，P8-006 不归档，不进入 Phase 9。
+- Coordinator 本轮未修改 Source/Content/Config，未运行 Build/Editor/PIE，未 stage/commit/push。
+
+## 2026-07-21｜Coordinator：P8-006 Rebuild 复审后的三项最小路径
+
+- Reviewer 修订复审仍为 `REVISE`。执行者 `-Rebuild` 的 18 actions 已关闭 fresh HSR C++、`UnrealEditor-HSR.lib/.dll` Link、WriteMetadata 与 exit `0` 阻断；该输出未列 UHT，fresh UHT 保持 `NOT VERIFIED`。
+- 只读检查本地 UE5.6 UBT 源码确认 `BuildConfiguration.cs` 暴露 `-ForceHeaderGeneration`，注释为强制 header regeneration。下一次补证只允许 Editor/Live Coding 关闭后运行普通 HSREditor Development Build 加该参数；不改 Source/Content/Config，不 reset/clean，不手工删除或 touch。
+- 若该参数技术上仍不能产生可核对 UHT action，只有用户明确接受“本轮 fresh UHT 未验证，仅接受本轮 C++/Link/metadata + 历史 UHT”的风险边界后，Coordinator 才可修订 Gate；不得替用户接受，也不得改写 Reviewer `REVISE`。
+- provenance ledger 建立动作通过，但全项 unresolved。用户需按精确路径分别确认用户 Editor/Config、Implementation、Reviewer、Teacher、Coordinator/Archive 与 P7 遗留组的当前完整内容、角色、任务和无混写事实；不能确认者保持 unresolved 且不得 stage/commit。
+- Teacher Gate 仍未完成。Phase 8 不标记 Ready，P8-006 不归档，不进入 Phase 9，不 push。
+
+## 2026-07-21｜Coordinator：Build Gate PASS 与剩余顺序冻结
+
+- Reviewer 最新复审确认批准后的 `-ForceHeaderGeneration` 已真实运行 Internal UnrealHeaderTool、生成 HSREditor reflection code 并 exit `0`；与此前 Rebuild 的 HSR C++、lib/dll Link、WriteMetadata 互补后，P8-006 Build Gate 完整 `PASS`，无需再运行 Build。
+- Teacher 的 Phase 8 课程已在 `learning-journal.md` 落盘，但用户尚未开始测验；原始回答、纠正、掌握项和复习项均未形成，Teacher Gate 继续 `REVISE REQUIRED`。
+- 后续顺序冻结为：先让用户自行消化课程；仅在用户明确表示准备好后由 Teacher 分批测验并保存真实回答链；教学闭环后，Coordinator 再按用户资产、Implementation、Reviewer、Teacher、Coordinator/Archive、P7 遗留六组逐项请求 provenance 声明。
+- 当前不要求用户答题，不并行催促 provenance，不推定掌握度。ledger 全项仍为 `UNRESOLVED`，整体 stage/commit 禁止。
+- Phase 8 仍未完成，P8-006 不归档，不进入 Phase 9，不 push；本轮未修改 Source/Content/Config，未运行 Build/Editor/PIE。
+
+## 2026-07-21｜Coordinator：Teacher Gate 完成与唯一剩余阻断
+
+- Teacher 已按用户指示完成 Phase 8 课程与分批测验：第一、二批均为 `PASS WITH FOLLOW-UP`；第三批为部分掌握、已讲解并留作未来复习；第四批按用户要求记录为 `USER SKIPPED / NOT ASSESSED`，不推定掌握或错误。
+- 用户原始回答、Teacher 纠正、掌握项与复习项已落盘；Teacher 子任务状态为 `COMPLETE`。`learning-journal.md` 的独立 `git diff --check` exit `0`，但该文件 mixed provenance，不能安全创建 Teacher 角色提交。
+- Build Gate 与 Teacher Gate 均已完成。P8-006 当前唯一项目级阻断为 provenance ledger 全项 `UNRESOLVED`，因此 safe role commit boundary 尚未建立。
+- 下一步只按用户资产、Implementation、Reviewer、Teacher、Coordinator/Archive、P7 遗留六组逐项取得用户精确归属声明；不重新开启教师题目。不能确认者保持 unresolved，不 stage、不提交。
+- Phase 8 仍未完成，P8-006 不归档，不进入 Phase 9，不 push；本轮未修改 Source/Content/Config，未运行 Build/Editor/PIE。
+
+## 2026-07-21｜Coordinator：Provenance 第一组用户确认
+
+- 用户明确回复“确认第一组 provenance 声明”。Coordinator 因此将 `Config/DefaultGameplayTags.ini`、七个 tracked P8 `.uasset` 和未跟踪 `BP_GE_P8_ToughnessDamage.uasset` 共九项记录为 `ATTRIBUTED (User)`。
+- 归属角色为用户/UE Editor 与 Config 作者，关联任务为 P8-001、P8-002、P8-005；八个二进制资产的当前 SHA-256 已保存在活动卡。
+- 该确认只解决 provenance，不构成 stage/commit/push 授权。其余 Implementation、Reviewer、Teacher、Coordinator/Archive 与 P7 遗留组仍为 `UNRESOLVED`。
+- 本轮未修改 Source/Content/Config，未 stage/commit/reset/clean/push。
+
+## 2026-07-21｜Coordinator：Provenance 第二组用户确认
+
+- 用户明确回复“确认第二组 provenance 声明”。Coordinator 将 23 个 Phase 7/8 Source 文件和 `tasks/execution-result.md` 共 24 项记录为 `ATTRIBUTED (Implementation)`。
+- 当前完整未提交内容来自同一 Implementation 角色，但跨 TASK-P7-004 与 TASK-P8-001～P8-006 累积；不改写为单一 P8 子任务产物。`tasks/execution-result.md` 同样保持多任务汇总文件语义。
+- 该确认只解决 provenance，不构成 stage/commit/push 授权。Reviewer、Teacher、Coordinator/Archive 与 P7 遗留组仍待逐组处理。
+- 本轮未修改 Source/Content/Config，未 stage/commit/reset/clean/push。
+
+## 2026-07-21｜Coordinator：Provenance 第三组用户确认
+
+- 用户明确回复“确认第三组 provenance 声明”。Coordinator 将 `tasks/final-review.md` 当前完整内容记录为 `ATTRIBUTED (Independent Reviewer / TASK-P8-006)`。
+- 该根文件是当前最新审查视图，相对 HEAD 替换旧 TASK-P7-003 根审查；P7-004 与 P8-001～P8-005 历史结论继续由对应 archive 文件保留，不改写历史。
+- 本确认不构成 stage/commit/push 授权。Teacher、Coordinator/Archive 与 P7 遗留组仍待逐组处理。
+- 本轮未修改 Source/Content/Config，未 stage/commit/reset/clean/push。
+
+## 2026-07-21｜Coordinator：Provenance 第四组用户确认
+
+- 用户明确回复“确认第四组 provenance 声明”。Coordinator 将 `learning-journal.md` 当前未提交新增内容记录为 `ATTRIBUTED (Teacher deliverable with User-authored quoted answers)`。
+- Teacher 交付范围跨 TASK-P7-005 与 TASK-P8-006；课程结构、题目、讲解、纠正、评阅和总结由 Teacher 整理，明确标注的用户原始回答/复答、反馈和跳过指令仍归 User 原始表达，不冒认 Teacher 原创。
+- 本确认不构成 stage/commit/push 授权。Coordinator/Archive 与 P7 遗留组仍待处理。
+- 本轮未修改 Source/Content/Config，未 stage/commit/reset/clean/push。
+
+## 2026-07-21｜Coordinator：Provenance 第五组用户确认
+
+- 用户明确回复“确认第五组 provenance 声明”。Coordinator 将 7 个维护中的状态/设计文档、未跟踪 Phase 8 执行计划和 15 个 P8 archive 容器共 23 项记录为 `ATTRIBUTED (Coordinator-maintained docs / Coordinator-curated archives preserving embedded role authorship)`。
+- archive active-task 的契约作者保持 Coordinator；execution-result 的实施内容保持 Implementation；final-review 的审查内容保持 Independent Reviewer；用户证据与 `USER ACCEPTED` 仍保持 User 事实来源。归档整理不改变内嵌作者。
+- 本确认不构成 stage/commit/push 授权。仅剩第六组 P7 遗留 provenance 待用户确认。
+- 本轮未修改 Source/Content/Config，未 stage/commit/reset/clean/push。
+
+## 2026-07-21｜Coordinator：Provenance 第六组用户确认
+
+- 用户明确回复“确认第六组 provenance 声明”。Coordinator 将实际存在的 Phase 7 计划、P7-005 Teacher 复盘、P7-004 三个 archive 和 P7-005 active archive 共六项记录为 `ATTRIBUTED (preserving embedded role authorship)`。
+- Coordinator 维护计划与 archive 容器；Teacher 教学、Implementation 执行、Independent Reviewer 结论和 User 证据仍保留原作者/来源，不因归档或引用改变。
+- `tasks/archive/TASK-P7-005-execution-result.md` 与 `tasks/archive/TASK-P7-005-final-review.md` 当前 `MISSING`，不在本轮补造，也不冒充三件套存在。
+- 本确认不构成 stage/commit/push 授权；下一步仅做六组与完整 Git dirty 集合的路径对账。
+
+## 2026-07-21｜Coordinator：Provenance 全集闭合
+
+- 用户已确认第六组实际存在六项；两个 P7-005 archive 文件保持 `MISSING` 且不补造。六组 provenance 至此均有明确用户声明并保留内嵌角色作者边界。
+- Coordinator 以完整 `git status --porcelain=v1 -uall` 与六组精确路径集合做机器差集：dirty/untracked 64 项，ledger 64 项；遗漏 0、多余 0、重复 0、`UNRESOLVED` 0。
+- provenance 项目阻断已关闭，safe role commit boundary established。这不表示任何文件已 stage/commit，也不替代 Independent Reviewer 最终 Gate。
+- `Binaries/`、`Intermediate/`、`Saved/`、`DerivedDataCache/` 为 Git `!!` ignored Build/Editor 派生产物，排除于业务/文档 ledger 和提交候选之外。
+- P8-006 当前仍保持文件化 `REVISE`，只等待 Independent Reviewer 最终复审；不得提前宣称 P8-006 PASS、Phase 8 Ready、进入 Phase 9 或 push。
+- 本轮未修改 Source/Content/Config，未 stage/commit/reset/clean/push。
+
+## 2026-07-21｜Coordinator：P8-006 最终 Reviewer PASS 与交付待授权
+
+- Independent Reviewer 已最终落盘 `PASS WITH FOLLOW-UP`，并独立重算 dirty/ledger 64/64、遗漏 0、多余 0、重复 0、`UNRESOLVED=0`；Build、Teacher、provenance Gate 全部通过。
+- Follow-up 原样保留：P8-003/P8-004 的部分 Reset/terminal/3+稳定排序/正值过量归零、缺失 UI 动态路径；Teacher 第三批复习与第四批 `USER SKIPPED / NOT ASSESSED`；MSVC preferred-version/API warning；网络、Save 与 Phase 9 状态生命周期均未外推。
+- 当前未 stage/commit/push 是 Reviewer Gate 后的交付动作，不推翻 PASS。但六组用户 provenance 声明均明确“不授权现在 stage/commit/push”，Coordinator 本轮不得执行任何 Git 写操作。
+- Phase 8 当前记为 `Review passed / delivery pending`。只有分角色 commits、P8-006 归档、Coordinator closeout 与 push 真实成功并记录 hash/remote/branch/result 后，才可写最终远端 `Ready with inherited follow-ups`；不自动进入 Phase 9。
+- 本轮未修改 Source/Content/Config，未 stage/commit/reset/clean/push。
+
+## 2026-07-21｜Coordinator：P8-006 本地 closeout 交付
+
+- 前四个角色提交已核对：User `ff22ed0be5d8180249524d77d7a8876ef93d0e43`、Implementation `d05cb66`、Teacher `14d2fea`、Independent Reviewer `0e3e38e`；提交前 index 为空。
+- 前四提交后剩余 dirty/untracked 集合恰为 Coordinator 已归属 28 项，遗漏/多余均为 0。P8-006 active/execution/final-review 三个归档文件由 Coordinator 创建，并保持 Implementation/Reviewer/User 内嵌作者边界。
+- P8-006 Reviewer 最终 `PASS WITH FOLLOW-UP`；本地角色交付、归档与 Phase closeout 随当前 Coordinator commit 完成。Phase 8 状态为 `Ready with inherited follow-ups / local closeout complete / push pending`。
+- inherited follow-ups 原样保留，不改写为已验证；Phase 9 没有活动任务且不得自动进入。
+- 当前步骤不 push。Coordinator commit 成功后必须先回报 hash、HEAD paths、空 index 与 branch/ahead，待最终核对后再执行已授权 push。

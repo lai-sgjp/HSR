@@ -1,22 +1,27 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-07-20
+> 最后更新：2026-07-21
 > 作用：CC-SWITCH 切换模型后的快速恢复快照。高级模型负责维护；低级模型不得把本文件作为执行入口。
 
 ## 当前 Phase
 
 - **Phase 1 与 Phase 2 均为 `Ready`。P2-003 最终处置为 `USER ACCEPTED`：Reviewer 的唯一结论仍为 `REVISE`，用户明确接受未完全掌握的学习项作为非阻断复习项。**
 - **Phase 3 为 `Ready`：P3-003 最终 Reviewer commit `3b3fbeb` 为 `PASS WITH FOLLOW-UP`，且用户已明确接受三个工程证据缺口；所有 follow-up 原样保留。**
-- **Phase 4、Phase 5 与 Phase 6 均为 `Ready with inherited follow-ups`。Phase 7 的 P7-001、P7-002、P7-003 均以 Reviewer `PASS WITH FOLLOW-UP` 归档；唯一活动任务为 `TASK-P7-004`，状态 `PLANNED — 等待用户独立确认执行`，仅处理 follow-up 闭环。**
+- **Phase 4～7 均为 `Ready with inherited follow-ups`。P8-006 Independent Reviewer 最终 `PASS WITH FOLLOW-UP`；角色提交与 P8-006 归档已完成。Phase 8 当前为 `Ready with inherited follow-ups / local closeout complete / push pending`，尚未记录远端交付完成，不进入 Phase 9。**
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
 ## 当前任务
 
+- `TASK-P8-006` 已以 Reviewer `PASS WITH FOLLOW-UP` 完成本地收尾并归档。User `ff22ed0`、Implementation `d05cb66`、Teacher `14d2fea`、Reviewer `0e3e38e` 已提交；Coordinator closeout 随当前提交完成。当前仅剩 push 与远端结果记录；不进入 Phase 9。
+
 - `TASK-P7-001` 已归档：Reviewer `PASS WITH FOLLOW-UP`；fresh Rebuild、canonical Config、资产与烟雾 PIE follow-up 已如实保留。
 - `TASK-P7-002` 已归档：Reviewer commit `f916fd7` 为 `PASS WITH FOLLOW-UP`；用户资产 `d35fdff`、Implementation `288932c` 与完整矩阵证据保留。
 - `TASK-P7-003` 已归档：用户资产 `f1687d3`、Implementation `cf0d9b4`、Reviewer `56e89d1`；最终结论 `PASS WITH FOLLOW-UP`。Follow-up 原样保留，不改写为无风险完成。
-- `TASK-P7-004` 已由 Coordinator 创建：只闭环 Breakdown 对账、失败注入、overkill/lethal/真实 Reset；不得扩展资源系统或进入 P7-005。
+- `TASK-P7-004` 已归档；其五项矩阵与 follow-up 已由最终 Reviewer 记录，当前不再是活动任务。
+- `TASK-P7-004A` AppliedDamage 写回和 fresh Build 已完成；B/C/D 因缺安全注入与真实 Reset 重建 seam 暂停。Coordinator 已精确扩权 EffectContext、Execution、AbilityBase、Coordinator/GameMode 的 `WITH_EDITOR` 测试入口，状态为 `REVISION PLANNED`，等待执行者重新复述与用户再次确认。
+- `TASK-P7-004` 已归档：Reviewer `PASS WITH FOLLOW-UP`；五项矩阵、正式技能/P6 legal 和 Reset/overkill 证据已通过，底层 Aggregator/自然 ApplyFailure/多轮 teardown follow-up 原样保留。
+- `TASK-P7-005` 已创建：仅教学、独立阶段审查、文档同步和收尾，不新增 Gameplay，不自动进入 Phase 8。
 
 ## Phase 7 资源延期需求
 

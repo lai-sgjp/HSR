@@ -92,3 +92,9 @@ MVP 明确推迟 Attack、Defense、Crit、ExecutionCalculation、Skill、Ultima
 - 当前四类占位路径为 BasicAttack、Skill、Ultimate、Heal。SingleEnemy、Self 已有动态 Harness；SingleAlly 仅静态支持。
 - P6-004A 已用真实 `WBP_BattleCommandPanel` 闭合构造、stable-ID 提交、NativeDestruct/解绑和重建无重复 Delegate 的阻断。
 - 真实 Rollback/并发、SingleAlly 动态路径、Heal/Ability GE 失败、目标销毁、终局与异步路径仍未完整动态验证，继续作为 Phase 6 inherited follow-ups；最小 WBP 不代表 Phase 10 完整 UI。
+
+## Phase 7 伤害事务收尾（2026-07-20）
+
+- 正式 Basic/Skill/Ultimate 统一使用 Execution GE；Heal 保持旧治疗 GE；旧固定伤害 GE 资产保留但不再是正式运行时引用。
+- Coordinator 通过 prepared damage、RNG stream-copy、ActionId exactly-once、SP Reserve/Commit/Rollback、Ultimate GAS Cost/Refund 和 terminal 延迟维护事务顺序；失败不得由 Coordinator 直接写 Energy/Health。
+- P7-004 五项动态矩阵已通过，但底层 Aggregator capture false/真实 NaN、自然 GAS ApplyFailure、Refund 自身失败、Cost 后 HP 异常和多轮 teardown 仍是 follow-up，不能外推为已验证。
