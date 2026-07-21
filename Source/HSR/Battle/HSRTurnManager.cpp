@@ -58,6 +58,44 @@ bool UHSRTurnManager::ResolveAction(FName ResolvingParticipantId)
 	return true;
 }
 
+bool UHSRTurnManager::ConsumeBreakDelay(const FHSRTurnDelayRequest& Request)
+{
+	if (!Request.ActionId.IsValid() || Request.TargetParticipantId.IsNone())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("P8-004 Delay ActionId=%s Target=%s Applied=0 Reason=InvalidRequest"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString());
+		return false;
+	}
+	if (ConsumedBreakDelayActionIds.Contains(Request.ActionId))
+	{
+		UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Applied=0 Reason=Replay"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString());
+		return false;
+	}
+	ConsumedBreakDelayActionIds.Add(Request.ActionId);
+	if (State == EHSRTurnManagerState::Finished)
+	{
+		UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Applied=0 Reason=Finished"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString());
+		return false;
+	}
+	const int32 TargetIndex = OrderedParticipants.IndexOfByPredicate([&Request](const FHSRBattleParticipant& Participant)
+	{
+		return Participant.ParticipantId == Request.TargetParticipantId;
+	});
+	if (!OrderedParticipants.IsValidIndex(TargetIndex) || !OrderedParticipants[TargetIndex].IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Applied=0 Reason=InvalidTarget"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString());
+		return false;
+	}
+	if (OrderedParticipants[TargetIndex].AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) <= 0.0f)
+	{
+		UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Applied=0 Reason=DefeatedTarget"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString());
+		return false;
+	}
+
+	PendingBreakDelayActionIds.Add(Request.TargetParticipantId, Request.ActionId);
+	UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Registered=1 Consumed=0 Next=%s Reason=None"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString(), *GetCurrentParticipantId().ToString());
+	return true;
+}
+
 void UHSRTurnManager::FinishBattle()
 {
 	State = EHSRTurnManagerState::Finished;
@@ -68,6 +106,8 @@ void UHSRTurnManager::FinishBattle()
 void UHSRTurnManager::Reset()
 {
 	OrderedParticipants.Empty();
+	ConsumedBreakDelayActionIds.Empty();
+	PendingBreakDelayActionIds.Empty();
 	CurrentTurnIndex = INDEX_NONE;
 	State = EHSRTurnManagerState::Waiting;
 }
@@ -87,13 +127,37 @@ bool UHSRTurnManager::AdvanceToNextValidTurn()
 	}
 
 	const int32 StartIndex = CurrentTurnIndex == INDEX_NONE ? 0 : (CurrentTurnIndex + 1) % OrderedParticipants.Num();
+	FName ConsumedDelayTarget = NAME_None;
+	FGuid ConsumedDelayActionId;
 	for (int32 Offset = 0; Offset < OrderedParticipants.Num(); ++Offset)
 	{
 		const int32 CandidateIndex = (StartIndex + Offset) % OrderedParticipants.Num();
-		if (OrderedParticipants[CandidateIndex].IsValid())
+		const FHSRBattleParticipant& Candidate = OrderedParticipants[CandidateIndex];
+		if (!Candidate.IsValid())
+		{
+			if (const FGuid* PendingActionId = PendingBreakDelayActionIds.Find(Candidate.ParticipantId))
+			{
+				const FGuid ClearedActionId = *PendingActionId;
+				PendingBreakDelayActionIds.Remove(Candidate.ParticipantId);
+				UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Registered=0 Consumed=1 Next=%s Reason=InvalidTarget"), *ClearedActionId.ToString(), *Candidate.ParticipantId.ToString(), *GetCurrentParticipantId().ToString());
+			}
+			continue;
+		}
+		if (const FGuid* PendingActionId = PendingBreakDelayActionIds.Find(Candidate.ParticipantId))
+		{
+			ConsumedDelayTarget = Candidate.ParticipantId;
+			ConsumedDelayActionId = *PendingActionId;
+			PendingBreakDelayActionIds.Remove(Candidate.ParticipantId);
+			continue;
+		}
+		if (Candidate.IsValid())
 		{
 			CurrentTurnIndex = CandidateIndex;
-			State = OrderedParticipants[CandidateIndex].Team == EHSRBattleParticipantTeam::Player ? EHSRTurnManagerState::PlayerTurn : EHSRTurnManagerState::EnemyTurn;
+			State = Candidate.Team == EHSRBattleParticipantTeam::Player ? EHSRTurnManagerState::PlayerTurn : EHSRTurnManagerState::EnemyTurn;
+			if (!ConsumedDelayTarget.IsNone())
+			{
+				UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Registered=0 Consumed=1 Next=%s Reason=None"), *ConsumedDelayActionId.ToString(), *ConsumedDelayTarget.ToString(), *Candidate.ParticipantId.ToString());
+			}
 			return true;
 		}
 	}
@@ -101,6 +165,10 @@ bool UHSRTurnManager::AdvanceToNextValidTurn()
 	UE_LOG(LogTemp, Warning, TEXT("UHSRTurnManager::AdvanceToNextValidTurn - FINISHED no valid participants"));
 	State = EHSRTurnManagerState::Finished;
 	CurrentTurnIndex = INDEX_NONE;
+	if (!ConsumedDelayTarget.IsNone())
+	{
+		UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Registered=0 Consumed=1 Next=None Reason=NoValidParticipant"), *ConsumedDelayActionId.ToString(), *ConsumedDelayTarget.ToString());
+	}
 	return false;
 }
 

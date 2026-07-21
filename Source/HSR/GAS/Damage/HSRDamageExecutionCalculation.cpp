@@ -1,4 +1,5 @@
 #include "HSRDamageExecutionCalculation.h"
+#include <limits>
 #include "HSRDamageEffectContext.h"
 #include "../Attribute/HSRCoreAttributeSet.h"
 #include "GameplayEffectExtension.h"
@@ -52,6 +53,10 @@ void UHSRDamageExecutionCalculation::Execute_Implementation(const FGameplayEffec
 	FHSRDamageResult& Result = Context->DamageResult;
 	Result.ActionId = Context->DamageContext.ActionId;
 	Result.DamageType = Context->DamageContext.DamageType;
+#if WITH_EDITOR
+	if (Context->TestInjection == EHSRDamageTestInjection::ForceCaptureFailed) { Result.Result = EHSRDamageResultType::CaptureFailed; return; }
+	if (Context->TestInjection == EHSRDamageTestInjection::ForceInvalidCapturedValue) { Attack = std::numeric_limits<float>::quiet_NaN(); }
+#endif
 	if (!bCaptured) { Result.Result = EHSRDamageResultType::CaptureFailed; return; }
 	if (!FMath::IsFinite(Attack) || !FMath::IsFinite(Defense) || !FMath::IsFinite(CritRate) || !FMath::IsFinite(CritDamage)) { Result.Result = EHSRDamageResultType::InvalidCapturedValue; return; }
 	const float NormalAttack = FMath::Max(0.0f, Attack);

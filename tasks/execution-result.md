@@ -1,4 +1,61 @@
-# TASK-P7-002 Execution Result
+# TASK-P8-001 Execution Result
+
+## Status
+
+`IMPLEMENTED — Build and user Editor/PIE evidence pending` (2026-07-20).
+
+## Implemented contract
+
+- `UHSRSkillDefinition` now authors `ElementTag` and positive `ToughnessDamage`; `UHSREnemyDefinition` now authors `WeaknessTags`, `InitialToughness`, and `InitialMaxToughness`.
+- New `FHSRToughnessConfiguration` yields a pure-value structured result for missing/invalid Element, empty/invalid Weakness, non-positive or non-finite toughness damage, and invalid initial toughness/max pairs. It has no Actor, ASC, GE, HP, RNG, resource, turn, break, or queue side effect.
+- `UHSRCoreAttributeSet` now owns runtime `Toughness`/`MaxToughness`, clamps finite values to `[0, MaxToughness]`, and reconciles Current Toughness after a Max change. Zero remains representable for P8-002; this task does not emit Break.
+
+## User Editor steps (not performed here)
+
+1. Add the frozen original `Element.*` and `Weakness.*` Tags, plus reserved `State.Break` and `Damage.Type.Break`, in `Config/DefaultGameplayTags.ini`.
+2. Assign an Element Tag and positive Toughness Damage to the three existing Skill Definition assets.
+3. Assign at least one Weakness Tag and matching positive Initial Toughness/MaxToughness to an Enemy Definition; mirror toughness values in its initialization GE.
+4. Save, restart Editor, verify fields/tags/references persist, run one 1v1 initialization PIE, and return logs/screenshots/asset paths. No weakness subtraction, break, delay, or UI change is expected yet.
+
+## Remaining evidence / exclusions
+
+- Fresh `HSREditor Win64 Development` Build, Editor restart, PIE, Config/assets, and failure cases remain pending. P7 inherited follow-ups remain unchanged.
+- Break resolution/damage/debuff, turn delay, UI, statuses, SaveGame, networking, AoE, and third-party assets are out of scope.
+
+## Evidence Segment — Development/Editor-only contract harness
+
+- `AHSRBattleGameMode::bRunP8ContractHarness` is an opt-in `WITH_EDITORONLY_DATA` flag, default `false`. After real participant construction succeeds, it invokes a pure validation-only harness; the harness never calls Ability, GameplayEffect, Coordinator action resolution, RNG consumption, resource mutation, or TurnManager mutation.
+- The six logged cases are `ValidContract`, `MissingElement`, `EmptyWeakness`, `InvalidWeaknessTag`, `InvalidToughnessDamage`, and `InvalidInitialToughness`. Each log uses `P8-001 Contract`, reports Case/Result/Reason and before/after HP, Toughness, Turn, Resource, and RNG values. Every case requires its snapshots to match; invalid-input cases therefore log `NoMutation=1` when correct.
+- `ValidContract` requires the user-configured `Element` and `Weakness` root Tags to exist. If those Tags are absent, it intentionally reports FAIL rather than pretending an unconfigured tag contract passed.
+- Editor/PIE execution and Output Log evidence remain `USER PROVIDED`; without them P8-001 is not passed.
+
+---
+
+# Historical TASK-P7-005 Gate 0 Execution Result
+
+## 结论
+
+`COMPLETE — GATE 0 PASSED`（2026-07-20）。
+
+## 归档依据
+
+- Teacher 复盘：`tasks/p7-005-teacher-review.md`。
+- Independent Reviewer：`tasks/final-review.md`，结论为 `Ready with inherited follow-ups`。
+- P7-001～P7-004 的 active/execution/final-review 三件套已存在于 `tasks/archive/`。
+- `PROJECT_STATE.md` 已记录 Phase 7 最终状态和 inherited follow-ups。
+- `docs/phase-8-execution-plan.md` 已归档 Phase 8 计划，但不构成 Phase 8 实现证据。
+
+## 保留的 inherited follow-ups
+
+底层 Aggregator/真实 NaN、自然 GAS ApplyFailure/Refund failure、Cost 后 HP 异常、多轮 teardown、真实 Reset/目标销毁/异步、网络/Save、技能点/回能/Team SP/Wait/Pass 等继续作为后续独立任务；本 Gate 不关闭这些问题。
+
+## 范围与证据边界
+
+本次未修改 Source、Content、Config、uproject 或 Build.cs，未运行新的 Gameplay、Build 或 PIE。既有证据继续按 `USER PROVIDED`、`LOG INSPECTED BY REVIEWER`、`STATIC REVIEW` 和 `NOT VERIFIED` 分级引用。
+
+## 下一步
+
+Gate 0 通过后，允许启动 Phase 8 的 P8-000 设计冻结，随后执行 P8-001 元素/弱点/韧性数据闭环。
 
 ## TASK-P7-003 implementation block
 
@@ -141,3 +198,435 @@
 ## Handoff gate
 
 Reviewer must independently inspect exact allowlist, Config/assets, Rebuild, Harness matrix, and P6 smoke, then write `tasks/final-review.md`. P7-003 remains unauthorized until that result exists.
+## TASK-P7-004 stage A — Breakdown reconciliation
+
+- Added the minimal allowlisted AttributeSet write-back at the actual meta-damage commit point. `FHSRDamageEffectContext::DamageResult.Breakdown.AppliedDamage` is now set to the finite non-negative `HealthBefore - HealthAfter` delta after clamping, while `FinalDamage` remains the pre-clamp formula value for overkill accounting.
+- This preserves the existing Execution/GE formula and makes normal, lethal, and overkill evidence auditable from one context result.
+- Fresh `HSREditor Win64 Development -NoHotReload` completed UHT/C++/Link with exit `0`; `git diff --check` passed. Existing AIModule/toolchain warnings only.
+
+## TASK-P7-004 stage B/C boundary
+
+- No safe existing development-only injection seam currently exists for forcing `CaptureFailed`, `InvalidCapturedValue`, or a post-Cost synchronous Apply failure. The Execution capture implementation and its inputs are read-only under the active allowlist; the prepared Spec is private to Ability Base, which is explicitly outside this task's allowlist.
+- Adding a Coordinator test hook that mutates the formal Apply path would require expanding the frozen seam/contract beyond the approved files or changing formal runtime behavior. Per the task gate, implementation stops here and records this boundary rather than shipping a production-facing or silently simulated failure path.
+
+## TASK-P7-004 stage D boundary
+
+- Existing editor Harness already exercises lethal terminal publication and rejection after `Finished`; the new AppliedDamage write-back supports explicit overkill accounting (`FinalDamage > AppliedDamage`, target Health clamped to zero).
+- A true Reset lifecycle test cannot be completed safely with the current allowlist: `UHSRBattleCoordinator::Reset()` intentionally clears Participants, RequestId, definitions, and TurnManager. No allowed development API retains the consumed encounter request and rebuilds a valid Spawned battle afterward. Calling Reset and then submitting a forged request would not test the real lifecycle and would violate the evidence contract.
+- Therefore no fake Reset/Spawned assertion was added. This is a concrete API boundary requiring a separately approved Coordinator development seam; formal runtime behavior and assets remain untouched.
+
+## TASK-P7-004-REVISION B/C/D seams
+
+- Added editor-only `EHSRDamageTestInjection` with default `None`; the custom damage Context carries it through duplication/serialization. Coordinator consumes a one-shot next-injection value while constructing a formal Context. Shipping has no setter or branch.
+- Execution supports controlled `ForceCaptureFailed` and `ForceInvalidCapturedValue`; both set the structured result and return without emitting IncomingDamage. The first build exposed the unsupported UE `TNumericLimits::QuietNaN` spelling; corrected to standard `quiet_NaN()`.
+- Ability Base supports `ForcePostCostApplyFailure` immediately before its unique target Apply. Ultimate therefore follows its existing real CommitAbility then failure/refund path without applying damage.
+- Added editor-only `ResetAndRebuildForDevelopmentTest`: it copies the last formally submitted pure-value encounter request, calls real `Reset()`, then formal `SubmitBattleRequest` and `BuildParticipants`. It does not restore Actors/ASCs or write Spawned directly.
+- Fresh build after all revised seams completed UHT/C++/Link exit `0`; `git diff --check` passed. Dynamic PIE matrix remains required before review.
+
+## TASK-P7-004 dynamic Harness
+
+- Added editor-only matrix cards for CaptureFailed, InvalidCapturedValue, Ultimate post-Cost Apply failure/refund, and real Reset/Rebuild. Cards run after P5/P6 smoke, reset their own HP/Energy/SP/Turn baselines, replay the same ActionId, and emit `P7-004 Matrix Case=... Result=PASS/FAIL` audit fields.
+- Formal execution failure now requires `DamageResult==DamageResolved` in addition to a successful GAS handle. Coordinator copies structured failure DamageResult into rejected Resolution, rolls back SP, and discards RNG preview.
+- Ultimate injected card executes real Cost and existing Refund; its audit requires final Energy/HP/SP/RNG/Turn/terminal state unchanged and cached duplicate rejection.
+- Reset card calls the real Reset→Submit→Build seam and logs Spawned state, participant count, RNG consume count, and SP baseline. Existing terminal scenario remains the lethal/terminal-after-rejection entry; PIE evidence is still required for lethal/overkill and same-ActionId post-reset assertions.
+- Fresh build completed C++/Link exit `0`; `git diff --check` passed.
+
+## TASK-P7-004 D matrix completion
+
+- Added terminal overkill card at the end of the smoke suite: target starts at 1 HP, formal Basic must report `FinalDamage > AppliedDamage == 1`, clamp HP to zero, produce Finished once, cache duplicate without a second RNG/SP mutation, and reject a new terminal action.
+- Development Reset/Rebuild now gives the copied formal encounter request a fresh RequestId before real Submit/Build. The Harness reuses the overkill ActionId in that rebuilt battle, requires a fresh HP mutation and RNG consume index 1, and verifies Spawned/new participants/turn/SP baseline instead of returning the old terminal cache.
+- Fresh build completed C++/Link exit `0`; `git diff --check` passed. PIE evidence remains required.
+
+## Post-PIE injection isolation correction
+
+- Preserved CaptureFailed/InvalidCapturedValue in Ability Base instead of overwriting them with generic EffectApplicationFailed after GAS returned a valid handle.
+- Replaced the unbound next-action flag with an ActionId-bound one-shot injection. BuildParticipants, Reset, each Harness setup, and targeted consumption explicitly restore `None`; unrelated normal P7/P6 actions cannot consume or inherit the injection.
+- Coordinator retains an editor-only pure-value execution snapshot for Harness audit. Refund case now requires CostCommitted=1, RefundApplied=1, Energy execution 100→100 after the real intermediate Cost, no HP/SP/RNG/Turn mutation, and cached duplicate behavior; Refund=0 is a FAIL.
+- Verification attempt reached UHT successfully but was blocked before C++ because Live Coding/Editor was active (`Unable to build while Live Coding is active`). `git diff --check` passed. Close Editor and run the required fresh build before PIE.
+
+## Injection ordering correction
+
+- Explicitly clears the editor injection at the normal P7/P6 smoke entry and before every normal formal card. Matrix cards still create ActionId first, set their exact one-shot injection, execute, and clear immediately after reading the pure execution snapshot.
+- This prevents a rejected/preflight or previous matrix card from contaminating normal Ultimate Cost/Apply behavior; expected normal Ultimate remains DamageApplied=1, RefundApplied=0, Energy 100→0. P7-004 Refund remains the only Cost1/Refund1 case.
+- Fresh build after the ordering fix completed C++/Link exit `0`; `git diff --check` passed.
+
+## Injection binding diagnostic correction
+
+- Normal formal cards now explicitly bind their own ActionId to `EHSRDamageTestInjection::None` after generating the command, in addition to clearing global state. This makes normal Ultimate/P6 Cost behavior independent of any prior matrix case.
+- Injection cleanup uses explicit zero `FGuid()` assignment. Context construction logs ActionId, bound ActionId, requested enum, and applied enum (`P7-004 InjectionBind`) so a PIE run can prove only the targeted ActionId receives ForcePostCostApplyFailure.
+- Fresh Build and `git diff --check` passed after this correction.
+
+## Spec Context copy correction
+
+- PIE showed Coordinator's source Context had `Requested=0/Applied=0` while Ability still saw ForcePostCost. The corrected path now reacquires the Context stored inside the returned `FGameplayEffectSpec` and explicitly copies the current ActionId and TestInjection into that Spec-owned Context after `MakeOutgoingSpec`.
+- Ability Base logs the Spec Context ActionId/Injection immediately before Apply. This removes dependence on whether GAS duplicated the original `ContextHandle` and makes normal formal specs explicitly `Injection=None`.
+- Fresh Build completed C++/Link exit `0`; `git diff --check` passed. Next PIE must show matching `P7-004 SpecContext` and `AbilityApply Context` values for every ActionId.
+
+## Normal Ultimate Apply-result correction
+
+- Normal Ultimate PIE showed HP damage applied with Injection=0 but Ability rejected because a duplicated GAS Context retained default DamageResult metadata. Ability Base now treats a valid Apply handle as normal success when no failure injection is active, while preserving CaptureFailed/InvalidCapturedValue and explicit PostCost failure results.
+- Fresh Build completed C++/Link exit `0`; `git diff --check` passed. Expected normal Ultimate/P6 legal evidence is DamageResolved/DamageApplied once, RefundApplied=0, Energy cost committed once; only targeted P7-004 Refund remains RefundApplied=1.
+
+## P8-001 Evidence Segment User PIE (2026-07-21)
+
+- User-provided Output Log contains `ValidContract`, `MissingElement`, `EmptyWeakness`, `InvalidWeaknessTag`, `InvalidToughnessDamage`, and `InvalidInitialToughness`, all with `Result=PASS` and `NoMutation=1`.
+- The same log contains `P8-001 Contract Harness=COMPLETE`, after successful participant/ASC construction and TurnManager initialization.
+- Evidence level: `USER PROVIDED / LOG INSPECTED`; no claim is made that this pure contract harness implements weakness subtraction, Break, Debuff, or Turn Delay.
+
+---
+
+# TASK-P8-002 Execution Result
+
+## Status
+
+`IMPLEMENTED — fresh HSREditor Win64 Development build passed; Editor/PIE evidence pending` (2026-07-21).
+
+## Implemented contract
+
+- After a successful formal HP damage activation, `RequestAction` performs an independent toughness pass before `Finalize`, defeat publication, or turn resolution. A toughness failure never rolls back the committed HP result.
+- The pass converts `Element.<Suffix>` to `Weakness.<Suffix>`, uses exact target weakness membership, validates finite positive `ToughnessDamage`, and applies only the configured toughness GE with `Damage.Data.ToughnessDamage` SetByCaller magnitude.
+- Every HP-success resolution now caches `FHSRToughnessResult` alongside `FHSRDamageResult` under the same ActionId. Duplicate ActionIds return this cache and cannot apply toughness twice.
+- `FHSRToughnessResult` records before/damage/after, match state, structured failure, and `bReachedZero`. `bReachedZero` is purely observational; no Break, Debuff, Turn Delay, or other follow-on side effect was added.
+- Enemy participant initialization now assigns its ASC before applying configured initial Toughness/MaxToughness.
+
+## Verification
+
+- `git diff --check` passed.
+- Fresh `HSREditor Win64 Development -NoHotReload` build completed UHT, C++, linking, and metadata writing with exit code 0.
+- Build emitted only pre-existing non-preferred MSVC and AIModule deprecation warnings.
+
+## Audit logging addendum
+
+- Each successful HP action now writes one `P8-002 Toughness` record before `Finalize`, containing ActionId, Actor, Target, Element, expected Weakness, match flag, before/damage/after values, ReachedZero, and structured failure reason.
+- A duplicate cache return writes `P8-002 Toughness Replay` with the cached toughness values and no GE application. This makes exactly-once toughness behavior auditable from the Output Log.
+
+## Instant GE result correction
+
+- User PIE evidence exposed that an Instant toughness GE can apply its AttributeSet mutation while returning no retained active-effect handle. `RequestAction` now reads Toughness after application and compares it to `Clamp(Before - Damage, 0, MaxToughness)` with `IsNearlyEqual`.
+- A matching write is recorded as successful (`FailureReason=None`) even at zero Toughness; a mismatch alone records `EffectApplicationFailed`. This keeps failure reporting aligned with the observed AttributeSet outcome and does not introduce Break, Debuff, or Turn Delay behavior.
+- Post-correction fresh-build attempt was blocked before compilation because the running Editor has Live Coding active. `git diff --check` still passed; close the Editor or exit Live Coding before the required fresh build/PIE rerun.
+- Follow-up verification after Live Coding was cleared: `HSREditor Win64 Development -clean` completed, followed by `-NoHotReload` fresh build with exit code 0. The build compiled `HSRBattleCoordinator.cpp` and the remaining HSR translation units, linked `UnrealEditor-HSR.lib` and `UnrealEditor-HSR.dll`, and wrote target metadata. UHT was not invoked because generated headers were already current. Existing MSVC-version and engine deprecation warnings remained; no project compile/link error occurred.
+
+---
+
+# TASK-P8-003 Execution Result
+
+## Status
+
+`IMPLEMENTED — build passed; Editor/PIE evidence pending` (2026-07-21).
+
+## Implemented contract
+
+- Added pure-value `FHSRBreakResult` and `EHSRBreakFailureReason`, then stored them with Damage and Toughness in `FHSRAbilityResolution` under the existing ActionId cache.
+- After Toughness resolves and before `Finalize`, Coordinator publishes a BreakResult only when `ReachedZero`, `Before > 0`, and `After == 0`; it records the action, target, before/after values, trigger state, and structured reason.
+- The spawned participant owns only a Coordinator lifecycle latch. Once a target publishes BreakResult, later zero candidates return `AlreadyPublished`; `0 -> 0`, non-matches, and toughness failures return `ToughnessNotDepleted`. A terminal/inactive battle and invalid target have explicit non-trigger reasons.
+- The result is publication-only: no additional GE application, damage, Debuff, Cue, Turn Delay, RNG, resource, or UI work was added.
+
+## Development / Editor audit entry
+
+- Normal resolution writes `P8-003 Break ActionId=... Target=... Before=... After=... Triggered=... Replay=0 FailureReason=...` immediately before cache finalization.
+- ActionId cache replay writes the same structured record with `Replay=1` and cached values; it cannot re-enter Toughness GE or publish another BreakResult.
+
+## Build and static verification
+
+- `git diff --check` passed.
+- The first post-change build ran UHT successfully, then exposed the real const-participant latch write error. The local target pointer was corrected.
+- Fresh retry compiled `HSRBattleCoordinator.cpp`, linked `UnrealEditor-HSR.lib` and `UnrealEditor-HSR.dll`, wrote metadata, and exited `0` (`Result: Succeeded`). Only the existing MSVC version warning appeared.
+
+## Required user PIE evidence
+
+1. With P8-002 weakness and toughness GE bindings configured, run a 1v1 action that changes Toughness `10 -> 0` and capture one `P8-003 Break` record with `Triggered=1`, `Replay=0`, `FailureReason=0`.
+2. Replay the same ActionId and verify `Replay=1` with the same cached values and no second Toughness subtraction or Break publication.
+3. Verify an overkill toughness hit also produces one trigger, while a subsequent `0 -> 0` hit logs `Triggered=0`.
+4. Capture a weakness non-match, missing/failed toughness GE, terminal action rejection, and invalid target rejection; none may produce a triggered BreakResult or mutate HP/SP/Energy/RNG/Turn beyond their pre-existing action path.
+
+---
+
+# TASK-P8-004 Execution Result
+
+## Status
+
+`IMPLEMENTED — build passed; Editor/PIE evidence pending` (2026-07-21).
+
+## Implemented contract
+
+- A triggered `FHSRBreakResult` now creates only a pure `FHSRTurnDelayRequest`; Coordinator passes it to TurnManager before Resolution finalization and normal turn advancement.
+- TurnManager is the only request consumer. It records consumed ActionIds, rejects replay, terminal, invalid, and defeated-target requests, then clears the consumed set on Reset.
+- A valid request registers one pending skip for its living target. When normal turn advancement next encounters that target, TurnManager consumes the pending skip and selects the next valid participant; the target returns to normal eligibility on the following advancement. This makes a 1v1 Break delay observable even when the target was already queue tail. Initial equal-initiative ordering remains the existing stable `ParticipantId` tie-break. No Tick is used.
+- Replay never re-enters the Coordinator mutation path, so it cannot submit a second delay. BreakResults that are not triggered emit no delay request.
+- No Break damage, Debuff, Cue, UI, resource, Toughness, HP, Energy, SP, RNG, or Phase 9 behavior was added.
+
+## Development / Editor audit entry
+
+- TurnManager logs `P8-004 Delay` with ActionId, Target, registration/consumption state, Next participant, and reason (`None`, `Replay`, `Finished`, `InvalidTarget`, or `DefeatedTarget`).
+
+## Verification
+
+- `git diff --check` passed.
+- Fresh `HSREditor Win64 Development -NoHotReload` build ran UHT, compiled `HSRTurnManager.cpp` and `HSRBattleCoordinator.cpp`, linked `UnrealEditor-HSR.lib/.dll`, wrote metadata, and exited 0. Only existing MSVC/AIModule warnings appeared.
+
+## Required user PIE evidence
+
+1. In 1v1, trigger a first valid Break; verify `Registered=1`, then on normal turn advancement one `Consumed=1` record whose `Next` is the breaker rather than the broken target. On the following advancement, verify the target becomes eligible normally again.
+2. Replay its ActionId; verify cached P8-003 replay logging and no second P8-004 applied record.
+3. Verify a later `0 -> 0` hit and weakness non-match create no applied delay.
+4. Verify a defeated target and a finished battle produce no delay with the appropriate reason, then Reset/rebuild and verify old ActionIds do not carry over into the new TurnManager instance.
+
+## P8-004 1v1 delay correction
+
+- The first implementation's remove/append operation was a no-op when the broken enemy was already queue tail in `[Player, Enemy]`. It was replaced by the one-shot pending-skip model above.
+- Fresh post-correction build ran UHT, compiled `HSRTurnManager.cpp`/Coordinator dependencies, linked `UnrealEditor-HSR.lib/.dll`, and exited 0. `git diff --check` passed.
+
+---
+
+# TASK-P8-005 Execution Result
+
+## Status
+
+`IMPLEMENTED — build passed; user Widget configuration and PIE evidence pending` (2026-07-21).
+
+## Implemented read-only UI flow
+
+- GameMode creates and binds the command ViewModel to Coordinator, and explicitly unbinds it before battle teardown/reset.
+- ViewModel reads the selected target's immutable Weakness tags and current ASC Toughness/MaxToughness. It binds only the target's Toughness and MaxToughness attribute-change delegates; selection and Coordinator Resolution events refresh the same pure display data. No Tick is used.
+- ViewModel exposes display-only `WeaknessText`, `ToughnessText`, `BreakText`, and `DelayText`; Widget exposes matching pure getters. Break and Delay are derived from the cached pure Resolution plus Coordinator's recorded delay-registration outcome. UI writes no gameplay attribute, result, queue, or rule state.
+- Target delegate handles are removed before rebinding a selection and during GameMode teardown. Missing Widget configuration only skips widget creation; Coordinator/ASC/TurnManager rules remain independent.
+
+## Audit and verification
+
+- `P8-005 ViewModel Bind`, `P8-005 ViewModel Unbind`, and event-only `P8-005 View` logs audit lifecycle and displayed target/break/delay data.
+- `git diff --check` passed.
+- Fresh `HSREditor Win64 Development -NoHotReload` ran UHT, compiled ViewModel, Widget, Coordinator, and GameMode, linked `UnrealEditor-HSR.lib/.dll`, wrote metadata, and exited 0. Only existing toolchain/AIModule warnings appeared.
+
+## Required user Editor steps — WBP_BattleCommandPanel
+
+1. Open the existing `WBP_BattleCommandPanel`; confirm its parent class is `HSRBattleCommandWidget` and that `AHSRBattleGameMode.BattleCommandWidgetClass` references this Widget class.
+2. Add four TextBlocks, for example `WeaknessTextBlock`, `ToughnessTextBlock`, `BreakTextBlock`, and `DelayTextBlock`. Do not use UMG property bindings or Event Tick.
+3. In the Widget Event Graph, implement/override `Command View State Changed`. From that event, call `Get Weakness Text`, `Get Toughness Text`, `Get Break Text`, and `Get Delay Text` on `self`, then call `SetText` on the corresponding TextBlocks.
+4. Save, restart PIE, choose an enemy target, and verify the initial Weakness/Toughness values. Execute one matching hit and capture `P8-005 View` plus P8-003/P8-004 logs. Verify Toughness updates immediately, first break shows `Triggered`, delay shows `Registered`, replay/0-to-0 does not create another Break/Delay, and closing/reopening the Widget produces one bind/unbind pair per instance.
+
+## P8-005 normal PIE harness isolation correction
+
+- Added `bRunLegacyBattleHarnesses` as a `WITH_EDITORONLY_DATA` GameMode option, default `false`. It exclusively gates the former unconditional P5/P6 legacy harness calls; `bRunP7DamageHarness` remains a separate opt-in path.
+- With the default setting, normal PIE no longer lets legacy cards consume Toughness or overwrite the last Resolution before the player can test the UI manually.
+- `P8-005 View` is now `Log` verbosity so user PIE evidence appears in the normal Output Log filter.
+- Fresh post-correction Build ran UHT, C++, Link, and metadata writing with exit 0; `git diff --check` passed.
+
+## Updated Editor prerequisite
+
+Before normal P8 UI PIE, open the Battle GameMode Blueprint defaults and leave `Development > Legacy > Run Legacy Battle Harnesses` unchecked. Leave `Run P7 Damage Harness` unchecked too unless explicitly running that separate diagnostic suite.
+
+## P8-005 initialization GE prerequisite repair
+
+- Added required GameMode-configurable `ParticipantInitializationGameplayEffect`, passed to Coordinator before participant construction.
+- Formal participant order is now Spawn -> InitASC -> apply init GE once -> enemy Definition Toughness/MaxToughness override -> grant abilities -> TurnManager initialization. Reset/rebuild constructs fresh participants, so no old GE application state is reused.
+- Missing effect, invalid spec, or failed GAS application terminates `BuildParticipants` with structured `InitFailed` and `P8-005 InitGE` error logging. Successful applications log once per participant. UI remains read-only.
+- Fresh Build ran UHT, C++, Link, and metadata writing with exit 0; `git diff --check` passed.
+
+## Updated Editor binding / PIE steps
+
+1. Open `BP_HSRBattleGameMode` defaults and set `Participant Initialization Gameplay Effect` to the existing `BP_GE_InitializeCoreAttributes` asset. Do not create or modify a GE for this change.
+2. Confirm its instant modifiers initialize the normal core attributes. Enemy `InitialToughness` and `InitialMaxToughness` from the Enemy Definition are deliberately applied after this GE.
+3. Keep both legacy and P7 harness flags disabled for normal P8 UI PIE. Start PIE and require one `P8-005 InitGE ... Result=SUCCESS` record per spawned participant before the widget binds.
+4. If the effect reference is missing or cannot apply, expect `BuildParticipants` failure and no battle actions; correct the GameMode asset reference rather than writing attributes from UI.
+
+## InitGE post-apply validation correction
+
+- InitGE success now requires a valid resulting attribute state, not merely a successful GAS application call. Coordinator logs Health/MaxHealth, Energy/MaxEnergy, Speed, Toughness, and MaxToughness for every participant.
+- Admission requires finite values, `Health > 0`, `MaxHealth > 0`, `Health <= MaxHealth`, `Speed > 0`, and legal Energy/Toughness ranges. Any failure produces `InitFailed` before abilities, TurnManager, or UI are created.
+- Enemy Toughness/MaxToughness remains Definition-owned after InitGE and is logged separately as `P8-005 EnemyToughness` after the override.
+- Fresh post-correction Build compiled Coordinator, linked Editor binaries, and exited 0; `git diff --check` passed.
+
+## Updated Init GE authoring prerequisite
+
+In `BP_GE_InitializeCoreAttributes`, keep the Instant modifiers ordered as `MaxHealth -> Health`, `MaxEnergy -> Energy`, and `MaxToughness -> Toughness`. Set a positive Speed and ensure resulting Health is positive and no greater than MaxHealth. Do not compensate from Widget code.
+
+## Required user Editor configuration and PIE evidence
+
+1. Create `Content/GameplayEffects/BP_GE_P8_ToughnessDamage` as an Instant GE. Add exactly one Modifier: Attribute `IncomingToughnessDamage`, operation Additive, magnitude Set By Caller, data tag `Damage.Data.ToughnessDamage`. Do not add Health, Energy, SP, Turn, Break, Debuff, Cue, or execution modifiers.
+2. Assign this GE to `ToughnessDamageGameplayEffectClass` on each formal Basic/Skill/Ultimate Skill Definition. Assign an `Element.<Suffix>` and positive `ToughnessDamage`.
+3. On the Enemy Definition, assign matching `Weakness.<Suffix>` tags and valid positive initial Toughness/MaxToughness; retain matching values in its initialization GE.
+4. Restart the Editor, run a 1v1 PIE action, and capture logs or screenshots for matched subtraction, unmatched no-change, overkill clamp to zero with `ReachedZero`, duplicate ActionId no second subtraction, and a missing-GE failure whose HP damage remains applied.
+
+## Exclusions
+
+Break damage/result publication, Break Debuff, Turn Delay, UI, networking, SaveGame, AoE, and Phase 9 lifecycle work remain out of scope.
+
+---
+
+# TASK-P8-006 Execution Result
+
+## Status
+
+`BLOCKED — evidence audit complete; independent review required` (2026-07-21).
+
+## Scope and preservation
+
+- This P8-006 implementation-agent pass made no changes to `Source/`, `Content/`, `Config/`, `.uproject`, plugin, or third-party files. UE Editor and PIE were not started. No Git staging, commit, push, reset, clean, deletion, or rollback was performed.
+- The only intentional write is this P8-006 section in `tasks/execution-result.md`, as allowed by the active-task contract.
+- `git diff --check` completed without diff-content errors. Git emitted only its existing LF-to-CRLF conversion warnings for tracked text files.
+
+## Dirty-tree audit
+
+- `git status --short` shows a large uncommitted Phase 8 candidate set: modified `Config/DefaultGameplayTags.ini`; eight existing Content assets; Battle, Data, GAS, and UI source files; project/docs/journal/task files; and untracked `Content/GameplayEffects/BP_GE_P8_ToughnessDamage.uasset`, `Source/HSR/Data/HSRBreakTypes.h`, `docs/phase-8-execution-plan.md`, and P8-001 through P8-005 archive triplets.
+- `git diff --stat` reports 41 tracked files changed, 1321 insertions, and 110 deletions, plus the untracked files above. The candidate implementation paths correspond to the Phase 8 Element -> Weakness -> Toughness -> BreakResult -> Turn Delay -> read-only UI flow.
+- Static inspection found the expected concepts in the candidate source: Element/Toughness skill data, enemy Weakness/initial toughness, CoreAttributeSet toughness fields, `FHSRBreakResult`/`FHSRTurnDelayRequest`, ActionId cache/one-shot delay structures in Coordinator and TurnManager, and ViewModel/widget display-only interfaces.
+- P8-001 through P8-004 archived reviewer files retain `PASS WITH FOLLOW-UP`; P8-005 retains its historical `REVISE` conclusion. Existing Editor/PIE material remains inherited evidence and must be treated as `USER PROVIDED` unless independently reproduced by the user.
+
+## Build evidence
+
+- Attempted launcher path: `C:\Program Files\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat`.
+- Result: exit `2` before UBT launch because that path does not exist. This was an environment-path probe, not a source compile failure.
+- Actual engine path was recovered from the existing project UnrealVersionSelector log: `E:\programs\Epic Games\UE_5.6`.
+- Executed exactly once:
+
+  ```powershell
+  & 'E:\programs\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat' HSREditor Win64 Development 'E:\work\unreal_projects\HSR\HSR.uproject' -NoHotReload
+  ```
+
+- Actual result: exit `0`; UBT ran with bundled DotNet SDK `8.0.300`, identified the HSR project, and reported `Target is up to date`, followed by `Result: Succeeded` and total execution time `0.71 seconds`.
+- UHT/C++/Link evidence: **NOT VERIFIED in this run**. Since the target was already up to date, UBT did not emit UHT, C++ compilation, link, or metadata-writing steps. No build error exists; consequently there is no source first-error location to report.
+
+## Blocking conditions and handoff
+
+- The active contract requires auditable fresh UHT/C++/Link evidence (or an accurately recorded build failure). The one permitted Build invocation succeeded but did not recompile, so it does not provide that stronger evidence.
+- The dirty tree contains user assets, candidate implementation files, role-specific Markdown, and archives without commits or another provenance boundary. This implementation agent cannot safely attribute each modification to user, Implementation, Teacher, Reviewer, or Coordinator from Git state alone.
+- Per the active-task stop condition, no implementation change will be attempted to force a rebuild or resolve ownership. Independent Reviewer must preserve these limitations and determine the Gate outcome. User-run Editor/PIE evidence, if later requested by Reviewer, remains outside agent execution.
+
+## P8-006 Rebuild revision (user-confirmed)
+
+### Rebuild evidence
+
+```powershell
+& 'E:\programs\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat' HSREditor Win64 Development 'E:\work\unreal_projects\HSR\HSR.uproject' -Rebuild -NoHotReload -WaitMutex
+```
+
+- Exit code: `0`; UBT cleaned HSREditor derived binaries, created the makefile, and ran 18 actions. No Editor/Live Coding lock was reported.
+- UHT: `NOT RUN / not listed by UBT` for this invocation; UBT proceeded directly to the C++ action graph after makefile creation. This is not represented as a successful UHT action.
+- HSR C++ compilation: completed for `HSRDamageEffectContext.cpp`, `HSRBattleCommandWidget.cpp`, `HSREnemyDefinition.cpp`, `HSRCoreAttributeSet.cpp`, `HSRBattleCommandViewModel.cpp`, `HSRDamageExecutionCalculation.cpp`, `HSRBattleCoordinator.cpp`, `HSRGameplayAbilityBase.cpp`, `HSRTurnManager.cpp`, `HSRBattleGameMode.cpp`, and `Module.HSR.1/2/3.cpp`.
+- Link: completed `UnrealEditor-HSR.lib` and `UnrealEditor-HSR.dll`.
+- Metadata: completed `WriteMetadata HSREditor.target`.
+- First real error: none. The output contains only existing toolchain/API warnings, including the non-preferred MSVC 14.51.36248 warning and engine deprecation warnings.
+- Scope preservation: `-Rebuild` was the only mechanism used to recreate ignored derived `Binaries/Intermediate` output. No Git clean/reset, manual delete/touch, source, Content, or Config modification was performed.
+
+### Dirty-tree attribution manifest
+
+Method: current `git status --porcelain=v2`, P8 active/archived task allowlists, role-file rules, and Content SHA-256 snapshots. `ATTRIBUTED` requires evidence for the complete current file content; ordinary binary diffs and file names do not prove an asset author. Every entry below is therefore `UNRESOLVED` unless a future user declaration or isolated commit supplies provenance.
+
+| Path | Git state | Candidate role / task | Evidence source | Status |
+|---|---|---|---|---|
+| `Config/DefaultGameplayTags.ini` | tracked `.M` | User Editor asset / P8-001 | asset-candidate rule only | UNRESOLVED |
+| `Content/Blueprints/Framework/BP_HSRBattleGameMode.uasset` | tracked `.M`; SHA256 `6D13CC885132661395B56ECA57A4B5BD448D561D41A8B2E09A4AF2F224CD38AC` | User Editor asset / P8-005 | binary asset; no author proof | UNRESOLVED |
+| `Content/Data/Enemies/DA_Enemy_Phase5Test1.uasset` | tracked `.M`; SHA256 `A6D08ED109B2D07676F5EA4EB03226812247611380186EDC324B0B9D47D2A405` | User Editor asset / P8-001/002 | binary asset; no author proof | UNRESOLVED |
+| `Content/Data/Skills/DA_BasicAttack_Single_Test.uasset` | tracked `.M`; SHA256 `A4C20A4275DB1F92A3E5A740B066BE5C7C3B116642024F10040A5F39AF53A8D5` | User Editor asset / P8-001/002 | binary asset; no author proof | UNRESOLVED |
+| `Content/Data/Skills/DA_Skill_Single_Test.uasset` | tracked `.M`; SHA256 `D2293D342300F86467364463488FBA85FC60DC20398D7AB9BE5393FE3A855BB0` | User Editor asset / P8-001/002 | binary asset; no author proof | UNRESOLVED |
+| `Content/Data/Skills/DA_Ultimate_Single_Test.uasset` | tracked `.M`; SHA256 `22E79E43D5A8709B40D1DBD1E0EEC7B5B7A3891D7223CB9349741166AB352A33` | User Editor asset / P8-001/002 | binary asset; no author proof | UNRESOLVED |
+| `Content/GameplayEffects/BP_GE_InitializeCoreAttributes.uasset` | tracked `.M`; SHA256 `9F54A33603D93CACDE197B4A04740DCA624383B424D99E818C95C44D1140F4EE` | User Editor asset / P8-005 | binary asset; no author proof | UNRESOLVED |
+| `Content/GameplayEffects/BP_GE_P8_ToughnessDamage.uasset` | untracked; SHA256 `38A921B99EEFF51A759DAAD7C09D49CDADC5ADF9EFA86BB13715ABB3A10316ED` | User Editor asset / P8-002 | binary asset; no author proof | UNRESOLVED |
+| `Content/UI/WBP_BattleCommandPanel.uasset` | tracked `.M`; SHA256 `0F7BD023655D5EDC744464762C4C550FCBA277EADF0421A190A91A038CCD32E5` | User Editor asset / P8-005 | binary asset; no author proof | UNRESOLVED |
+| `Source/HSR/Battle/HSRBattleCoordinator.cpp` | tracked `.M` | Implementation / P8-002/003/004/005 | P8 allowlists + static audit | UNRESOLVED |
+| `Source/HSR/Battle/HSRBattleCoordinator.h` | tracked `.M` | Implementation / P8-002/003/004/005 | P8 allowlists + static audit | UNRESOLVED |
+| `Source/HSR/Battle/HSRBattleGameMode.cpp` | tracked `.M` | Implementation / P8-001/005 | P8 allowlists + static audit | UNRESOLVED |
+| `Source/HSR/Battle/HSRBattleGameMode.h` | tracked `.M` | Implementation / P8-001/005 | P8 allowlists + static audit | UNRESOLVED |
+| `Source/HSR/Battle/HSRBattleParticipant.h` | tracked `.M` | Implementation / P8-003 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/Battle/HSRTurnManager.cpp` | tracked `.M` | Implementation / P8-004 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/Battle/HSRTurnManager.h` | tracked `.M` | Implementation / P8-004 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/Data/Definitions/HSREnemyDefinition.cpp` | tracked `.M` | Implementation / P8-001/002 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/Data/Definitions/HSREnemyDefinition.h` | tracked `.M` | Implementation / P8-001/002 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/Data/HSRSkillDefinition.h` | tracked `.M` | Implementation / P8-001/002 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/Data/HSRBreakTypes.h` | untracked | Implementation / P8-001/003/004 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/GAS/Ability/HSRAbilityTypes.h` | tracked `.M` | Implementation / P8-002/003 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/GAS/Ability/HSRGameplayAbilityBase.cpp` | tracked `.M` | Implementation / P8-002 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/GAS/Attribute/HSRCoreAttributeSet.cpp` | tracked `.M` | Implementation / P8-001/002 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/GAS/Attribute/HSRCoreAttributeSet.h` | tracked `.M` | Implementation / P8-001/002 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/GAS/Damage/HSRDamageEffectContext.cpp` | tracked `.M` | Implementation / P8-002/003 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/GAS/Damage/HSRDamageEffectContext.h` | tracked `.M` | Implementation / P8-002/003 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/GAS/Damage/HSRDamageExecutionCalculation.cpp` | tracked `.M` | Implementation / P8-002/003 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/GAS/Damage/HSRDamageTypes.h` | tracked `.M` | Implementation / P8-002/003 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/UI/HSRBattleCommandViewModel.cpp` | tracked `.M` | Implementation / P8-005 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/UI/HSRBattleCommandViewModel.h` | tracked `.M` | Implementation / P8-005 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/UI/HSRBattleCommandWidget.cpp` | tracked `.M` | Implementation / P8-005 | P8 allowlist + static audit | UNRESOLVED |
+| `Source/HSR/UI/HSRBattleCommandWidget.h` | tracked `.M` | Implementation / P8-005 | P8 allowlist + static audit | UNRESOLVED |
+| `learning-journal.md` | tracked `.M` | Teacher candidate / P8-006 | role-file rule; mixed existing content | UNRESOLVED |
+| `tasks/final-review.md` | tracked `.M` | Reviewer candidate / P8-006 | role-file rule; mixed existing content | UNRESOLVED |
+| `tasks/execution-result.md` | tracked `.M` | Implementation candidate / P8-001..006 | role-file rule; prior mixed content (this P8-006 revision is agent-recorded) | UNRESOLVED |
+| `tasks/active-task.md` | tracked `.M` | Coordinator candidate / P8-006 | role-file rule; mixed existing content | UNRESOLVED |
+| `PROJECT_STATE.md` | tracked `.M` | Coordinator candidate / P8 | role-file rule; mixed existing content | UNRESOLVED |
+| `README.md` | tracked `.M` | Coordinator candidate / P8 | role-file rule; mixed existing content | UNRESOLVED |
+| `todo_plan.md` | tracked `.M` | Coordinator candidate / P8 | role-file rule; mixed existing content | UNRESOLVED |
+| `worklog.md` | tracked `.M` | Coordinator candidate / P8 | role-file rule; mixed existing content | UNRESOLVED |
+| `docs/phase-8-execution-plan.md` | untracked | Coordinator candidate / P8 | role-file rule; no commit boundary | UNRESOLVED |
+| `docs/battle-system-design.md` | tracked `.M` | Coordinator candidate / P8 | document relationship only | UNRESOLVED |
+| `docs/gas-notes.md` | tracked `.M` | Coordinator candidate / P8 | document relationship only | UNRESOLVED |
+| `docs/phase-7-execution-plan.md` | tracked `.M` | Coordinator candidate / P7/P8 | document relationship only | UNRESOLVED |
+| `tasks/p7-005-teacher-review.md` | untracked | Teacher candidate / P7-005 | filename only; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P7-004-active-task.md` | untracked | Coordinator candidate / P7-004 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P7-004-execution-result.md` | untracked | Implementation candidate / P7-004 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P7-004-final-review.md` | untracked | Reviewer candidate / P7-004 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P7-005-active-task.md` | untracked | Coordinator candidate / P7-005 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-001-active-task.md` | untracked | Coordinator candidate / P8-001 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-001-execution-result.md` | untracked | Implementation candidate / P8-001 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-001-final-review.md` | untracked | Reviewer candidate / P8-001 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-002-active-task.md` | untracked | Coordinator candidate / P8-002 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-002-execution-result.md` | untracked | Implementation candidate / P8-002 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-002-final-review.md` | untracked | Reviewer candidate / P8-002 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-003-active-task.md` | untracked | Coordinator candidate / P8-003 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-003-execution-result.md` | untracked | Implementation candidate / P8-003 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-003-final-review.md` | untracked | Reviewer candidate / P8-003 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-004-active-task.md` | untracked | Coordinator candidate / P8-004 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-004-execution-result.md` | untracked | Implementation candidate / P8-004 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-004-final-review.md` | untracked | Reviewer candidate / P8-004 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-005-active-task.md` | untracked | Coordinator candidate / P8-005 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-005-execution-result.md` | untracked | Implementation candidate / P8-005 | archive role rule; no commit boundary | UNRESOLVED |
+| `tasks/archive/TASK-P8-005-final-review.md` | untracked | Reviewer candidate / P8-005 | archive role rule; no commit boundary | UNRESOLVED |
+
+### Remaining verification / handoff
+
+- The Rebuild now supplies the requested HSR compile, lib/dll link, metadata, and exit-code evidence. It does **not** supply a UHT action in its own output; preserve that limitation as `NOT VERIFIED` for this revision.
+- All user Editor/PIE paths, failure-path reproduction, and inherited P8 follow-ups remain `USER PROVIDED` or `NOT VERIFIED` as previously recorded. No agent ran Editor or PIE.
+- Because every file-level provenance entry remains `UNRESOLVED`, this implementation agent cannot authorize staging, committing, or reclassification. Hand off the Build evidence and manifest to Teacher/Independent Reviewer.
+
+## P8-006 ForceHeaderGeneration revision (user-confirmed)
+
+### Locked command
+
+```powershell
+& 'E:\programs\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat' HSREditor Win64 Development 'E:\work\unreal_projects\HSR\HSR.uproject' -ForceHeaderGeneration -NoHotReload -WaitMutex
+```
+
+### Actual result
+
+- Exit code: `6`.
+- UBT launch: started with bundled DotNet SDK `8.0.300` and forwarded the locked target/configuration/project/options exactly as shown above.
+- First real error: `UnauthorizedAccessException: Access to the path 'C:\Users\Lai\AppData\Local\UnrealEngine\Intermediate\Build\UnrealBuildTool.Env.BuildConfiguration.xml' is denied.`
+- Failure site: `UnrealBuildTool.XmlConfig.WriteEnvironmentXml` while reading/writing UBT configuration, before action-graph or header-generation execution.
+- UHT/header generation: **NOT RUN**; no UHT action appeared.
+- HSR C++ compile: **NOT RUN**.
+- `UnrealEditor-HSR.lib/.dll` Link: **NOT RUN**.
+- Metadata writing: **NOT RUN**.
+- UBT summary: `Result: Failed (OtherCompilationError)`; total execution time `1.42 seconds`.
+
+### Stop and preservation
+
+- The active-task stop condition was met by the first real error and absence of a UHT action. No retry, privilege expansion, alternate command, source/asset/config edit, reset/clean, manual deletion, or touch was attempted.
+- The earlier successful `-Rebuild` C++/Link/metadata/exit-0 evidence remains unchanged; fresh UHT remains `NOT VERIFIED` after this failed revision.
+- Only this execution-report section was intentionally updated. No staging, commit, or push was performed.
+
+### Approved sandbox-external retry
+
+The initial exit `6` was identified as sandbox denial of the user-level UBT configuration path. Following the environment escalation rule, the exact same locked command was rerun once outside the sandbox after approval; no argument or project file was changed.
+
+- Command: identical `Build.bat HSREditor Win64 Development <uproject> -ForceHeaderGeneration -NoHotReload -WaitMutex` command recorded above.
+- Exit code: `0`.
+- Fresh UHT action: **VERIFIED**. UBT reported `Parsing headers for HSREditor` and ran:
+
+  ```text
+  Internal UnrealHeaderTool E:\work\unreal_projects\HSR\HSR.uproject E:\work\unreal_projects\HSR\Intermediate\Build\Win64\HSREditor\Development\HSREditor.uhtmanifest -WarningsAsErrors -installed
+  ```
+
+- Header-generation result: `Total of 0 written`; `Reflection code generated for HSREditor in 6.7486976 seconds`.
+- Subsequent build state: `Target is up to date`; therefore this retry did not perform a second HSR C++ compile, lib/dll Link, or metadata write and does not claim those actions.
+- UBT summary: `Result: Succeeded`; total execution time `7.78 seconds`.
+- First real error in the approved retry: none. The previous sandbox `UnauthorizedAccessException` remains preserved above as environment evidence, not a project/UHT failure.
+- Combined Build evidence: the earlier `-Rebuild` invocation verifies HSR C++ compile, `UnrealEditor-HSR.lib/.dll` Link, metadata, and exit `0`; this approved `-ForceHeaderGeneration` retry verifies fresh UHT and exit `0` against the same working tree.
+- No Source, Content, Config, or `.uproject` file was changed; only ignored UBT/Intermediate generation was permitted. No reset/clean, manual deletion/touch, Editor/PIE, stage, commit, or push was performed.

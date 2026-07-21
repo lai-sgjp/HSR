@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "HSRBattleTypes.h"
+#include "HSREncounterTypes.h"
 #include "HSRBattleParticipant.h"
 #include "../UI/HSRBattleCommandTypes.h"
 #include "../GAS/Damage/HSRDamageTypes.h"
@@ -13,6 +14,7 @@ class UHSRTurnManager;
 class UHSRSkillDefinition;
 class UHSRDamageRuleDefinition;
 class UGameplayEffect;
+class UHSREnemyDefinition;
 struct FOnAttributeChangeData;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleResultReadyDelegate, const FHSRBattleResult&);
@@ -55,11 +57,19 @@ public:
 	void SetUltimateDefinition(UHSRSkillDefinition* InDefinition) { UltimateDefinition = InDefinition; }
 	void SetSkillDefinition(UHSRSkillDefinition* InDefinition) { SkillDefinition = InDefinition; }
 	void SetHealDefinition(UHSRSkillDefinition* InDefinition) { HealDefinition = InDefinition; }
+	void SetEnemyDefinition(UHSREnemyDefinition* InDefinition) { EnemyDefinition = InDefinition; }
+	void SetParticipantInitializationGameplayEffect(TSubclassOf<UGameplayEffect> InEffect) { ParticipantInitializationGameplayEffect = InEffect; }
 	const FHSRTeamResourceState& GetTeamResourceState() const { return TeamResourceState; }
+	bool WasLastBreakDelayRegistered() const { return bLastBreakDelayRegistered; }
+	FGuid GetLastBreakDelayActionId() const { return LastBreakDelayActionId; }
 	/** Event-driven, pure-value UI snapshot. Consumers never receive runtime Actors or ASCs. */
 	FHSRBattleCommandStateReadyDelegate& OnCommandStateReady() { return CommandStateReady; }
 	FHSRBattleCommandViewState GetCommandViewState() const;
 #if WITH_EDITOR
+	void SetDamageTestInjectionForAction(const FGuid& ActionId, EHSRDamageTestInjection InInjection) { DamageTestInjectionActionId = ActionId; NextDamageTestInjection = InInjection; }
+	void ClearDamageTestInjection() { DamageTestInjectionActionId = FGuid(); NextDamageTestInjection = EHSRDamageTestInjection::None; }
+	const FHSRFormalDamageExecutionResult& GetLastDevelopmentFormalExecutionResult() const { return LastDevelopmentFormalExecutionResult; }
+	FHSRBattleInitResult ResetAndRebuildForDevelopmentTest(UWorld* BattleWorld);
 	void SetTeamSkillPointsForDevelopmentTest(int32 Current, int32 Max) { TeamResourceState.MaxSkillPoints = FMath::Max(0, Max); TeamResourceState.CurrentSkillPoints = FMath::Clamp(Current, 0, TeamResourceState.MaxSkillPoints); }
 	void InitializeDevelopmentDamageRng(int32 InSeed);
 	int32 GetDevelopmentDamageConsumeCount() const { return DevelopmentDamageConsumeCount; }
@@ -90,6 +100,8 @@ private:
 	TMap<FGuid, FHSRAbilityResolution> ProcessedActionResolutions;
 	FHSRAbilityResolution LastActionResolution;
 	FHSRTeamResourceState TeamResourceState;
+	bool bLastBreakDelayRegistered = false;
+	FGuid LastBreakDelayActionId;
 	TMap<FGuid, FHSRSkillPointReservation> SkillPointReservations;
 	UPROPERTY()
 	TObjectPtr<UHSRSkillDefinition> BasicAttackDefinition;
@@ -98,12 +110,20 @@ private:
 	UPROPERTY()
 	TObjectPtr<UHSRSkillDefinition> SkillDefinition;
 	UPROPERTY() TObjectPtr<UHSRSkillDefinition> HealDefinition;
+	UPROPERTY() TObjectPtr<UHSREnemyDefinition> EnemyDefinition;
+	TSubclassOf<UGameplayEffect> ParticipantInitializationGameplayEffect;
 	FHSRBattleResultReadyDelegate BattleResultReady;
 	FHSRBattleCommandStateReadyDelegate CommandStateReady;
 	FRandomStream DevelopmentDamageRandomStream;
 	int32 DevelopmentDamageSeed = 1337;
 	int32 DevelopmentDamageConsumeCount = 0;
 	TMap<FGuid, FHSRDamageResult> DevelopmentDamageResults;
+#if WITH_EDITOR
+	EHSRDamageTestInjection NextDamageTestInjection = EHSRDamageTestInjection::None;
+	FGuid DamageTestInjectionActionId;
+	FHSRFormalDamageExecutionResult LastDevelopmentFormalExecutionResult;
+	TOptional<FHSREncounterRequest> LastSubmittedRequestForDevelopment;
+#endif
 	/** Health observers defer terminal publication while the one synchronous
 	 * formal-damage application is still transactional. */
 	bool bFormalDamageTransactionOpen = false;
@@ -114,6 +134,7 @@ private:
 
 	AActor* SpawnParticipantActor(UWorld* World, const FHSRBattleParticipantDefinition& Definition);
 	bool InitParticipantASC(AActor* TargetActor);
+	bool ApplyParticipantInitializationGameplayEffect(const FHSRBattleParticipant& Participant);
 	bool GrantBasicAttackAbility(const FHSRBattleParticipant& Participant);
 	bool GrantUltimateAbility(const FHSRBattleParticipant& Participant);
 	bool GrantSkillAbility(const FHSRBattleParticipant& Participant);

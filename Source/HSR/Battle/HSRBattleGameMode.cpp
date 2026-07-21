@@ -9,6 +9,8 @@
 #include "../GAS/Ability/HSRSkillAbility.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "../Data/HSRSkillDefinition.h"
+#include "../Data/Definitions/HSREnemyDefinition.h"
+#include "../Data/HSRBreakTypes.h"
 #include "../UI/HSRBattleCommandViewModel.h"
 #include "../UI/HSRBattleCommandWidget.h"
 #include "Blueprint/UserWidget.h"
@@ -16,6 +18,65 @@
 #if WITH_EDITOR
 namespace HSRBattleDevelopmentTest
 {
+	struct FP8Snapshot
+	{
+		float Health = 0.0f;
+		float Toughness = 0.0f;
+		FName Turn = NAME_None;
+		int32 SkillPoints = 0;
+		int32 Rng = 0;
+	};
+
+	static FP8Snapshot CaptureP8Snapshot(const UHSRBattleCoordinator* Coordinator)
+	{
+		FP8Snapshot Snapshot;
+		if (!Coordinator) return Snapshot;
+		Snapshot.SkillPoints = Coordinator->GetTeamResourceState().CurrentSkillPoints;
+		Snapshot.Rng = Coordinator->GetDevelopmentDamageConsumeCount();
+		if (const UHSRTurnManager* TurnManager = Coordinator->GetTurnManager()) Snapshot.Turn = TurnManager->GetCurrentParticipantId();
+		for (const FHSRBattleParticipant& Participant : Coordinator->GetParticipants())
+		{
+			if (Participant.AbilitySystemComponent.IsValid())
+			{
+				Snapshot.Health = Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+				Snapshot.Toughness = Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetToughnessAttribute());
+				break;
+			}
+		}
+		return Snapshot;
+	}
+
+	static void RunP8ContractHarness(const UHSRBattleCoordinator* Coordinator)
+	{
+		const auto RunCase = [Coordinator](const TCHAR* Name, EHSRElementToughnessContractResult Actual, EHSRElementToughnessContractResult Expected)
+		{
+			const FP8Snapshot Before = CaptureP8Snapshot(Coordinator);
+			const FP8Snapshot After = CaptureP8Snapshot(Coordinator);
+			const bool bNoMutation = Before.Health == After.Health && Before.Toughness == After.Toughness && Before.Turn == After.Turn && Before.SkillPoints == After.SkillPoints && Before.Rng == After.Rng;
+			const bool bPass = Actual == Expected && bNoMutation;
+			if (bPass)
+			{
+				UE_LOG(LogTemp, Log, TEXT("P8-001 Contract Case=%s Result=PASS Reason=%d HPBefore=%f HPAfter=%f ToughnessBefore=%f ToughnessAfter=%f TurnBefore=%s TurnAfter=%s ResourceBefore=%d ResourceAfter=%d RNGBefore=%d RNGAfter=%d NoMutation=%d"), Name, static_cast<int32>(Actual), Before.Health, After.Health, Before.Toughness, After.Toughness, *Before.Turn.ToString(), *After.Turn.ToString(), Before.SkillPoints, After.SkillPoints, Before.Rng, After.Rng, bNoMutation ? 1 : 0);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("P8-001 Contract Case=%s Result=FAIL Reason=%d HPBefore=%f HPAfter=%f ToughnessBefore=%f ToughnessAfter=%f TurnBefore=%s TurnAfter=%s ResourceBefore=%d ResourceAfter=%d RNGBefore=%d RNGAfter=%d NoMutation=%d"), Name, static_cast<int32>(Actual), Before.Health, After.Health, Before.Toughness, After.Toughness, *Before.Turn.ToString(), *After.Turn.ToString(), Before.SkillPoints, After.SkillPoints, Before.Rng, After.Rng, bNoMutation ? 1 : 0);
+			}
+		};
+		const FGameplayTag ElementRoot = FGameplayTag::RequestGameplayTag(TEXT("Element"), false);
+		const FGameplayTag WeaknessRoot = FGameplayTag::RequestGameplayTag(TEXT("Weakness"), false);
+		FGameplayTagContainer ValidWeaknesses; ValidWeaknesses.AddTag(WeaknessRoot);
+		FGameplayTagContainer InvalidWeaknesses; InvalidWeaknesses.AddTag(ElementRoot);
+		const EHSRElementToughnessContractResult ValidResult = FHSRToughnessConfiguration::ValidateElement(ElementRoot) == EHSRElementToughnessContractResult::Valid && FHSRToughnessConfiguration::ValidateWeaknesses(ValidWeaknesses) == EHSRElementToughnessContractResult::Valid && FHSRToughnessConfiguration::ValidateToughnessDamage(1.0f) == EHSRElementToughnessContractResult::Valid && FHSRToughnessConfiguration::ValidateInitialToughness(1.0f, 1.0f) == EHSRElementToughnessContractResult::Valid ? EHSRElementToughnessContractResult::Valid : EHSRElementToughnessContractResult::InvalidElementTag;
+		RunCase(TEXT("ValidContract"), ValidResult, EHSRElementToughnessContractResult::Valid);
+		RunCase(TEXT("MissingElement"), FHSRToughnessConfiguration::ValidateElement(FGameplayTag()), EHSRElementToughnessContractResult::MissingElement);
+		RunCase(TEXT("EmptyWeakness"), FHSRToughnessConfiguration::ValidateWeaknesses(FGameplayTagContainer()), EHSRElementToughnessContractResult::EmptyWeaknesses);
+		RunCase(TEXT("InvalidWeaknessTag"), FHSRToughnessConfiguration::ValidateWeaknesses(InvalidWeaknesses), EHSRElementToughnessContractResult::InvalidWeaknessTag);
+		RunCase(TEXT("InvalidToughnessDamage"), FHSRToughnessConfiguration::ValidateToughnessDamage(0.0f), EHSRElementToughnessContractResult::InvalidToughnessDamage);
+		RunCase(TEXT("InvalidInitialToughness"), FHSRToughnessConfiguration::ValidateInitialToughness(0.0f, 1.0f), EHSRElementToughnessContractResult::InvalidInitialToughness);
+		UE_LOG(LogTemp, Log, TEXT("P8-001 Contract Harness=COMPLETE"));
+	}
+
 	static void LogCase(const TCHAR* CaseName, bool bPassed)
 	{
 		if (bPassed)
@@ -479,6 +540,8 @@ void AHSRBattleGameMode::BeginPlay()
 	Coordinator->SetUltimateDefinition(UltimateSkillDefinition);
 	Coordinator->SetSkillDefinition(SkillSkillDefinition);
 	Coordinator->SetHealDefinition(HealSkillDefinition);
+	Coordinator->SetEnemyDefinition(EnemyDefinition);
+	Coordinator->SetParticipantInitializationGameplayEffect(ParticipantInitializationGameplayEffect);
 #if WITH_EDITOR
 	Coordinator->InitializeDevelopmentDamageRng(DevelopmentDamageSeed);
 #endif
@@ -499,6 +562,13 @@ void AHSRBattleGameMode::BeginPlay()
 			*BuildResult.Message.ToString(), static_cast<int32>(BuildResult.FailureType), *BuildResult.TargetDefinitionId.ToString());
 		return;
 	}
+
+#if WITH_EDITOR
+	if (bRunP8ContractHarness)
+	{
+		HSRBattleDevelopmentTest::RunP8ContractHarness(Coordinator);
+	}
+#endif
 
 #if WITH_EDITOR
 	if (bRunP7DamageHarness && Coordinator->GetParticipants().Num() >= 2)
@@ -659,6 +729,8 @@ void AHSRBattleGameMode::BeginPlay()
 				const float EnergyBefore = Source.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
 				const float HPBefore = Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
 				FHSRBattleActionCommand Command; Command.ActionId = FGuid::NewGuid(); Command.BattleId = Coordinator->GetCurrentRequestId(); Command.ActorParticipantId = Source.ParticipantId; Command.SkillId = Definition->SkillId; Command.TargetParticipantIds.Add(Target.ParticipantId);
+				Coordinator->ClearDamageTestInjection();
+				Coordinator->SetDamageTestInjectionForAction(Command.ActionId, EHSRDamageTestInjection::None);
 				const FHSRAbilityResolution FirstResolution = Coordinator->RequestAction(Command);
 				const float HPAfter = Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
 				const float EnergyAfter = Source.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
@@ -687,6 +759,7 @@ void AHSRBattleGameMode::BeginPlay()
 
 	Coordinator->OnBattleResultReady().AddUObject(this, &AHSRBattleGameMode::HandleBattleResultReady);
 	CommandViewModel = NewObject<UHSRBattleCommandViewModel>(this);
+	CommandViewModel->BindCoordinator(Coordinator);
 	CommandStateReadyHandle = Coordinator->OnCommandStateReady().AddUObject(this, &AHSRBattleGameMode::HandleCommandStateReady);
 	HandleCommandStateReady(Coordinator->GetCommandViewState());
 	if (BattleCommandWidgetClass)
@@ -734,16 +807,57 @@ void AHSRBattleGameMode::BeginPlay()
 	}
 
 #if WITH_EDITOR
-	HSRBattleDevelopmentTest::Run(Coordinator);
-	HSRBattleDevelopmentTest::RunP6Ultimate(Coordinator, UltimateSkillDefinition);
-	HSRBattleDevelopmentTest::RunP6SkillPoints(Coordinator, SkillSkillDefinition);
-	HSRBattleDevelopmentTest::RunP6HealAndViewState(Coordinator, HealSkillDefinition);
+	Coordinator->ClearDamageTestInjection();
+	if (bRunLegacyBattleHarnesses)
+	{
+		HSRBattleDevelopmentTest::Run(Coordinator);
+		HSRBattleDevelopmentTest::RunP6Ultimate(Coordinator, UltimateSkillDefinition);
+		HSRBattleDevelopmentTest::RunP6SkillPoints(Coordinator, SkillSkillDefinition);
+		HSRBattleDevelopmentTest::RunP6HealAndViewState(Coordinator, HealSkillDefinition);
+	}
+	if (bRunP7DamageHarness && Coordinator && Coordinator->GetCurrentState() == EHSRBattleCoordinatorState::Spawned && Coordinator->GetParticipants().Num() == 2)
+	{
+		const auto RunInjectedFailure = [this](const TCHAR* CaseName, EHSRDamageTestInjection Injection, const UHSRSkillDefinition* Definition, EHSRDamageResultType Expected)
+		{
+			const FHSRBattleParticipant& Source = Coordinator->GetParticipants()[0]; const FHSRBattleParticipant& Target = Coordinator->GetParticipants()[1];
+			Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), 120.0f); Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), 80.0f);
+			Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(), 1000.0f); Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 1000.0f);
+			Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxEnergyAttribute(), 100.0f); Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetEnergyAttribute(), 100.0f);
+			Coordinator->SetTeamSkillPointsForDevelopmentTest(2, 3); Coordinator->GetTurnManager()->Initialize(Coordinator->GetParticipants());
+			const float HPBefore = Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()); const float EnergyBefore = Source.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute()); const int32 SPBefore = Coordinator->GetTeamResourceState().CurrentSkillPoints; const int32 RNGBefore = Coordinator->GetDevelopmentDamageConsumeCount(); const FName TurnBefore = Coordinator->GetTurnManager()->GetCurrentParticipantId();
+			FHSRBattleActionCommand Command; Command.ActionId=FGuid::NewGuid(); Command.BattleId=Coordinator->GetCurrentRequestId(); Command.ActorParticipantId=Source.ParticipantId; Command.SkillId=Definition->SkillId; Command.TargetParticipantIds.Add(Target.ParticipantId);
+			Coordinator->ClearDamageTestInjection(); Coordinator->SetDamageTestInjectionForAction(Command.ActionId,Injection); const FHSRAbilityResolution First=Coordinator->RequestAction(Command); const FHSRFormalDamageExecutionResult Execution=Coordinator->GetLastDevelopmentFormalExecutionResult(); Coordinator->ClearDamageTestInjection(); const FHSRAbilityResolution Replay=Coordinator->RequestAction(Command);
+			const float HPAfter=Target.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()); const float EnergyAfter=Source.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
+			const bool bRefundCase=Injection==EHSRDamageTestInjection::ForcePostCostApplyFailure;
+			const bool bPass=First.Status==EHSRAbilityResolutionStatus::Rejected && First.bHasDamageResult && First.DamageResult.Result==Expected && Replay.Status==First.Status && FMath::IsNearlyEqual(HPBefore,HPAfter) && FMath::IsNearlyEqual(EnergyBefore,EnergyAfter) && SPBefore==Coordinator->GetTeamResourceState().CurrentSkillPoints && RNGBefore==Coordinator->GetDevelopmentDamageConsumeCount() && TurnBefore==Coordinator->GetTurnManager()->GetCurrentParticipantId() && Coordinator->GetCurrentState()==EHSRBattleCoordinatorState::Spawned && (!bRefundCase || (Execution.bCostCommitted && Execution.bRefundApplied && FMath::IsNearlyEqual(Execution.EnergyBefore,100.0f) && FMath::IsNearlyEqual(Execution.EnergyAfter,100.0f)));
+			if (bPass) { UE_LOG(LogTemp,Log,TEXT("P7-004 Matrix Case=%s Result=PASS ActionId=%s DamageResult=%d HP=%.2f Energy=%.2f SP=%d RNG=%d Turn=%s Cost=%d Refund=%d EnergyExec=%.2f->%.2f"),CaseName,*Command.ActionId.ToString(),static_cast<int32>(First.DamageResult.Result),HPAfter,EnergyAfter,Coordinator->GetTeamResourceState().CurrentSkillPoints,Coordinator->GetDevelopmentDamageConsumeCount(),*TurnBefore.ToString(),Execution.bCostCommitted?1:0,Execution.bRefundApplied?1:0,Execution.EnergyBefore,Execution.EnergyAfter); }
+			else { UE_LOG(LogTemp,Error,TEXT("P7-004 Matrix Case=%s Result=FAIL ActionId=%s DamageResult=%d HPBefore=%.2f HPAfter=%.2f EnergyBefore=%.2f EnergyAfter=%.2f SPBefore=%d SPAfter=%d RNGBefore=%d RNGAfter=%d"),CaseName,*Command.ActionId.ToString(),static_cast<int32>(First.DamageResult.Result),HPBefore,HPAfter,EnergyBefore,EnergyAfter,SPBefore,Coordinator->GetTeamResourceState().CurrentSkillPoints,RNGBefore,Coordinator->GetDevelopmentDamageConsumeCount()); }
+		};
+		RunInjectedFailure(TEXT("CaptureFailed"),EHSRDamageTestInjection::ForceCaptureFailed,BasicAttackSkillDefinition,EHSRDamageResultType::CaptureFailed);
+		RunInjectedFailure(TEXT("InvalidCapturedValue"),EHSRDamageTestInjection::ForceInvalidCapturedValue,BasicAttackSkillDefinition,EHSRDamageResultType::InvalidCapturedValue);
+		RunInjectedFailure(TEXT("UltimatePostCostApplyFailureRefund"),EHSRDamageTestInjection::ForcePostCostApplyFailure,UltimateSkillDefinition,EHSRDamageResultType::EffectApplicationFailed);
+		const FHSRBattleParticipant& OverkillSource=Coordinator->GetParticipants()[0]; const FHSRBattleParticipant& OverkillTarget=Coordinator->GetParticipants()[1];
+		OverkillSource.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(),120.0f); OverkillTarget.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(),80.0f); OverkillSource.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetAttackAttribute(),10.0f); OverkillTarget.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(),100.0f); OverkillTarget.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(),1.0f); Coordinator->SetTeamSkillPointsForDevelopmentTest(1,3); Coordinator->GetTurnManager()->Initialize(Coordinator->GetParticipants());
+		FHSRBattleActionCommand OverkillCommand; OverkillCommand.ActionId=FGuid::NewGuid(); OverkillCommand.BattleId=Coordinator->GetCurrentRequestId(); OverkillCommand.ActorParticipantId=OverkillSource.ParticipantId; OverkillCommand.SkillId=BasicAttackSkillDefinition->SkillId; OverkillCommand.TargetParticipantIds.Add(OverkillTarget.ParticipantId);
+		const int32 OverkillRNGBefore=Coordinator->GetDevelopmentDamageConsumeCount(); const FHSRAbilityResolution OverkillFirst=Coordinator->RequestAction(OverkillCommand); const int32 OverkillRNGAfter=Coordinator->GetDevelopmentDamageConsumeCount(); const int32 OverkillSPAfter=Coordinator->GetTeamResourceState().CurrentSkillPoints; const FHSRAbilityResolution OverkillReplay=Coordinator->RequestAction(OverkillCommand); FHSRBattleActionCommand TerminalCommand=OverkillCommand; TerminalCommand.ActionId=FGuid::NewGuid(); const FHSRAbilityResolution TerminalRejected=Coordinator->RequestAction(TerminalCommand);
+		const bool bOverkillPass=OverkillFirst.Succeeded() && OverkillFirst.bHasDamageResult && OverkillFirst.DamageResult.Breakdown.FinalDamage>OverkillFirst.DamageResult.Breakdown.AppliedDamage && FMath::IsNearlyEqual(OverkillFirst.DamageResult.Breakdown.AppliedDamage,1.0f) && FMath::IsNearlyEqual(OverkillTarget.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()),0.0f) && Coordinator->GetCurrentState()==EHSRBattleCoordinatorState::Finished && OverkillReplay.Succeeded() && TerminalRejected.Status==EHSRAbilityResolutionStatus::Rejected && Coordinator->GetDevelopmentDamageConsumeCount()==OverkillRNGAfter && Coordinator->GetTeamResourceState().CurrentSkillPoints==OverkillSPAfter;
+		if(bOverkillPass){UE_LOG(LogTemp,Log,TEXT("P7-004 Matrix Case=Overkill Result=PASS ActionId=%s Final=%.2f Applied=%.2f HPAfter=0 RNG=%d->%d SP=%d TerminalReason=%d"),*OverkillCommand.ActionId.ToString(),OverkillFirst.DamageResult.Breakdown.FinalDamage,OverkillFirst.DamageResult.Breakdown.AppliedDamage,OverkillRNGBefore,OverkillRNGAfter,OverkillSPAfter,static_cast<int32>(TerminalRejected.FailureReason));}else{UE_LOG(LogTemp,Error,TEXT("P7-004 Matrix Case=Overkill Result=FAIL ActionId=%s Final=%.2f Applied=%.2f State=%d RNG=%d->%d"),*OverkillCommand.ActionId.ToString(),OverkillFirst.DamageResult.Breakdown.FinalDamage,OverkillFirst.DamageResult.Breakdown.AppliedDamage,static_cast<int32>(Coordinator->GetCurrentState()),OverkillRNGBefore,Coordinator->GetDevelopmentDamageConsumeCount());}
+		const FHSRBattleInitResult ResetResult=Coordinator->ResetAndRebuildForDevelopmentTest(GetWorld());
+		bool bResetSamePass=false; float ResetHPBefore=0.0f,ResetHPAfter=0.0f; int32 ResetRNGAfter=Coordinator->GetDevelopmentDamageConsumeCount();
+		if(ResetResult.IsSuccess()&&Coordinator->GetParticipants().Num()==2){const FHSRBattleParticipant& NewSource=Coordinator->GetParticipants()[0];const FHSRBattleParticipant& NewTarget=Coordinator->GetParticipants()[1];NewSource.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(),120.0f);NewTarget.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(),80.0f);NewSource.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetAttackAttribute(),10.0f);NewTarget.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(),100.0f);NewTarget.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(),100.0f);Coordinator->GetTurnManager()->Initialize(Coordinator->GetParticipants());ResetHPBefore=NewTarget.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());FHSRBattleActionCommand Reused=OverkillCommand;Reused.BattleId=Coordinator->GetCurrentRequestId();const FHSRAbilityResolution Fresh=Coordinator->RequestAction(Reused);ResetHPAfter=NewTarget.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());ResetRNGAfter=Coordinator->GetDevelopmentDamageConsumeCount();bResetSamePass=Fresh.Succeeded()&&ResetHPAfter<ResetHPBefore&&ResetRNGAfter==1&&Coordinator->GetCurrentState()==EHSRBattleCoordinatorState::Spawned;}
+		if (bResetSamePass) { UE_LOG(LogTemp,Log,TEXT("P7-004 Matrix Case=RealResetSameActionId Result=PASS ActionId=%s BattleId=%s State=%d Participants=%d HP=%.2f->%.2f RNG=%d SP=%d"),*OverkillCommand.ActionId.ToString(),*Coordinator->GetCurrentRequestId().ToString(),static_cast<int32>(Coordinator->GetCurrentState()),Coordinator->GetParticipants().Num(),ResetHPBefore,ResetHPAfter,ResetRNGAfter,Coordinator->GetTeamResourceState().CurrentSkillPoints); }
+		else { UE_LOG(LogTemp,Error,TEXT("P7-004 Matrix Case=RealResetSameActionId Result=FAIL State=%d Participants=%d HP=%.2f->%.2f RNG=%d SP=%d"),static_cast<int32>(Coordinator->GetCurrentState()),Coordinator->GetParticipants().Num(),ResetHPBefore,ResetHPAfter,ResetRNGAfter,Coordinator->GetTeamResourceState().CurrentSkillPoints); }
+	}
 	RunTerminalScenarioForDevelopment();
 #endif
 }
 
 void AHSRBattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (CommandViewModel)
+	{
+		CommandViewModel->UnbindCoordinator();
+	}
 	if (BattleCommandWidget)
 	{
 		BattleCommandWidget->RemoveFromParent();

@@ -4,6 +4,16 @@
 #include "GameplayTagContainer.h"
 #include "HSRDamageTypes.generated.h"
 
+#if WITH_EDITOR
+enum class EHSRDamageTestInjection : uint8
+{
+	None,
+	ForceCaptureFailed,
+	ForceInvalidCapturedValue,
+	ForcePostCostApplyFailure
+};
+#endif
+
 UENUM(BlueprintType)
 enum class EHSRDamageResultType : uint8
 {

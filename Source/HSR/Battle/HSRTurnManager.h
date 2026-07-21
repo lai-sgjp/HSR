@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "HSRBattleParticipant.h"
+#include "../Data/HSRBreakTypes.h"
 #include "HSRTurnManager.generated.h"
 
 UENUM(BlueprintType)
@@ -24,6 +25,8 @@ class HSR_API UHSRTurnManager : public UObject
 public:
 	bool Initialize(const TArray<FHSRBattleParticipant>& InParticipants);
 	bool ResolveAction(FName ResolvingParticipantId);
+	/** Registers one pure break-delay request. The next candidate turn for its living target is skipped once. */
+	bool ConsumeBreakDelay(const FHSRTurnDelayRequest& Request);
 	/** Stops turn progression after a terminal battle result. */
 	void FinishBattle();
 	void Reset();
@@ -44,6 +47,8 @@ private:
 	static float ReadInitiativeSpeed(const FHSRBattleParticipant& Participant);
 
 	TArray<FHSRBattleParticipant> OrderedParticipants;
+	TSet<FGuid> ConsumedBreakDelayActionIds;
+	TMap<FName, FGuid> PendingBreakDelayActionIds;
 	int32 CurrentTurnIndex = INDEX_NONE;
 	EHSRTurnManagerState State = EHSRTurnManagerState::Waiting;
 	FHSRActionResolvedDelegate ActionResolved;

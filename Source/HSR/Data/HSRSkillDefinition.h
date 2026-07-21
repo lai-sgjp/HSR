@@ -7,6 +7,7 @@
 #include "GameplayTagContainer.h"
 #include "../GAS/Ability/HSRAbilityTypes.h"
 #include "../GAS/Damage/HSRDamageRuleDefinition.h"
+#include "HSRBreakTypes.h"
 #include "HSRSkillDefinition.generated.h"
 
 UCLASS(BlueprintType)
@@ -44,6 +45,16 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage")
 	FGameplayTag DamageType;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Element")
+	FGameplayTag ElementTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Element", meta = (ClampMin = "0.000001", ClampMax = "1000.0"))
+	float ToughnessDamage = 1.0f;
+
+	/** P8-only Instant GE which modifies IncomingToughnessDamage and nothing else. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Element")
+	TSoftClassPtr<UGameplayEffect> ToughnessDamageGameplayEffectClass;
+
 	/** Static damage multiplier. The default preserves existing P6 asset validity. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage", meta = (ClampMin = "0.000001", ClampMax = "100.0"))
 	float AbilityMultiplier = 1.0f;
@@ -55,6 +66,12 @@ public:
 	bool IsValidDefinition() const
 	{
 		return !SkillId.IsNone() && AbilityClass != nullptr;
+	}
+
+	EHSRElementToughnessContractResult GetElementToughnessContractResult() const
+	{
+		const EHSRElementToughnessContractResult ElementResult = FHSRToughnessConfiguration::ValidateElement(ElementTag);
+		return ElementResult != EHSRElementToughnessContractResult::Valid ? ElementResult : FHSRToughnessConfiguration::ValidateToughnessDamage(ToughnessDamage);
 	}
 
 	bool IsValidUltimateDefinition() const

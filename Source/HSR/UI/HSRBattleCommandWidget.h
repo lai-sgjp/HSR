@@ -22,6 +22,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetEnergyText() const;
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetSkillPointsText() const;
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetLastResolutionText() const;
+	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetWeaknessText() const;
+	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetToughnessText() const;
+	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetBreakText() const;
+	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetDelayText() const;
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkill(EHSRSkillCategory Category);
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectTarget(FName TargetId);
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FName GetSelectedSkillId() const;

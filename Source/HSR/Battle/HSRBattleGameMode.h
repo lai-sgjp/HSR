@@ -11,6 +11,7 @@ class UHSRBattleCommandViewModel;
 class UHSRBattleCommandWidget;
 class UHSRDamageRuleDefinition;
 class UGameplayEffect;
+class UHSREnemyDefinition;
 struct FHSRBattleResult;
 
 UENUM(BlueprintType)
@@ -54,6 +55,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Skills")
 	TObjectPtr<UHSRSkillDefinition> SkillSkillDefinition;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Skills") TObjectPtr<UHSRSkillDefinition> HealSkillDefinition;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Definitions") TObjectPtr<UHSREnemyDefinition> EnemyDefinition;
+	/** Required initialization GE, applied once to every spawned participant before abilities are granted. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Initialization") TSubclassOf<UGameplayEffect> ParticipantInitializationGameplayEffect;
 
 	/** Editor-only test selector. Set on BP_HSRBattleGameMode; no runtime UI is added. */
 	UPROPERTY(EditDefaultsOnly, Category = "Development", meta = (DisplayName = "P5 Terminal Test Scenario"))
@@ -64,6 +68,9 @@ protected:
 	TSubclassOf<UHSRBattleCommandWidget> BattleCommandWidgetClass;
 
 #if WITH_EDITORONLY_DATA
+	/** Opt-in legacy P5/P6 harnesses. Keep disabled for normal editor PIE. */
+	UPROPERTY(EditDefaultsOnly, Category = "Development|Legacy")
+	bool bRunLegacyBattleHarnesses = false;
 	UPROPERTY(EditDefaultsOnly, Category = "Development|P7")
 	TObjectPtr<UHSRDamageRuleDefinition> DevelopmentDamageRule;
 	UPROPERTY(EditDefaultsOnly, Category = "Development|P7")
@@ -76,6 +83,9 @@ protected:
 	FGameplayTag DevelopmentDamageType;
 	UPROPERTY(EditDefaultsOnly, Category = "Development|P7", meta = (ClampMin = "0.000001", ClampMax = "100.0"))
 	float DevelopmentAbilityMultiplier = 1.0f;
+	/** Opt-in pure-value P8-001 contract audit; it never invokes battle gameplay. */
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P8")
+	bool bRunP8ContractHarness = false;
 #endif
 
 	UPROPERTY()

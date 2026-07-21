@@ -1,5 +1,6 @@
 ﻿#include "HSRCoreAttributeSet.h"
 #include "GameplayEffectExtension.h"
+#include "../Damage/HSRDamageEffectContext.h"
 
 UHSRCoreAttributeSet::UHSRCoreAttributeSet()
 {
@@ -16,6 +17,10 @@ void UHSRCoreAttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attr
 	else if (Attribute == GetMaxEnergyAttribute())
 	{
 		NewValue = FMath::Max(NewValue, 0.0f);
+	}
+	else if (Attribute == GetMaxToughnessAttribute())
+	{
+		NewValue = FMath::IsFinite(NewValue) ? FMath::Max(NewValue, 0.0f) : 0.0f;
 	}
 	else if (Attribute == GetSpeedAttribute())
 	{
@@ -37,6 +42,10 @@ void UHSRCoreAttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attr
 	{
 		NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxEnergy());
 	}
+	else if (Attribute == GetToughnessAttribute())
+	{
+		NewValue = FMath::IsFinite(NewValue) ? FMath::Clamp(NewValue, 0.0f, GetMaxToughness()) : 0.0f;
+	}
 }
 
 void UHSRCoreAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
@@ -48,8 +57,20 @@ void UHSRCoreAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 		SetIncomingDamage(0.0f);
 		if (Damage > 0.0f)
 		{
+			const float HealthBefore = GetHealth();
 			SetHealth(FMath::Clamp(GetHealth() - Damage, 0.0f, GetMaxHealth()));
+			if (FHSRDamageEffectContext* DamageContext = static_cast<FHSRDamageEffectContext*>(Data.EffectSpec.GetContext().Get()))
+			{
+				DamageContext->DamageResult.Breakdown.AppliedDamage = FMath::Max(0.0f, HealthBefore - GetHealth());
+			}
 		}
+		return;
+	}
+	if (Data.EvaluatedData.Attribute == GetIncomingToughnessDamageAttribute())
+	{
+		const float Damage = FMath::IsFinite(GetIncomingToughnessDamage()) ? FMath::Max(0.0f, GetIncomingToughnessDamage()) : 0.0f;
+		SetIncomingToughnessDamage(0.0f);
+		if (Damage > 0.0f) SetToughness(FMath::Clamp(GetToughness() - Damage, 0.0f, GetMaxToughness()));
 		return;
 	}
 
@@ -101,6 +122,17 @@ void UHSRCoreAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 			UE_LOG(LogTemp, Log, TEXT("UHSRCoreAttributeSet::PostGameplayEffectExecute - Energy clamped from %f to %f"), CurEnergy, Clamped);
 		}
 	}
+
+	if (Data.EvaluatedData.Attribute == GetMaxToughnessAttribute() || Data.EvaluatedData.Attribute == GetToughnessAttribute())
+	{
+		const float CurrentToughness = GetToughness();
+		const float ClampedToughness = FMath::Clamp(CurrentToughness, 0.0f, GetMaxToughness());
+		if (CurrentToughness != ClampedToughness)
+		{
+			SetToughness(ClampedToughness);
+			UE_LOG(LogTemp, Log, TEXT("UHSRCoreAttributeSet::PostGameplayEffectExecute - Toughness clamped from %f to %f"), CurrentToughness, ClampedToughness);
+		}
+	}
 }
 
 void UHSRCoreAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
@@ -114,6 +146,10 @@ void UHSRCoreAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
 	else if (Attribute == GetMaxEnergyAttribute())
 	{
 		NewValue = FMath::Max(NewValue, 0.0f);
+	}
+	else if (Attribute == GetMaxToughnessAttribute())
+	{
+		NewValue = FMath::IsFinite(NewValue) ? FMath::Max(NewValue, 0.0f) : 0.0f;
 	}
 	else if (Attribute == GetSpeedAttribute())
 	{
@@ -134,5 +170,9 @@ void UHSRCoreAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribut
 	else if (Attribute == GetEnergyAttribute())
 	{
 		NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxEnergy());
+	}
+	else if (Attribute == GetToughnessAttribute())
+	{
+		NewValue = FMath::IsFinite(NewValue) ? FMath::Clamp(NewValue, 0.0f, GetMaxToughness()) : 0.0f;
 	}
 }

@@ -14,6 +14,9 @@ struct HSR_API FHSRDamageEffectContext : public FGameplayEffectContext
 	float DefenseCoefficient = 0.5f;
 	float MinDamage = 1.0f;
 	FHSRDamageResult DamageResult;
+#if WITH_EDITOR
+	EHSRDamageTestInjection TestInjection = EHSRDamageTestInjection::None;
+#endif
 
 	virtual UScriptStruct* GetScriptStruct() const override;
 	virtual FGameplayEffectContext* Duplicate() const override;

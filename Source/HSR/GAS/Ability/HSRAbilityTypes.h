@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "../../Data/HSRBreakTypes.h"
 #include "../Damage/HSRDamageTypes.h"
 #include "HSRAbilityTypes.generated.h"
 
@@ -93,6 +94,18 @@ struct FHSRAbilityResolution
 
 	UPROPERTY(BlueprintReadOnly, Category = "Battle")
 	FHSRDamageResult DamageResult;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	bool bHasToughnessResult = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FHSRToughnessResult ToughnessResult;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	bool bHasBreakResult = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FHSRBreakResult BreakResult;
 
 	bool Succeeded() const { return Status == EHSRAbilityResolutionStatus::Succeeded; }
 };
