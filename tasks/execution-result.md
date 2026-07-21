@@ -1033,3 +1033,15 @@ Status: `CLOSEOUT AUDIT IN PROGRESS / PHASE NOT READY` (2026-07-22).
 - `?? .agents/CLAUDE.md` remains unclassified and is not claimed or modified by this audit. It requires provenance classification before delivery.
 - Global `git diff --check` currently fails at `Config/DefaultGameplayTags.ini:40: new blank line at EOF.` This is a User/Coordinator pre-commit follow-up; no Config edit is authorized in this audit.
 - Still required: Teacher records with real user answers and explicit mastery/review/not-assessed boundaries; an Independent Reviewer P9-006 Gate; exact provenance closure; role commits; P9-006 archive; Coordinator closeout; and remote delivery. Until those complete, P9-006 is not PASS and Phase 9 must not be marked Ready or advance to Phase 10.
+
+## P9-006 final delivery closure
+
+Status: `COMPLETE / PASS WITH FOLLOW-UP / READY WITH INHERITED FOLLOW-UPS` (2026-07-22).
+
+- The user accepted the existing successful Phase 9 Build evidence without requiring separate precise Build indexes for P9-004/P9-005. This does not erase the preserved UHT/C++ failure and correction history.
+- Teacher Q5 was answered correctly. All six Phase 9 questions are recorded as mastered; the teaching record retains the user's real answers and Teacher corrections.
+- Provenance is closed. `.agents/CLAUDE.md` was created by another agent, explicitly accepted by the user, and included in the User/project-owned delivery set.
+- The Config EOF issue was corrected under later user authorization, and the global `git diff --check` passed before role delivery.
+- Role commits completed: User `2a2eb3d`; Implementation `a996475`; Teacher `39e0449`; Independent Reviewer `db383b3`.
+- Independent Reviewer final Gate is `PASS WITH FOLLOW-UP`. Runtime evidence remains `USER PROVIDED / REVIEWER LOG INSPECTED`; asset-field evidence remains `USER PROVIDED`; existing MSVC/AIModule warnings, manager-local Epoch constraints, P9-000 InvalidTarget diagnostic granularity, and future network/Save/Phase 10 work remain inherited follow-ups.
+- P9-006 archive summaries are created by Coordinator. The remaining local delivery action is the Coordinator Markdown closeout commit, followed by remote push if still pending. Phase 10 is not started automatically.

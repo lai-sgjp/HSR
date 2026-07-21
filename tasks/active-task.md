@@ -1,15 +1,23 @@
-# 当前状态：Phase 8 本地收尾完成，远端交付待执行
+# TASK-P9-006：Phase 9 独立验收、教学与阶段归档
 
-`TASK-P8-006` Independent Reviewer 最终结论为 `PASS WITH FOLLOW-UP`。Build、Teacher、provenance 与独立审查 Gate 均已通过；六组 64 项 provenance 精确闭合，`UNRESOLVED=0`。
+状态：`CLOSEOUT CONTRACT ACTIVE / IMPLEMENTATION COMPLETE / PHASE NOT READY`
 
-角色提交：
+## 唯一目标
 
-- User/Editor+Config：`ff22ed0be5d8180249524d77d7a8876ef93d0e43`
-- Implementation：`d05cb66`
-- Teacher：`14d2fea`
-- Independent Reviewer：`0e3e38e`
-- Coordinator：本次 closeout commit
+不新增 Gameplay。汇总 P9-000～005 的 Build、用户资产、两轮 PIE、失败/REVISE 历史、Teacher 学习与 Independent Reviewer Gate；完成作者归属、三件套、状态文档和阶段交付准备。只有最终 Gate、角色提交和远端交付均闭合后，Phase 9 才可标记 Ready with inherited follow-ups。
 
-P8-006 active/execution/final-review 已归档至 `tasks/archive/`。Phase 8 当前为 `Ready with inherited follow-ups / local closeout complete / push pending`；只有 push 成功并记录 remote、branch 和结果后，才能写成最终远端交付完成。
+## 允许范围与禁止
 
-当前无 Phase 9 活动任务。不得自动进入 Phase 9；后续必须先完成并核对 Phase 8 push，再等待用户另行授权。
+只允许 Coordinator/Teacher/Reviewer/Implementation 各自的 Markdown 证据文件、必要 fresh Build/只读 Git 核对和用户回传证据。禁止新增/修改 Gameplay、Config、Content、资产、Tags、UI、P9-005 逻辑、Phase 10 工作；禁止 reset/clean、混合作者认领或提前 push。
+
+## Gate
+
+- Fresh HSREditor Build：UHT/C++/Link/metadata/exit0，首错与 warnings 保留。
+- 最终矩阵基线：P9-005/004/003/002/001=`28/38/36/16/28 PASS`、各2 COMPLETE、零失败；P6-004A 空VM warnings 为 HARNESS EXPECTED。
+- Asset/Config/Content 路径和 User 作者归属逐项对账；Config EOF 在提交前处理并重跑全局 diff-check。
+- Teacher 记录真实回答、掌握/复习/未评估；Reviewer 独立给出 PASS/PASS WITH FOLLOW-UP/REVISE。
+- P9-000～005 三件套、历史 BLOCKED/REVISE/失败、follow-ups、dirty tree/provenance 精确闭合。
+
+## 首次响应门禁
+
+各角色首次复述自己的范围、证据与禁止项，等待用户确认。P9-006 不授权 Phase 10 或 Gameplay/Git 写操作；角色提交/Phase push 仅按项目长期规则和最终 Gate 单独执行。

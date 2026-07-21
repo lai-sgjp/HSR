@@ -1,19 +1,23 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-07-21
+> 最后更新：2026-07-22
 > 作用：CC-SWITCH 切换模型后的快速恢复快照。高级模型负责维护；低级模型不得把本文件作为执行入口。
 
 ## 当前 Phase
 
 - **Phase 1 与 Phase 2 均为 `Ready`。P2-003 最终处置为 `USER ACCEPTED`：Reviewer 的唯一结论仍为 `REVISE`，用户明确接受未完全掌握的学习项作为非阻断复习项。**
 - **Phase 3 为 `Ready`：P3-003 最终 Reviewer commit `3b3fbeb` 为 `PASS WITH FOLLOW-UP`，且用户已明确接受三个工程证据缺口；所有 follow-up 原样保留。**
-- **Phase 4～7 均为 `Ready with inherited follow-ups`。P8-006 Independent Reviewer 最终 `PASS WITH FOLLOW-UP`；角色提交与 P8-006 归档已完成。Phase 8 当前为 `Ready with inherited follow-ups / local closeout complete / push pending`，尚未记录远端交付完成，不进入 Phase 9。**
+- **Phase 4～9 均为 `Ready with inherited follow-ups`。P9-000～006 已完成；最终 P9-005～001=`28/38/36/16/28 PASS`、各 2 COMPLETE、零失败，P9-006 Independent Reviewer 为 `PASS WITH FOLLOW-UP`。**
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
 ## 当前任务
 
-- `TASK-P8-006` 已以 Reviewer `PASS WITH FOLLOW-UP` 完成本地收尾并归档。User `ff22ed0`、Implementation `d05cb66`、Teacher `14d2fea`、Reviewer `0e3e38e` 已提交；Coordinator closeout 随当前提交完成。当前仅剩 push 与远端结果记录；不进入 Phase 9。
+- 当前无 Phase 9 活动任务。P9-006 已完成 Teacher 六题掌握、Reviewer Gate、provenance、Config EOF 修复、全局 diff-check、四个角色提交和三件套归档；Coordinator closeout Markdown 等待单独提交。
+- Phase 9 角色提交：User `2a2eb3d`、Implementation `a996475`、Teacher `39e0449`、Independent Reviewer `db383b3`。`.agents/CLAUDE.md` 经用户确认纳入 User/project-owned 交付集合。
+- Inherited follow-ups：Epoch 仅 manager-local；用户资产字段级证据仍为 `USER PROVIDED`；P9-000 `InvalidTarget` 诊断粒度、既有 MSVC/AIModule warnings、网络、Save 与 Phase 10 完整 UI 均未由 Phase 9 关闭。
+- Phase 10 尚未创建或实施；进入下一阶段仍需用户单独授权。
+- `TASK-P8-006` 已以 Reviewer `PASS WITH FOLLOW-UP` 完成收尾并归档。User `ff22ed0`、Implementation `d05cb66`、Teacher `14d2fea`、Reviewer `0e3e38e`、Coordinator `2c2abc2` 均已提交；`main` 与 `origin/main` 已同步。历史 Reviewer 结论和 inherited follow-ups 原样保留。
 
 - `TASK-P7-001` 已归档：Reviewer `PASS WITH FOLLOW-UP`；fresh Rebuild、canonical Config、资产与烟雾 PIE follow-up 已如实保留。
 - `TASK-P7-002` 已归档：Reviewer commit `f916fd7` 为 `PASS WITH FOLLOW-UP`；用户资产 `d35fdff`、Implementation `288932c` 与完整矩阵证据保留。
@@ -114,7 +118,7 @@
 
 ## 下一个推荐任务
 
-- **当前下一步：** TASK-P5-001 Independent Reviewer 已复审为 `PASS WITH FOLLOW-UP`。仍需补修复后的 fresh Build/UHT/C++/Link 与 invalid-but-nonempty DefinitionId 运行时失败证据；完成前不得归档或创建 P5-002。
+- **当前下一步：** 等待 P9-004 Reviewer 最终结论；早期 SKIPPED 与当前 USER PROVIDED 证据均保留。
 
 ## 2026-07-19 TASK-P4-004 最终收尾
 

@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～7 均为 `Ready with inherited follow-ups`。P8-001～P8-004 已以 `PASS WITH FOLLOW-UP` 归档，P8-005 为 `USER ACCEPTED`；P8-006 独立验收与归档已启动，Phase 8 尚未标记为 `Ready`。
+> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～9 均为 `Ready with inherited follow-ups`。Phase 10 尚未规划或实施。
 
 ## 已完成的规划工作
 
@@ -18,7 +18,14 @@
 - [x] P8-003：一次性 BreakResult 结算（Reviewer `PASS WITH FOLLOW-UP`，已归档）。
 - [x] P8-004：Break Turn Delay（Reviewer `PASS WITH FOLLOW-UP`，已归档）。
 - [x] P8-005：只读 Weakness/Toughness/Break/Delay 表现与收尾（`USER ACCEPTED`，已归档）。
-- [x] P8-006：Independent Reviewer 最终 `PASS WITH FOLLOW-UP`；Build、Teacher、64/64 provenance、分角色提交、归档与本地 Phase closeout 已完成。远端 push 尚待执行并记录，不自动进入 Phase 9。
+- [x] P8-006：Independent Reviewer 最终 `PASS WITH FOLLOW-UP`；Build、Teacher、64/64 provenance、分角色提交、归档、Phase closeout 与远端交付均已完成；`HEAD == origin/main == 2c2abc2`。
+- [x] P9-000：TurnStarted/TurnEnded 纯值事件、顺序、exactly-once、Finished/Reset/死亡/Delay 语义与 Development 矩阵（Reviewer `PASS WITH FOLLOW-UP`；Build 成功；USER PROVIDED `24 PASS / 2 COMPLETE / 0 FAIL`；三项 follow-up 保留）。
+- [x] P9-001：两回合 Attack Buff 生命周期纵切（Reviewer `PASS WITH FOLLOW-UP`；两轮 USER PROVIDED `28 PASS / 2 COMPLETE / 0 FAIL`；Config/资产归属与 follow-up 保留）。
+- [x] P9-002：叠层/刷新/替换纵切（Reviewer `PASS WITH FOLLOW-UP`；P9-002 `16 PASS/2 COMPLETE` + P9-001 回归 `28 PASS/2 COMPLETE`；零失败；三个 follow-up 保留）。
+- [x] P9-003：DoT 与 Break Debuff 接入（Reviewer `PASS WITH FOLLOW-UP`；最终 P9-003/P9-002/P9-001=`36/16/28 PASS`，各 2 COMPLETE，零失败）。
+- [x] P9-004：免疫/驱散/来源/清理（Reviewer `PASS WITH FOLLOW-UP`；最终 `38 PASS/2 COMPLETE`，P9-001～003 全回归零失败）。
+- [x] P9-005：只读状态 UI/Debug（Reviewer `PASS WITH FOLLOW-UP`；最终五套矩阵 `28/38/36/16/28 PASS`，各2 COMPLETE，零失败）。
+- [x] P9-006：独立验收、教学与阶段归档（Reviewer `PASS WITH FOLLOW-UP`；Teacher 六题掌握；provenance、Config EOF/global diff-check、User `2a2eb3d`、Implementation `a996475`、Teacher `39e0449`、Reviewer `db383b3` 和三件套归档均闭合）。
 - [ ] 独立资源后续：Wait/Pass、Basic/Skill/受击回能，以及按 Team 拆分共享 SP 池（敌方独立或无池，禁止误做每角色 SP）；不得塞入 P7-003。
 
 - [x] 迁移 ChatBot SNS 的文档协作经验。
@@ -223,7 +230,7 @@
 - [ ] 实现削韧、击破伤害、Turn Delay 和击破 Debuff。
 - [ ] 创建弱点图标和韧性条。
 
-## Phase 9：Buff、Debuff 与状态效果
+## Phase 9：Buff、Debuff 与状态效果（Ready with inherited follow-ups）
 
 - [ ] 建立 StatusDefinition、StatusComponent 和 Runtime StatusInstance。
 - [ ] 实现回合持续时间、叠层、刷新、免疫、驱散和触发时机。

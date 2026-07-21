@@ -1715,3 +1715,107 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - P8-006 Reviewer 最终 `PASS WITH FOLLOW-UP`；本地角色交付、归档与 Phase closeout 随当前 Coordinator commit 完成。Phase 8 状态为 `Ready with inherited follow-ups / local closeout complete / push pending`。
 - inherited follow-ups 原样保留，不改写为已验证；Phase 9 没有活动任务且不得自动进入。
 - 当前步骤不 push。Coordinator commit 成功后必须先回报 hash、HEAD paths、空 index 与 branch/ahead，待最终核对后再执行已授权 push。
+
+## 2026-07-21｜Coordinator：Phase 8 远端校准与 P9-000 契约启动
+
+- 只读 Git 核对显示 `HEAD` 与 `origin/main` 均为 `2c2abc200b683b31fd2337dcfa84edad16317a9e`，分支为 `main`；Phase 8 的 Coordinator closeout 已存在于远端，旧文档中的 `push pending` 属于状态滞后。
+- P8-006 Reviewer 原始结论继续为 `PASS WITH FOLLOW-UP`；Reset/terminal/3+ 排序/正值过量归零、缺失 UI 动态路径、Teacher 未评估项、MSVC/API warning、网络与 Save 等 inherited follow-ups 均未升级为已验证。
+- 用户明确授权进入 Phase 9。当前仅启动 `TASK-P9-000`，冻结 TurnStarted/TurnEnded 纯值事件、顺序、exactly-once、Finished/Reset/死亡/Delay 语义与 Development 失败矩阵；Gameplay implementation 尚未开始。
+
+## 2026-07-22｜P9-006 Coordinator 首轮收官审计
+
+- P9-000～P9-005 的 active/execution/final-review 三件套共 18/18 已存在；各任务历史 `BLOCKED`、`REVISE`、Build 首错、失败/不完整 harness 与 follow-up 保留。
+- 最终 `USER PROVIDED` 附件 `bb513d65-1075-4f5a-a9f6-6d65397c8781` 对账为 P9-005/004/003/002/001=`28/38/36/16/28 PASS`、各 2 COMPLETE、零 FAIL/INCOMPLETE/SKIPPED。两条 P6-004A 空 ViewModel 绑定失败为 `HARNESS EXPECTED`，后续成功绑定与解绑闭合。
+- P9-005 fresh Build 保留 reflected `uint64` 被 UHT 拒绝的首错；修正为公开 `int64` 后，UHT、HSR C++、`UnrealEditor-HSR.lib/.dll` Link、metadata 与 exit 0 链闭合。
+- Config、GameMode/WBP、Status DataAssets、GameplayEffects 与 Tags 归 User；资产字段仍为 `USER PROVIDED`，不声明独立解析 `.uasset`。
+- 当前未闭合项：dirty tree 的逐项角色 provenance、未分类 `.agents/CLAUDE.md`、`Config/DefaultGameplayTags.ini:40` EOF diff-check、Teacher 真实问答、Independent Reviewer Gate、角色 commits、P9-006 归档及远端交付。
+- 本轮只更新 Coordinator Markdown；未修改 Source/Config/Content，未 stage/commit/reset/clean/push。Phase 9 保持 `NOT READY`，不进入 Phase 10。
+
+## 2026-07-22｜P9-006 最终收尾
+
+- 用户接受当前 Phase 9 成功 Build 证据，不要求补 P9-004/P9-005 精确 Build 索引；所有历史首错与修订链继续保留。
+- Teacher Q5 补答正确，六题全部掌握；Independent Reviewer 最终 Gate 为 `PASS WITH FOLLOW-UP`。
+- `.agents/CLAUDE.md` 经用户确认由另一 agent 创建并纳入项目，provenance 不再未决。Config EOF 已在授权后修复，全局 `git diff --check` 通过。
+- 角色提交完成：User `2a2eb3d`、Implementation `a996475`、Teacher `39e0449`、Reviewer `db383b3`。
+- Coordinator 创建 P9-006 三件套归档并同步 canonical 状态。Phase 9 标记为 `Ready with inherited follow-ups`；本轮未修改 Source/Config/Content、未执行 Git，Phase 10 未自动开始。
+- 保留既有未跟踪 `docs/phase-9-execution-plan.md`；本轮未修改 Source、Config、Content，未 stage、commit 或 push。
+
+## 2026-07-21｜Coordinator：TASK-P9-000 PASS WITH FOLLOW-UP 归档
+
+- Independent Reviewer 最终结论为 `PASS WITH FOLLOW-UP`；首次 `REVISE` 的 Health-zero 资格缺口由统一 eligibility 与 `DefeatedCurrent_SkippedWithoutEnded` 修订关闭。
+- 修订后 `HSREditor Win64 Development` Build exit `0`，UHT、HSR C++、`UnrealEditor-HSR.lib/.dll` Link 与 metadata 均有证据；既有 MSVC/AIModule warning 保留。
+- 用户附件证据等级为 `USER PROVIDED / REVIEWER LOG INSPECTED`：两轮共 `24 PASS / 2 Harness=COMPLETE / 0 FAIL`，不冒充 Agent 运行 PIE。
+- 三个非阻断 follow-up 原样保留：根执行历史旧 PIE pending 语境；Epoch 仅 manager-local 且 future consumer 必须成对解绑；死亡目标 Break Delay 诊断合并为 `InvalidTarget`。
+- P9-000 active/execution/final-review 已分别归档并保留 Implementation、User、Reviewer 与 Coordinator 作者边界。根执行/审查文件继续承担历史汇总语义；当前无活动任务，不自动创建 P9-001。
+- 本轮未修改 Source、Config、Content，未 stage、commit 或 push。
+
+## 2026-07-21｜Coordinator：TASK-P9-001 归档与 P9-002 契约启动
+
+- P9-001 Independent Reviewer 最终 `PASS WITH FOLLOW-UP`；用户附件两轮核对为 `28 PASS / 2 COMPLETE / 0 FAIL`。早期实现失败、首次 `REVISE`、修订 Build 和用户资产归属均保留在归档与根历史。
+- P9-001 follow-up：`Config/DefaultGameplayTags.ini` EOF 空行由 User/Coordinator 提交前修复；BattleEpoch 仅 TurnManager instance-local；用户资产无 Period/额外 Modifier/Cue/Execution 的字段级证据仍 USER PROVIDED；P9-000 `InvalidTarget` 诊断 follow-up 未关闭。
+- P9-001 三件套已归档。当前唯一活动卡切换为 P9-002：同 Target+StatusId 身份、MaxStacks=2、AddStack/Refresh/Replace 原子性和精确 Handle 策略；不进入 DoT/Break Debuff。
+- 已知 Config EOF 空行本轮不代改，列为提交前 User follow-up；本轮未修改 Source/Config/Content，未 stage、commit 或 push。
+
+## 2026-07-21｜Coordinator：P9-002 User Asset Gate 修订
+
+- UE5.6 公开 Runtime API/现有资产契约形成硬阻断；P9-002 改为先完成 User-only 资产 Gate，Gameplay 保持未开始。阻断历史不改写。
+- 禁止修改 P9-001 GE，其 sentinel 精确移除证据依赖独立 Handle。用户另建 `DA_Status_AttackUpStack_P9_002` 与 `GE_Status_AttackUpStack_P9_002`：Infinite、AggregateByTarget、StackLimit=2、每层 Attack +10；第三层 overflow 不增加层数，逻辑回合刷新仍由 Runtime RemainingTurns 负责。
+- 新 Definition/Tag 复用 `Status.Buff.AttackUp`，保持 Target+StatusId 唯一键；P9-002 harness 只能在干净目标上选择新 Definition，不允许两个 Definition 同目标并存。
+- 用户须提供 UE5.6 实际字段、保存重开与引用持久证据。Gate 通过后执行者必须重新复述并等待新的单独确认；旧确认不延续。
+- Config EOF 空行继续作为提交前 User follow-up；本轮未修改 Source/Config/Content，未 stage、commit 或 push。
+
+## 2026-07-21｜Coordinator：P9-002 两段资产 Gate 校正
+
+- 发现循环依赖：当前 `EHSRStatusRefreshPolicy` 尚无 `AddStack`，用户无法在实现前选择该值。P9-002 改为 Gate A → Implementation/Build → Gate B。
+- Gate A 的 DA 使用现有 `RefreshDuration` 只为保存骨架，明确为 placeholder、禁止运行、不得作为验收配置；专用 GE 的 AggregateByTarget/StackLimit=2/每层 +10 字段必须先完整验证。
+- Gate A 通过后执行者重新复述/确认，实现 AddStack 枚举和逻辑并 Build；Gate B 再由用户重开 Editor 切换真实 AddStack、保存重开，之后才运行两轮 PIE。
+- 本轮未修改 Source/Config/Content，未 stage、commit 或 push；Config EOF follow-up 保留。
+
+## 2026-07-21｜Coordinator：P9-002 实际资产路径校准
+
+- User 实际创建的 Stack 资产路径为 `Content/Data/Status/DA_Status_AttackUpStack_P9_002.uasset` 与 `Content/GameplayEffects/GE_Status_AttackUpStack_P9_002.uasset`；沿用现状，不移动资产、不创建 redirector。
+- Gate A 字段、保存重开与 placeholder 禁 PIE 要求不变。附件 `a316...` 仅是 P9-001 运行日志，不能证明 P9-002 stacking 字段、引用或保存重开。
+- 本轮未修改 Source/Config/Content，未 stage、commit 或 push。
+
+## 2026-07-22｜Coordinator：P9-004 Asset Gate PASS 与 PIE 授权
+
+- 用户确认 immunity GE 为 Infinite/tag-only、无 Modifiers/Executions/Cues/Period；GameMode immunity GE 与 Status bindings 保存、关闭/重开 Editor 后持久。记录为 `USER PROVIDED PASS`。
+- P9-004 PIE 已授权。最终附件 `f15dc30b...` 统计为 P9-004 `38 PASS/2 COMPLETE`，P9-003 `36/2`，P9-002 `16/2`，P9-001 `28/2`，零失败标记；早期 SKIPPED 历史保留。
+- 当前等待 Independent Reviewer 最终结论，不归档 P9-004、不创建下一任务卡；Config EOF follow-up 保留。
+
+## 2026-07-22｜Coordinator：P9-003 Asset Gate USER PROVIDED PASS
+
+- 用户确认三个 Tags、DoT/Break marker GE、两个 Status Definition、BP 两 Definition 绑定及 Editor 保存重开保持；记录为 `USER PROVIDED PASS`，不冒充二进制资产独立解析。
+- DoT GE 保持 Infinite marker-only/无 Period/直接 Health Modifier/自有 Execution；Break GE 为 Infinite tag-only；Definitions 的 Duration、Trigger、单层、Damage/Rule/GE 与 Tag 字段按契约确认。
+- 当前切换为 Implementation matrix revision active；所有 harness 保持关闭，fresh Build 与矩阵补齐前 PIE not authorized，提前运行不计验收。
+- 历史结论和 Config EOF follow-up 保留；本轮未修改 Source/Config/Content，未 stage、commit 或 push。
+
+## 2026-07-22｜Coordinator：P9-003 归档与 P9-004 契约启动
+
+- P9-003 Reviewer 最终 `PASS WITH FOLLOW-UP`；fresh Build UHT/C++/Link/metadata exit0。最终 USER PROVIDED 附件 `63c329eb...`：P9-003/P9-002/P9-001=`36/16/28 PASS`，各 2 COMPLETE，零 FAIL/INCOMPLETE/SKIPPED。
+- sandbox/C2679、Asset Gate、truthfulness REVISE、两轮 lethal failure、terminal TurnManager 修订历史全部保留；三件套已归档并保持角色作者边界。
+- 当前唯一活动卡为 P9-004，冻结免疫拒绝、确定性驱散、来源 Keep/Remove 和 teardown 精确 Handle 清理；Gameplay not started。
+- Config EOF、用户资产字段证据等级与工具链 warning follow-up 保留；本轮未修改 Source/Config/Content，未 stage、commit 或 push。
+
+## 2026-07-21｜Coordinator：P9-002 Gate A USER PROVIDED PASS
+
+- 用户明确确认专用 Stack GE/DA 的全部 Gate A 字段及 Editor 保存重开保持；实际路径保持不变，证据等级为 `USER PROVIDED`。
+- Gate A 由 BLOCKED 推进为 PASS，但原硬阻断和两段 Gate 形成历史保留；不外推为 Gameplay、Build、Gate B 或 PIE 完成。
+- DA 的 RefreshDuration 继续只是 placeholder / DO NOT RUN。当前下一步仅为执行者重新复述并等待单独确认；Build 后仍须由用户在 Gate B 切换真实 AddStack。
+- Config EOF follow-up 保留；本轮未修改 Source/Config/Content，未 stage、commit 或 push。
+
+## 2026-07-21｜Coordinator：P9-002 归档与 P9-003 契约启动
+
+- P9-002 Reviewer 最终 `PASS WITH FOLLOW-UP`；最终两轮 P9-002 `16 PASS / 2 COMPLETE`，P9-001 回归 `28 PASS / 2 COMPLETE`，合计零 FAIL/INCOMPLETE/SKIPPED。Gate A/B、BLOCKED、REVISE、失败历史和 User 资产归属均保留。
+- P9-002 三件套已归档。三个 follow-up：Config EOF 空行；Gate A/B stacking 字段与 Editor 重开仍 USER PROVIDED；异常 Handle rollback/secondary ownership 动态注入可后续加强。
+- 当前唯一活动卡为 P9-003：DoT 必须走统一 Damage 入口，Break 只请求 Status，trigger-before-decrement、死亡/终局/重复/旧 Epoch 原子性、P9-001/002 全回归均已冻结；Gameplay not started。
+- 本轮未修改 Source/Config/Content，未 stage、commit 或 push。
+
+## 2026-07-21｜Coordinator：TASK-P9-001 Attack Buff 契约启动
+
+- 用户授权开始 P9-001 Coordinator 工作；唯一活动卡已创建。当前仅冻结两回合、单层、RefreshDuration 的 Attack Buff 纵切，Gameplay/Config/Content 尚未实施。
+- 所有权冻结：StatusDefinition 为静态 DataAsset；StatusComponent 保存 Runtime Instance 与唯一 Active GE Handle；Infinite GE 只承载 Attack +10 与 Tag；TurnManager 只发布纯值事件且本任务禁止修改；Coordinator 负责组件创建、接线、解绑和 teardown；GameMode 只提供默认关闭的 Development harness。
+- Add 采用 GE 成功后提交 Instance；Refresh 复用原 Handle 且不再次 Apply；Expire/Clear 按原 Handle 幂等移除。失败、死亡、Finished、Reset、EndPlay 与 manager replacement 均有零副作用/清理矩阵。
+- P9-000 manager-local Epoch 风险必须由本任务的 manager replacement 解绑/重绑与旧事件拒绝证据关闭；根执行历史旧 pending 已归档校准；Break Delay `InvalidTarget` 诊断粒度继续保留为非阻断 follow-up。
+- Config GameplayTag 与两个 Content 资产明确归 User Editor/Config 作者，Implementation 不得代建；执行者首次只读复述后必须等待用户单独确认。
+- 本轮未修改 Source、Config、Content，未 stage、commit 或 push。

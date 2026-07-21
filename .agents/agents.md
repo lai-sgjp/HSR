@@ -1437,3 +1437,16 @@ Teacher 可读取 `learning-journal.md`、`worklog.md`、`todo_plan.md`、`READM
 - 角色必须提交自己本轮的实际产物并记录 commit hash；未提交、未记录 hash 或工作树仍有未分类变更时，不得宣称任务已交接或进入下一角色。
 - 用户 Editor 资产必须先由用户完成并提供证据；执行者不得代替用户提交未知资产。用户资产、代码、文档和审查结果必须按作者/角色分开记录。
 - 交接时若发现工作树不干净，必须先分类：归属当前角色则提交，归属用户则记录并等待用户确认，越权或未知变更则停止请求处置；不得用 reset、clean、删除或覆盖掩盖问题。
+
+## 44. Automatic Role Handoff / 自动角色交接规则
+
+- 用户确认一张活动任务卡后，Coordinator 应主动驱动角色链路，不要求用户反复提醒“下一步”或手工点名角色。
+- 标准链路为：Coordinator 冻结契约与白名单 -> Implementation Agent 复述并等待该任务的用户确认 -> Implementation Agent 实现 -> Reviewer 独立审查 -> 根据结论自动路由。
+- Reviewer 给出 `PASS` 或 `PASS WITH FOLLOW-UP` 后，必须先落盘审查结论，再由 Coordinator 自动归档三件套、同步状态文档、创建下一张活动任务卡，并触发下一执行者的只读契约复述；下一张卡的实际实现仍须用户单独确认。
+- Reviewer 给出 `REVISE` 时，若问题在当前白名单和既有授权内，Coordinator 应自动把具体证据与修复要求交回原 Implementation Agent，修复后自动重新进入 Reviewer；不要求用户人工转发。
+- `REVISE` 涉及 Editor/Blueprint/Content/Config 用户资产时，Implementation Agent 必须停在 Asset Gate，给出准确字段、路径、保存与重开验证步骤，由用户操作并回传证据。
+- 修复需要白名单外文件、扩大 Gameplay 契约、危险文件操作、外部系统变更或新的 Phase 时，自动交接必须停止并请求最小明确授权；不得把“自动流转”解释为扩大权限。
+- Build、静态检查和日志机械统计应在角色间自动传递。Reviewer 通过后可自动进入归档与下一张任务卡准备；Reviewer 未通过则自动进入修复或用户 Editor Gate。
+- Teacher 和 Reviewer 只记录真实证据。Teacher 不得根据实现结果推定用户掌握；需要教学验收时应主动提出精简复盘题，收到用户回答后再更新掌握度。
+- 自动交接必须持续保留历史 `BLOCKED`、`REVISE`、Build 首错、`SKIPPED`、失败日志和证据等级，不得用最终成功覆盖历史。
+- Git 仍遵守 Role Commit / Phase Push 规则：自动交接不允许混合作者提交、提前推送、强制推送、reset 或 clean。
