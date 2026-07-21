@@ -630,3 +630,406 @@ The initial exit `6` was identified as sandbox denial of the user-level UBT conf
 - First real error in the approved retry: none. The previous sandbox `UnauthorizedAccessException` remains preserved above as environment evidence, not a project/UHT failure.
 - Combined Build evidence: the earlier `-Rebuild` invocation verifies HSR C++ compile, `UnrealEditor-HSR.lib/.dll` Link, metadata, and exit `0`; this approved `-ForceHeaderGeneration` retry verifies fresh UHT and exit `0` against the same working tree.
 - No Source, Content, Config, or `.uproject` file was changed; only ignored UBT/Intermediate generation was permitted. No reset/clean, manual deletion/touch, Editor/PIE, stage, commit, or push was performed.
+
+---
+
+# TASK-P9-000 Execution Result
+
+## Status
+
+`IMPLEMENTED / BUILD PASSED / USER PIE PASSED / REVIEWER PASS WITH FOLLOW-UP` (2026-07-21).
+
+## Implemented contract
+
+- Added pure-value `FHSRTurnLifecycleEvent` and `EHSRTurnLifecycleEventType` in `HSRTurnManager.h`. The payload contains only `BattleEpoch`, `ParticipantId`, `TurnSequence`, and event type; it contains no Actor, ASC, Component, UObject pointer, or mutable reference.
+- Every successful `Initialize` assigns a non-zero manager-local monotonically increasing epoch. The first valid participant receives sequence `1` and exactly one `TurnStarted`. `Reset` clears the active epoch and sequence without resetting the epoch counter or broadcasting an event.
+- A legal `ResolveAction` now broadcasts current `TurnEnded`, advances to the next valid non-delayed participant, broadcasts that participant's `TurnStarted`, and then preserves the compatibility `OnActionResolved` notification. Rejected calls do not emit lifecycle events.
+- Invalid/dead-lifetime and Break Delay candidates remain skips rather than turns. `FinishBattle` and `Reset` do not synthesize `TurnEnded`.
+- Added the default-off `Development|P9` flag `bRunP9TurnLifecycleHarness`. Its isolated temporary TurnManager checks initialization, legal ordering, non-current and duplicate rejection, Reset/new epoch, invalid-current skip, Break Delay skip, Finished rejection, empty initialization, and two-round epoch isolation. It does not mutate the Coordinator's TurnManager.
+
+## Static verification
+
+- `git diff --check` passed for the four allowed C++ files.
+- Broadcast order was inspected as `TurnEnded -> AdvanceToNextValidTurn/TurnStarted -> compatibility OnActionResolved`.
+- No Tick, Timer, world scan, static cross-PIE state, Config, Content, Coordinator, Build.cs, Status, GE, Tag, UI, stage, commit, or push change was introduced.
+
+## Fresh Development Editor Build
+
+Command:
+
+```powershell
+& 'E:\programs\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat' HSREditor Win64 Development 'E:\work\unreal_projects\HSR\HSR.uproject' -NoHotReload -WaitMutex
+```
+
+- First sandboxed attempt stopped before UHT with `UnauthorizedAccessException` for `C:\Users\Lai\AppData\Local\UnrealEngine\Intermediate\Build\UnrealBuildTool.Env.BuildConfiguration.xml`. This was an environment permission failure, not a project compile error.
+- The identical approved sandbox-external retry exited `0`.
+- UHT: `Parsing headers for HSREditor`; `Total of 4 written`; reflection generation completed in `2.8549457` seconds.
+- HSR C++: compiled `HSRTurnManager.cpp`, `HSRBattleGameMode.cpp`, `HSRBattleCoordinator.cpp`, `HSRBattleCommandWidget.cpp`, and generated module sources.
+- Link: completed `UnrealEditor-HSR.lib` and `UnrealEditor-HSR.dll`.
+- Metadata: completed `WriteMetadata HSREditor.target`.
+- Build summary: `Result: Succeeded`; total execution time `22.62` seconds. The existing non-preferred MSVC warning and AIModule deprecation warning remain; no TASK-P9-000 compile error occurred.
+
+## User Editor/PIE verification pending
+
+The agent did not run Editor or PIE. The user must enable `Run P9 Turn Lifecycle Harness` on `BP_HSRBattleGameMode`, keep unrelated legacy/P7/P8 harness flags disabled, enter the normal two-participant battle twice, and provide the `P9-000 TurnLifecycle` logs. Every named case must report `PASS`, each event line must show the expected epoch/participant/sequence/type ordering, and each run must end with `Harness=COMPLETE`.
+
+## Remaining risk
+
+- Runtime behavior is build-verified and statically inspected but not dynamically verified until the user supplies two PIE runs.
+- Existing `OnActionResolved` remains a compatibility notification after the new lifecycle pair; future status consumers must bind to `OnTurnStarted`/`OnTurnEnded`, not infer lifecycle from the compatibility delegate.
+
+## Independent Review REVISE and eligibility revision
+
+- First user PIE evidence is recorded as `USER PROVIDED`: two runs reported 22 case-level `PASS`, 2 `Harness=COMPLETE`, and 0 `FAIL` for the original harness.
+- Independent Reviewer returned `REVISE` because that matrix proved invalid Actor lifetime but did not prove a live Actor/ASC with `Health == 0` is ineligible for lifecycle events. The first user evidence therefore does not close TASK-P9-000 and a revised two-run PIE is required.
+- Turn eligibility now has one TurnManager source of truth: participant Actor/ASC validity and ASC Health strictly greater than zero. Current-turn validation, next-turn selection, and Break Delay target admission all use it.
+- The opt-in harness now includes `DefeatedCurrent_SkippedWithoutEnded`: after a valid first `TurnStarted`, it sets that current participant's Health to zero, requires Resolve rejection with no `TurnEnded`, requires exactly one `TurnStarted` for the next eligible participant, and restores the original Health/MaxHealth before later cases.
+
+### Revision build evidence
+
+- Command: `Build.bat HSREditor Win64 Development <HSR.uproject> -NoHotReload -WaitMutex`.
+- Exit code: `0`; `Result: Succeeded`; total execution time `10.49` seconds.
+- UHT: parsed headers for `HSREditor`, ran `Internal UnrealHeaderTool`, reported `Total of 0 written`, and completed reflection generation in `1.3806228` seconds.
+- HSR C++: compiled `HSRTurnManager.cpp`, `HSRBattleGameMode.cpp`, `HSRBattleCoordinator.cpp`, and generated module source.
+- Link and metadata: completed `UnrealEditor-HSR.lib`, `UnrealEditor-HSR.dll`, and `WriteMetadata HSREditor.target`.
+- First real error: none. Existing non-preferred MSVC and AIModule deprecation warnings remain.
+- `git diff --check` passed before this report update. Editor/PIE was not run by the agent.
+
+### Revised user verification required
+
+- Enable only `Run P9 Turn Lifecycle Harness` and run two fresh PIE battles.
+- Each run must now include `DefeatedCurrent_SkippedWithoutEnded Result=PASS`; all other existing cases must remain `PASS`, with one `Harness=COMPLETE` and zero `FAIL` per run.
+- The earlier 22 PASS / 2 COMPLETE evidence predates this revision and cannot be reused as verification of the Health-zero eligibility rule.
+
+### Revised user PIE evidence and final review
+
+- Evidence level: `USER PROVIDED`. Attachment: `C:\Users\Lai\.codex\attachments\29f92780-6ffd-4035-8fce-f9b600063fc5\pasted-text.txt`.
+- The revised attachment contains two complete PIE runs with 24 case-level `PASS`, 2 `Harness=COMPLETE`, and 0 `FAIL` in total.
+- Both runs include `DefeatedCurrent_SkippedWithoutEnded Result=PASS`, closing the Health-zero eligibility gap that caused the earlier Reviewer `REVISE`.
+- Event order is consistent in both runs: initialization emits only first-participant `TurnStarted`; legal resolution emits current `TurnEnded` followed by next eligible `TurnStarted`; invalid Actor and Health-zero current participants emit no `TurnEnded` and only the next eligible participant receives `TurnStarted`; Break Delay skips its candidate without lifecycle events; Reset starts a distinguishable new epoch at sequence 1; Finished and empty initialization emit no lifecycle events.
+- Independent Reviewer final conclusion: `PASS WITH FOLLOW-UP`. The earlier `REVISE`, its missing-death-path rationale, and both build records remain preserved above as history.
+
+---
+
+# TASK-P9-001 Execution Result
+
+## Status
+
+`IMPLEMENTED / BUILD PASSED / USER PIE PASSED / REVIEWER PASS WITH FOLLOW-UP` (2026-07-21).
+
+## Implemented runtime contract
+
+- Added static `UHSRStatusDefinition`, pure runtime/result types, and a no-Tick `UHSRStatusComponent` that uniquely owns one `FHSRStatusInstance` and its `FActiveGameplayEffectHandle`.
+- Add validates the frozen AttackUp definition, source/target, current manager-local epoch, ASC, living target, loaded GE class, and Infinite duration policy before Apply. The instance is committed only after GAS returns a successful handle.
+- Refresh reuses the existing active handle and only restores RemainingTurns to 2 plus SourceParticipantId. It rejects an invalid instance, epoch, ASC, or missing active GE without removing or replacing the old effect.
+- Only matching, newer `TurnEnded` events for the target and epoch decrement RemainingTurns. Expiry removes exactly the saved handle and then clears the instance. Clear is idempotent and clears local ownership even when removal fails.
+- Coordinator creates and holds one StatusComponent per participant, injects ParticipantId/ASC, binds the current TurnManager once, and clears/unbinds on defeat/Finished, Reset/rebuild, and GameMode teardown. TurnManager was not modified.
+- GameMode exposes the user-owned AttackUp Definition and a default-off `Development|P9` harness flag. No Config or Content asset was created by Implementation.
+
+## Build evidence
+
+- First fresh Build ran UHT (`Total of 11 written`) and reached C++. First real error: missing `UGameplayEffect` declaration in `HSRStatusComponent.h`; the same build also exposed a misplaced Coordinator initialization block. Both were corrected within the allowlist.
+- Fresh retry command: `Build.bat HSREditor Win64 Development <HSR.uproject> -NoHotReload -WaitMutex`.
+- Retry exit `0`, `Result: Succeeded`, total `8.44` seconds. UHT ran (`Total of 1 written`); `HSRStatusComponent.cpp`, `HSRBattleCoordinator.cpp`, `HSRBattleGameMode.cpp`, and generated module source compiled; `UnrealEditor-HSR.lib/.dll` linked; metadata was written.
+- Existing non-preferred MSVC and AIModule deprecation warnings remain. No Editor or PIE was run.
+- Final build after strict StatusId/Tag validation and Finished cleanup also exited `0` (`Result: Succeeded`, `4.16` seconds), compiled `HSRStatusDefinition.cpp` and `HSRBattleCoordinator.cpp`, linked both HSR binaries, and wrote metadata. UHT did not rerun in this final invocation; the immediately preceding successful retry supplies the fresh UHT evidence for the same implementation sequence.
+
+## Verification blocker
+
+- The current harness dynamically covers the main Add, other-participant isolation, first target decrement, refresh-without-reapply, and two-target-turn expiry path.
+- `DuplicateTurnEvent`, invalid-definition matrix, missing ASC/invalid/dead target, forced Apply failure, death/Finished clear isolation, Reset/second battle, EndPlay, and Manager replacement still require dedicated isolated setup. The harness explicitly emits `NOT_VERIFIED` for these cases rather than fabricating PASS.
+- Per the active contract, the 14-case matrix is therefore incomplete and TASK-P9-001 must not be marked complete. Coordinator/Reviewer must decide whether to authorize a revised isolated harness design inside the same allowlist before requesting user assets/PIE.
+
+## User asset steps pending
+
+- User must add `Status.Buff.AttackUp`, create `DA_Status_AttackUp_P9`, create Infinite `GE_Status_AttackUp_P9` with only Attack +10 and the granted tag, bind the Definition on `BP_HSRBattleGameMode`, save/reopen Editor, and provide asset evidence plus two PIE runs only after the harness blocker is resolved.
+
+## Independent Reviewer REVISE — lifecycle ownership revision
+
+- Independent Reviewer returned `REVISE` on the first P9-001 implementation. Confirmed production defects were: dynamically registered StatusComponents were removed from the Coordinator map without `DestroyComponent`; development Add did not prove the source was a real living participant; runtime initialization was not pristine-only; and snapshots could not prove handle identity or that the handle remained active in the ASC.
+- Revision now performs `ClearStatus -> UnbindTurnManager -> DestroyComponent -> Empty` for every owned dynamic component. Build failure cleanup routes through the same path.
+- Development Add now rejects an absent, invalid, or zero-Health source participant before target routing. `InitializeStatusRuntime` rejects reinitialization and any pre-existing participant/ASC/binding/active-instance state.
+- Runtime snapshots now expose the handle's UE string identity and whether that exact handle resolves to an active effect in the bound ASC. Main-path assertions include Stacks=1, Attack baseline+10, granted Tag, same handle after refresh, ASC-active handle, ApplyCount=1, exact expiry removal, RemoveCount=1, baseline Attack recovery, and Tag disappearance.
+- The Development harness now has executable isolated setup for all 14 named matrix rows, including duplicate event, invalid variants, missing/invalid/dead participants, forced Apply failure, idempotent clear, Finished teardown, Reset/rebuild, EndPlay, and manager replacement. Temporary Health and status effects are restored/cleared within their case flow.
+
+### Revision build evidence
+
+- First revision Build ran UHT successfully (`Total of 0 written`) and stopped at the first real C++ error: UE5.6 `FActiveGameplayEffectHandle` has no public `GetHandle()` API. Engine-header inspection confirmed `ToString()` is the supported public identity representation; the snapshot was corrected to use that pure string value.
+- Fresh retry exited `0`, `Result: Succeeded`, total `10.46` seconds. UHT ran; `HSRStatusDefinition.cpp`, `HSRStatusComponent.cpp`, `HSRBattleCoordinator.cpp`, `HSRBattleGameMode.cpp`, and generated module sources compiled; `UnrealEditor-HSR.lib/.dll` linked; metadata was written.
+- No Editor or PIE was run. Config, Content, TurnManager, AttributeSet, Build.cs, `.uproject`, and user DataAssets were not modified.
+
+### Remaining static limitation before PIE
+
+- The 14 named cases are now executable, but the requested independent sentinel-GE proof is not yet present: exact removal is proven by saved-handle identity, ASC-active checks, counts, Attack restoration, and Tag disappearance, but not by preserving a second unrelated active GE through removal.
+- Because that sentinel proof is an explicit Reviewer requirement, this report does not upgrade TASK-P9-001 to complete or request user PIE yet. A final minimal harness-only revision is still required if Reviewer does not accept the current exact-handle evidence.
+
+## Final Reviewer matrix revision
+
+- The preceding sentinel limitation is historical and has now been closed in code. The rewritten harness applies the configured Infinite GE once as an independent sentinel and once through the owned StatusComponent. It requires distinct handle identities; after the real Coordinator death/Finished cleanup removes the owned status, the sentinel handle must remain active, Attack must retain exactly one +10 contribution, and the Tag must remain. The harness then removes only the sentinel handle and restores the baseline.
+- Add/other turn/first target turn/refresh/expiry, duplicate, invalid/failure, EndPlay, and manager replacement use a temporary `UHSRTurnManager` plus a temporary registered `UHSRStatusComponent` over the real ASC. They do not initialize or resolve the Coordinator's real TurnManager. Speed and Health baselines are captured and restored; every known status/sentinel handle is cleared and every temporary component is destroyed.
+- EndPlay verification calls only `DestroyComponent`, allowing the component's real EndPlay path to clear and unbind. Reset/second battle creates and binds a new manager/component, proves an old-epoch event does not consume, then consumes two new-epoch target TurnEnded events through expiry.
+- TargetDeath and Finished are the final matrix operations. Because the harness runs before GameMode binds `OnBattleResultReady`, setting Health to zero safely follows the real `Health delegate -> ResolveDefeat -> FinishBattle -> ClearStatusComponents` path without initiating map return. The existing Reset/Rebuild seam restores the Coordinator between terminal cases.
+- The harness has exactly 14 named case rows. It emits `Harness=COMPLETE` only if every underlying assertion, including sentinel cleanup, is true; otherwise it emits Error-level `Harness=INCOMPLETE`. No `NOT_VERIFIED` branch remains.
+
+### Final build and static evidence
+
+- Build after the full isolation rewrite exited `0` and compiled `HSRBattleGameMode.cpp`, linked `UnrealEditor-HSR.lib/.dll`, and wrote metadata (`Result: Succeeded`, `4.94` seconds).
+- Final build after the all-cases COMPLETE gate also exited `0`, compiled `HSRBattleGameMode.cpp`, linked both HSR binaries, and wrote metadata (`Result: Succeeded`, `7.06` seconds).
+- Final isolation/log correction build exited `0`, compiled `HSRBattleGameMode.cpp`, linked both HSR binaries, and wrote metadata (`Result: Succeeded`, `4.80` seconds).
+- Fresh UHT and the full Status/Coordinator/GameMode compilation evidence remain supplied by the immediately preceding successful `10.46` second build in the same revision sequence.
+- Editor assets, Editor restart, and two user PIE runs remain pending. No agent Editor/PIE claim is made.
+
+## Pre-PIE Reviewer revision
+
+- All non-terminal status cases now use a temporary TurnManager and registered temporary StatusComponent over the real ASC. Original Speed/Health values are captured; Speed is restored and all temporary components/known handles are cleared before the first real terminal mutation. The old epoch is copied before Reset, and no old participant-array pointer or old manager is dereferenced after Reset/Rebuild.
+- ManagerReplacement proves the old manager's real `ResolveAction` broadcast no longer consumes after rebinding, then uses the replacement manager's real enemy/player Resolve sequence to consume the target turn. ResetSecondBattle injects only the stale old-epoch rejection probe; both new decrements and expiry come from four real `ResolveAction` calls in deterministic enemy/player order.
+- Added the Development-only `InvalidateAbilitySystemForDevelopmentTest` seam. A pristine component is initialized and bound with a real ASC, then its weak ASC is cleared; Add must return `MissingAbilitySystem` with zero instance, apply count, remaining turns, handle, Attack, and Tag side effects.
+- OtherParticipant and FirstTarget assertions now compare the full observable snapshot: instance, stacks, remaining turns, handle identity/active state, Apply/Remove counts, Attack baseline+10, and Tag presence. ForcedApplyFailure similarly proves all runtime and GAS observations remain unchanged.
+- Invalid Definition coverage now includes unsupported timing and refresh policy (`InvalidPolicy`). It also binds the Coordinator's existing initialization GE through a read-only Development getter and requires `GameplayEffectNotInfinite`.
+- Sentinel cleanup now additionally requires the sentinel handle to become inactive after its explicit removal, Attack to return to baseline, and the Tag to disappear. Real TargetDeath and Finished remain at the matrix tail and use the production Health delegate/ResolveDefeat/FinishBattle path.
+
+### Pre-PIE build evidence
+
+- Fresh `HSREditor Win64 Development -NoHotReload -WaitMutex` exited `0`, `Result: Succeeded`, total `8.69` seconds.
+- UHT ran (`Total of 0 written`); `HSRStatusComponent.cpp`, `HSRBattleCoordinator.cpp`, `HSRBattleGameMode.cpp`, and generated module sources compiled; `UnrealEditor-HSR.lib/.dll` linked; metadata was written.
+- Existing non-preferred MSVC and AIModule deprecation warnings remain. No project compilation error occurred.
+- Editor/PIE remains `NOT RUN` by the agent.
+
+## User-log REVISE and harness correction
+
+- Evidence level: `USER PROVIDED`. The pre-correction two-run log reported 20 case-level `PASS`, 8 `FAIL`, and 2 `Harness=INCOMPLETE`; both runs failed identically. This evidence is retained as a failed harness run and does not authorize another acceptance claim.
+- Root cause 1: after RefreshAtOneTurn the harness drove only one complete target turn, so the owned instance correctly remained at 1 instead of expiring. The harness now drives two complete enemy/player Resolve cycles after refresh before asserting expiry.
+- Root cause 2: the combined missing/invalid/dead-target card set Health to zero while the formal Coordinator health observer was still bound, causing a real terminal battle that contaminated forced failure, terminal, and rebuild cards. The failure card now uses temporary manager/components; the Coordinator runtime delegates are cleared before its isolated zero-Health probe, and a fresh Reset/Rebuild creates a clean formal battle before any terminal card.
+- TargetDeathClear, ResetAndSecondBattle, and FinishedClear now each run in their own formal Reset/Rebuild battle. ResetSecondBattle must Add successfully and consume two target TurnEnded events through real ResolveAction before expiry. TargetDeath and Finished remain real Health delegate/ResolveDefeat/FinishBattle paths at the matrix tail.
+
+### User-log correction build
+
+- Fresh `HSREditor Win64 Development -NoHotReload -WaitMutex` exited `0`, `Result: Succeeded`, total `26.62` seconds.
+- UHT ran (`Total of 0 written`); Coordinator, GameMode, and generated module sources compiled; `UnrealEditor-HSR.lib/.dll` linked; metadata was written.
+- `git diff --check` passed before this report update. Existing non-preferred MSVC warning remains. Agent did not run Editor/PIE.
+- A new two-run user PIE log is required; the failed 20 PASS / 8 FAIL / 2 INCOMPLETE evidence cannot be reused.
+
+## Second user-log REVISE — manager-local epoch correction
+
+- Evidence level: `USER PROVIDED`. The latest two-run log reported 26 case-level `PASS`, 2 `FAIL`, and 2 `Harness=INCOMPLETE`; the only failing row in each run was ResetAndSecondBattle with Remaining=1.
+- Root cause: the old and replacement TurnManagers can both legitimately use manager-local `BattleEpoch=1`. The harness directly injected an old-manager event with sequence 500 into the new component; because the epoch matched locally, the component accepted it, after which real new-manager sequences 1–4 were correctly rejected as non-increasing.
+- P9-000's cross-manager safety rule is delegate ownership, not globally unique epochs. The invalid direct old-event injection and its `AfterStale==2` gate were removed. ManagerReplacement continues to prove unbinding by issuing a real ResolveAction on the old manager after the component has rebound and confirming no consumption.
+- ResetAndSecondBattle now tests only the intended second-battle contract: Add on the component bound to the new manager, real enemy/player Resolve pair for Remaining 2→1, then a second real pair for expiry and exact removal.
+- Correction Build: fresh `HSREditor Win64 Development -NoHotReload -WaitMutex` exited `0`, `Result: Succeeded`, total `5.72` seconds; `HSRBattleGameMode.cpp` compiled, HSR lib/dll linked, and metadata was written. `git diff --check` passed. Editor/PIE remains user-only.
+
+## Final user PIE evidence and review
+
+- Evidence level: `USER PROVIDED`. Attachment: `C:\Users\Lai\.codex\attachments\22b97b03-3893-4dcc-9714-bdca135589fe\pasted-text.txt`.
+- Final evidence contains 28 of 28 case-level `PASS`, 2 `Harness=COMPLETE`, and zero `Result=FAIL`, `Harness=INCOMPLETE`, or `Harness=SKIPPED` across two complete runs.
+- All 14 unique matrix cases appear exactly twice, once per run: AddSuccess, OtherParticipantTurnEnded, FirstTargetTurnEnded, RefreshAtOneTurn, TwoTargetTurnEndedAfterRefresh, DuplicateTurnEvent, InvalidDefinition_StatusId_Duration_GE, MissingASC_InvalidTarget_DefeatedTarget, ForcedApplyFailure, EndPlayClear, ManagerReplacement, TargetDeathClear, ResetAndSecondBattle, and FinishedClear.
+- Main lifecycle evidence shows Attack `10→20` on Add, one active owned handle and one stack, unchanged Attack/Tag/handle on other-participant turns, Remaining `2→1`, refresh back to `2` with the same handle and ApplyCount still `1`, then exact expiry removal with Attack returning to `10`, Tag absent, and RemoveCount `1`.
+- Failure evidence reports zero instances and no Attack/Tag/handle side effects for invalid Definition/policy/GE, missing ASC, invalid/dead target, and forced Apply failure. Duplicate turn consumption leaves Remaining and sequence unchanged after the first accepted event.
+- Manager replacement and ResetSecondBattle pass in both runs using real ResolveAction broadcasts: old-manager delivery does not consume after unbind, the replacement manager consumes normally, and the second battle reaches exact expiry after two target TurnEnded events.
+- TargetDeathClear proves distinct owned and sentinel handles: real death/Finished cleanup removes only the owned handle, sentinel remains active with one +10 contribution and Tag, and explicit sentinel removal restores baseline. FinishedClear passes through the independent real terminal battle and leaves no owned StatusComponent.
+- Independent Reviewer final conclusion: `PASS WITH FOLLOW-UP`. All earlier incomplete matrices, user-log failures, Reviewer `REVISE` decisions, root causes, and Build evidence remain preserved above as historical evidence.
+
+---
+
+# TASK-P9-002 Execution Result
+
+## Status
+
+`IMPLEMENTED / BUILD PASSED / USER PIE PASSED / REVIEWER PASS WITH FOLLOW-UP` (2026-07-21).
+
+## UE5.6 API evidence
+
+- Read-only inspection of UE5.6 `AbilitySystemComponent.h` found public `GetCurrentStackCount(Handle)` and `SetActiveGameplayEffectLevel(Handle, NewLevel)`, but no public API that sets an active effect's stack count by Handle.
+- UE5.6 `FGameplayEffectSpec::SetStackCount` explicitly states that it sets stack count only when stacking is supported by the GameplayEffect.
+- `UGameplayEffect` owns the required authoring contract: `StackingType`, `StackLimitCount`, stack refresh/expiration policy, and `bFactorInStackCount`. The existing P9-001 asset contract guaranteed only Infinite duration, one static Attack +10 modifier, and one granted Tag; it did not freeze or verify these stacking fields.
+- `SetActiveGameplayEffectLevel` is not an equivalent fallback. A static +10 magnitude does not become +20 merely because the GE level changes unless the asset magnitude is authored to scale with level, which is also outside the current asset contract.
+
+## Stop decision
+
+- P9-002 requires AddStack 1→2 to retain one active Handle while producing auditable two-layer attribute behavior. With the existing unmodified user GE, applying again may create a second Handle because stacking is not guaranteed; mutating an active spec through engine-private containers would violate the public API and ownership boundary; direct Attack writes are forbidden.
+- Therefore the same-Handle AddStack contract cannot be implemented safely inside the current code-only allowlist. No Status, Definition, Coordinator, GameMode, Config, Content, AttributeSet, TurnManager, Build, Editor, PIE, or Git mutation was performed for P9-002. Only this allowed execution report was appended.
+
+## Required replacement contract
+
+- Preferred revision: User authors or updates a dedicated P9-002 Infinite GE with `StackingType=AggregateByTarget`, `StackLimitCount=2`, modifier stack factoring enabled, and explicitly frozen overflow/duration policies; user then provides Editor-reopen evidence. Implementation may apply the same GE spec and require GAS to return/retain the same active Handle while `GetCurrentStackCount` moves 1→2 and Attack moves baseline+10→baseline+20.
+- If changing the asset is not desired, Coordinator must revise the requirement away from same-Handle GAS stacking. A code-owned logical stack with one static +10 GE cannot honestly represent +20 without another authorized magnitude mechanism or a transactional Replace contract.
+- Replace failure tracking is separately implementable by retaining explicit old/new handle ownership until old removal resolves, but implementing it now would create a partial P9-002 while the primary AddStack gate is blocked; no partial Gameplay was written.
+
+## Gate A resumed implementation
+
+Gate A was subsequently accepted as `USER PROVIDED PASS` for the dedicated assets:
+
+- `Content/Data/Status/DA_Status_AttackUpStack_P9_002.uasset`
+- `Content/GameplayEffects/GE_Status_AttackUpStack_P9_002.uasset`
+
+The original block and evidence above remain historical. Implementation resumed only after the dedicated GE was confirmed Infinite, AggregateByTarget, StackLimit=2, Attack +10 per stack, and isolated from the P9-001 GE.
+
+### Implemented runtime contract
+
+- Added `EHSRStatusRefreshPolicy::AddStack` and structured `StackAdded`, `AtMaxRefreshed`, and `Replaced` outcomes. Definition validation accepts exactly `RefreshDuration + MaxStacks=1` or `AddStack + MaxStacks=2`.
+- AddStack reapplies the configured stacking GE and requires GAS to return the existing active Handle and `GetCurrentStackCount` to equal the expected Runtime stack. An unexpected second Handle is removed and the operation fails; Runtime state is committed only after the same-Handle/GAS-count checks pass.
+- At MaxStacks=2, Add performs no third Apply, preserves the Handle and both GAS/Runtime stack counts, updates the latest successful SourceParticipantId, and refreshes logical RemainingTurns.
+- RefreshDuration preserves Stacks, Handle, GAS effect, and ApplyCount and only updates SourceParticipantId plus RemainingTurns.
+- Explicit Replace validates and applies the new GE first. New Apply failure leaves the old instance untouched. Old Remove success commits the new Handle and resets the replacement instance to one layer. Injected old Remove failure retains the old Handle as primary and the new Handle as a separately auditable secondary owned Handle; Clear removes both.
+- Runtime snapshots now expose latest SourceParticipantId, GAS stack count, and secondary Handle identity/active state. Add accepts an optional OperationId; a replay returns `IgnoredEvent` without changing stacks, source, duration, Handle, or counts.
+
+### Development verification surface
+
+- Added the user-bound `AttackUpStackStatusDefinition` GameMode property. The P9-002 stacking harness runs before the P9-001 regression and refuses to run until Gate B sets the dedicated Definition to `AddStack`.
+- P9-002 cases cover AddStack 1→2 with the same Handle and Attack baseline+20, OverMax refresh without Apply, RefreshAt1, ExplicitReplaceSuccess, NewApplyFailure, OldRemoveFailure dual ownership, DifferentSources, and duplicate Add OperationId. Every run then executes the full P9-001 14-case regression.
+- The harness emits `COMPLETE` only when all P9-002 assertions pass; otherwise it emits Error-level `INCOMPLETE`. Editor/PIE was not run by the agent.
+
+### Build evidence
+
+- Core runtime Build: fresh UHT wrote 4 reflection files; StatusDefinition, StatusComponent, Coordinator, GameMode, and generated module sources compiled; HSR lib/dll linked; metadata completed; exit `0`, total `29.14` seconds.
+- Final harness Build: fresh UHT wrote 2 reflection files; GameMode and generated module sources compiled; HSR lib/dll linked; metadata completed; exit `0`, total `8.47` seconds.
+- Final matrix evidence-split Build compiled `HSRBattleGameMode.cpp`, linked HSR lib/dll, and wrote metadata; exit `0`, total `13.83` seconds. P9-002 now emits eight distinct new case rows rather than combining DifferentSources and DuplicateAdd.
+- Existing non-preferred MSVC and AIModule deprecation warnings remain. `git diff --check` passed.
+
+## Gate B required before PIE
+
+- User must close/reopen Editor, bind `DA_Status_AttackUpStack_P9_002` to the new `Attack Up Stack Status Definition` GameMode property, change its RefreshPolicy from the Gate A placeholder `RefreshDuration` to the newly exposed `AddStack`, save, close/reopen again, and confirm the enum value and dedicated GE soft reference persist.
+- P9-001 `AttackUpStatusDefinition`, GE, Tag, and bindings must remain unchanged. Only the P9-002 dedicated Definition may use `AddStack`.
+- No PIE evidence is valid before Gate B is confirmed. After Gate B, run two PIE battles with only the P9 status harness enabled and provide complete P9-002 plus P9-001 logs.
+
+## Reviewer transaction revision and final pre-Gate-B build
+
+- Reviewer requested stronger transaction guarantees after the first P9-002 implementation. AddStack now rolls back one GAS stack when a same-handle stack-count postcondition fails; an unexpected second Handle is removed, or retained as secondary ownership when that cleanup fails. Replace rejects the same GE class before Apply and rolls back one layer if GAS unexpectedly returns the existing Handle.
+- Existing-instance mutation now requires both an active primary Handle and exact Runtime/GAS stack-count agreement. Clear independently inspects/removes primary and secondary owned Handles, reports `RemoveFailed` when any known active removal fails, and clears local ownership after both attempts.
+- The eight-case P9-002 harness now verifies same-Handle Runtime/GAS stack 2, Attack +20, Tag and no secondary ownership; max-stack no-Apply refresh plus exact Clear; complete Refresh-at-one preservation; Replace old/new Handle activity and counts; full no-mutation Apply failure; dual ownership and dual cleanup after old-remove failure; source replacement; and duplicate OperationId full no-mutation behavior. Failed case rows emit Error-level evidence and prevent `Harness=COMPLETE`.
+- A Development-only read-only Handle getter was added so the harness can query the ASC directly for old/cleared Handle inactivity; it does not mutate runtime behavior.
+- The first revision build exposed one harness-only `UE_LOG` macro `if/else` syntax error; braces were added. The immediate fresh retry exited `0`, compiled `HSRBattleGameMode.cpp`, linked `UnrealEditor-HSR.lib/.dll`, and wrote target metadata (`Result: Succeeded`, total `5.51` seconds). The preceding build in the same revision ran UHT (`Total of 0 written`) and compiled the updated StatusComponent, Coordinator, and generated sources before stopping at that harness syntax error.
+- Editor/PIE was not run. Gate B asset configuration and two user PIE runs remain required; no acceptance claim is made before that evidence.
+
+## Final user PIE evidence and review
+
+- Evidence level: `USER PROVIDED`. Attachment: `C:\Users\Lai\.codex\attachments\4cadf17c-f983-4f3f-95e1-ec1bb1ef1132\pasted-text.txt`.
+- Across two complete runs, P9-002 contains 16 of 16 case-level `PASS` and 2 `Harness=COMPLETE`; the immediately following P9-001 regression contains 28 of 28 case-level `PASS` and 2 `Harness=COMPLETE`. The combined evidence contains zero `Result=FAIL`, `Harness=INCOMPLETE`, or `Harness=SKIPPED`.
+- AddStack proves one stable active Handle while Runtime and GAS both move from one to two stacks and Attack moves from baseline +10 to baseline +20. OverMax performs no third Apply, retains two stacks, refreshes RemainingTurns/source, and exact Clear returns Attack to baseline.
+- Explicit Replace proves the old Handle becomes inactive, a distinct new Handle remains active at one Runtime/GAS stack, and Apply/Remove counts advance exactly once. Forced new-Apply failure preserves the complete prior snapshot, Handle, GAS stack count, Attack, Tag, and counters.
+- Injected old-Remove failure proves distinct primary and secondary owned Handles remain active together with two +10 contributions. The subsequent Clear removes both Handles, restores baseline Attack, removes the granted Tag, and advances RemoveCount for both removals.
+- DifferentSources proves source metadata updates without creating a second runtime instance; DuplicateAdd proves replaying the same OperationId returns `IgnoredEvent` with snapshot, Handle, stacks, Attack, Tag, and counters unchanged.
+- Independent Reviewer final conclusion: `PASS WITH FOLLOW-UP`. All preceding BLOCKED, REVISE, failed-build, and pre-Gate-B records remain preserved above as historical evidence.
+
+---
+
+# TASK-P9-003 Execution Result
+
+## Build-first-error history
+
+- The main thread's first sandboxed Build attempt failed before UBT could validate project code with `UnauthorizedAccessException` while accessing the user's UnrealBuildTool state. This is retained as an environment-permission failure, not a C++ result.
+- The first Build outside the sandbox ran UHT and wrote 8 generated files, then reached the first real C++ error in `HSRStatusComponent.h`: inline `BindBattleCoordinator` attempted to assign `TWeakObjectPtr<UHSRBattleCoordinator>` while `UHSRBattleCoordinator` was still an incomplete forward-declared type (`C2679`).
+- The minimal whitelist correction leaves only the method declaration in the header and performs the weak-pointer assignment in `HSRStatusComponent.cpp`, where the Coordinator definition is complete.
+- The fresh Build after that correction exited `0`, `Result: Succeeded`, total `11.04` seconds. UHT ran with `Total of 0 written`; `HSRStatusComponent.cpp`, `HSRBattleCoordinator.cpp`, `HSRBattleGameMode.cpp`, and generated module sources compiled; `UnrealEditor-HSR.lib/.dll` linked; target metadata was written.
+- Existing non-preferred MSVC and AIModule deprecation warnings remain. Both the sandbox permission failure and the C2679 Build remain preserved above as historical evidence.
+
+## Asset-gate Reviewer REVISE
+
+- Coordinator now owns distinct AttackUp, DamageOverTime, and Break StatusDefinition bindings. GameMode explicitly injects the DoT and Break Definitions without changing the existing P9-001/P9-002 AttackUp bindings. BreakResult maps only to the Break Definition; the Development DoT add entry maps only to the DoT Definition.
+- Added a default-off P9-003 harness entry. Missing assets or invalid reflected fields emit `Harness=SKIPPED`. With assets ready, the current harness executes real DoT Add/no-immediate-damage, duplicate Add, non-target event, first target trigger-before-decrement, and final damage-then-expiry cases before the P9-002/P9-001 regression entry.
+- BreakResult, lethal tick, invalid/failure matrix, Reset, EndPlay, and manager-replacement cards remain explicitly `NOT_VERIFIED`; therefore this revision emits `Harness=INCOMPLETE` and makes no P9-003 completion claim. A later harness revision must close those cards before user PIE acceptance.
+- Build was not rerun by the implementation agent. The main thread owns the fresh Build after this asset-gate revision.
+
+## Asset-gate matrix completion revision
+
+- After user Asset Gate confirmation, the P9-003 harness was expanded from the historical incomplete subset above. It now includes scoped duplicate Add and duplicate lifecycle delivery, old Epoch/non-target rejection, forced Damage ApplyFailure with same-event retry, two successful trigger-before-decrement ticks, Break Status request/replay through the same Coordinator helper used by production BreakResult, and simultaneous DoT/Break ownership.
+- Structured invalid coverage includes unsupported StatusId, missing Infinite GE, missing Damage Rule, invalid DamageType, missing ASC, and invalid Target. Temporary component/manager cards cover manager replacement, Finished no-event behavior, EndPlay exact cleanup, and stale old-manager delivery.
+- The lethal card runs last: a temporary DoT component reaches one remaining turn, the final tick kills through the production Coordinator damage transaction, clears without decrementing the lethal event, publishes terminal cleanup once, and ignores duplicate delivery. The existing Development Reset/Rebuild then restores a clean formal battle before P9-002 and P9-001 regression harnesses run.
+- `Harness=COMPLETE` is emitted only when every P9-003 case passes; otherwise Error-level `Harness=INCOMPLETE` reports the failed-case count. No `NOT_VERIFIED` completion path remains.
+- Build was not run by the implementation agent; the main thread owns the required fresh Build.
+
+## Harness truthfulness Reviewer REVISE
+
+- Core DoT ApplyFailure, retry, duplicate, final expiry, and lethal cards now use the Coordinator-owned production StatusComponent and real `TurnManager::ResolveAction` broadcasts for target `TurnEnded`. Direct lifecycle injection remains only for the scoped non-target, cached old-epoch, and duplicate-sequence rejection probes.
+- Old Epoch evidence now caches the formal manager's actual epoch, resets/reinitializes that same manager to a new epoch, adds the DoT in the new epoch, and injects only the cached real old epoch. The previous synthetic `Current+1` probe is historical and removed.
+- Finished now uses the production Health observer -> ResolveDefeat -> FinishBattle -> ClearStatusComponents path with both DoT and Break active. It requires both Handles inactive, one Defeat/result publication, a rejected late ResolveAction, and unchanged publication counters, then performs an independent Reset/Rebuild.
+- Lethal uses the rebuilt Coordinator-owned component. A real first target turn reaches Remaining=1; the real final target ResolveAction kills through ResolveStatusDamage/FinalizeStatusDamage, and Coordinator-owned audit counters require exactly one status-damage commit, Defeat, and BattleResult broadcast. Cleanup audit proves the removed DoT still had Remaining=1 and the prior consumed sequence, so the lethal event did not decrement. No destroyed component is read; duplicate late resolution is rejected and counters remain unchanged.
+- Each terminal segment rebuilds before later work and reacquires participants from the new battle. P9-002/P9-001 regression harnesses run only after the final clean Reset/Rebuild. Build remains owned by the main thread.
+
+## User PIE lethal-only REVISE
+
+- Evidence level: `USER PROVIDED`. Attachment: `C:\Users\Lai\.codex\attachments\21fb7b97-95de-4689-bc3b-a482796622b3\pasted-text.txt`.
+- Both runs had the identical single failure: `LethalFinalTick_ExactlyOnceNoDecrement`; all other P9-003 cases, `DeathReset_RebuildsCleanRuntime`, P9-002 (`8 PASS/1 COMPLETE` per run), and P9-001 (`14 PASS/1 COMPLETE` per run) passed.
+- Root cause was a harness expectation mismatch, not a missing lethal transaction: the final target `ResolveAction` broadcasts `TurnEnded`, DoT damage kills, `FinalizeStatusDamage` invokes production `ResolveDefeat`, and `FinishBattle` transitions the TurnManager before `ResolveAction` returns. Therefore the terminal ResolveAction correctly returns `false`, while damage/Defeat/BattleResult exactly-once counters and cleanup audit remain the acceptance evidence.
+- The assertion now explicitly requires `bFirstLethalTurn == true` and terminal `bFinalLethalTurn == false`, while retaining all prior requirements: one additional status-damage commit, one Defeat, one BattleResult, rejected late ResolveAction, cleanup Remaining=1, and unchanged pre-lethal sequence. A detailed `LethalEvidence` line records every compared value; no damage or cleanup condition was weakened.
+
+## Second lethal evidence and production terminal fix
+
+- Evidence level: `USER PROVIDED`. Attachment: `C:\Users\Lai\.codex\attachments\2443c58b-9a19-4447-85b4-add65c5dd16e\pasted-text.txt`.
+- Both runs reported `FirstResolve=1 TerminalResolve=1 LateResolve=1`; Remaining/removed Remaining stayed `1`, consumed/removed sequence stayed `1`, and Damage, Defeat, and BattleResult each advanced exactly once. This disproved the preceding return-value diagnosis while confirming the DoT transaction itself was correct.
+- Root cause was in the synchronous terminal turn chain: `ResolveAction` broadcast `TurnEnded`; the callback called `FinishBattle`, but after returning, `ResolveAction` unconditionally called `AdvanceToNextValidTurn`, which overwrote Finished state and reopened a turn. The user explicitly authorized `HSRTurnManager.cpp` for this minimal correction.
+- `ResolveAction` now checks for Finished state or an invalid current index immediately after `TurnEnded`. In that terminal branch it preserves the successful current-action return contract and `ActionResolved` notification, but does not advance. The harness restores the strong expectation: first and terminal resolves succeed, the late resolve is rejected, all exactly-once counters remain unchanged, and lethal cleanup does not decrement Remaining or sequence.
+
+## Final matrix Build evidence
+
+- The main thread's fresh Build outside the sandbox exited `0`, `Result: Succeeded`, total `20.01` seconds. UHT ran with `Total of 0 written`; `HSRStatusDefinition.cpp`, `HSRStatusComponent.cpp`, `HSRBattleCoordinator.cpp`, `HSRBattleGameMode.cpp`, and generated module sources compiled; `UnrealEditor-HSR.lib/.dll` linked; target metadata was written.
+- Existing non-preferred MSVC and AIModule deprecation warnings remain. Unreal Build Accelerator also reported memory-pressure warnings while scheduling local actions; these were non-blocking and the complete compile/link/metadata chain succeeded.
+- All earlier sandbox permission failures, C2679 first error, asset-gate revisions, and harness truthfulness revisions remain preserved above as historical evidence.
+
+---
+
+# TASK-P9-004 Execution Result
+
+## Code-side asset gate
+
+- Added frozen Status classification, dispellability, immunity-tag, and source-invalid Keep/Remove policy fields. AttackUp validates only as Buff; DoT validates as dispellable Debuff with Remove; Break validates as undispellable Debuff with Keep. Debuffs require `Status.Immunity.Debuff`.
+- Debuff immunity is checked on the target ASC before marker GE Spec creation or Apply. Rejection returns structured `Immune` with no Runtime instance, Handle, Apply count, turn mutation, or damage.
+- Dispel candidates come only from StatusComponent-owned instances, are filtered to `Debuff && bDispellable`, sorted lexically by StatusId, and remove exactly the saved Handle. Forced remove failure retains ownership for a real retry; empty and repeated Dispel return `NoDispelCandidate`.
+- Source-invalid events are domain-idempotent per source. Latest successful source metadata controls the policy. In production 1v1 defeat, Coordinator routes and audits Remove/Keep before terminal cleanup; Keep does not survive Finished, because global battle cleanup has higher priority.
+- Added a default-off P9-004 Development harness covering immunity rejection, deterministic Dispel and forced failure/retry, undispellable Break/Buff/sentinel preservation, empty/duplicate Dispel, source Remove/Keep/replay, multi-source latest-source behavior, invalid Definition/classification/immunity Tag/ASC/target, EndPlay, ManagerReplacement, target death, Finished, and Reset/rebuild. P9-003/P9-002/P9-001 regression harnesses remain separate and unchanged.
+- Build and Editor/PIE are not claimed here. User asset configuration and Editor reopen evidence are required before P9-004 PIE.
+
+## Source-invalid ownership REVISE
+
+- Reviewer found that `HandleSourceInvalid` previously marked a bare SourceId before attempting removal, so a forced `RemoveFailed` could not retry the same event and the key was not BattleEpoch-scoped.
+- The implementation now keys idempotency by `BattleEpoch|SourceParticipantId`, gathers all Remove-policy instances first, and records the key only when every relevant removal succeeds or there are no relevant instances. Any failure leaves the key unrecorded and ownership available for retry.
+- The P9-004 harness now forces source removal failure, verifies zero removal and retained ownership, retries the same source event successfully, then verifies the replay is zero-side-effect. Existing Keep/Remove and latest-source assertions remain unchanged.
+- Build remains deferred to the main thread; `git diff --check` is required after this revision.
+
+---
+
+# TASK-P9-005 Execution Result
+
+## Code-side UI asset gate
+
+- Added `FHSRStatusPublicSnapshot`, a Blueprint-visible pure-value entry containing only StatusId, TargetParticipantId, display name, classification, stacks, remaining turns, and the latest structured result. Runtime Handle identities, ASC/Actor pointers, and StatusComponent references are not present in the Battle ViewState.
+- StatusComponent now exposes a production changed delegate and stable StatusId-sorted public snapshots. Successful Add/Stack/Refresh/Replace, non-expiring Trigger, Dispel/source removal, expiry, and Clear publish changes; rejection/failure paths do not publish false updates.
+- Coordinator binds each StatusComponent delegate, rebuilds a stable TargetId/StatusId-sorted `FHSRBattleCommandViewState::Statuses` array, and publishes through the existing command-state event. Teardown removes each Status delegate before Clear/Destroy to prevent reentrant UI publication.
+- BattleCommandViewModel formats read-only status text from ViewState values; BattleCommandWidget exposes that text through its existing event-driven binding. Widget `NativeDestruct`, GameMode `EndPlay`, and ViewModel `BeginDestroy` provide paired unbind fallbacks. No Tick, Timer, polling, or status mutation was added.
+- Added a default-off P9-005 harness that subscribes to the real Coordinator command-state delegate and verifies event-driven Add, Refresh, stable multi-status ordering, Dispel removal, Clear, and post-unbind no callback. It does not call `SetState` directly to simulate runtime changes.
+- Build and Editor/PIE are not claimed. User WBP/display asset binding and Editor reopen evidence remain required.
+
+## Public result ownership and UI matrix REVISE
+
+- `LastResult` is now stored per `FHSRStatusInstance`; Add, Stack, Refresh, Replace, and real turn Trigger update only that instance. Public snapshots no longer copy the component-wide diagnostic result, so concurrent Buff/DoT/Break entries cannot overwrite one another's displayed operation.
+- The default-off P9-005 harness now covers real Coordinator-owned Stack, production Break request, real TurnManager DoT trigger and expiry, stable multi-status ordering, DisplayName/classification/stacks/remaining/result values, Dispel, Clear, Finished, Reset/rebuild, ViewModel rebind, Widget repeated bind, `NativeDestruct`, and post-unbind no callback.
+- Widget lifecycle verification requires the user-bound BattleCommandWidgetClass. Missing WBP/display assets keep the harness at the explicit asset gate; it cannot report COMPLETE by substituting direct ViewModel `SetState` calls.
+- Build remains deferred to the main thread pending static review and user WBP asset confirmation.
+
+## Removed-status operation payload REVISE
+
+- Dispelled and expired instances no longer lose their visible result when removed from the active list. StatusComponent records an independent pure-value latest-operation payload before deletion: operation, structured result, StatusId, TargetParticipantId, and monotonic sequence. It contains no Handle, UObject, ASC, Actor, or component reference.
+- Coordinator captures that payload through the production status-changed delegate and includes it in BattleCommand ViewState. ViewModel formats a separate read-only operation line, and Widget exposes it without mutating Gameplay.
+- The P9-005 harness now requires real production Dispel and real TurnManager-driven Expire payloads to reach the ViewModel with the correct operation, result, stable IDs, and increasing sequence; checking only that the active list became empty is no longer sufficient.
+- Generic Clear also publishes a structured Clear operation. Rejection and remove-failure paths still do not emit false successful operations.
+
+### Build first error
+
+- Fresh Build reached UHT's first real error at `HSRStatusTypes.h`: Blueprint reflection does not support the `uint64` property used by `FHSRStatusPublicOperationEvent::Sequence`.
+- The minimal correction changes only the reflected payload field to Blueprint-supported `int64`. StatusComponent retains its internal non-negative monotonic `uint64` counter and explicitly casts each increment into the public payload; ViewModel formatting now uses the matching signed 64-bit format.
+- Build was not rerun by the implementation agent; the main thread owns the fresh retry.
+
+---
+
+# TASK-P9-006 Coordinator closeout audit
+
+Status: `CLOSEOUT AUDIT IN PROGRESS / PHASE NOT READY` (2026-07-22).
+
+- Archive completeness: P9-000 through P9-005 each retain `active-task`, `execution-result`, and `final-review`; 18 of 18 expected archive files are present. Historical `BLOCKED`, `REVISE`, failed Build, failed/incomplete harness, and follow-up records remain preserved rather than rewritten by the closeout.
+- Final runtime evidence is `USER PROVIDED` from `C:\Users\Lai\.codex\attachments\bb513d65-1075-4f5a-a9f6-6d65397c8781\pasted-text.txt`. P9-005/004/003/002/001 report `28/38/36/16/28 PASS`, respectively, with two `Harness=COMPLETE` markers per suite and zero `Result=FAIL`, `Harness=INCOMPLETE`, or `Harness=SKIPPED` markers.
+- The two `P6-004A Widget Bind Result=FAILED ... ViewModel=null` warnings are `HARNESS EXPECTED` empty-ViewModel failure probes. Each is followed by the successful bind/unbind/lifecycle evidence; they are retained and are not classified as Phase 9 regressions.
+- Fresh P9-005 Build evidence closes the current implementation chain: the first real UHT error rejected Blueprint-reflected `uint64`; the reflected public sequence was corrected to `int64` while the internal counter remained `uint64`. The successful retry records UHT, HSR C++ compilation, `UnrealEditor-HSR.lib/.dll` link, metadata write, and exit `0`. Earlier Phase 9 UHT/C++ failures and successful correction chains remain in the per-task archives.
+- User-authored Editor/configuration scope includes `Config/DefaultGameplayTags.ini`, `Content/Blueprints/Framework/BP_HSRBattleGameMode.uasset`, `Content/UI/WBP_BattleCommandPanel.uasset`, `Content/Data/Status/*.uasset`, and the Phase 9 GameplayEffect assets. Observed status assets are AttackUp, AttackUpStack, DamageOverTime, and BreakDebuff; observed GE assets additionally include DebuffImmunity. Observed Tags are `Damage.Type.Status`, `Status.Buff.AttackUp`, `Status.Debuff.Break`, `Status.Debuff.DamageOverTime`, and `Status.Immunity.Debuff`. Asset-field truth remains `USER PROVIDED`; this audit does not claim independent `.uasset` deserialization.
+- The current dirty tree contains Phase 9 Source/UI work, the user-owned Config/Content assets, root status documents, the Phase 9 plan, and all 18 archives. Exact role ownership of the still-dirty Source/docs/assets must be closed in a formal provenance ledger before role commits.
+- `?? .agents/CLAUDE.md` remains unclassified and is not claimed or modified by this audit. It requires provenance classification before delivery.
+- Global `git diff --check` currently fails at `Config/DefaultGameplayTags.ini:40: new blank line at EOF.` This is a User/Coordinator pre-commit follow-up; no Config edit is authorized in this audit.
+- Still required: Teacher records with real user answers and explicit mastery/review/not-assessed boundaries; an Independent Reviewer P9-006 Gate; exact provenance closure; role commits; P9-006 archive; Coordinator closeout; and remote delivery. Until those complete, P9-006 is not PASS and Phase 9 must not be marked Ready or advance to Phase 10.

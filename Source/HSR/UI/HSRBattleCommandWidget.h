@@ -15,6 +15,10 @@ class HSR_API UHSRBattleCommandWidget : public UUserWidget
 
 public:
 	void BindViewModel(UHSRBattleCommandViewModel* InViewModel, UHSRBattleCoordinator* InCoordinator);
+#if WITH_EDITOR
+	int32 GetBindGenerationForDevelopmentTest() const { return BindGeneration; }
+	bool HasActiveViewModelBindingForDevelopmentTest() const { return StateChangedHandle.IsValid(); }
+#endif
 
 	UFUNCTION(BlueprintPure, Category = "Battle|Command")
 	FHSRBattleCommandViewState GetCurrentViewState() const;
@@ -26,6 +30,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetToughnessText() const;
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetBreakText() const;
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetDelayText() const;
+	UFUNCTION(BlueprintPure, Category = "Battle|Status") FText GetStatusText() const;
+	UFUNCTION(BlueprintPure, Category = "Battle|Status") FText GetStatusOperationText() const;
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkill(EHSRSkillCategory Category);
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectTarget(FName TargetId);
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FName GetSelectedSkillId() const;

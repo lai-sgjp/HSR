@@ -6,6 +6,7 @@
 #include "HSRBattleParticipant.h"
 #include "../UI/HSRBattleCommandTypes.h"
 #include "../GAS/Damage/HSRDamageTypes.h"
+#include "../Status/HSRStatusTypes.h"
 #include "HSRBattleCoordinator.generated.h"
 
 class UWorld;
@@ -15,6 +16,8 @@ class UHSRSkillDefinition;
 class UHSRDamageRuleDefinition;
 class UGameplayEffect;
 class UHSREnemyDefinition;
+class UHSRStatusDefinition;
+class UHSRStatusComponent;
 struct FOnAttributeChangeData;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleResultReadyDelegate, const FHSRBattleResult&);
@@ -52,6 +55,8 @@ public:
 	/** Requests one synchronous basic attack. Only a current participant may attack an opposing valid target. */
 	bool RequestBasicAttack(FName AttackerParticipantId, FName TargetParticipantId);
 	FHSRAbilityResolution RequestAction(const FHSRBattleActionCommand& Command);
+	FHSRDamageResult ResolveStatusDamage(FName SourceParticipantId, FName TargetParticipantId, const FGuid& ActionId, const UHSRStatusDefinition* Definition);
+	void FinalizeStatusDamage();
 	void SetBasicAttackDefinition(UHSRSkillDefinition* InDefinition) { BasicAttackDefinition = InDefinition; }
 	const UHSRSkillDefinition* GetBasicAttackDefinition() const { return BasicAttackDefinition; }
 	void SetUltimateDefinition(UHSRSkillDefinition* InDefinition) { UltimateDefinition = InDefinition; }
@@ -59,6 +64,11 @@ public:
 	void SetHealDefinition(UHSRSkillDefinition* InDefinition) { HealDefinition = InDefinition; }
 	void SetEnemyDefinition(UHSREnemyDefinition* InDefinition) { EnemyDefinition = InDefinition; }
 	void SetParticipantInitializationGameplayEffect(TSubclassOf<UGameplayEffect> InEffect) { ParticipantInitializationGameplayEffect = InEffect; }
+	void SetStatusDefinition(UHSRStatusDefinition* InDefinition) { StatusDefinition = InDefinition; }
+	void SetDamageOverTimeStatusDefinition(UHSRStatusDefinition* InDefinition) { DamageOverTimeStatusDefinition = InDefinition; }
+	void SetBreakStatusDefinition(UHSRStatusDefinition* InDefinition) { BreakStatusDefinition = InDefinition; }
+	const UHSRStatusDefinition* GetStatusDefinition() const { return StatusDefinition; }
+	UHSRStatusComponent* GetStatusComponent(FName ParticipantId) const;
 	const FHSRTeamResourceState& GetTeamResourceState() const { return TeamResourceState; }
 	bool WasLastBreakDelayRegistered() const { return bLastBreakDelayRegistered; }
 	FGuid GetLastBreakDelayActionId() const { return LastBreakDelayActionId; }
@@ -66,6 +76,25 @@ public:
 	FHSRBattleCommandStateReadyDelegate& OnCommandStateReady() { return CommandStateReady; }
 	FHSRBattleCommandViewState GetCommandViewState() const;
 #if WITH_EDITOR
+	EHSRStatusOperationResult AddStatusForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId);
+	EHSRStatusOperationResult AddDamageOverTimeForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId = FGuid());
+	EHSRStatusOperationResult AddSpecificStatusForDevelopmentTest(const UHSRStatusDefinition* Definition, FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId = FGuid());
+	EHSRStatusOperationResult RequestBreakStatusForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId) { return RequestBreakStatus(SourceParticipantId, TargetParticipantId, OperationId); }
+	void SetStatusDamageApplyFailureForDevelopmentTest(bool bForce) { bForceStatusDamageApplyFailure = bForce; }
+	int32 GetStatusDamageCommitCountForDevelopmentTest() const { return StatusDamageCommitCount; }
+	int32 GetDefeatCountForDevelopmentTest() const { return DefeatCount; }
+	int32 GetBattleResultBroadcastCountForDevelopmentTest() const { return BattleResultBroadcastCount; }
+	FHSRStatusRuntimeSnapshot GetLastClearedStatusSnapshotForDevelopmentTest(FName ParticipantId) const { const FHSRStatusRuntimeSnapshot* Found = LastClearedStatusSnapshots.Find(ParticipantId); return Found ? *Found : FHSRStatusRuntimeSnapshot(); }
+	EHSRStatusOperationResult DispelOneStatusForDevelopmentTest(FName TargetParticipantId);
+	int32 RouteSourceInvalidForDevelopmentTest(FName SourceParticipantId) { return RouteSourceInvalid(SourceParticipantId); }
+	int32 GetLastSourceInvalidRemovedCountForDevelopmentTest() const { return LastSourceInvalidRemovedCount; }
+	void SetStatusApplyFailureForDevelopmentTest(bool bForce);
+	void SetDispelRemoveFailureForDevelopmentTest(bool bForce);
+	FHSRStatusRuntimeSnapshot GetStatusSnapshotForDevelopmentTest(FName ParticipantId, FName StatusId = NAME_None) const;
+	TSubclassOf<UGameplayEffect> GetParticipantInitializationGameplayEffectForDevelopmentTest() const { return ParticipantInitializationGameplayEffect; }
+	void ClearRuntimeDelegatesForDevelopmentTest() { ClearRuntimeDelegates(); }
+	void ClearStatusComponentsForDevelopmentTest() { ClearStatusComponents(); }
+	bool InitializeStatusComponentsForDevelopmentTest() { return InitializeStatusComponents(); }
 	void SetDamageTestInjectionForAction(const FGuid& ActionId, EHSRDamageTestInjection InInjection) { DamageTestInjectionActionId = ActionId; NextDamageTestInjection = InInjection; }
 	void ClearDamageTestInjection() { DamageTestInjectionActionId = FGuid(); NextDamageTestInjection = EHSRDamageTestInjection::None; }
 	const FHSRFormalDamageExecutionResult& GetLastDevelopmentFormalExecutionResult() const { return LastDevelopmentFormalExecutionResult; }
@@ -111,6 +140,11 @@ private:
 	TObjectPtr<UHSRSkillDefinition> SkillDefinition;
 	UPROPERTY() TObjectPtr<UHSRSkillDefinition> HealDefinition;
 	UPROPERTY() TObjectPtr<UHSREnemyDefinition> EnemyDefinition;
+	UPROPERTY() TObjectPtr<UHSRStatusDefinition> StatusDefinition;
+	UPROPERTY() TObjectPtr<UHSRStatusDefinition> DamageOverTimeStatusDefinition;
+	UPROPERTY() TObjectPtr<UHSRStatusDefinition> BreakStatusDefinition;
+	UPROPERTY() TMap<FName, TObjectPtr<UHSRStatusComponent>> StatusComponents;
+	TMap<FName, FDelegateHandle> StatusChangedHandles;
 	TSubclassOf<UGameplayEffect> ParticipantInitializationGameplayEffect;
 	FHSRBattleResultReadyDelegate BattleResultReady;
 	FHSRBattleCommandStateReadyDelegate CommandStateReady;
@@ -123,6 +157,12 @@ private:
 	FGuid DamageTestInjectionActionId;
 	FHSRFormalDamageExecutionResult LastDevelopmentFormalExecutionResult;
 	TOptional<FHSREncounterRequest> LastSubmittedRequestForDevelopment;
+	bool bForceStatusDamageApplyFailure = false;
+	int32 StatusDamageCommitCount = 0;
+	int32 DefeatCount = 0;
+	int32 BattleResultBroadcastCount = 0;
+	TMap<FName, FHSRStatusRuntimeSnapshot> LastClearedStatusSnapshots;
+	int32 LastSourceInvalidRemovedCount = 0;
 #endif
 	/** Health observers defer terminal publication while the one synchronous
 	 * formal-damage application is still transactional. */
@@ -148,5 +188,11 @@ private:
 	void HandleHealthChanged(const FOnAttributeChangeData& ChangeData, FName ParticipantId);
 	void ResolveDefeat(FName DefeatedParticipantId);
 	void ClearRuntimeDelegates();
+	bool InitializeStatusComponents();
+	void ClearStatusComponents();
+	EHSRStatusOperationResult RequestBreakStatus(FName SourceParticipantId, FName TargetParticipantId, const FGuid& OperationId);
+	int32 RouteSourceInvalid(FName SourceParticipantId);
+	void HandleStatusChanged(FName ParticipantId);
+	FHSRStatusPublicOperationEvent LastStatusOperation;
 	void PublishCommandViewState();
 };

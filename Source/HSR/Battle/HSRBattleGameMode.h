@@ -12,6 +12,7 @@ class UHSRBattleCommandWidget;
 class UHSRDamageRuleDefinition;
 class UGameplayEffect;
 class UHSREnemyDefinition;
+class UHSRStatusDefinition;
 struct FHSRBattleResult;
 
 UENUM(BlueprintType)
@@ -86,7 +87,28 @@ protected:
 	/** Opt-in pure-value P8-001 contract audit; it never invokes battle gameplay. */
 	UPROPERTY(EditDefaultsOnly, Category = "Development|P8")
 	bool bRunP8ContractHarness = false;
+	/** Opt-in isolated P9-000 turn lifecycle contract harness. */
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P9")
+	bool bRunP9TurnLifecycleHarness = false;
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P9")
+	bool bRunP9StatusHarness = false;
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P9")
+	bool bRunP9DotBreakHarness = false;
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P9")
+	bool bRunP9ImmunityDispelHarness = false;
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P9")
+	bool bRunP9StatusViewHarness = false;
 #endif
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Status")
+	TObjectPtr<UHSRStatusDefinition> AttackUpStatusDefinition;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Status")
+	TObjectPtr<UHSRStatusDefinition> AttackUpStackStatusDefinition;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Status")
+	TObjectPtr<UHSRStatusDefinition> DamageOverTimeStatusDefinition;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Status")
+	TObjectPtr<UHSRStatusDefinition> BreakStatusDefinition;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Status")
+	TSubclassOf<UGameplayEffect> DebuffImmunityGameplayEffect;
 
 	UPROPERTY()
 	TObjectPtr<UHSRBattleCoordinator> Coordinator;

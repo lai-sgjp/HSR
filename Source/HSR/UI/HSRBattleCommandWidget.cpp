@@ -43,6 +43,8 @@ FText UHSRBattleCommandWidget::GetWeaknessText() const { return ViewModel.IsVali
 FText UHSRBattleCommandWidget::GetToughnessText() const { return ViewModel.IsValid() ? ViewModel->GetToughnessText() : FText::GetEmpty(); }
 FText UHSRBattleCommandWidget::GetBreakText() const { return ViewModel.IsValid() ? ViewModel->GetBreakText() : FText::GetEmpty(); }
 FText UHSRBattleCommandWidget::GetDelayText() const { return ViewModel.IsValid() ? ViewModel->GetDelayText() : FText::GetEmpty(); }
+FText UHSRBattleCommandWidget::GetStatusText() const { return ViewModel.IsValid() ? ViewModel->GetStatusText() : FText::GetEmpty(); }
+FText UHSRBattleCommandWidget::GetStatusOperationText() const { return ViewModel.IsValid() ? ViewModel->GetStatusOperationText() : FText::GetEmpty(); }
 bool UHSRBattleCommandWidget::SelectSkill(EHSRSkillCategory Category) { return ViewModel.IsValid() && ViewModel->SelectSkill(Category); }
 bool UHSRBattleCommandWidget::SelectTarget(FName TargetId) { return ViewModel.IsValid() && ViewModel->SelectTarget(TargetId); }
 FName UHSRBattleCommandWidget::GetSelectedSkillId() const { return ViewModel.IsValid() ? ViewModel->GetSelectedSkillId() : NAME_None; }

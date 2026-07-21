@@ -25,9 +25,21 @@ bool UHSRTurnManager::Initialize(const TArray<FHSRBattleParticipant>& InParticip
 		}
 		return Left.ParticipantId.LexicalLess(Right.ParticipantId);
 	});
+	++BattleEpochCounter;
+	if (BattleEpochCounter == 0)
+	{
+		++BattleEpochCounter;
+	}
+	BattleEpoch = BattleEpochCounter;
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRTurnManager::Initialize - Queue built Count=%d"), OrderedParticipants.Num());
-	return AdvanceToNextValidTurn();
+	if (!AdvanceToNextValidTurn())
+	{
+		BattleEpoch = 0;
+		TurnSequence = 0;
+		return false;
+	}
+	return true;
 }
 
 bool UHSRTurnManager::ResolveAction(FName ResolvingParticipantId)
@@ -52,6 +64,13 @@ bool UHSRTurnManager::ResolveAction(FName ResolvingParticipantId)
 	}
 
 	const FName ResolvedId = Current.ParticipantId;
+	BroadcastLifecycleEvent(EHSRTurnLifecycleEventType::TurnEnded, ResolvedId);
+	if (State == EHSRTurnManagerState::Finished || CurrentTurnIndex == INDEX_NONE)
+	{
+		ActionResolved.Broadcast(ResolvedId);
+		UE_LOG(LogTemp, Log, TEXT("UHSRTurnManager::ResolveAction - SUCCESS terminal ParticipantId=%s Next=None"), *ResolvedId.ToString());
+		return true;
+	}
 	AdvanceToNextValidTurn();
 	ActionResolved.Broadcast(ResolvedId);
 	UE_LOG(LogTemp, Log, TEXT("UHSRTurnManager::ResolveAction - SUCCESS ParticipantId=%s Next=%s"), *ResolvedId.ToString(), *GetCurrentParticipantId().ToString());
@@ -80,14 +99,9 @@ bool UHSRTurnManager::ConsumeBreakDelay(const FHSRTurnDelayRequest& Request)
 	{
 		return Participant.ParticipantId == Request.TargetParticipantId;
 	});
-	if (!OrderedParticipants.IsValidIndex(TargetIndex) || !OrderedParticipants[TargetIndex].IsValid())
+	if (!OrderedParticipants.IsValidIndex(TargetIndex) || !IsParticipantTurnEligible(OrderedParticipants[TargetIndex]))
 	{
 		UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Applied=0 Reason=InvalidTarget"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString());
-		return false;
-	}
-	if (OrderedParticipants[TargetIndex].AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) <= 0.0f)
-	{
-		UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Applied=0 Reason=DefeatedTarget"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString());
 		return false;
 	}
 
@@ -109,6 +123,8 @@ void UHSRTurnManager::Reset()
 	ConsumedBreakDelayActionIds.Empty();
 	PendingBreakDelayActionIds.Empty();
 	CurrentTurnIndex = INDEX_NONE;
+	BattleEpoch = 0;
+	TurnSequence = 0;
 	State = EHSRTurnManagerState::Waiting;
 }
 
@@ -133,7 +149,7 @@ bool UHSRTurnManager::AdvanceToNextValidTurn()
 	{
 		const int32 CandidateIndex = (StartIndex + Offset) % OrderedParticipants.Num();
 		const FHSRBattleParticipant& Candidate = OrderedParticipants[CandidateIndex];
-		if (!Candidate.IsValid())
+		if (!IsParticipantTurnEligible(Candidate))
 		{
 			if (const FGuid* PendingActionId = PendingBreakDelayActionIds.Find(Candidate.ParticipantId))
 			{
@@ -150,14 +166,16 @@ bool UHSRTurnManager::AdvanceToNextValidTurn()
 			PendingBreakDelayActionIds.Remove(Candidate.ParticipantId);
 			continue;
 		}
-		if (Candidate.IsValid())
+		if (IsParticipantTurnEligible(Candidate))
 		{
 			CurrentTurnIndex = CandidateIndex;
 			State = Candidate.Team == EHSRBattleParticipantTeam::Player ? EHSRTurnManagerState::PlayerTurn : EHSRTurnManagerState::EnemyTurn;
+			++TurnSequence;
 			if (!ConsumedDelayTarget.IsNone())
 			{
 				UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Registered=0 Consumed=1 Next=%s Reason=None"), *ConsumedDelayActionId.ToString(), *ConsumedDelayTarget.ToString(), *Candidate.ParticipantId.ToString());
 			}
+			BroadcastLifecycleEvent(EHSRTurnLifecycleEventType::TurnStarted, Candidate.ParticipantId);
 			return true;
 		}
 	}
@@ -172,9 +190,37 @@ bool UHSRTurnManager::AdvanceToNextValidTurn()
 	return false;
 }
 
+void UHSRTurnManager::BroadcastLifecycleEvent(EHSRTurnLifecycleEventType EventType, FName ParticipantId)
+{
+	if (BattleEpoch == 0 || TurnSequence == 0 || ParticipantId.IsNone() || State == EHSRTurnManagerState::Finished)
+	{
+		return;
+	}
+
+	FHSRTurnLifecycleEvent Event;
+	Event.BattleEpoch = BattleEpoch;
+	Event.ParticipantId = ParticipantId;
+	Event.TurnSequence = TurnSequence;
+	Event.EventType = EventType;
+	if (EventType == EHSRTurnLifecycleEventType::TurnStarted)
+	{
+		TurnStarted.Broadcast(Event);
+	}
+	else
+	{
+		TurnEnded.Broadcast(Event);
+	}
+}
+
 bool UHSRTurnManager::IsCurrentParticipantValid() const
 {
-	return OrderedParticipants.IsValidIndex(CurrentTurnIndex) && OrderedParticipants[CurrentTurnIndex].IsValid();
+	return OrderedParticipants.IsValidIndex(CurrentTurnIndex) && IsParticipantTurnEligible(OrderedParticipants[CurrentTurnIndex]);
+}
+
+bool UHSRTurnManager::IsParticipantTurnEligible(const FHSRBattleParticipant& Participant)
+{
+	return Participant.IsValid()
+		&& Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) > 0.0f;
 }
 
 float UHSRTurnManager::ReadInitiativeSpeed(const FHSRBattleParticipant& Participant)

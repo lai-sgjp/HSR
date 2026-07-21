@@ -17,6 +17,7 @@ class HSR_API UHSRBattleCommandViewModel : public UObject
 	GENERATED_BODY()
 
 public:
+	virtual void BeginDestroy() override;
 	const FHSRBattleCommandViewState& GetState() const { return State; }
 
 	UFUNCTION(BlueprintPure, Category = "Battle|Command")
@@ -31,6 +32,8 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FText ToughnessText;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FText BreakText;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FText DelayText;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Status") FText StatusText;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Status") FText StatusOperationText;
 
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetCurrentActorText() const { return CurrentActorText; }
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetEnergyText() const { return EnergyText; }
@@ -40,6 +43,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetToughnessText() const { return ToughnessText; }
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetBreakText() const { return BreakText; }
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetDelayText() const { return DelayText; }
+	UFUNCTION(BlueprintPure, Category = "Battle|Status") FText GetStatusText() const { return StatusText; }
+	UFUNCTION(BlueprintPure, Category = "Battle|Status") FText GetStatusOperationText() const { return StatusOperationText; }
 
 	/** Selects a configured skill and automatically chooses its first valid target. */
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkill(EHSRSkillCategory Category);

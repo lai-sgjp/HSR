@@ -5,6 +5,12 @@
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "AbilitySystemComponent.h"
 
+void UHSRBattleCommandViewModel::BeginDestroy()
+{
+	UnbindCoordinator();
+	Super::BeginDestroy();
+}
+
 void UHSRBattleCommandViewModel::SetState(const FHSRBattleCommandViewState& InState)
 {
 	State = InState;
@@ -44,6 +50,17 @@ void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
 	EnergyText = FText::Format(NSLOCTEXT("HSRCommand", "Energy", "Energy: {0} / {1}"), FText::AsNumber(FMath::RoundToInt(State.Energy)), FText::AsNumber(FMath::RoundToInt(State.MaxEnergy)));
 	SkillPointsText = FText::Format(NSLOCTEXT("HSRCommand", "SkillPoints", "Skill Points: {0} / {1}"), FText::AsNumber(State.SkillPoints), FText::AsNumber(State.MaxSkillPoints));
 	LastResolutionText = FText::Format(NSLOCTEXT("HSRCommand", "Resolution", "Last Resolution: {0} ({1})"), FText::AsNumber(static_cast<int32>(State.LastResolution.Status)), FText::AsNumber(static_cast<int32>(State.LastResolution.FailureReason)));
+	TArray<FString> StatusLines;
+	for (const FHSRStatusPublicSnapshot& Status : State.Statuses)
+	{
+		StatusLines.Add(FString::Printf(TEXT("%s | %s | %s | %s | x%d | %d"), *Status.TargetParticipantId.ToString(), *Status.StatusId.ToString(), *Status.DisplayName.ToString(),
+			Status.Classification == EHSRStatusClassification::Buff ? TEXT("Buff") : TEXT("Debuff"), Status.Stacks, Status.RemainingTurns));
+	}
+	StatusText = FText::FromString(FString::Join(StatusLines, TEXT("\n")));
+	const FHSRStatusPublicOperationEvent& Operation = State.LastStatusOperation;
+	StatusOperationText = Operation.Sequence > 0
+		? FText::FromString(FString::Printf(TEXT("%s | %s | op=%d | result=%d | #%lld"), *Operation.TargetParticipantId.ToString(), *Operation.StatusId.ToString(), static_cast<int32>(Operation.Operation), static_cast<int32>(Operation.Result), Operation.Sequence))
+		: FText::GetEmpty();
 
 	const FHSRBattleCommandSkillView* SelectedSkill = FindSelectedSkill();
 	if (!SelectedSkill)

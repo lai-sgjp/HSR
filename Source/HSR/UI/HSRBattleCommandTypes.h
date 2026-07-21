@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "../GAS/Ability/HSRAbilityTypes.h"
+#include "../Status/HSRStatusTypes.h"
 #include "HSRBattleCommandTypes.generated.h"
 
 USTRUCT(BlueprintType)
@@ -30,4 +31,6 @@ struct FHSRBattleCommandViewState
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") float MaxEnergy = 0.0f;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") TArray<FHSRBattleCommandSkillView> Skills;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FHSRAbilityResolution LastResolution;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Status") TArray<FHSRStatusPublicSnapshot> Statuses;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Status") FHSRStatusPublicOperationEvent LastStatusOperation;
 };
