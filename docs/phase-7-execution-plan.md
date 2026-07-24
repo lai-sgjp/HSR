@@ -161,7 +161,7 @@ AppliedDamage = HealthBefore - HealthAfter
 
 > 状态：已创建唯一 `TASK-P7-003` 活动卡，等待用户独立确认；尚未实施。
 
-> 资源延期边界：当前 Basic 成功 +1 SP、Skill 成功 -1 SP，无 Wait/Pass；Energy 仅作 Ultimate Cost，无 Basic/Skill/受击回能；当前单一 TeamResourceState 的敌我共池风险另行规划为“每 Team 共享池、敌方独立或无池”，不是每角色独立。本包不得顺带实现这些需求。
+> 资源边界：当前 Basic 成功 +1 SP、Skill 成功 -1 SP，无 Wait/Pass；成功的 Basic/Skill 按 SkillDefinition 的 `EnergyGain` 在 Coordinator 权威结算中回能（默认 20，可在 DataAsset 调整），Ultimate Cost/失败 Refund 仍由 GAS 管理。受击回能和 TeamResourceState 敌我共池风险仍另行规划。
 
 ### 唯一结果
 
