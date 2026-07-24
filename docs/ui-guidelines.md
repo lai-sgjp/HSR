@@ -22,6 +22,12 @@
 
 第一阶段不制作正式风格、复杂动画、队伍列表、完整技能菜单或手柄导航。
 
+## Phase 10 closeout boundary
+
+- Battle ViewModel/Widget continue to consume pure-value state and emit stable command or result-confirm intents only; Coordinator/GameMode/Transition retain gameplay and travel authority.
+- Result focus may use a dedicated button or the focusable Widget fallback. Keyboard/gamepad handler support is not proof that a physical device was tested.
+- P10-005 is archived `PASS WITH FOLLOW-UP`; Phase 10 is `Ready with inherited follow-ups`, without starting Phase 11. Resolution, real-device navigation, and unrun lifecycle matrices retain their actual evidence labels: 1920x1080 is user-observed, while 1280x720 is user-accepted but not verified.
+
 ## 可访问性与文本
 
 - 玩家可见文本使用 `FText`。

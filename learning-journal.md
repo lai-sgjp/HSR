@@ -1,5 +1,11 @@
 ﻿# HSR Learning Journal
 
+## 2026-07-24｜Phase 10 closeout learning boundary
+
+- A static review, a Development harness, User-provided PIE, and `USER ACCEPTED` are distinct evidence labels. User acceptance can close a planning gate without becoming a fabricated dynamic test or Independent Reviewer PASS.
+- Result-screen input belongs to controller/GameMode integration; Widget focus and confirmation remain presentation/intent boundaries. A base `APlayerController` integration can require a generic UIOnly/GameOnly path even when exploration uses a project-specific controller.
+- Phase 10 is `Ready with inherited follow-ups`: preserve historical failures and unrun matrices as inherited follow-ups, and keep runtime, teaching, reviewer, provenance, and delivery gates separately named. 1920x1080 is user-observed; 1280x720 is user-accepted but not verified; physical gamepad, navigation quality, dual-resolution verification, and injected preflight retry remain unverified. Phase 11 is not started.
+
 ## 使用方式
 
 本文件沉淀可复习的 UE5.6 C++、GAS、回合制架构、数据驱动、UI 和存档知识。它不替代 `worklog.md`：

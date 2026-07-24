@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～9 均为 `Ready with inherited follow-ups`。Phase 10 尚未规划或实施。
+> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～10 均为 `Ready with inherited follow-ups`。P10-005 已归档为 `PASS WITH FOLLOW-UP`；不自动开始 Phase 11。1920x1080 为用户视觉观察，1280x720 为 `USER ACCEPTED / NOT VERIFIED`；物理手柄、完整导航、双分辨率和注入式 preflight 拒绝/重试保留为 follow-ups。
 
 ## 已完成的规划工作
 

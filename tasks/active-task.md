@@ -1,23 +1,28 @@
-# TASK-P9-006：Phase 9 独立验收、教学与阶段归档
+# TASK-P10-005: Independent acceptance, teaching, and phase archive
 
-状态：`CLOSEOUT CONTRACT ACTIVE / IMPLEMENTATION COMPLETE / PHASE NOT READY`
+Status: `ARCHIVED / PASS WITH FOLLOW-UP`
 
-## 唯一目标
+## Goal
 
-不新增 Gameplay。汇总 P9-000～005 的 Build、用户资产、两轮 PIE、失败/REVISE 历史、Teacher 学习与 Independent Reviewer Gate；完成作者归属、三件套、状态文档和阶段交付准备。只有最终 Gate、角色提交和远端交付均闭合后，Phase 9 才可标记 Ready with inherited follow-ups。
+Produced an auditable Phase 10 closeout with its required evidence, teaching record, independent conclusion, archive set, and separable dirty provenance. This task added no Gameplay, Source, Content, or Config behavior.
 
-## 允许范围与禁止
+## Retained follow-ups and evidence boundaries
 
-只允许 Coordinator/Teacher/Reviewer/Implementation 各自的 Markdown 证据文件、必要 fresh Build/只读 Git 核对和用户回传证据。禁止新增/修改 Gameplay、Config、Content、资产、Tags、UI、P9-005 逻辑、Phase 10 工作；禁止 reset/clean、混合作者认领或提前 push。
+- P10-001 is a historical reconstruction with `USER ACCEPTED / STATIC REVIEW`; no located standalone Reviewer or Teacher conclusion may be represented as Reviewer PASS.
+- P10-001A and P10-003 Teacher archive records preserve their real/absent evidence boundary.
+- P10-004 is now archived `PASS WITH FOLLOW-UP`; its runtime follow-ups are non-blocking, but they must not be promoted to independently verified device evidence.
+- P10-005 Teacher and Independent Reviewer Gates are `PASS WITH FOLLOW-UP`; final `-Rebuild` evidence is retained. Mixed staged/unstaged shared containers remain Coordinator-controlled and this archive is not staging authorization.
+- P10-002 equal-Speed/death and P10-003 replay/reset/Finished/two-round Widget matrices are `USER ACCEPTED / STATIC REVIEW / inherited follow-up`; no dynamic PIE result is claimed.
+- The authoritative final `-Rebuild` and traceable Phase 5-9 regression index are complete. The user reports visually observing the battle UI at 1920x1080 (`USER PROVIDED / VISUALLY OBSERVED`). The user explicitly accepts 1280x720 as `USER ACCEPTED / NOT VERIFIED / inherited follow-up`; it is not represented as PASS. Physical-gamepad use is recorded as unavailable/unverified and is not inferred from static key handling.
 
-## Gate
+## Allowed scope
 
-- Fresh HSREditor Build：UHT/C++/Link/metadata/exit0，首错与 warnings 保留。
-- 最终矩阵基线：P9-005/004/003/002/001=`28/38/36/16/28 PASS`、各2 COMPLETE、零失败；P6-004A 空VM warnings 为 HARNESS EXPECTED。
-- Asset/Config/Content 路径和 User 作者归属逐项对账；Config EOF 在提交前处理并重跑全局 diff-check。
-- Teacher 记录真实回答、掌握/复习/未评估；Reviewer 独立给出 PASS/PASS WITH FOLLOW-UP/REVISE。
-- P9-000～005 三件套、历史 BLOCKED/REVISE/失败、follow-ups、dirty tree/provenance 精确闭合。
+Only task/archive/phase documentation and provenance records after a Coordinator-approved evidence plan. Do not modify Source, Content, Config, plugins, maps, UMG assets, or Git state.
 
-## 首次响应门禁
+## Evidence boundary
 
-各角色首次复述自己的范围、证据与禁止项，等待用户确认。P9-006 不授权 Phase 10 或 Gameplay/Git 写操作；角色提交/Phase push 仅按项目长期规则和最终 Gate 单独执行。
+The latest P10-004 user log `64b7b402-e47c-44e2-9033-64ed03ecd0be` proves three generic-controller result/return cycles. It does not prove a physical gamepad, full navigation quality, both target resolutions, or injected transition-preflight retry.
+
+## Disposition
+
+Phase 10 is `Ready with inherited follow-ups`. Do not start Phase 11 automatically.

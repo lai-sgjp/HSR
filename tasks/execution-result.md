@@ -1,5 +1,183 @@
 # TASK-P8-001 Execution Result
 
+---
+
+# TASK-P10-005 Closeout Audit
+
+Status: `ARCHIVED / PASS WITH FOLLOW-UP`
+
+- Resolution evidence update (2026-07-24): the user reports visually observing the battle UI at 1920x1080. Evidence level is `USER PROVIDED / VISUALLY OBSERVED`; no screenshot or automated viewport assertion is claimed. The user did not observe 1280x720, which remains unverified and is not silently promoted to PASS.
+- User decision (2026-07-24): 1280x720 is explicitly accepted as `USER ACCEPTED / NOT VERIFIED / inherited follow-up`. This decision removes it as a closeout blocker without creating visual or dynamic evidence.
+
+- P10-004 has been archived with its active, execution, teacher, and independent-review records. Latest user-provided log `64b7b402-e47c-44e2-9033-64ed03ecd0be` supports its `PASS WITH FOLLOW-UP`; the earlier base-controller failure remains historical evidence, not a current pass claim.
+- P10-001 historical archive and P10-001A/P10-003 Teacher archive records are now added without inventing missing conclusions. P10-001 is explicitly `USER ACCEPTED / STATIC REVIEW`; P10-003 Teacher evidence remains absent rather than assessed.
+- User explicitly accepts P10-002 equal-speed/death and P10-003 replay/reset/Finished/two-round Widget matrices as `USER ACCEPTED / STATIC REVIEW / inherited follow-up`; they are not retroactively reported as dynamic PIE PASS.
+- `tasks/p10-005-provenance-ledger.md` classifies the dirty tree. Mixed shared containers remain Coordinator-controlled; this archive is not staging authorization.
+- Final P10-005 Build evidence: the initial sandbox invocation failed only because UnrealBuildTool could not write its AppData configuration; a first external invocation was target-up-to-date and is not treated as authoritative. The approved `HSREditor Win64 Development -Rebuild` then succeeded with exit 0 after 26 actions, compiling the relevant HSR ViewModel/Widget/Coordinator/GameMode/Transition/Ability files, linking HSR DLL/LIB, building the plugin, writing metadata, and completing in 121.32 seconds.
+- P10-005 Teacher Gate is `PASS WITH FOLLOW-UP`; its mastery/follow-up boundary is archived. `tasks/p10-005-regression-evidence-index.md` maps retained Phase 5–9 evidence without representing it as a fresh rerun. The Independent Reviewer final Gate is `PASS WITH FOLLOW-UP`; Phase 10 is `Ready with inherited follow-ups` and Phase 11 is not started.
+- Resolution/device boundary retained: 1920x1080 is `USER PROVIDED / VISUALLY OBSERVED`; 1280x720 is `USER ACCEPTED / NOT VERIFIED`; physical gamepad confirmation, full navigation quality, both-resolution verification, and injected transition-preflight rejection/retry remain inherited follow-ups.
+- No Source, Content, Config, plugin, map, or Git mutation was performed for this audit.
+
+---
+
+# TASK-P10-004 Execution Result
+
+Status: `ARCHIVED / PASS WITH FOLLOW-UP`
+
+- Added a pure-value `ResultViewState` and a single confirm-intent seam. The result panel cannot consume a battle result or initiate travel itself.
+- GameMode now shows the first matching terminal result, enters the existing `UIOnly` control mode, and defers existing `ConsumeBattleResult` plus `RequestBattleReturn` until the matching confirm intent. Duplicate/stale result and duplicate confirm paths are rejected.
+- Optional `TXT_Result` / `BTN_ResultConfirm` bindings display the result and establish keyboard focus with a widget fallback. EndPlay removes the result delegate before ViewModel teardown and clears the pure state.
+- Added default-off `bRunP10004ResultHarness`; a fresh retry after a harness-only macro fix passed UHT, relevant C++ compilation, HSR DLL/LIB link, metadata, and exit code 0. The first build failed only on the corrected `UE_LOG`/single-line `if` macro expansion in that harness.
+- User-provided normal PIE log `6881a411-c82c-4003-bb38-829be7752135` records two complete rounds: Defeat (`Outcome=2`) and Victory (`Outcome=1`). Each has one `P10-004 ResultView Show`, one successful `ConsumeBattleResult`, one matching `HandleBattleResultConfirmRequested`, one Widget bind/unbind pair, travel back to exploration, and one successful return-context consumption. The intentional second consumption is rejected as `AlreadyConsumed`, preserving the existing exactly-once return contract.
+- User-provided harness PIE log `088403ab-bb8d-4c79-b4d6-855e75386fb5` reports four PASS cases: `FirstMatchingResult_LocksAndShowsOnce`, `DuplicateAndOldResult_Rejected`, `ConfirmIntent_ExactlyOnce`, and `Teardown_ClearsResultAndLocks`; final marker is `P10-004 Harness=COMPLETE`.
+- Neither supplied log contains an extracted `Result=FAIL`, `Harness=INCOMPLETE`, or Blueprint Runtime Error marker. Evidence level is `USER PROVIDED / LOG INSPECTED`.
+- Remaining evidence boundary: logs do not independently prove the exact UMG layout, both target resolutions, or use of a physical gamepad. Keyboard/gamepad focus quality and visual presentation remain user-observed unless separately captured. Independent Reviewer recheck is pending.
+- Reviewer `REVISE` findings are being addressed: explicit controller/mode and focus logs, a usable no-button confirmation fallback, and a read-only transition preflight before result consumption. New build/PIE evidence is pending.
+- Revision build passed: UHT regenerated reflection code; `HSRBattleCommandWidget.cpp` and `HSRBattleGameMode.cpp` compiled; HSR DLL/LIB linked; metadata wrote; exit code 0. `git diff --check` passed before the build. The first revision build exposed only constructor initialization and runtime `UE_LOG`-verbosity macro mistakes, both corrected before this successful retry.
+- User log `3da7fb96-4348-4c38-84d5-65a2ad89d444` then exposed a real integration mismatch: Battle Map supplied base `PlayerController`, producing two `UnexpectedController` failures; the second result showed but did not consume or return. This is retained as failed `USER PROVIDED / LOG INSPECTED` evidence.
+- GameMode now preserves the specialized `AHSRPlayerController` path while supporting any local base `APlayerController` through generic `FInputModeUIOnly`, cursor visibility, and movement/look suppression. Confirmed return and EndPlay restore generic GameOnly/input state. Fresh build compiled GameMode, linked the HSR DLL/LIB, wrote metadata, and exited 0; `git diff --check` passed.
+- Latest user log `64b7b402-e47c-44e2-9033-64ed03ecd0be` closes that mismatch across three rounds (Victory, Victory, Defeat): 3 UIOnly generic-controller successes, 3 focus successes, 3 result shows, 3 successful result consumptions, 3 GameOnly restores, 3 successful return requests, 3 Widget bind/unbind pairs, and 3 successful exploration return-context consumptions. It contains zero `UnexpectedController`, `Result=FAIL`, `Harness=INCOMPLETE`, or Blueprint Runtime Error markers.
+- Latest evidence is `USER PROVIDED / LOG INSPECTED`. It proves the real generic-controller result lifecycle and repeated travel path. Physical-gamepad use, full navigation quality, and both target resolutions are not inferable from the log.
+- Independent Reviewer final conclusion: `PASS WITH FOLLOW-UP`. Static review confirms preflight-before-consume, retry restoration, Enter/Space/Gamepad Face Button Bottom fallback, and paired delegate/control cleanup. Dynamic follow-ups are a real-device confirm trace and an injected preflight rejection/retry. Generic GameOnly restore is accepted for the current dedicated Battle Map travel contract; a future Phase 17 screen stack must restore a tokenized prior mode.
+- New user PIE evidence is a `REVISE` failure, not a pass: Battle Map reports base `PlayerController`, yielding two `P10-004 ResultInput Result=FAILED Reason=UnexpectedController` entries and no control-mode-1 log. Result focus and the pure-value harness completed, but the second terminal result had no matching consume/return before teardown. The implementation now has a generic local `APlayerController` UIOnly/GameOnly fallback; its build and PIE evidence are pending.
+- Generic-controller revision build passed: `HSRBattleGameMode.cpp` compiled, HSR DLL/LIB linked, metadata wrote, exit code 0; `git diff --check` passed before the build. The existing default-off pure-value P10-004 harness remains valid, but only a new User PIE can prove the generic controller input/confirm/return path.
+
+---
+
+# TASK-P10-003 Execution Result
+
+Status: `IMPLEMENTATION IN PROGRESS / BUILD PASSED / USER PIE EVIDENCE REQUIRED`
+
+- Added pure-value presentation event type and bounded event history to the command ViewState.
+- Coordinator maps existing successful Damage, Toughness, and triggered Break Resolution payloads to events without changing gameplay calculation.
+- ViewModel and optional Widget binding format and display the event history through the existing event-driven refresh path.
+- Fresh Build passed UHT, C++ compile, HSR DLL/LIB link, metadata, and exit code 0. Existing non-preferred MSVC and AIModule C4996 warnings remain non-blocking.
+- User PIE/WBP evidence is not yet claimed for P10-003.
+- User-provided log `f4e7e5fd-19fb-4caa-a449-ed551fed2e86` confirms the existing Damage/Toughness/Break/Heal gameplay resolutions and successful WBP save, but contains no `P10-003 PresentationEvent` audit lines yet. Presentation mapping remains unverified until the rebuilt binary is run.
+- User-provided PIE log `fd2ff331-4ef6-42a3-b9c1-865555e373ff` now confirms the rebuilt mapping: Damage and Toughness events carry unique EventId/ActionId/source/target/value, triggered Break emits a Break event, and critical Damage events report `Critical=1`. No extracted FAIL, Blueprint Runtime Error, or Error-level line was found.
+- Heal gameplay still succeeds through its existing resolution path, but no HealResult exists in `FHSRAbilityResolution`; no fake Heal presentation value was added. A real Heal event requires a pure-value HealResult producer in a later P10-003 slice.
+- Added `bHasHealResult` and `HealAmount` to `FHSRAbilityResolution`; Coordinator measures the target's authoritative Health delta around the existing Heal ability activation and maps it to a Heal PresentationEvent. No Heal formula or GE behavior changed.
+- Fresh rebuild after the HealResult addition passed UHT, C++ compilation, HSR DLL/LIB link, metadata, and exit code 0. Existing MSVC/AIModule warnings remain non-blocking.
+- User PIE evidence `26609a4d-6593-4156-b244-b3f59821b89b` confirms the complete event mapping: Damage, Toughness, Break, Critical Damage, and Heal events all carry unique EventId/ActionId/source/target/value. Heal events report `Value=50.00` and correspond to successful `HealTest` actions. No extracted FAIL, Blueprint Runtime Error, or Error-level line was found.
+- Independent Reviewer Gate: `PASS WITH FOLLOW-UP`. Evidence is `USER PROVIDED / REVIEWER LOG INSPECTED`. Replay de-duplication, Reset/Finished event clearing, and two-round Widget bind stress were not independently logged as separate P10-003 cases and remain non-blocking follow-ups for before P10-004.
+
+---
+
+# TASK-P10-001A Implementation Record (in progress)
+
+Status: `IMPLEMENTED / FRESH BUILD PASSED / DEVELOPMENT HARNESS PASSED / NORMAL USER PIE PASSED / REVIEWER PASS WITH FOLLOW-UP / TEACHER PASS` (2026-07-23).
+
+- Added authored `DisplayName` and multiline `Description` fields to `UHSRSkillDefinition`. Coordinator copies both into pure Skill View values, falls back to `SkillId` for an empty short name, and marks a safe placeholder when long text is empty.
+- Command-button description TextBlocks are no longer written; when present they are collapsed. The existing optional bindings remain deletion-safe for the User's Designer cleanup.
+- Refactored the existing single `RequestAction` body into `RequestActionCore` without duplicating its ability, damage, reservation, resolution, or turn logic. The outer dispatcher tracks depth and drains enemy work only after the outer transaction returns.
+- Coordinator now binds the current TurnManager's `TurnStarted` through a weak manager identity, queues a canonical manager-pointer/epoch/sequence/participant key only, normalizes the initial post-Spawned boundary through the same queue, and iteratively dispatches a fixed BasicAttack against the stable first legal target. Keys are consumed before dispatch; Reset/Finished detach the handle and clear queued/consumed keys.
+- Initial implementation state: static `git diff --check` passed, but the local UE 5.6 Build.bat path had not yet been located at that point. This historical state is superseded by the preserved failed and successful Build evidence below; no Editor/PIE or DataAsset authoring was claimed at that time.
+
+## Reviewer REVISE / stop condition
+
+- The enemy drain was revised so it calls only `RequestActionCore` inside an explicit dispatch-depth scope. The public `RequestAction` wrapper is not called by the drain; editor-only counters expose maximum public-wrapper and core execution depths for audit.
+- First real fresh Build after this revision: UHT generated 2 files, then C++ failed in `HSRBattleGameMode.cpp` because `UE_LOG` requires a compile-time verbosity token and the initial harness used a conditional expression. The local branch replaces that expression with explicit Log/Error branches, but no successful retry is claimed.
+- STOPPED pending contract revision: the required full default-off GameMode harness cannot safely prove old-manager same-epoch identity and 3+ enemy/delay sequences under the current interface. It would need an old-manager lifecycle-event injection or Coordinator manager-replacement seam not present in the frozen runtime contract. The partial depth audit is not represented as full matrix completion; no false Build, harness, Editor/PIE, or Reviewer PASS claim is made.
+
+## Reviewer seam revision / successful retry
+
+- Added `WITH_EDITOR`-only, non-reflected audit methods that can temporarily bind an isolated TurnManager, inject only a source-manager plus pure lifecycle event into the existing record function, expose read-only counters, and restore the original bound manager, pending key, and consumed-key set. The seam never drains, creates ActionIds, invokes RequestAction/Core, or changes Gameplay.
+- Fresh retry after the real verbosity correction: `Build.bat HSREditor Win64 Development -Project=E:\work\unreal_projects\HSR\HSR.uproject -WaitMutex -NoHotReload -NoUBA -MaxParallelActions=1` succeeded. UHT wrote 0 files; 9/9 actions compiled, linked `UnrealEditor-HSR.dll/.lib`, wrote target metadata, and exited `0` in 43.31 seconds. Existing non-preferred MSVC and AIModule C4996 warnings remain.
+- The P10-001A GameMode flag remains false by default. Editor/PIE and the authored DataAsset fields are still USER PROVIDED; this record makes no independent Reviewer conclusion.
+
+## Full isolated Development matrix revision
+
+- The default-off harness now uses the strict `WITH_EDITOR` audit seam to prove that a different manager with the same numeric epoch/sequence cannot enqueue, the bound manager queues the same key exactly once, and ending the audit restores the production manager identity, delegate handle, pending state, and consumed-key count.
+- Two isolated TurnManagers exercise real lifecycle events without replacing the production TurnManager: the first uses four participants and verifies stable Enemy/EnemyB/EnemyC/Player progression across three consecutive Enemy turns; the second uses three participants, registers a real Break Delay for EnemyB, and verifies the next event skips directly from Enemy to Player. The harness reports `COMPLETE` only when all cases pass and remains disabled by default.
+- Harness declaration and definition are fully wrapped in `WITH_EDITOR`, so Shipping has no empty harness symbol. TurnManager source remains unchanged.
+- Fresh Build after this revision succeeded with `-NoUBA -MaxParallelActions=1`: UHT wrote 0 files; 9/9 actions compiled the revised Coordinator/GameMode/UI module units, linked `UnrealEditor-HSR.dll/.lib`, wrote metadata, and exited `0` in 35.32 seconds. Existing non-preferred MSVC and AIModule C4996 warnings remain.
+- Final EnemyC matrix correction Build succeeded: 4/4 actions compiled `HSRBattleGameMode.cpp`, linked `UnrealEditor-HSR.dll/.lib`, wrote metadata, and exited `0` in 6.15 seconds.
+- The Development harness has not yet been run in Editor/PIE; its runtime result remains pending. User-authored DisplayName/Description fields, Editor reopen, normal two-round PIE, and final Independent Reviewer acceptance are also pending.
+
+## User harness and normal-PIE evidence / stale post-turn ViewState correction
+
+- User-provided harness log passed every isolated case and ended with `P10-001A Harness=COMPLETE`: dispatcher/core depth, old-manager identity rejection, duplicate-key queue-once, production restoration, four-participant three-consecutive-enemy ordering, and real Break Delay skip all reported PASS.
+- The normal PIE log proved both the initial and subsequent Enemy BasicAttack production path. After the player's Ultimate, the Coordinator queued epoch 1 sequence 3, dispatched exactly one Enemy action, committed it, and TurnManager advanced `Enemy -> Player`.
+- The observed grey buttons after that action were a stale event-driven UI snapshot, not a missing Enemy action. In the formal damage branch, `Finalize` published while Enemy still owned the turn, then `ResolveAction` advanced to Player without a second ViewState publication. The minimal correction publishes the current command ViewState after a successful formal-path turn transition; it does not change damage, resources, AI selection, TurnManager, or action transaction semantics.
+- The user evidence is `USER PROVIDED`. Fresh Build after the correction succeeded: 4/4 actions compiled `HSRBattleCoordinator.cpp`, linked `UnrealEditor-HSR.dll/.lib`, wrote metadata, and exited `0` in 12.63 seconds. Another flag=false normal PIE round remains required.
+
+## Flag=false normal PIE closure after post-turn publication fix
+
+- Evidence level: `USER PROVIDED`. Attachment: `C:\Users\Lai\.codex\attachments\f445bd1c-7fd7-49d5-a8cb-30264c431206\pasted-text.txt`.
+- Two normal PIE battles ran with the Development harness disabled. The first accepted eight consecutive Player submissions and ended in victory (`Outcome=1`); the second accepted nine consecutive Player submissions and ended in defeat (`Outcome=2`). Repeated submissions after every Enemy action prove that the post-turn Player command state and enabled controls were restored rather than remaining on the stale Enemy snapshot.
+- The first run repeatedly queued and dispatched one Enemy BasicAttack at sequences 1, 3, 5, 8, 10, 12, and 14, with every non-terminal Enemy action resolving back to Player. The second run covered Player Skill, Ultimate, Heal, and BasicAttack commands and queued one Enemy BasicAttack at sequences 1, 3, 5, 7, 9, 12, 14, 16, and 18; all non-terminal Enemy actions resolved back to Player.
+- Both widgets bound exactly once and unbound exactly once. Submit totals were 8 and 9. The log contains no `Result=FAIL`, Blueprint runtime error, assertion, ensure, fatal error, or infinite-loop marker. Encounter-state `FAILED`/`AlreadyConsumed` lines occur outside the battle action loop during encounter/return guards and are not P10-001A failures.
+- This closes the requested flag=false normal PIE follow-up for the stale ViewState correction. Final task acceptance remains owned by the Independent Reviewer.
+
+---
+
+# TASK-P10-001 Implementation Record (in progress)
+
+Status: `IMPLEMENTED / FRESH BUILD PASSED — User Editor/PIE, Teacher and Independent Reviewer pending` (2026-07-22).
+
+## Development harness audit stop (2026-07-23)
+
+- Result: `SKIPPED / INCOMPLETE`; no P10-001 harness completion claim and no fresh Build was run for this stopped attempt.
+- The frozen matrix requires independent production availability coverage for both missing Definition and missing/ungranted Ability. In the current production builder, a null Definition is omitted from `State.Skills` rather than represented by a Skill View with `DisabledReason=DefinitionMissing`; producing that exact reason would require changing production ViewState semantics. An ungranted Ability case would require removing and restoring a real ASC ability spec or adding a mutating injection seam. Both exceed the authorized read-only/audit boundary and risk contaminating the formal battle.
+- Per the active-task stop condition, the implementation did not add a test-only second result path, mutate production definitions/specs, modify TurnManager, or mark synthesized ViewState values as production availability evidence. The tentative local audit getters/flag from this attempt were removed before handoff; pre-existing P10-001/P10-001A changes remain untouched.
+
+## Reviewer contract revision and harness implementation
+
+- The later contract revision authorized four fixed command slots. `GetCommandViewState` now emits BasicAttack, Skill, Ultimate and Heal in stable order. Null or category-mismatched Definitions produce a non-submittable `SkillId=None / DefinitionMissing` placeholder and are restored by the opt-in harness after each temporary replacement.
+- The default-false Editor harness covers repeated-query purity, fixed/null/mismatched slots, temporary SP/Energy unavailability with restoration, invalid target/unknown skill/stale Battle rejection, pending BattleId+ActionId correlation, empty binding, Widget lifecycle, replay payload/side-effect equality, and two formal rounds using the existing Widget-to-Coordinator submission path. Ungranted Ability is logged as `NOT_DYNAMICALLY_ASSESSED / STATICALLY_COVERED`; it is not reported as a dynamic PASS.
+- First fresh Build reached UHT (`0 written`) and failed in `HSRBattleGameMode.cpp` with C2601 because the harness body was inserted inside `BeginPlay`; after moving it into the Editor-only BeginPlay audit closure, the retry exposed a second compile failure from an unsafe single-line `if/else` around `UE_LOG`. Both failures remain part of the correction chain.
+- The first successful retry compiled `HSRBattleGameMode.cpp`, linked `UnrealEditor-HSR.dll/.lib`, wrote metadata, and completed 4/4 actions with exit `0` in 7.62 seconds. After the Reviewer REVISE matrix additions, a fresh retry again completed 4/4 actions, linked the DLL/LIB, wrote metadata, and exited `0` in 7.85 seconds. Runtime harness and Editor/PIE results are not claimed here.
+
+## Reviewer second REVISE assertion strengthening
+
+- The Energy-unavailable dynamic card now accepts only the exact production `InsufficientEnergy` reason; any other reason is `SKIPPED` and therefore keeps the harness `INCOMPLETE`. Ungranted Ability remains explicitly non-blocking `NOT_DYNAMICALLY_ASSESSED / STATICALLY_COVERED`.
+- Replay equality now compares Status/FailureReason and every available Damage, Toughness and Break payload field. Its side-effect snapshot includes current/max SP, all participant HP/Energy, RNG, Turn, stable full Status snapshots and every LastStatusOperation field.
+- Stale Battle, unknown Skill and invalid Target rejections now use the same full before/after side-effect snapshot. The earlier historical “matrix not yet added” line is retained but explicitly marked `SUPERSEDED`.
+- Fresh Build after this assertion-only revision completed 4/4 actions, compiled `HSRBattleGameMode.cpp`, linked `UnrealEditor-HSR.dll/.lib`, wrote target metadata, and exited `0` in 7.65 seconds. The existing non-preferred Visual Studio compiler warning remains; runtime harness and PIE are not claimed.
+
+## Implemented C++ scope
+
+- Added `UHSRGameplayAbilityBase::GetAvailabilityFailureReason`: a const, observationally-pure preflight that accepts the existing spec/actor info and candidate target ASC, returns a structured failure reason, and does not call `SetPendingTarget`, activate an ability, touch prepared damage, alter resources, or consume RNG. `GetCommandViewState` now uses this seam and no longer calls `SetPendingTarget`/`ClearPendingTarget` while building availability.
+- Extended the pure command snapshot with display name/description/SP cost, selection, `bCanSubmit`, command-pending, presentation-lock (kept disabled because this package has no reliable animation completion event), and pending ActionId fields.
+- Added ViewModel-owned pending correlation. The widget must validate and set pending before it forwards one command; only a matching BattleId + ActionId resolution or teardown clears it. Widget direct/multi-entry submits that do not match the current selected available command reject before Coordinator submission.
+- Saved the GameMode BattleResult delegate handle and remove it before Coordinator reset in EndPlay.
+
+## Reviewer REVISE correction
+
+- Coordinator now derives `bCurrentActorPlayerControlled` from the current participant's existing Team value. ViewModel `bCanSubmit` and `BeginCommandSubmit` both require it, so the Widget never infers team ownership and an enemy turn cannot enter the command path.
+- Widget captures one verified ViewState before pending is established and constructs the Command from that snapshot BattleId. It checks that frozen id against the live Coordinator immediately before `RequestAction`; a reset/replacement mismatch returns `InvalidBattle`, resolves the matching pending lock, and never calls Coordinator action resolution for the new battle.
+- `HSRSkillDefinition` has no authored display-name, description, or direct numeric Energy-cost field. The ViewState therefore exposes the stable SkillId as its display fallback, explicitly labels its description as a placeholder, gives Skill a fixed existing SP cost of 1, and reads Ultimate EnergyCost only from the existing static CostGameplayEffect's negative Energy modifier. It does not infer cost from current Energy.
+
+## Reviewer second REVISE correction
+
+- `GetCommandViewState` no longer calls `LoadSynchronous` for Energy cost. It reads only `CostGameplayEffectClass.Get()` and a const CDO when that class is already loaded; it performs no synchronous load, cache write, or mutation.
+- `bEnergyCostIsKnown` defaults false. It becomes true only when the already-loaded Cost GE has exactly one Energy modifier and that modifier is statically evaluable, Additive, and negative. Multiple Energy modifiers, non-Additive/non-static values, missing class, or non-negative values leave `EnergyCost=0` with `bEnergyCostIsKnown=false`; zero must not be rendered as a free command in that state.
+- Fresh Build after this correction: `Build.bat HSREditor Win64 Development -Project=E:\work\unreal_projects\HSR\HSR.uproject -WaitMutex -NoHotReload -NoUBA -MaxParallelActions=1` exited `0` with `Result: Succeeded`. UHT wrote 5 files; 9/9 actions compiled the revised ViewModel, Widget, Coordinator, GameMode and HSR module units, linked `UnrealEditor-HSR.dll/.lib`, and wrote metadata. Parallel executor time was 76.31s, total 78.85s. Warnings remained the non-preferred VS2022 compiler and existing AIModule `CleanupWorld` C4996 only.
+
+## User-authorized Designer binding migration
+
+- Moved the existing `WBP_BattleCommandPanel` text refresh, skill-button availability, selected skill, target options, Execute submission, pending visibility and disabled-reason presentation into `UHSRBattleCommandWidget` using optional bindings for the user-provided Designer names. Blueprint remains responsible for layout and the single target-combo selection forwarding event.
+- First Build reached UHT and C++ but failed linking `Z_Construct_UEnum_SlateCore_ESelectInfo` because reflecting the ComboBox selection signature would require a new SlateCore module dependency. The implementation did not expand `Build.cs`; it removed that reflected C++ handler and retained one Blueprint forwarding seam for target selection.
+- Final fresh Build with `-NoUBA -MaxParallelActions=1` succeeded: UHT wrote 3 files; 6/6 actions compiled `HSRBattleCommandWidget.cpp`, `HSRBattleGameMode.cpp` and the generated HSR unit, linked `UnrealEditor-HSR.dll/.lib`, wrote metadata and exited `0` in 12.67s. The non-preferred compiler warning remains; no new project warning was reported.
+
+## Not yet verified
+
+- Fresh Build has passed as recorded below. Editor restart, PIE, WBP binding, asset persistence, and the two-round lifecycle run have not occurred; Build/static evidence is `AGENT REPORTED`, while Editor/PIE/assets remain `USER PROVIDED` until actual evidence exists.
+- SUPERSEDED HISTORICAL STATE: at that point the Development-only matrix had not yet been added or executed. Later harness implementation and Build evidence are recorded below; no Reviewer conclusion is claimed by this historical paragraph.
+- Fresh `HSREditor Win64 Development -Project=E:\work\unreal_projects\HSR\HSR.uproject -WaitMutex -NoHotReload` was started. The tool timed out at 64 seconds before UHT/C++/Link/exit evidence was returned; UnrealBuildTool remained running when observed. This is a real timeout with no pass/fail conclusion, not a successful Build.
+- After Reviewer REVISE corrections, a fresh retry with the supported `-NoUBA` argument also reached the 64-second tool ceiling without returning UHT/C++/Link/exit output. Its UnrealBuildTool process remained alive at the single post-timeout check. This is likewise `TIMED OUT / NO BUILD CONCLUSION`; no further retry was started.
+
+## Final fresh Build evidence (provided to Implementation)
+
+- Command: `Build.bat HSREditor Win64 Development -Project=E:\work\unreal_projects\HSR\HSR.uproject -WaitMutex -NoHotReload -NoUBA -MaxParallelActions=1`.
+- Result: `Succeeded`, exit code `0`; 12/12 actions completed in 93.64s (parallel executor 91.12s).
+- UHT completed with `Total of 5 written`; compiled `HSRBattleCommandViewModel.cpp`, `HSRBattleCommandWidget.cpp`, `HSRBattleCoordinator.cpp`, `HSRBattleGameMode.cpp`, `HSRGameplayAbilityBase.cpp`, and `Module.HSR.1-4`; linked `UnrealEditor-HSR.dll` and `.lib`; then completed `WriteMetadata`.
+- Warnings were limited to the non-preferred VS2022 compiler warning and the existing AIModule `CleanupWorld` C4996 warning. The two earlier UBA memory-pressure timeout records remain historical failures and are not rewritten by this successful single-parallel, `-NoUBA` Build.
+
+---
+
+# TASK-P8-001 Execution Result (continued)
+
 ## Status
 
 `IMPLEMENTED — Build and user Editor/PIE evidence pending` (2026-07-20).
@@ -47,7 +225,7 @@
 
 ## 保留的 inherited follow-ups
 
-底层 Aggregator/真实 NaN、自然 GAS ApplyFailure/Refund failure、Cost 后 HP 异常、多轮 teardown、真实 Reset/目标销毁/异步、网络/Save、技能点/回能/Team SP/Wait/Pass 等继续作为后续独立任务；本 Gate 不关闭这些问题。
+底层 Aggregator/真实 NaN、自然 GAS ApplyFailure/Refund failure、Cost 后 HP 异常、多轮 teardown、真实 Reset/目标销毁/异步、网络/Save、受击回能/Team SP/Wait/Pass 等继续作为后续独立任务；Basic/Skill 的 Definition 驱动回能已纳入本轮 Coordinator 结算。
 
 ## 范围与证据边界
 
@@ -1045,3 +1223,32 @@ Status: `COMPLETE / PASS WITH FOLLOW-UP / READY WITH INHERITED FOLLOW-UPS` (2026
 - Role commits completed: User `2a2eb3d`; Implementation `a996475`; Teacher `39e0449`; Independent Reviewer `db383b3`.
 - Independent Reviewer final Gate is `PASS WITH FOLLOW-UP`. Runtime evidence remains `USER PROVIDED / REVIEWER LOG INSPECTED`; asset-field evidence remains `USER PROVIDED`; existing MSVC/AIModule warnings, manager-local Epoch constraints, P9-000 InvalidTarget diagnostic granularity, and future network/Save/Phase 10 work remain inherited follow-ups.
 - P9-006 archive summaries are created by Coordinator. The remaining local delivery action is the Coordinator Markdown closeout commit, followed by remote push if still pending. Phase 10 is not started automatically.
+
+---
+
+# TASK-P10-002 Execution Result
+
+Status: `ARCHIVED / PASS WITH FOLLOW-UP`
+
+- Added pure-value participant snapshots for both teams: stable participant ID, team, defeated state, HP/MaxHP, Energy/MaxEnergy, Toughness/MaxToughness, and weakness tags.
+- Added a pure-value visible turn-order list. During an active battle it starts at the current actor, follows the TurnManager's existing stable order, and excludes invalid, defeated, and zero-HP participants. Finished/Reset publishes an empty order.
+- Reused Phase 9 public status snapshots; no runtime status ownership or handles reach UI state.
+- ViewModel repairs stale target selection using authoritative targeting candidates. The existing TargetingPolicy already excludes invalid and defeated participants.
+- Widget refreshes optional `TXT_TurnOrder` and `TXT_Participants` TextBlocks without Tick, Timer, or polling.
+- Static verification: global `git diff --check` passed.
+- Build verification: the first invocation exceeded the command wrapper's five-second limit without reporting a compiler error; the immediate authoritative retry returned `Target is up to date`, `Result: Succeeded`, and exit code 0. User PIE is not claimed.
+- User asset/visual evidence (2026-07-23): user confirmed `TXT_TurnOrder` and `TXT_Participants` were already added to `WBP_BattleCommandPanel` before the latest supplied Output Log and that both displays are normal in PIE. This remains `USER PROVIDED`; the Output Log does not serialize the TextBlock contents.
+- Latest supplied Output Log shows a two-participant queue initialized, normal participant construction and battle startup, and no extracted `Result=FAIL`, `Harness=INCOMPLETE`, Blueprint runtime error, or Error-level line. The same run also confirms the corrected player-only SP behavior recorded under P10-001.
+- Independent static review initially returned `REVISE`: WeaknessTags reached ViewState but were omitted from participant display, and invalid participant snapshots could appear as misleading zero values. The display now includes lexically stable weakness names and Coordinator omits invalid participants. Target-death reselection, Finished/Reset, 3+ participant order/delay, and two-round lifecycle cases remain explicitly unclaimed dynamic evidence.
+- The first fresh build after that review reached C4458 because local `WeaknessText` shadowed the ViewModel member. The local was renamed to `ParticipantWeaknessText`; no behavior changed.
+- Fresh retry passed: `HSRBattleCommandViewModel.cpp` compiled, `UnrealEditor-HSR.dll` and `.lib` linked, target metadata was written, `Result: Succeeded`, exit code 0. The existing non-preferred Visual Studio compiler warning remains non-blocking.
+- Independent reviewer recheck: `CODE GATE PASS`. Final task closure remains blocked on targeted dynamic evidence for invalid/defeated target repair, Finished/Reset empty queue with no stale callback, and P10-001 pending/dedup/SP regression; the broader Phase 10 matrix still requires 3+ participants, tie-break/delay/death removal, and two-round lifecycle evidence.
+- Added default-off Editor-only `bRunP10002ViewHarness` in `HSRBattleGameMode`. It reports active ViewState current-actor-first, isolated three-participant progression, and delay acceptance/advance. It explicitly logs target repair plus Finished/Reset teardown as `SKIPPED` because those require the user-bound Coordinator/Widget PIE lifecycle.
+- Harness build retry passed after fixing the UE_LOG macro dangling-else compile error: C++ compile, DLL/LIB link, metadata, `Result: Succeeded`, exit code 0.
+- User PIE evidence (2026-07-24): `ActiveView_CurrentActorFirst`, `ActiveView_InvalidParticipantsExcluded`, `ThreeParticipants_StableOrderProgresses`, and `ThreeParticipants_DelayAcceptedAndAdvances` all reported PASS; the harness reported `COMPLETE_WITH_SKIPPED_DYNAMIC_CASES`. Widget bind/unbind and Coordinator Reset during PIE teardown were clean, with no extracted Result=FAIL or Blueprint runtime error.
+- The harness now replaces the intentional skip with production-path checks: transient ViewModel target reselection/clear, TurnManager Finished producing an empty Coordinator view order, and real Coordinator Reset publication followed by `ResetAndRebuildForDevelopmentTest` with a fresh manager and current-actor-first queue.
+- Fresh build after the full matrix passed: `HSRBattleGameMode.cpp` compiled, HSR DLL/LIB linked, metadata written, `Result: Succeeded`, exit code 0.
+- User PIE evidence (2026-07-24, `ca0bce75-954d-4937-b6ab-fc93d099a778`): all seven P10-002 cases reported PASS: active current actor first, invalid participants excluded, three-participant stable progression, three-participant delay, target reselection then clear, Finished empty order, and Reset empty publication plus fresh rebuild. Final marker: `P10-002 Harness=COMPLETE`.
+- The supplied log contains no extracted `Result=FAIL`, `Harness=INCOMPLETE`, Blueprint runtime error, or Error-level line. The rebuilt battle returned to Coordinator state Spawned with two valid participants.
+
+---

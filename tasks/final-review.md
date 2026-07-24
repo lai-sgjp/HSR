@@ -1,5 +1,17 @@
 # TASK-P8-006 Independent Reviewer Final Review
 
+---
+
+# TASK-P10-005 Closeout Audit Record
+
+Status: `ARCHIVED / PASS WITH FOLLOW-UP` (2026-07-24)
+
+P10-004 is independently recorded as `PASS WITH FOLLOW-UP` from the latest three-round generic-controller PIE log. P10-001 is a historical `USER ACCEPTED / STATIC REVIEW` reconstruction; P10-001A/P10-003 Teacher archive records preserve their respective real/absent evidence boundaries. The user accepts P10-002 equal-speed/death and P10-003 replay/reset/Finished/two-round cases as inherited static-review follow-ups, not dynamic evidence. The P10-005 Independent Reviewer final Gate is `PASS WITH FOLLOW-UP`; Phase 10 is `Ready with inherited follow-ups`, and Phase 11 is not started.
+
+Retained evidence boundary: 1920x1080 is `USER PROVIDED / VISUALLY OBSERVED`; 1280x720 is `USER ACCEPTED / NOT VERIFIED`; physical gamepad confirmation, full navigation quality, both-resolution verification, and injected transition-preflight rejection/retry remain follow-ups.
+
+---
+
 ## 审查对象
 
 - 任务编号：`TASK-P8-006`
@@ -299,6 +311,69 @@ P9-001 未修改 TurnManager；当前 TurnManager dirty 内容属于已验收的
 TASK-P9-001 可以进入 Coordinator 归档与角色提交。本 Reviewer 的 `PASS WITH FOLLOW-UP` 不代表 Phase 9 已完成，也不授权实施 P9-002、通用叠层、Replace、多来源策略、DoT、Break Debuff、免疫、驱散、UI、Save 或网络工作。P9-002 必须由用户/Coordinator 另行授权并建立新的活动契约。
 
 本 Reviewer 本轮仅追加 `tasks/final-review.md`，未修改 Source、Content 或 Config，未 stage、commit 或 push。
+
+---
+
+# TASK-P10-001A Final Independent Review
+
+结论：`PASS WITH FOLLOW-UP`（2026-07-23）。
+
+## 审查范围与证据边界
+
+本次复审覆盖 P10-001A 的敌方确定性 BasicAttack、TurnStarted queue/drain、post-turn ViewState 修复、技能展示文本边界、Development harness、fresh Build 与用户正常两局 PIE 日志。
+
+运行证据等级保持 `USER PROVIDED / REVIEWER LOG INSPECTED`。Reviewer 检查了附件 `C:\Users\Lai\.codex\attachments\f445bd1c-7fd7-49d5-a8cb-30264c431206\pasted-text.txt`，未冒充亲自运行 Editor/PIE，也未独立反序列化 `.uasset`。
+
+## 静态架构结论
+
+- 既有单行动事务只保留一份 `RequestActionCore`；公开 `RequestAction` 保存外部调用的 Resolution，并仅在最外层事务完成后启动 enemy drain。
+- Drain 不递归调用公开 `RequestAction`，而是在显式 dispatch/core depth scope 内调用唯一 Core；同步 TurnStarted 只记录规范 key，不能在事务中重入 Gameplay。
+- 敌方自动行动 key 包含 bound manager identity、BattleEpoch、TurnSequence 与 ParticipantId；同 key 先标记 consumed，再生成唯一 ActionId。同步拒绝不重试、不额外推进 TurnManager。
+- initial Enemy turn 在 Coordinator 完成 Spawned 组装后进入与 subsequent turn 相同的 queue/drain 路径。
+- Finish、Reset、manager replacement 与 teardown 会解绑 TurnStarted handle，并清理 pending/consumed key；旧 manager 即使复用相同 epoch/sequence 也因 identity 不同而拒绝。
+- formal action 先由 Finalize 发布权威行动结果，再同步推进 TurnManager；只有 ResolveAction 成功且战斗未终结时，才追加发布推进后的当前行动者 ViewState。Defeat 与 ResolveAction 失败路径不会发布伪下一回合状态。
+- `DisplayName` 与多行 `Description` 为 Skill Definition authored `FText`；Coordinator 只复制纯值。按钮仅显示短名与成本，Optional Description 控件存在时折叠且不写文本，控件删除不影响绑定或 Gameplay。
+- Development audit seam 与 harness 严格位于 `WITH_EDITOR`，不暴露 Blueprint/反射 API；Shipping 无 harness 符号。隔离 manager 测试恢复生产 manager、唯一 delegate、pending 与 consumed 状态，不用注入 seam 冒充真实 Ability/Damage/Turn 行动。
+
+## Development harness 与 Build
+
+用户先前提供的默认关闭 harness 运行日志中，dispatcher/core depth、旧 manager identity 拒绝、bound manager 同 key 仅 queue 一次、生产绑定恢复、四参与者 Enemy/EnemyB/EnemyC/Player 三个连续 Enemy turn，以及真实 Break Delay 跳过均为 PASS，最终为 `P10-001A Harness=COMPLETE`。
+
+Build 失败与修订历史均保留，包括最初 `UE_LOG` verbosity 必须为编译期 token 的真实 C++ 首错。最终 post-turn ViewState 修订后的 fresh Build 完成相关 C++、`UnrealEditor-HSR.lib/.dll` Link、metadata，exit `0`；既有 non-preferred compiler 与 AIModule warning 保留。Build 只证明编译链，不替代 PIE。
+
+## Flag=false 两局正常 PIE 对账
+
+附件包含两局 harness 关闭的正常战斗：
+
+- EnemyTurn `Queue` 共 `16` 条，`Dispatch` 共 `16` 条，逐项对应，无重复 dispatch 或漏 dispatch 标记。
+- 非终局 `ResolveAction - SUCCESS ParticipantId=Enemy Next=Player` 共 `15` 条；第二局最后一次 Enemy 行动击败 Player，正确进入 Finished，因此不应产生第十六条 `Next=Player`。
+- 第一局 initial sequence `1`，subsequent sequences `3/5/8/10/12/14` 均恰好 queue/dispatch，并在非终局时回到 Player。Widget 玩家提交计数连续达到 `8`，最后 Player 击败 Enemy，唯一终局为 `Outcome=1`。
+- 第二局 initial sequence `1`，subsequent sequences `3/5/7/9/12/14/16/18` 均恰好 queue/dispatch；玩家提交覆盖 Skill、Ultimate、Heal 与 BasicAttack，计数连续达到 `9`。sequence `18` 的 Enemy 行动击败 Player，唯一终局为 `Outcome=2`。
+- 每次非终局 Enemy 行动后都出现新的玩家 Widget submission，证明 post-turn 当前行动者 ViewState、pending 与按钮可用态已恢复，没有继续停在 stale Enemy snapshot。
+- 两局 Widget 均绑定一次、解绑一次；未发现绑定倍增、无限循环或终局后的额外 Enemy dispatch。
+- 日志中精确 `Result=FAIL`、Error、ensure、assert 与 fatal 均为 `0`。
+
+## Warning 分类
+
+以下 warning 不构成 P10-001A 失败，但必须保留为 follow-up，不得改写为零 warning：
+
+1. GameplayCueNotifyPaths fallback 是既有 AbilitySystem 配置/性能提醒，不改变命令、伤害或回合结果。
+2. RecastNavMesh/CrowdManager warning 是既有探索地图环境问题，不属于敌方回合或战斗 UI 规则失败。
+3. `ConsumeReturnContext - FAILED AlreadyConsumed` 后紧跟既有 A4c “correctly returned AlreadyConsumed”，属于 exactly-once guard 的预期探针。
+4. 返回探索后已 resolved encounter 的 `TryRequestEncounter` 拒绝属于场景状态 guard，不是 battle action failure。
+
+## Follow-up
+
+1. 资产字段、Editor 保存重开、harness 与两局正常 PIE 继续保持 `USER PROVIDED / REVIEWER LOG INSPECTED`；归档不得升级证据等级。
+2. GameplayCue paths、NavMesh/CrowdManager 与返回探索 encounter guard warning 继续作为既有非阻断项。
+3. P10-001A 的 Teacher、active/execution/final-review 三件套、角色 provenance 与独立 commits 仍须由 Coordinator 按流程闭合。
+4. 本结论只关闭 P10-001A 的敌方确定性 BasicAttack、技能展示文本边界与 post-turn ViewState 修复；不自动完成 P10-001，不授权或自动进入 P10-002。
+
+## 授权边界
+
+TASK-P10-001A 可以进入 Teacher、Coordinator 归档与角色提交准备。任何 P10-002 行动条/双方状态面板扩展仍须独立活动契约和明确授权。
+
+本 Reviewer 本轮仅追加 `tasks/final-review.md`；未修改 Source、Content、Config 或其他文档，未 stage、commit 或 push。
 
 ---
 

@@ -1,5 +1,14 @@
 ﻿# HSR Worklog
 
+## 2026-07-24｜P10-005 closeout archived
+
+- P10-004 latest USER PROVIDED log closes the base-PlayerController integration across three result/return rounds; Reviewer conclusion is `PASS WITH FOLLOW-UP`.
+- P10-001 is archived as `USER ACCEPTED / STATIC REVIEW` historical reconstruction; P10-001A/P10-003 Teacher archive records preserve their real/absent evidence boundaries.
+- User accepts P10-002 equal-speed/death and P10-003 replay/reset/Finished/two-round matrices as inherited static-review follow-ups, not dynamic PIE PASS.
+- Final P10-005 `HSREditor Win64 Development -Rebuild` succeeded: exit 0, 26 actions, relevant HSR UI/Battle/Ability compilation, HSR DLL/LIB link, plugin build, WriteMetadata, 121.32s. The initial sandbox run failed only on AppData permission; an external target-up-to-date run was not treated as authoritative.
+- P10-005 Teacher and Independent Reviewer Gates are `PASS WITH FOLLOW-UP`; Phase 5–9 regression claims are indexed to retained task/log evidence, while absent dynamic cases remain explicitly labelled.
+- Phase 10 is `Ready with inherited follow-ups`; Phase 11 is not started. 1920x1080 is `USER PROVIDED / VISUALLY OBSERVED`; 1280x720 is `USER ACCEPTED / NOT VERIFIED`; physical gamepad, full navigation, dual-resolution, and injected preflight rejection/retry checks remain open. No Source/Content/Config/Git action is implied by this worklog entry.
+
 ## 2026-07-15｜规则迁移与项目文档基线
 
 ### 用户目标与需求变化
@@ -1819,3 +1828,5 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - P9-000 manager-local Epoch 风险必须由本任务的 manager replacement 解绑/重绑与旧事件拒绝证据关闭；根执行历史旧 pending 已归档校准；Break Delay `InvalidTarget` 诊断粒度继续保留为非阻断 follow-up。
 - Config GameplayTag 与两个 Content 资产明确归 User Editor/Config 作者，Implementation 不得代建；执行者首次只读复述后必须等待用户单独确认。
 - 本轮未修改 Source、Config、Content，未 stage、commit 或 push。
+- 2026-07-24：P10-005 分辨率证据更新：用户确认已在 1920x1080 下观察战斗 UI，证据等级为 `USER PROVIDED / VISUALLY OBSERVED`；1280x720 未观察，继续明确标记为未验证，不将单一分辨率改写为双分辨率通过。
+- 2026-07-24：用户明确接受 1280x720 保留为 `USER ACCEPTED / NOT VERIFIED / inherited follow-up`；该项不再阻断 P10-005，但不会被记录为分辨率 PASS。

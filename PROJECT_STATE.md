@@ -16,7 +16,7 @@
 - 当前无 Phase 9 活动任务。P9-006 已完成 Teacher 六题掌握、Reviewer Gate、provenance、Config EOF 修复、全局 diff-check、四个角色提交和三件套归档；Coordinator closeout Markdown 等待单独提交。
 - Phase 9 角色提交：User `2a2eb3d`、Implementation `a996475`、Teacher `39e0449`、Independent Reviewer `db383b3`。`.agents/CLAUDE.md` 经用户确认纳入 User/project-owned 交付集合。
 - Inherited follow-ups：Epoch 仅 manager-local；用户资产字段级证据仍为 `USER PROVIDED`；P9-000 `InvalidTarget` 诊断粒度、既有 MSVC/AIModule warnings、网络、Save 与 Phase 10 完整 UI 均未由 Phase 9 关闭。
-- Phase 10 尚未创建或实施；进入下一阶段仍需用户单独授权。
+- Phase 10 的 P10-001～005 已归档；P10-005 Teacher 与 Independent Reviewer Gate 均为 `PASS WITH FOLLOW-UP`，Phase 10 为 `Ready with inherited follow-ups`，不自动进入 Phase 11。1920x1080 为 `USER PROVIDED / VISUALLY OBSERVED`；1280x720 为 `USER ACCEPTED / NOT VERIFIED`；物理手柄、完整导航、双分辨率验证和注入式 preflight 拒绝/重试保持为 follow-ups。
 - `TASK-P8-006` 已以 Reviewer `PASS WITH FOLLOW-UP` 完成收尾并归档。User `ff22ed0`、Implementation `d05cb66`、Teacher `14d2fea`、Reviewer `0e3e38e`、Coordinator `2c2abc2` 均已提交；`main` 与 `origin/main` 已同步。历史 Reviewer 结论和 inherited follow-ups 原样保留。
 
 - `TASK-P7-001` 已归档：Reviewer `PASS WITH FOLLOW-UP`；fresh Rebuild、canonical Config、资产与烟雾 PIE follow-up 已如实保留。
