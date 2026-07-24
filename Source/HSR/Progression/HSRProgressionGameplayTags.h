@@ -1,0 +1,3 @@
+#pragma once
+#include "NativeGameplayTags.h"
+namespace HSRProgressionTags { HSR_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(BonusMaxHealth); HSR_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(BonusAttack); HSR_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(BonusDefense); HSR_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(BonusSpeed); }

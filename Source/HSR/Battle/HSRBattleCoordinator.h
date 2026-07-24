@@ -7,10 +7,13 @@
 #include "../UI/HSRBattleCommandTypes.h"
 #include "../GAS/Damage/HSRDamageTypes.h"
 #include "../Status/HSRStatusTypes.h"
+#include "GameplayEffectTypes.h"
+#include "../Progression/HSRCharacterDerivedStats.h"
 #include "HSRBattleCoordinator.generated.h"
 
 class UWorld;
 class AActor;
+class APawn;
 class UAbilitySystemComponent;
 class UHSRTurnManager;
 class UHSRSkillDefinition;
@@ -65,6 +68,9 @@ public:
 	void SetHealDefinition(UHSRSkillDefinition* InDefinition) { HealDefinition = InDefinition; }
 	void SetEnemyDefinition(UHSREnemyDefinition* InDefinition) { EnemyDefinition = InDefinition; }
 	void SetParticipantInitializationGameplayEffect(TSubclassOf<UGameplayEffect> InEffect) { ParticipantInitializationGameplayEffect = InEffect; }
+	void SetCharacterProgressionGameplayEffect(TSubclassOf<UGameplayEffect> InEffect) { CharacterProgressionGameplayEffect = InEffect; }
+	void SetCharacterProgressionContext(FName ParticipantId, const FHSRCharacterProgressionContext& Context) { CharacterProgressionContexts.Add(ParticipantId, Context); }
+	void SetPlayerCharacterDefinition(FName CharacterId, TSubclassOf<APawn> CharacterClass) { PlayerCharacterId = CharacterId; PlayerCharacterClass = CharacterClass; }
 	void SetStatusDefinition(UHSRStatusDefinition* InDefinition) { StatusDefinition = InDefinition; }
 	void SetDamageOverTimeStatusDefinition(UHSRStatusDefinition* InDefinition) { DamageOverTimeStatusDefinition = InDefinition; }
 	void SetBreakStatusDefinition(UHSRStatusDefinition* InDefinition) { BreakStatusDefinition = InDefinition; }
@@ -76,6 +82,8 @@ public:
 	/** Event-driven, pure-value UI snapshot. Consumers never receive runtime Actors or ASCs. */
 	FHSRBattleCommandStateReadyDelegate& OnCommandStateReady() { return CommandStateReady; }
 	FHSRBattleCommandViewState GetCommandViewState() const;
+	static bool ValidateCharacterProgressionEffectContract(const UGameplayEffect* Effect);
+	static bool HasSameProgressionFingerprint(const FHSRCharacterProgressionContext& A, const FHSRCharacterProgressionContext& B);
 #if WITH_EDITOR
 	EHSRStatusOperationResult AddStatusForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId);
 	EHSRStatusOperationResult AddDamageOverTimeForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId = FGuid());
@@ -188,6 +196,13 @@ private:
 	UPROPERTY() TMap<FName, TObjectPtr<UHSRStatusComponent>> StatusComponents;
 	TMap<FName, FDelegateHandle> StatusChangedHandles;
 	TSubclassOf<UGameplayEffect> ParticipantInitializationGameplayEffect;
+	TSubclassOf<UGameplayEffect> CharacterProgressionGameplayEffect;
+	TMap<FName, FHSRCharacterProgressionContext> CharacterProgressionContexts;
+	struct FHSRProgressionEffectState { TWeakObjectPtr<UAbilitySystemComponent> AbilitySystemComponent; TSubclassOf<UGameplayEffect> EffectClass; FName CharacterId; FHSRCharacterDerivedStats Bonuses; FActiveGameplayEffectHandle ActiveHandle; TArray<FActiveGameplayEffectHandle> SecondaryOwnedHandles; uint64 Epoch = 0; int64 Revision = 0; };
+	TMap<FName, FHSRProgressionEffectState> ProgressionEffects;
+	FName PlayerCharacterId;
+	TSubclassOf<APawn> PlayerCharacterClass;
+	uint64 ProgressionEpoch = 0;
 	FHSRBattleResultReadyDelegate BattleResultReady;
 	FHSRBattleCommandStateReadyDelegate CommandStateReady;
 	FRandomStream DevelopmentDamageRandomStream;
@@ -217,6 +232,8 @@ private:
 	AActor* SpawnParticipantActor(UWorld* World, const FHSRBattleParticipantDefinition& Definition);
 	bool InitParticipantASC(AActor* TargetActor);
 	bool ApplyParticipantInitializationGameplayEffect(const FHSRBattleParticipant& Participant);
+	bool ApplyCharacterProgressionGameplayEffect(const FHSRBattleParticipant& Participant);
+	bool ClearProgressionGameplayEffects();
 	bool GrantBasicAttackAbility(const FHSRBattleParticipant& Participant);
 	bool GrantUltimateAbility(const FHSRBattleParticipant& Participant);
 	bool GrantSkillAbility(const FHSRBattleParticipant& Participant);

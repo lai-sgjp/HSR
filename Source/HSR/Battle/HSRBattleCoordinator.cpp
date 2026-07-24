@@ -5,6 +5,8 @@
 #include "HSRTargetingPolicy.h"
 #include "../GAS/Ability/HSRGameplayAbilityBase.h"
 #include "../GAS/HSRAbilitySystemComponent.h"
+#include "../Character/HSRCharacterBase.h"
+#include "../Progression/HSRProgressionGameplayTags.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
@@ -119,6 +121,14 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 	}
 
 	Participants.Empty();
+	const auto RollbackBuild = [this]()
+	{
+		ClearRuntimeDelegates();
+		ClearProgressionGameplayEffects();
+		for (FHSRBattleParticipant& Existing : Participants) if (Existing.Actor.IsValid()) Existing.Actor->Destroy();
+		Participants.Empty();
+		TurnManager = nullptr;
+	};
 	if (!EnemyDefinition || EnemyDefinition->EnemyDefinitionId != CurrentEnemyDefinitionId)
 	{
 		CurrentState = EHSRBattleCoordinatorState::Failed;
@@ -135,8 +145,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 				TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED spawn ParticipantId=%s DefId=%s RequestId=%s"),
 				*Def.ParticipantId.ToString(), *Def.DefinitionId.ToString(), *CurrentRequestId.ToString());
 			// Cleanup previously spawned
-			for (auto& P : Participants) { if (P.Actor.IsValid()) P.Actor->Destroy(); }
-			Participants.Empty();
+			RollbackBuild();
 			ParticipantDefinitions.Empty();
 			CurrentState = EHSRBattleCoordinatorState::Failed;
 			return FHSRBattleInitResult::MakeFailure(
@@ -150,9 +159,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			UE_LOG(LogTemp, Error,
 				TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED InitASC ParticipantId=%s DefId=%s RequestId=%s"),
 				*Def.ParticipantId.ToString(), *Def.DefinitionId.ToString(), *CurrentRequestId.ToString());
-			SpawnedActor->Destroy();
-			for (auto& P : Participants) { if (P.Actor.IsValid()) P.Actor->Destroy(); }
-			Participants.Empty();
+			SpawnedActor->Destroy(); RollbackBuild();
 			ParticipantDefinitions.Empty();
 			CurrentState = EHSRBattleCoordinatorState::Failed;
 			return FHSRBattleInitResult::MakeFailure(
@@ -170,8 +177,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		if (!ApplyParticipantInitializationGameplayEffect(Participant))
 		{
 			UE_LOG(LogTemp, Error, TEXT("P8-005 InitGE Participant=%s Result=FAILED"), *Participant.ParticipantId.ToString());
-			SpawnedActor->Destroy(); for (FHSRBattleParticipant& Existing : Participants) { if (Existing.Actor.IsValid()) Existing.Actor->Destroy(); }
-			Participants.Empty(); ParticipantDefinitions.Empty(); CurrentState = EHSRBattleCoordinatorState::Failed;
+			SpawnedActor->Destroy(); RollbackBuild(); ParticipantDefinitions.Empty(); CurrentState = EHSRBattleCoordinatorState::Failed;
 			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Participant initialization GameplayEffect failed.")), Def.DefinitionId);
 		}
 		if (Def.Team == EHSRBattleParticipantTeam::Enemy)
@@ -184,9 +190,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		if (!GrantBasicAttackAbility(Participant))
 		{
 			UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED to grant BasicAttack ParticipantId=%s"), *Participant.ParticipantId.ToString());
-			SpawnedActor->Destroy();
-			for (FHSRBattleParticipant& ExistingParticipant : Participants) { if (ExistingParticipant.Actor.IsValid()) ExistingParticipant.Actor->Destroy(); }
-			Participants.Empty();
+			SpawnedActor->Destroy(); RollbackBuild();
 			ParticipantDefinitions.Empty();
 			CurrentState = EHSRBattleCoordinatorState::Failed;
 			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to grant BasicAttack ability.")), Def.DefinitionId);
@@ -194,9 +198,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		if (UltimateDefinition && !GrantUltimateAbility(Participant))
 		{
 			UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED to grant Ultimate ParticipantId=%s"), *Participant.ParticipantId.ToString());
-			SpawnedActor->Destroy();
-			for (FHSRBattleParticipant& ExistingParticipant : Participants) { if (ExistingParticipant.Actor.IsValid()) ExistingParticipant.Actor->Destroy(); }
-			Participants.Empty();
+			SpawnedActor->Destroy(); RollbackBuild();
 			ParticipantDefinitions.Empty();
 			CurrentState = EHSRBattleCoordinatorState::Failed;
 			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to grant Ultimate ability.")), Def.DefinitionId);
@@ -204,12 +206,10 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		if (SkillDefinition && !GrantSkillAbility(Participant))
 		{
 			UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED to grant Skill ParticipantId=%s"), *Participant.ParticipantId.ToString());
-			SpawnedActor->Destroy();
-			for (FHSRBattleParticipant& ExistingParticipant : Participants) { if (ExistingParticipant.Actor.IsValid()) ExistingParticipant.Actor->Destroy(); }
-			Participants.Empty(); ParticipantDefinitions.Empty(); CurrentState = EHSRBattleCoordinatorState::Failed;
+			SpawnedActor->Destroy(); RollbackBuild(); ParticipantDefinitions.Empty(); CurrentState = EHSRBattleCoordinatorState::Failed;
 			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to grant Skill ability.")), Def.DefinitionId);
 		}
-		if (HealDefinition && !GrantHealAbility(Participant)) { SpawnedActor->Destroy(); CurrentState=EHSRBattleCoordinatorState::Failed; return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed,FText::FromString(TEXT("Failed to grant Heal ability.")),Def.DefinitionId); }
+		if (HealDefinition && !GrantHealAbility(Participant)) { SpawnedActor->Destroy(); RollbackBuild(); CurrentState=EHSRBattleCoordinatorState::Failed; return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed,FText::FromString(TEXT("Failed to grant Heal ability.")),Def.DefinitionId); }
 		Participants.Add(Participant);
 		BindHealthObserver(Participant);
 
@@ -225,18 +225,14 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 	if (!TurnManager || !TurnManager->Initialize(Participants))
 	{
 		UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED to initialize TurnManager RequestId=%s"), *CurrentRequestId.ToString());
-		for (FHSRBattleParticipant& Participant : Participants) { if (Participant.Actor.IsValid()) Participant.Actor->Destroy(); }
-		Participants.Empty();
-		TurnManager = nullptr;
+		RollbackBuild();
 		CurrentState = EHSRBattleCoordinatorState::Failed;
 		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to initialize TurnManager.")));
 	}
 	if (!InitializeStatusComponents())
 	{
 		ClearStatusComponents();
-		for (FHSRBattleParticipant& Participant : Participants) { if (Participant.Actor.IsValid()) Participant.Actor->Destroy(); }
-		Participants.Empty();
-		TurnManager = nullptr;
+		RollbackBuild();
 		CurrentState = EHSRBattleCoordinatorState::Failed;
 		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to initialize StatusComponents.")));
 	}
@@ -1102,10 +1098,10 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildAndValidateParticipantDefinitio
 	// Player Definition: uses a well-known constant, not EncounterId
 	FHSRBattleParticipantDefinition PlayerDef;
 	PlayerDef.ParticipantId = FName(TEXT("Player"));
-	PlayerDef.DefinitionId = FName(TEXT("PlayerCharacter"));
+	PlayerDef.DefinitionId = PlayerCharacterId;
 	PlayerDef.Team = EHSRBattleParticipantTeam::Player;
-	PlayerDef.PawnClass = nullptr;
-	if (PlayerDef.DefinitionId != FName(TEXT("PlayerCharacter")))
+	PlayerDef.PawnClass = PlayerCharacterClass;
+	if (PlayerDef.DefinitionId.IsNone() || !PlayerDef.PawnClass)
 	{
 		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::DefinitionNotFound,
 			FText::FromString(TEXT("Player definition is not registered.")), PlayerDef.DefinitionId);
@@ -1130,7 +1126,6 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildAndValidateParticipantDefinitio
 	// Resolve the registered definitions to their controlled runtime class.
 	// The prototype intentionally uses the native APawn shell for both entries;
 	// SpawnParticipantActor never falls back for a validated definition.
-	PlayerDef.PawnClass = APawn::StaticClass();
 	EnemyDef.PawnClass = APawn::StaticClass();
 	ParticipantDefinitions.Add(PlayerDef);
 	ParticipantDefinitions.Add(EnemyDef);
@@ -1184,6 +1179,7 @@ void UHSRBattleCoordinator::Reset()
 		static_cast<int32>(CurrentState), *CurrentRequestId.ToString());
 
 	ClearRuntimeDelegates();
+	ClearProgressionGameplayEffects();
 	CurrentState = EHSRBattleCoordinatorState::Idle;
 	CurrentRequestId = FGuid();
 	CurrentEncounterId = NAME_None;
@@ -1489,9 +1485,13 @@ bool UHSRBattleCoordinator::InitParticipantASC(AActor* TargetActor)
 		return false;
 	}
 
-	// Add UHSRAbilitySystemComponent at runtime (UE5.0+ AddComponentByClass)
-	UHSRAbilitySystemComponent* ASC = Cast<UHSRAbilitySystemComponent>(
-		TargetActor->AddComponentByClass(UHSRAbilitySystemComponent::StaticClass(), false, FTransform::Identity, false));
+	// A Character already owns its ASC. The minimal APawn shell gets one only when absent.
+	UAbilitySystemComponent* ASC = TargetActor->FindComponentByClass<UAbilitySystemComponent>();
+	const bool bCreatedASCForThisCall = ASC == nullptr;
+	if (ASC == nullptr)
+	{
+		ASC = Cast<UAbilitySystemComponent>(TargetActor->AddComponentByClass(UHSRAbilitySystemComponent::StaticClass(), false, FTransform::Identity, false));
+	}
 
 	if (!ASC)
 	{
@@ -1506,14 +1506,18 @@ bool UHSRBattleCoordinator::InitParticipantASC(AActor* TargetActor)
 	ASC->SetComponentTickEnabled(false);
 	// ASC->RegisterComponent() ?? auto-registered by AddComponentByClass
 
-	// Register CoreAttributeSet via InitStats
-	const UAttributeSet* AttrSet = ASC->InitStats(UHSRCoreAttributeSet::StaticClass(), nullptr);
+	// Reuse the Character-owned set. Do not create a second AttributeSet on the same ASC.
+	const UAttributeSet* AttrSet = ASC->GetSet<UHSRCoreAttributeSet>();
+	if (AttrSet == nullptr)
+	{
+		AttrSet = ASC->InitStats(UHSRCoreAttributeSet::StaticClass(), nullptr);
+	}
 	if (!AttrSet)
 	{
 		UE_LOG(LogTemp, Warning,
 			TEXT("UHSRBattleCoordinator::InitParticipantASC - InitStats failed for Actor=%s"),
 			*TargetActor->GetName());
-		ASC->DestroyComponent(true);
+		if (bCreatedASCForThisCall) ASC->DestroyComponent(true);
 		return false;
 	}
 
@@ -1525,7 +1529,7 @@ bool UHSRBattleCoordinator::InitParticipantASC(AActor* TargetActor)
 		UE_LOG(LogTemp, Warning,
 			TEXT("UHSRBattleCoordinator::InitParticipantASC - ActorInfo invalid after Init for Actor=%s"),
 			*TargetActor->GetName());
-		ASC->DestroyComponent(true);
+		if (bCreatedASCForThisCall) ASC->DestroyComponent(true);
 		return false;
 	}
 
@@ -1678,6 +1682,11 @@ FHSRStatusRuntimeSnapshot UHSRBattleCoordinator::GetStatusSnapshotForDevelopment
 
 bool UHSRBattleCoordinator::ApplyParticipantInitializationGameplayEffect(const FHSRBattleParticipant& Participant)
 {
+	if (const AHSRCharacterBase* Character = Cast<AHSRCharacterBase>(Participant.Actor.Get()); Character && Character->HasAppliedInitialAttributes())
+	{
+		// Character BeginPlay owns the one-shot base layer; Battle owns only progression.
+		return ApplyCharacterProgressionGameplayEffect(Participant);
+	}
 	if (!Participant.AbilitySystemComponent.IsValid() || !ParticipantInitializationGameplayEffect)
 	{
 		UE_LOG(LogTemp, Error, TEXT("P8-005 InitGE Participant=%s Result=FAILED Reason=MissingASCOrEffect"), *Participant.ParticipantId.ToString());
@@ -1716,7 +1725,147 @@ bool UHSRBattleCoordinator::ApplyParticipantInitializationGameplayEffect(const F
 	{
 		return false;
 	}
+	return ApplyCharacterProgressionGameplayEffect(Participant);
+}
+
+bool UHSRBattleCoordinator::ApplyCharacterProgressionGameplayEffect(const FHSRBattleParticipant& Participant)
+{
+	if (Participant.Team == EHSRBattleParticipantTeam::Enemy) return true;
+	UAbilitySystemComponent* ASC = Participant.AbilitySystemComponent.Get();
+	if (ASC == nullptr || Participant.ParticipantId.IsNone() || !CharacterProgressionGameplayEffect)
+	{
+		UE_LOG(LogTemp, Error, TEXT("P11-003 ProgressionGE Participant=%s Result=FAILED Reason=MissingASCOrEffect"), *Participant.ParticipantId.ToString());
+		return false;
+	}
+	const UGameplayEffect* CDO = CharacterProgressionGameplayEffect->GetDefaultObject<UGameplayEffect>();
+	if (CDO == nullptr || CDO->DurationPolicy != EGameplayEffectDurationType::Infinite)
+	{
+		UE_LOG(LogTemp, Error, TEXT("P11-003 ProgressionGE Participant=%s Result=FAILED Reason=EffectMustBeInfinite"), *Participant.ParticipantId.ToString());
+		return false;
+	}
+	if (!ValidateCharacterProgressionEffectContract(CDO))
+	{
+		UE_LOG(LogTemp, Error, TEXT("P11-003 ProgressionGE Participant=%s Result=FAILED Reason=ModifierContract"), *Participant.ParticipantId.ToString()); return false;
+	}
+	const FHSRCharacterProgressionContext* Configured = CharacterProgressionContexts.Find(Participant.ParticipantId);
+	if (!Configured) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProgressionGE Participant=%s Result=FAILED Reason=MissingPlayerContext"), *Participant.ParticipantId.ToString()); return false; }
+	const FHSRCharacterProgressionContext Context = *Configured;
+	if (Context.CharacterId.IsNone() || Context.RuntimeRevision < 0) return false;
+	const float Bonuses[] = {Context.ProgressionBonuses.MaxHealth, Context.ProgressionBonuses.Attack, Context.ProgressionBonuses.Defense, Context.ProgressionBonuses.Speed};
+	for (const float Bonus : Bonuses) if (!FMath::IsFinite(Bonus) || Bonus < 0.0f) return false;
+	if (FHSRProgressionEffectState* Existing = ProgressionEffects.Find(Participant.ParticipantId))
+	{
+		// Secondary handles are retained rollback obligations. Clear them before any idempotent return or replacement.
+		UAbilitySystemComponent* ExistingASC = Existing->AbilitySystemComponent.Get();
+		if (ExistingASC == nullptr)
+		{
+			// The recorded ASC was torn down with its actor; no live effect can remain owned by it.
+			ProgressionEffects.Remove(Participant.ParticipantId);
+		}
+		else if (ExistingASC != ASC)
+		{
+			// Never mix handles from two ASCs in one ownership record.
+			const auto RemoveOld = [ExistingASC](const FActiveGameplayEffectHandle Handle)
+			{
+				return !Handle.IsValid() || !ExistingASC->GetActiveGameplayEffect(Handle) || ExistingASC->RemoveActiveGameplayEffect(Handle);
+			};
+			for (const FActiveGameplayEffectHandle Handle : Existing->SecondaryOwnedHandles)
+			{
+				if (!RemoveOld(Handle)) return false;
+			}
+			if (!RemoveOld(Existing->ActiveHandle)) return false;
+			ProgressionEffects.Remove(Participant.ParticipantId);
+		}
+		else
+		{
+		for (int32 Index = Existing->SecondaryOwnedHandles.Num() - 1; Index >= 0; --Index)
+		{
+			const FActiveGameplayEffectHandle Handle = Existing->SecondaryOwnedHandles[Index];
+			if (!Handle.IsValid() || !ExistingASC->GetActiveGameplayEffect(Handle)) { Existing->SecondaryOwnedHandles.RemoveAtSwap(Index); continue; }
+			if (!ExistingASC->RemoveActiveGameplayEffect(Handle)) return false;
+			Existing->SecondaryOwnedHandles.RemoveAtSwap(Index);
+		}
+		}
+	}
+	if (const FHSRProgressionEffectState* Existing = ProgressionEffects.Find(Participant.ParticipantId);
+		Existing && Existing->AbilitySystemComponent.Get() == ASC && Existing->EffectClass == CharacterProgressionGameplayEffect && Existing->CharacterId == Context.CharacterId
+		&& Existing->Revision == Context.RuntimeRevision && Existing->Epoch == ProgressionEpoch
+		&& Existing->Bonuses.MaxHealth == Context.ProgressionBonuses.MaxHealth && Existing->Bonuses.Attack == Context.ProgressionBonuses.Attack
+		&& Existing->Bonuses.Defense == Context.ProgressionBonuses.Defense && Existing->Bonuses.Speed == Context.ProgressionBonuses.Speed
+		&& Existing->ActiveHandle.IsValid() && ASC->GetActiveGameplayEffect(Existing->ActiveHandle))
+	{
+		return true;
+	}
+	const FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(CharacterProgressionGameplayEffect, 1.0f, ASC->MakeEffectContext());
+	if (!Spec.IsValid()) return false;
+	Spec.Data->SetSetByCallerMagnitude(HSRProgressionTags::BonusMaxHealth, Context.ProgressionBonuses.MaxHealth);
+	Spec.Data->SetSetByCallerMagnitude(HSRProgressionTags::BonusAttack, Context.ProgressionBonuses.Attack);
+	Spec.Data->SetSetByCallerMagnitude(HSRProgressionTags::BonusDefense, Context.ProgressionBonuses.Defense);
+	Spec.Data->SetSetByCallerMagnitude(HSRProgressionTags::BonusSpeed, Context.ProgressionBonuses.Speed);
+	const float OldHealth = ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+	const FActiveGameplayEffectHandle NewHandle = ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+	if (!NewHandle.WasSuccessfullyApplied() || !ASC->GetActiveGameplayEffect(NewHandle)) return false;
+	if (FHSRProgressionEffectState* Existing = ProgressionEffects.Find(Participant.ParticipantId))
+	{
+		if (Existing->AbilitySystemComponent.IsValid() && Existing->ActiveHandle.IsValid()
+			&& Existing->AbilitySystemComponent->GetActiveGameplayEffect(Existing->ActiveHandle)
+			&& !Existing->AbilitySystemComponent->RemoveActiveGameplayEffect(Existing->ActiveHandle))
+		{
+			const bool bRolledBack = ASC->RemoveActiveGameplayEffect(NewHandle);
+			if (!bRolledBack)
+			{
+				Existing->SecondaryOwnedHandles.Add(NewHandle);
+			}
+			return false;
+		}
+	}
+	FHSRProgressionEffectState& State = ProgressionEffects.FindOrAdd(Participant.ParticipantId);
+	State.AbilitySystemComponent = ASC;
+	State.EffectClass = CharacterProgressionGameplayEffect;
+	State.CharacterId = Context.CharacterId;
+	State.Bonuses = Context.ProgressionBonuses;
+	State.ActiveHandle = NewHandle;
+	State.SecondaryOwnedHandles.Empty();
+	State.Epoch = ProgressionEpoch;
+	State.Revision = Context.RuntimeRevision;
+	const float NewMaxHealth = ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxHealthAttribute());
+	ASC->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), FMath::Clamp(OldHealth, 0.0f, NewMaxHealth));
+	UE_LOG(LogTemp, Log, TEXT("P11-003 ProgressionGE SUCCESS Participant=%s CharacterId=%s Revision=%lld MaxHealthBonus=%.3f AttackBonus=%.3f DefenseBonus=%.3f SpeedBonus=%.3f Handle=%s"),
+		*Participant.ParticipantId.ToString(), *Context.CharacterId.ToString(), Context.RuntimeRevision,
+		Context.ProgressionBonuses.MaxHealth, Context.ProgressionBonuses.Attack, Context.ProgressionBonuses.Defense, Context.ProgressionBonuses.Speed, *NewHandle.ToString());
 	return true;
+}
+
+bool UHSRBattleCoordinator::ValidateCharacterProgressionEffectContract(const UGameplayEffect* Effect)
+{
+	if (!Effect || Effect->DurationPolicy != EGameplayEffectDurationType::Infinite || Effect->Modifiers.Num() != 4) return false;
+	const auto Has = [Effect](const FGameplayAttribute& Attribute, FGameplayTag Tag) { int32 N=0; for (const FGameplayModifierInfo& M:Effect->Modifiers) if(M.Attribute==Attribute&&M.ModifierOp==EGameplayModOp::Additive&&M.ModifierMagnitude.GetMagnitudeCalculationType()==EGameplayEffectMagnitudeCalculation::SetByCaller&&M.ModifierMagnitude.GetSetByCallerFloat().DataTag==Tag)++N; return N==1; };
+	return Has(UHSRCoreAttributeSet::GetMaxHealthAttribute(),HSRProgressionTags::BonusMaxHealth)&&Has(UHSRCoreAttributeSet::GetAttackAttribute(),HSRProgressionTags::BonusAttack)&&Has(UHSRCoreAttributeSet::GetDefenseAttribute(),HSRProgressionTags::BonusDefense)&&Has(UHSRCoreAttributeSet::GetSpeedAttribute(),HSRProgressionTags::BonusSpeed);
+}
+
+bool UHSRBattleCoordinator::HasSameProgressionFingerprint(const FHSRCharacterProgressionContext& A, const FHSRCharacterProgressionContext& B)
+{
+	return A.CharacterId==B.CharacterId&&A.RuntimeRevision==B.RuntimeRevision&&A.ProgressionBonuses.MaxHealth==B.ProgressionBonuses.MaxHealth&&A.ProgressionBonuses.Attack==B.ProgressionBonuses.Attack&&A.ProgressionBonuses.Defense==B.ProgressionBonuses.Defense&&A.ProgressionBonuses.Speed==B.ProgressionBonuses.Speed;
+}
+
+bool UHSRBattleCoordinator::ClearProgressionGameplayEffects()
+{
+	bool bAllRemoved = true;
+	TArray<FName> ClearedKeys;
+	for (const TPair<FName, FHSRProgressionEffectState>& Pair : ProgressionEffects)
+	{
+		UAbilitySystemComponent* ASC = Pair.Value.AbilitySystemComponent.Get();
+		const auto TryRemove = [ASC](const FActiveGameplayEffectHandle Handle)
+		{
+			return !Handle.IsValid() || ASC == nullptr || !ASC->GetActiveGameplayEffect(Handle) || ASC->RemoveActiveGameplayEffect(Handle);
+		};
+		bool bRemoved = TryRemove(Pair.Value.ActiveHandle);
+		for (const FActiveGameplayEffectHandle Handle : Pair.Value.SecondaryOwnedHandles) bRemoved = TryRemove(Handle) && bRemoved;
+		if (bRemoved) ClearedKeys.Add(Pair.Key); else bAllRemoved = false;
+	}
+	for (const FName Key : ClearedKeys) ProgressionEffects.Remove(Key);
+	if (ProgressionEffects.IsEmpty()) ++ProgressionEpoch;
+	return bAllRemoved;
 }
 
 bool UHSRBattleCoordinator::GrantBasicAttackAbility(const FHSRBattleParticipant& Participant)

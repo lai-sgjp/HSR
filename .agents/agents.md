@@ -279,6 +279,17 @@ docs/
 
 ## 10. AI 行为规则
 
+### 新 Phase 的强制首步
+
+从 Phase 11 起，每次用户明确进入一个新 Phase 后，必须先创建并运行以下四个角色，再开始该 Phase 的工程实施：
+
+- `gpt-5.6-sol / light` Coordinator；
+- `gpt-5.6-sol / light` Independent Reviewer；
+- `gpt-5.6-sol / light` Teacher；
+- `gpt-5.6-terra / light` Implementation。
+
+Coordinator 必须参考已有 Phase execution-plan 的稳定模式，结合当前仓库证据产出 `docs/phase-<N>-execution-plan.md`；Reviewer、Teacher 和 Implementation 分别审查证据/安全边界、学习顺序和可实施性。整阶段计划完成并复核前，不得先实施 Gameplay、创建该 Phase 的正式资产或跳到后续工作包。并发槽不足时允许分批运行角色，但不得省略角色。
+
 1. 优先采用 UE5.6 和 C++ 方案。
 2. 面向初学者时按“概念 → UE 职责 → 最小实现 → 数据流 → 验证”解释。
 3. 实现前先列出计划修改的文件和每个文件的职责。

@@ -1,5 +1,10 @@
 #include "HSRBattleGameMode.h"
 #include "HSRBattleCoordinator.h"
+#include "../Progression/HSRCharacterProfileSubsystem.h"
+#include "../Progression/HSRCharacterDerivedStats.h"
+#include "../Data/Definitions/HSRCharacterCatalog.h"
+#include "../Data/Definitions/HSRCharacterDefinition.h"
+#include "../Character/HSRCharacterBase.h"
 #include "HSRTurnManager.h"
 #include "HSRBattleTransitionSubsystem.h"
 #include "Engine/World.h"
@@ -1407,6 +1412,26 @@ void AHSRBattleGameMode::BeginPlay()
 	Coordinator->SetDamageOverTimeStatusDefinition(DamageOverTimeStatusDefinition);
 	Coordinator->SetBreakStatusDefinition(BreakStatusDefinition);
 	Coordinator->SetParticipantInitializationGameplayEffect(ParticipantInitializationGameplayEffect);
+	Coordinator->SetCharacterProgressionGameplayEffect(CharacterProgressionGameplayEffect);
+	UHSRCharacterProfileSubsystem* Profiles = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRCharacterProfileSubsystem>() : nullptr;
+	if (!Profiles || !CharacterCatalog || PlayerCharacterId.IsNone()) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED MissingSubsystemCatalogOrCharacterId")); return; }
+	const EHSRCharacterProfileResult CatalogResult = Profiles->RegisterLoadedCatalog(CharacterCatalog);
+	if (CatalogResult != EHSRCharacterProfileResult::Success && CatalogResult != EHSRCharacterProfileResult::DefinitionAlreadyRegistered) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CatalogResult=%d"), static_cast<int32>(CatalogResult)); return; }
+#if WITH_EDITOR
+	if (P11DevelopmentStartingExperience > 0)
+	{
+		const EHSRCharacterProfileResult ExperienceResult = Profiles->GrantExperience(PlayerCharacterId, P11DevelopmentStartingExperience);
+		if (ExperienceResult != EHSRCharacterProfileResult::Success) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED DevelopmentExperience Result=%d CharacterId=%s"), static_cast<int32>(ExperienceResult), *PlayerCharacterId.ToString()); return; }
+	}
+#endif
+	FHSRCharacterProgressionContext PlayerContext; const UHSRCharacterDefinition* PlayerDefinition = nullptr;
+	if (!Profiles->GetProgressionContext(PlayerCharacterId, PlayerContext) || !Profiles->GetDefinition(PlayerCharacterId, PlayerDefinition)) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterNotRegistered Id=%s"), *PlayerCharacterId.ToString()); return; }
+	if (PlayerDefinition->CharacterClass.IsNull()) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassEmpty Id=%s"), *PlayerCharacterId.ToString()); return; }
+	UClass* PlayerClass = PlayerDefinition->CharacterClass.LoadSynchronous();
+	if (!PlayerClass) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassLoad Id=%s"), *PlayerCharacterId.ToString()); return; }
+	if (!PlayerClass->IsChildOf<AHSRCharacterBase>()) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassType Id=%s"), *PlayerCharacterId.ToString()); return; }
+	Coordinator->SetPlayerCharacterDefinition(PlayerCharacterId, PlayerClass);
+	Coordinator->SetCharacterProgressionContext(TEXT("Player"), PlayerContext);
 #if WITH_EDITOR
 	Coordinator->InitializeDevelopmentDamageRng(DevelopmentDamageSeed);
 #endif

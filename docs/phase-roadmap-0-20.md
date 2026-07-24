@@ -525,6 +525,23 @@ SkillDefinition → 可用技能列表 → 合法目标 → Command → Turn/ASC
 
 ---
 
+## 跨阶段改进清单（Phase 0-20 完成后统一处理）
+
+以下问题明确延期到 Phase 20 收尾后的改进迭代，不作为当前 Phase 11 或后续单阶段 Gate 的阻塞项：
+
+1. **ActiveStatus 通用化**：当前存在 `Status.Buff.AttackUp` 硬编码。改为由 Status/Effect Definition 或 GameplayTag 驱动的通用状态查询、聚合与 UI 映射；新增 Buff 不应修改核心分支代码。
+2. **Break 可重复触发**：移除 `bBreakResultPublished` 对单个角色终身只发布一次 Break 的限制。Break 应以 Toughness 从大于零到零的边沿、恢复后的再次归零和独立 Break 事务为依据；同一归零事件幂等，但韧性恢复后允许再次 Break。
+3. **速度变更与拉条重排**：TurnManager 不能只在初始化时读取一次 Speed。速度变化、Advance Action、Delay、拉条和减速应触发可控的排序重建，并保持当前行动事务、Tie-break 和回合预算一致。
+
+### 延后改进的统一测试要求
+
+- **ActiveStatus**：使用至少三种不同 Buff Tag/Definition（攻击、速度、护盾），验证新增 Buff 不需新增硬编码分支；添加、刷新、叠层、驱散、过期和 UI 查询结果一致；未知 Tag 返回结构化 Unknown，不崩溃。
+- **Break**：测试 `Toughness > 0 -> 0` 只发布一次；恢复到大于零后再次降为零再次发布；同一伤害事务重复回调不重复发布；死亡、清场和跨地图重建不会伪造 Break。
+- **速度/拉条**：角色行动队列为 A/B/C 时，运行中修改 Speed、增加/减少 Action Advance、Delay 和 Slow，验证下一行动者和后续顺序按新值重排；当前已锁定行动不被重排取消；相同速度使用稳定 Tie-break；重排不重复执行行动、不丢失或重复回合。
+- **回归**：运行对应 Automation（状态、Break、TurnSystem）及完整 `HSR.Progression`/Battle 回归；再做两轮冷启动 PIE，记录状态快照、TurnOrder、Break 事件 ID 和 UI 事件计数。
+
+这些改进完成前，Phase 11 的 Party/Progression 结论不因上述遗留问题降级；它们只在 Phase 20 收尾改进 Gate 中统一关闭。
+
 ## 全局阶段门禁
 
 - Phase 0–6 每阶段必须独立编译、PIE 验证并更新文档。

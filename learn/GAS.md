@@ -1341,3 +1341,679 @@ FActiveGameplayEffectsContainer::ExecuteActiveEffectsFrom(Spec)
    > ExecCalc 输出的 `IncomingDamage` 是通过 Modifier 传递到 AttributeSet 的。如果在同一个 GE 中既有一个直接 Modifier（+50 Health）又有一个 ExecCalc（输出 -100 IncomingDamage），它们的执行顺序是什么？最终 Health 变化是多少？
    >
    > 提示：看 `ExecuteActiveEffectsFrom` 中 Modifiers 循环和 Executions 循环的先后顺序。
+
+---
+
+# 第 4 站：AttributeSet 与属性系统
+
+## 核心概念
+
+每个属性由 `FGameplayAttributeData` 实现，包含两个值：
+
+```
+struct FGameplayAttributeData
+{
+    float BaseValue;     // 基础值（移除所有 Duration/Infinite GE 后的值）
+    float CurrentValue;  // 当前值（包含 Aggregator 影响后的最终值）
+};
+```
+
+Instant GE 直接修改 BaseValue（所以 BaseValue == CurrentValue）。
+Duration/Infinite GE 通过 Aggregator 叠加，不修改 BaseValue。
+
+## 你项目的 13 个属性
+
+| 分类 | 属性 | 用途 |
+|---|---|---|
+| **核心资源** | Health, MaxHealth, Energy, MaxEnergy, Speed | 角色生存和行动 |
+| **战斗属性** | Attack, Defense, CritRate, CritDamage | 伤害公式输入 |
+| **韧性** | Toughness, MaxToughness | 破韧系统 |
+| **Meta 属性** | IncomingDamage, IncomingToughnessDamage | 瞬时数据通道 |
+
+## PreAttributeBaseChange vs PreAttributeChange vs PostGameplayEffectExecute
+
+引擎源码 `AttributeSet.h` 中的注释：
+
+```
+PreAttributeBaseChange: 基础值(BaseValue)即将被修改
+  → 应该做钳位（clamping）
+  → 绝不要触发游戏事件或回调
+  → 标记为 const
+
+PreAttributeChange: 最终值(CurrentValue)即将被修改
+  → 同样做钳位
+  → 可以触发 UI 预显示等轻量逻辑
+
+PostGameplayEffectExecute: 仅在 Instant GE 和 Periodic 执行时调用
+  → Duration/Infinite 不走这个路径
+  → 参数 FGameplayEffectModCallbackData 包含完整上下文
+```
+
+你的 `HSRCoreAttributeSet` 中 `PreAttributeBaseChange` 和 `PreAttributeChange` 的代码几乎相同（钳位逻辑）。这是正确的——因为 BaseValue 变化会导致 CurrentValue 重新计算，两边都需要钳位。
+
+## Meta 属性模式
+
+Meta 属性（`IncomingDamage`, `IncomingToughnessDamage`）是单次数据通道：
+
+```
+ExecCalc 输出 IncomingDamage（Additive）
+  → InternalExecuteMod(IncomingDamage)
+    → PostGameplayEffectExecute
+      → Health -= IncomingDamage
+      → SetIncomingDamage(0.0f)  ← 归零！
+```
+
+关键特征：
+- 用完即归零（防止残留值影响下次）
+- 不参与 Aggregator 系统（Instant GE 专属）
+- 公式计算和属性修改分离（ExecCalc 算，PostGEExecute 改）
+
+## ATTRIBUTE_ACCESSORS 宏
+
+```cpp
+#define ATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
+    GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) → static FGameplayAttribute GetXxxAttribute()
+    GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName)                → float GetXxx() const
+    GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName)                → void SetXxx(float NewVal)
+    GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)               → void InitXxx(float NewVal, UAttributeSet* Setter)
+```
+
+## ViewModel 绑定
+
+```cpp
+// HSRCharacterBase::BindAttributeDelegates()
+AttributeViewModel->InitializeFromASC(AbilitySystemComponent);
+// 内部通过 ASC->GetGameplayAttributeValueChangeDelegate(Attribute) 绑定
+// 属性变化 → 委托广播 → ViewModel 的 FText 属性 → OnChanged() → Widget
+```
+
+## 防御性编程
+
+`PreAttributeChange` 中的 `FMath::IsFinite(NewValue)` 检查——防止 NaN 或无穷大值进入属性系统。
+
+---
+
+# 第 5 站：GameplayTag 系统
+
+## 核心数据结构
+
+```
+┌─────────────────────────────────────────────┐
+│ GameplayTag = 带点分层的 FName              │
+│                                             │
+│  Element.Arc  → 层级: [Element, Arc]        │
+│  Status.Buff.AttackUp → [Status, Buff, AttackUp] │
+│                                             │
+│  核心 API：                                  │
+│  FGameplayTag                                │
+│  FGameplayTagContainer（一组 Tag）           │
+│  FGameplayTagQuery（复杂查询条件）            │
+└─────────────────────────────────────────────┘
+```
+
+## 为什么用 Tag 而不是枚举
+
+1. **不用重新编译**——加新 Tag 只在 .ini 加一行
+2. **天然继承关系**——`Element.Arc.MatchesTag(Element)` → true
+3. **GAS 深度绑定**——能力的 `ActivationBlockedTags`、GE 的 `SourceTags/TargetTags` 全是 Tag
+
+## 你项目的 Tag 结构
+
+```ini
+Element          → 元素类型（根）
+  .Arc, .Gale, .Tide
+Weakness         → 弱点类型（根）
+  .Arc, .Gale, .Tide
+Damage           → 伤害相关
+  .Data.*        → SetByCaller 键
+  .Type.*        → 伤害类型标识
+Status           → 状态效果
+  .Buff.AttackUp
+  .Debuff.DamageOverTime, .Debuff.Break
+  .Immunity.Debuff
+```
+
+## 关键 API 区别
+
+| API | 行为 | 适用场景 |
+|---|---|---|
+| `Tag.MatchesTag(Parent)` | TagToCheck 是 Tag 的父级或自身 → true | 类别归属验证 |
+| `HasTag(Tag)` | 容器中有 Tag 或其子级 → true | 类别检查 |
+| `HasTagExact(Tag)` | 容器中有精确的 Tag → true | 精确标识检查 |
+| `MatchesAny(Container)` | Tag 匹配容器中任意一个 | 快速判断 |
+
+## 底层实现
+
+`GameplayTagContainer.h`：
+
+```cpp
+// 内部存储
+TArray<FGameplayTag> GameplayTags;  // 实际存入的 Tag
+TArray<FGameplayTag> ParentTags;    // 所有父 Tag（预处理展开）
+
+bool HasTag(const FGameplayTag& TagToCheck) const
+{
+    return GameplayTags.Contains(TagToCheck) || ParentTags.Contains(TagToCheck);
+}
+
+bool HasTagExact(const FGameplayTag& TagToCheck) const
+{
+    return GameplayTags.Contains(TagToCheck);  // 只查精确
+}
+```
+
+## `MatchesTag` 实现
+
+```cpp
+bool FGameplayTag::MatchesTag(const FGameplayTag& TagToCheck) const
+{
+    TagNode = UGameplayTagsManager.Get().FindTagNode(*this);
+    return TagNode->GetSingleTagContainer().HasTag(TagToCheck);
+}
+```
+
+## 注册与生命周期
+
+- `DefaultGameplayTags.ini` 中注册所有 Tag
+- 游戏启动时 `UGameplayTagsManager` 读取，构建全局 Tag 树
+- `FGameplayTag::RequestGameplayTag("Element.Arc", false)` 在树中查找
+- 第二个参数 `false` —— 找不到时不创建，返回无效 Tag
+
+## 项目用法总结
+
+| 位置 | 用法 | 匹配策略 |
+|---|---|---|
+| `HSRBreakTypes.h` ValidateElement | `Tag.MatchesTag(Element)` | 继承匹配——验证类别 |
+| `HSRBattleCoordinator` 弱点检测 | `Target->WeaknessTags.HasTagExact(MatchingWeakness)` | 精确匹配 |
+| `HSRBreakTypes.h` ValidateWeaknesses | `Tag.MatchesTag(Weakness)` | 遍历容器，逐个依赖匹配 |
+| SetByCaller | `FGameplayTag::RequestGameplayTag("Damage.Data.X")` | 作为键名 |
+
+---
+
+# 第 6 站：自定义 Effect Context
+
+## 为什么需要自定义 Context
+
+GAS 默认的 `FGameplayEffectContext` 只记录 Instigator、EffectCauser、AbilityCDO。你项目的伤害公式需要额外参数：
+
+```
+AbilityMultiplier
+DefenseCoefficient
+MinDamage
+CritRoll
+DamageType
+DamageResult（公式追溯——含 AppliedDamage、bCritical 等）
+```
+
+## 三步接入
+
+### ① 重写 AllocGameplayEffectContext
+
+```cpp
+// HSRAbilitySystemGlobals.cpp
+FGameplayEffectContext* UHSRAbilitySystemGlobals::AllocGameplayEffectContext() const
+{
+    return new FHSRDamageEffectContext();
+}
+```
+
+需要在 `DefaultGame.ini` 中登记：
+
+```ini
+AbilitySystemGlobalsClassName="/Script/HSR.HSRAbilitySystemGlobals"
+```
+
+### ② 重写 GetScriptStruct 和 Duplicate
+
+```cpp
+UScriptStruct* FHSRDamageEffectContext::GetScriptStruct() const
+{
+    return StaticStruct();
+}
+
+FGameplayEffectContext* FHSRDamageEffectContext::Duplicate() const
+{
+    FHSRDamageEffectContext* NewContext = new FHSRDamageEffectContext();
+    *NewContext = *this;
+    if (GetHitResult()) NewContext->AddHitResult(*GetHitResult(), true);
+    return NewContext;
+}
+```
+
+### ③ 重写 NetSerialize
+
+```cpp
+bool FHSRDamageEffectContext::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
+{
+    FGameplayEffectContext::NetSerialize(Ar, Map, bBaseSuccess);  // 基类先
+    Ar << DamageContext.ActionId;
+    DamageContext.DamageType.NetSerialize(Ar, Map, bOutSuccess);
+    Ar << DamageContext.AbilityMultiplier << DamageContext.CritRoll;
+    Ar << DefenseCoefficient << MinDamage;
+    // ... 序列化所有自定义字段
+}
+```
+
+即使单机不需要网络，数据链路层仍然可能走序列化路径，不实现会导致静默数据丢失。
+
+## Context 的数据流生命周期
+
+```
+① 创建空 Context
+   ASC->MakeEffectContext() → new FHSRDamageEffectContext（全默认值）
+
+② 写入输入数据（Coordinator）
+   Context->AbilityMultiplier = 2.5f
+   Context->DefenseCoefficient = 0.5f
+   Context->CritRoll = 0.75f
+
+③ 绑定到 Spec
+   ASC->MakeOutgoingSpec(GE, 1.0f, ContextHandle)
+   → Spec.EffectContext 持有共享指针
+
+④ ExecCalc 读取输入，写入输出
+   Context = Spec.GetContext()
+   // 读
+   Attack * Context->AbilityMultiplier - Defense * Context->DefenseCoefficient
+   // 写
+   Context->DamageResult.Breakdown.FinalDamage = 100.0f
+
+⑤ Ability 读取输出
+   GetLastFormalDamageExecutionResult().DamageResult
+```
+
+## 双通道设计
+
+项目同时使用两种方式传递相同数据：
+
+| 通道 | 用途 |
+|---|---|
+| **Context 字段** | C++ ExecCalc 直接读写 |
+| **SetByCaller** | 纯蓝图/GAS 标准管道路径可访问 |
+
+---
+
+# 第 7 站：GameplayCue
+
+## GameplayCue 的本质
+
+GC 是 GAS 中"表现"和"逻辑"分离的接口——伤害算完了，播放特效/音效/伤害数字由 GC 处理。
+
+## 触发时机
+
+在 `ApplyGameplayEffectSpecToSelf` 源码中（`AbilitySystemComponent.cpp` 第 937-954 行）：
+
+```
+Instant GE:
+  → InvokeGameplayCueExecuted_FromSpec（一次性的）
+
+Duration/Infinite GE:
+  → InvokeGameplayCueAddedAndWhileActive_FromSpec（持续）
+  → InvokeGameplayCueExecuted_FromSpec（每周期，如果有 Period）
+  → 到期移除时自动触发 Removed
+```
+
+## 三种 Cue 事件类型
+
+| 事件 | 触发时机 | 适用场景 |
+|---|---|---|
+| **OnActive / WhileActive** | Duration/Infinite GE 加入 ActiveGE 池时 | "挂毒时冒绿光"（持续表现） |
+| **Executed** | Instant 执行或 Period 触发时 | "每跳闪红"（单次触发） |
+| **Removed** | Duration/Infinite GE 被移除时 | "中毒结束绿光消失" |
+
+## 三种实现类
+
+| 类 | 生命周期 | 性能 | 用途 |
+|---|---|---|---|
+| `UGameplayCueNotify_Static` | 单次，无实例 | ⭐ 最快 | 粒子爆开、音效 |
+| `UGameplayCueNotify_Burst` | 同上，可配置 | ⭐⭐ | 可配面板的爆炸效果 |
+| `UGameplayCueNotify_Actor` | 持续存在，可有 Tick | ⭐⭐⭐ 最重 | 持续光环、火焰环绕 |
+
+## GC 按 Tag 路由
+
+```
+GE 蓝图的 GameplayCues 数组 → 设置 Tag（如 "GameplayCue.Hit.Physical"）
+  → UGameplayCueManager 自动按 Tag 名查找匹配的 GC 资产
+  → 名字格式：GC_Hit.Physical（按命名惯例）
+```
+
+---
+
+# 第 8 站：Cost、Cooldown 与 Commit
+
+## 核心：Cost 和 Cooldown 是 GameplayEffect
+
+```
+CostGameplayEffectClass     → Instant GE（如 "Energy Add -30"）
+CooldownGameplayEffectClass → Duration GE（如 "持续 6 秒，带 Cooldown.Tag"）
+```
+
+`CommitAbility()` 内部调用：
+
+```cpp
+CommitAbility(Handle, ActorInfo, ActivationInfo)
+  ├── CommitAbilityCooldown() → 把 Cooldown GE 应用到自己身上
+  └── CommitAbilityCost()     → 把 Cost GE 应用到自己身上
+```
+
+本质就是 `ApplyGameplayEffectSpecToSelf`。
+
+## 为什么要用 GE 实现 Cost/Cooldown
+
+如果直接在 Ability 里写 `float EnergyCost`：
+
+| 场景 | GE 方案 | float 方案 |
+|---|---|---|
+| "返还 50% 能量" | 在 CostGE 后面再 Apply 一个返还 GE | 要写额外 if-else |
+| "满血不消耗" | CostGE 上配 TargetTags 条件 | 要写 `CanActivateAbility` 重写 |
+| "冷却缩减 30%" | 给角色挂一个修改 CooldownGE Duration 的 Modifier | 手动管理 Timer |
+
+**一句话：所有数值改动统一走 GE 管道，Tag 条件自动检查，不需要为消耗单独写代码。**
+
+## 你项目中 Ultimate 的完整 Cost 事务
+
+```
+ActivateAbility
+  │
+  ├── CheckCost（只读检查）
+  │     → GAS 检查：如果把 CostGE（Energy Add -30）应用，Energy 会 >= 0 吗？
+  │     → 不够 → EndAbility（不扣）
+  │
+  ├── CommitAbility
+  │     → CommitAbilityCost → Apply CostGE（Energy -30）
+  │     → Energy 被 Clamp 到 0
+  │
+  ├── ApplyPreparedFormalDamage
+  │     → 应用伤害 GE
+  │
+  └── 失败 → Apply RefundGE（Energy +30）→ 回滚
+```
+
+## Cooldown 机制（项目未使用）
+
+```
+给能力配 Cooldown GE（Duration 类型，6 秒）
+  → CommitAbilityCooldown → Apply 这个 GE
+  → GE 带 Tag（如 Cooldown.Ultimate）
+  → CheckCooldown 检查 Tag 是否存在
+  → 存在 → 不能激活 → 等 GE 到期自动移除
+  → 到期移除 → Tag 消失 → CheckCooldown 返回 true
+```
+
+你的项目中冷却由回合数（`UHSRStatusComponent`）管理，而非 GAS 的秒数冷却。
+
+---
+
+# 进阶一：Status 系统（回合制 Buff 实现）
+
+## 核心问题
+
+GAS 的 GE Duration 是秒数，你的游戏需要回合数。
+
+## 解决方案
+
+```
+Infinite GE（管理属性变化 + Aggregator 自动回退）
+  +
+自己跟踪回合数（FHSRStatusInstance.RemainingTurns）
+  +
+绑定额 TurnManager.OnTurnEnded 事件（回合边界消耗）
+```
+
+通过 `FActiveGameplayEffectHandle` 连接两套系统。
+
+## FHSRStatusInstance
+
+```cpp
+struct FHSRStatusInstance
+{
+    FName StatusId;                                    // 状态标识
+    FName SourceParticipantId;                          // 来源
+    FName TargetParticipantId;                          // 目标
+    uint64 BattleEpoch;                                 // 第几场战斗
+    int32 Stacks;                                        // 堆叠层数
+    int32 RemainingTurns;                                // 剩余回合数
+    uint64 LastConsumedTurnSequence;                      // 最后一次消耗回合的序列号
+    FActiveGameplayEffectHandle ActiveGameplayEffectHandle; // 连接 GAS 的钥匙
+};
+```
+
+## 三路缓存防重复
+
+```cpp
+TSet<FString> ProcessedStatusOperations;     // 复杂操作（按 OperationId 去重）
+TSet<FString> ProcessedInvalidSources;       // 来源失效（按 Epoch+Source 去重）
+TSet<FGuid> ProcessedAddOperations;          // 简化添加（AttackUp 专用）
+```
+
+## ActiveStatus vs AdditionalStatuses
+
+| 存储位置 | 用途 | 限制 |
+|---|---|---|
+| `ActiveStatus`（TOptional） | Status.Buff.AttackUp（唯一的主状态位） | 硬编码了 AttackUp，非通用 |
+| `AdditionalStatuses`（TMap） | 其他所有状态，按 StatusId 索引 | 允许多个共存 |
+
+**已知问题**：`ActiveStatus` 硬编码了 `Status.Buff.AttackUp`（`AddOrRefreshStatus` 第 92 行）。将来加 DefenseUp 等独占 Buff 时需要重构。
+
+---
+
+# 进阶二：Aggregator 完整原理
+
+## 核心公式
+
+```cpp
+// GameplayEffectAggregator.cpp 第 76-99 行
+float FAggregatorModChannel::EvaluateWithBase(float InlineBaseValue, ...)
+{
+    // 1. 检查 Override（覆盖）
+    for (const FAggregatorMod& Mod : Mods[Override])
+        if (Mod.Qualifies()) return Mod.EvaluatedMagnitude;
+
+    // 2. 分别收集五类 Mod
+    float Additive = SumMods(Mods[Additive]);
+    float Multiplicitive = SumMods(Mods[Multiplicitive]);
+    float Division = SumMods(Mods[Division]);
+    float FinalAdd = SumMods(Mods[AddFinal]);
+    float CompoundMultiply = MultiplyMods(Mods[MultiplyCompound]);
+
+    // 3. 完整公式
+    return ((InlineBaseValue + Additive) * Multiplicitive / Division * CompoundMultiply) + FinalAdd;
+}
+```
+
+## 公式与 Modifier Op 的关系
+
+```
+((BaseValue + 所有 AddBase) × (1+所有 MultAdd 之和) / (1+所有 DivAdd 之和) × 所有 MultComp 之积) + 所有 AddFinal
+```
+
+## Duration/Infinite GE 的注册路径
+
+```
+ApplyGameplayEffectSpec（Duration/Infinite）
+  → Modifier 不执行，注册到 Aggregator
+    → Aggregator->AddMod(Magnitude, Op, SourceTags, TargetTags, Handle)
+  → Evaluate() 重新计算
+  → 值变化 → 广播委托
+
+GE 移除时：
+  → Aggregator->RemoveMod(Handle)
+  → Evaluate() 重新计算（无此 Mod 后的值）
+  → 属性自动回退
+```
+
+## "自动回退"的底层原因
+
+Duration/Infinite GE 的 Modifier 不修改 BaseValue，只注册到 Aggregator。移除 GE 时删除对应的 Mod，Aggregator 用剩余 Mod 重新计算——值自然回到无此 Mod 时的状态。
+
+## Instant GE 的差异路径
+
+Instant GE 通过 `ApplyModToAttribute` 直接修改 BaseValue，不进 Aggregator，所以不可回退。
+
+---
+
+# 进阶三：AbilityTask 异步编程
+
+## 解决的问题
+
+GAS 中「等待」的机制——等待动画播完、等待玩家选择目标、等待延迟。
+
+```
+同步能力（你项目的 4 个能力）：
+  ActivateAbility → Execute → EndAbility（一瞬间）
+
+异步能力（实时战斗典型模式）：
+  ActivateAbility
+    → PlayMontageAndWait("挥剑动画")
+      → OnCompleted 回调：
+          → ApplyGE（伤害）
+          → EndAbility
+```
+
+## 常用 Task
+
+| Task | 等待什么 |
+|---|---|
+| `AbilityTask_PlayMontageAndWait` | 蒙太奇播完 |
+| `AbilityTask_WaitTargetData` | 玩家选择目标 |
+| `AbilityTask_WaitDelay` | 等待 N 秒 |
+| `AbilityTask_WaitGameplayTagAdded` | 某 Tag 出现在角色身上 |
+| `AbilityTask_WaitGameplayEffectApplied` | 某 GE 被应用到目标 |
+
+## 为什么你项目没用到
+
+你的回合制战斗是命令驱动——先算完所有伤害再统一播放表现，不需要"等动画播完再扣血"。
+
+---
+
+# 进阶四：Stacking / Immunity / GameplayEffectComponents
+
+## Stacking（堆叠）
+
+GAS 的堆叠配置（`GameplayEffect.h`）：
+
+```cpp
+EGameplayEffectStackingType StackingType;
+// AggregateBySource — 同来源堆叠（同一角色多次 Apply）
+// AggregateByTarget — 同目标堆叠（所有来源对一个目标累加）
+// None — 不堆叠
+
+int32 StackLimitCount;                    // 上限
+EGameplayEffectStackingDurationPolicy;     // 堆叠时刷新/保持时长
+EGameplayEffectStackingPeriodPolicy;       // 堆叠时重置/保持周期
+EGameplayEffectStackingExpirationPolicy;   // 到期逐层消失/整体消失
+```
+
+你项目的 Status 系统利用 GAS 的 Stacking 机制：
+
+```
+AddOrRefreshStatus 中：
+  已有 + 未达 MaxStacks → Apply GE → GAS 自动 StackCount++
+  已有 + 已达 MaxStacks → 只刷新 RemainingTurns，不 Apply GE
+```
+
+## Immunity（免疫）
+
+你项目中的免疫实现（`HSRStatusComponent` 第 79-80 行）：
+
+```cpp
+if (Definition->Classification == EHSRStatusClassification::Debuff
+    && Definition->ImmunityTag.IsValid()
+    && AbilitySystem->HasMatchingGameplayTag(Definition->ImmunityTag))
+    return Immune;
+```
+
+## GameplayEffectComponents（UE5.3+）
+
+UE5.3 之前 `UGameplayEffect` 是巨大的单体类，所有功能塞在一起。
+UE5.3+ 拆成模块化 `UGameplayEffectComponent` 子对象：
+
+```
+UGameplayEffect（壳）
+  ├── UDurationGameplayEffectComponent
+  ├── UModifierMagnitudeGameplayEffectComponent
+  ├── UGrantedTagsGameplayEffectComponent
+  ├── UImmunityGameplayEffectComponent
+  ├── UAbilitiesGameplayEffectComponent
+  └── ...
+```
+
+好处：模块化，可扩展，GE 资产只挂需要的 Component。
+
+---
+
+# 进阶五：GAS 网络与预测
+
+## 核心问题
+
+多人游戏中，玩家按技能键——等服务器确认再显示太慢，不等又怕不一致。
+
+## UE 网络角色
+
+```
+服务器（Authority）— 最终决定权
+  ├── Autonomous Proxy（自己）：你控制的角色，可以看到预测效果
+  └── Simulated Proxy（别人）：你看别人的角色，只能等服务器同步
+```
+
+## ReplicationMode
+
+```cpp
+enum class EGameplayEffectReplicationMode : uint8
+{
+    Minimal,  // 只复制最少信息
+    Mixed,    // 自己全量，别人最少（最常用）
+    Full,     // 所有人全量（最重）
+};
+```
+
+## PredictionKey——预测的核心
+
+```cpp
+struct FPredictionKey
+{
+    int16 Current;      // 客户端生成的唯一 ID
+    bool bIsPredicting; // 是否是客户端的预测动作
+};
+```
+
+## 预测流程
+
+```
+① 客户端生成 PredictionKey=37，预测执行技能
+② 客户端本地立即显示扣血
+③ 把 Key=37 和请求一起发给服务器
+④ 服务器用同样的输入重算，返回 Key=37 确认
+⑤ 如果一致 → 状态保持
+⑥ 如果不一致 → 回滚到服务器状态，再应用正确值
+```
+
+## 你项目的状态
+
+```cpp
+AbilitySystemComponent->SetIsReplicated(false);  // 完全关闭复制
+```
+
+单机游戏不需要网络。将来加联机时需要改为 `true` + `Mixed` 模式，再补预测逻辑。
+
+---
+
+# 回顾：GAS 完整知识体系
+
+```
+第 1 站：宏观架构（ASC/Ability/GE/AttributeSet） ✅
+第 2 站：GameplayAbility 深度（激活检查/Commit/实例化） ✅
+第 3 站：GE 执行管道（三种类型/ExecCalc/Modifier 公式） ✅
+第 4 站：AttributeSet 回调（Pre/Post/Meta/Clamp） ✅
+第 5 站：GameplayTag（MatchesTag/HasTagExact/层次） ✅
+第 6 站：自定义 Effect Context（Alloc/Serialize/Duplicate） ✅
+第 7 站：GameplayCue（OnActive/Executed/Removed） ✅
+第 8 站：Cost/Cooldown/Commit ✅
+┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+进阶：
+  Status 系统（Infinite GE + 回合计数） ✅
+  Aggregator 原理（Evaluate 公式/自动回退） ✅
+  AbilityTask（异步编程的用途与时机） ✅
+  Stacking/Immunity/GEComponents ✅
+  GAS 网络与预测 ✅
+```

@@ -13,6 +13,7 @@ class UHSRDamageRuleDefinition;
 class UGameplayEffect;
 class UHSREnemyDefinition;
 class UHSRStatusDefinition;
+class UHSRCharacterCatalog;
 struct FHSRBattleResult;
 
 UENUM(BlueprintType)
@@ -59,6 +60,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Definitions") TObjectPtr<UHSREnemyDefinition> EnemyDefinition;
 	/** Required initialization GE, applied once to every spawned participant before abilities are granted. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Initialization") TSubclassOf<UGameplayEffect> ParticipantInitializationGameplayEffect;
+	/** Infinite, handle-owned character progression layer. Bind the user-authored P11 asset here. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Initialization") TSubclassOf<UGameplayEffect> CharacterProgressionGameplayEffect;
+	/** Already-loaded catalog; GameMode resolves the player context before Coordinator build. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Initialization") TObjectPtr<UHSRCharacterCatalog> CharacterCatalog;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Initialization") FName PlayerCharacterId = TEXT("Character.A");
+#if WITH_EDITORONLY_DATA
+	/** Development-only starting EXP injection for validating a non-zero progression bonus. */
+	UPROPERTY(EditDefaultsOnly, Category = "Development", meta = (ClampMin = "0")) int32 P11DevelopmentStartingExperience = 0;
+#endif
 
 	/** Editor-only test selector. Set on BP_HSRBattleGameMode; no runtime UI is added. */
 	UPROPERTY(EditDefaultsOnly, Category = "Development", meta = (DisplayName = "P5 Terminal Test Scenario"))

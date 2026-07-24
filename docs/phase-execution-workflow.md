@@ -8,6 +8,21 @@
 
 ## 2. 每个阶段的通用循环
 
+### 2.0 新 Phase 启动门禁：四角色规划先行
+
+从 Phase 11 起以及之后每次进入一个新 Phase，第一项工作必须是建立该 Phase 的整阶段执行计划，不能先写 Gameplay、创建资产或建立后续工程任务卡。
+
+固定角色为：
+
+1. `gpt-5.6-sol / light` Coordinator：读取项目状态、上一阶段 Gate、roadmap 与既有 execution-plan 模式，提出整阶段工作包、依赖和 Gate。
+2. `gpt-5.6-sol / light` Independent Reviewer：独立检查范围、所有权、失败矩阵、证据边界与不可外推项。
+3. `gpt-5.6-sol / light` Teacher：检查学习顺序、用户 Editor 操作、知识验证与复盘边界。
+4. `gpt-5.6-terra / light` Implementation：只读检查计划对低级执行模型是否可实施、allowlist 是否精确以及工作包是否需要拆分。
+
+四角色结论由主协调者汇总为 `docs/phase-<N>-execution-plan.md`。计划至少包含当前事实与证据等级、Gate 0、阶段结果、所有权与数据流、串行工作包、每包唯一验收结果、精确 allowlist、用户 Editor 工作、Build/Automation/PIE/失败矩阵、教学与审查、Git 交付、风险/停止条件、完成定义和唯一下一步。
+
+计划文件存在只代表规划完成，不代表任何工程工作包或 Phase Gate 已通过。计划写入并复核后，才允许创建该 Phase 的第一张工程活动任务卡。
+
 ### 2.1 读取与确认
 
 开始前读取：

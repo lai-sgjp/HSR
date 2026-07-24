@@ -25,6 +25,7 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "GAS")
 	UHSRAttributeViewModel* GetAttributeViewModel() const { return AttributeViewModel; }
+	bool HasAppliedInitialAttributes() const { return bInitialAttributesApplied; }
 
 	// Development-only Phase 2 test interfaces
 	UFUNCTION(BlueprintCallable, Category = "GAS|Development", meta = (DevelopmentOnly))
