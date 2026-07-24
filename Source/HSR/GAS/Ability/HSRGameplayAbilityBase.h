@@ -34,6 +34,12 @@ public:
 	virtual bool DidLastActivationSucceed() const;
 	virtual EHSRAbilityFailureReason GetLastFailureReason() const;
 	virtual EHSRAbilityFailureReason GetPreActivationFailureReason(const FGameplayAbilitySpecHandle& Handle, const FGameplayAbilityActorInfo* ActorInfo) const;
+	/** Read-only availability preflight.  Unlike SetPendingTarget this must not
+	 * write ability instance state; the coordinator uses it while building UI. */
+	virtual EHSRAbilityFailureReason GetAvailabilityFailureReason(const FGameplayAbilitySpecHandle& Handle, const FGameplayAbilityActorInfo* ActorInfo, const UAbilitySystemComponent* CandidateTargetAbilitySystem) const;
+#if WITH_EDITOR
+	int32 GetAvailabilityQueryCountForDevelopmentTest() const { return AvailabilityQueryCount; }
+#endif
 	virtual bool ConfigureFromSkillDefinition(const UHSRSkillDefinition& Definition);
 	bool PrepareFormalDamage(const FHSRFormalDamageRequest& Request, const FGameplayEffectSpecHandle& Spec, UAbilitySystemComponent* TargetAbilitySystem, FHSRFormalDamagePrepareResult& OutResult);
 	const FHSRFormalDamageExecutionResult& GetLastFormalDamageExecutionResult() const { return LastFormalDamageExecutionResult; }
@@ -55,4 +61,7 @@ private:
 	};
 	FHSRPreparedFormalDamage PreparedFormalDamage;
 	FHSRFormalDamageExecutionResult LastFormalDamageExecutionResult;
+#if WITH_EDITOR
+	mutable int32 AvailabilityQueryCount = 0;
+#endif
 };

@@ -98,6 +98,17 @@ protected:
 	bool bRunP9ImmunityDispelHarness = false;
 	UPROPERTY(EditDefaultsOnly, Category = "Development|P9")
 	bool bRunP9StatusViewHarness = false;
+	/** Opt-in P10-001A dispatcher audit. Disabled for normal PIE. */
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P10")
+	bool bRunP10001AEnemyTurnHarness = false;
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P10")
+	bool bRunP10001CommandHarness = false;
+	/** Opt-in P10-002 pure-value turn/participant view harness. */
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P10")
+	bool bRunP10002ViewHarness = false;
+	/** Opt-in pure-value P10-004 result/confirm lifecycle harness. */
+	UPROPERTY(EditDefaultsOnly, Category = "Development|P10")
+	bool bRunP10004ResultHarness = false;
 #endif
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Status")
 	TObjectPtr<UHSRStatusDefinition> AttackUpStatusDefinition;
@@ -115,8 +126,16 @@ protected:
 	UPROPERTY() TObjectPtr<UHSRBattleCommandViewModel> CommandViewModel;
 	UPROPERTY() TObjectPtr<UHSRBattleCommandWidget> BattleCommandWidget;
 	FDelegateHandle CommandStateReadyHandle;
+	FDelegateHandle BattleResultReadyHandle;
+	FDelegateHandle ResultConfirmRequestedHandle;
 
 	void HandleBattleResultReady(const FHSRBattleResult& Result);
+	void HandleBattleResultConfirmRequested(const FGuid& RequestId);
 	void HandleCommandStateReady(const struct FHSRBattleCommandViewState& State);
 	void RunTerminalScenarioForDevelopment();
+	#if WITH_EDITOR
+	void RunP10001AEnemyTurnHarness();
+	void RunP10002ViewHarness();
+	void RunP10004ResultHarness();
+	#endif
 };

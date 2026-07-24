@@ -16,6 +16,14 @@ class HSR_API UHSRSkillDefinition : public UPrimaryDataAsset
 	GENERATED_BODY()
 
 public:
+	/** Short authored label for command buttons. Empty values safely fall back to SkillId. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation")
+	FText DisplayName;
+
+	/** Long authored presentation text for future battle-detail screens. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation", meta = (MultiLine = "true"))
+	FText Description;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill")
 	FName SkillId;
 
@@ -27,6 +35,11 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Skill")
 	TSubclassOf<UGameplayAbility> AbilityClass;
+
+	/** Energy granted to the acting participant after a successful Basic or Skill.
+	 * The Coordinator applies it once as part of the authoritative action transaction. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Resources", meta = (ClampMin = "0.0"))
+	float EnergyGain = 20.0f;
 
 	/** Used only by the Ultimate vertical slice. The ability owns the runtime
 	 * commit; the DataAsset remains static configuration. */

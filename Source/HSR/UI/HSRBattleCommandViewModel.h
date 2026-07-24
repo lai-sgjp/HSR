@@ -10,6 +10,7 @@ class UAbilitySystemComponent;
 struct FOnAttributeChangeData;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleCommandStateChanged, const FHSRBattleCommandViewState&);
+DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleResultConfirmRequested, const FGuid&);
 
 UCLASS()
 class HSR_API UHSRBattleCommandViewModel : public UObject
@@ -34,6 +35,9 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FText DelayText;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Status") FText StatusText;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Status") FText StatusOperationText;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FText TurnOrderText;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") FText ParticipantsText;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Presentation") FText PresentationText;
 
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetCurrentActorText() const { return CurrentActorText; }
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetEnergyText() const { return EnergyText; }
@@ -45,6 +49,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetDelayText() const { return DelayText; }
 	UFUNCTION(BlueprintPure, Category = "Battle|Status") FText GetStatusText() const { return StatusText; }
 	UFUNCTION(BlueprintPure, Category = "Battle|Status") FText GetStatusOperationText() const { return StatusOperationText; }
+	UFUNCTION(BlueprintPure, Category = "Battle|Command") FText GetTurnOrderText() const { return TurnOrderText; }
+	UFUNCTION(BlueprintPure, Category = "Battle|Participants") FText GetParticipantsText() const { return ParticipantsText; }
+	UFUNCTION(BlueprintPure, Category = "Battle|Presentation") FText GetPresentationText() const { return PresentationText; }
 
 	/** Selects a configured skill and automatically chooses its first valid target. */
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkill(EHSRSkillCategory Category);
@@ -52,11 +59,27 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FName GetSelectedTargetId() const { return SelectedTargetId; }
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") TArray<FName> GetTargetOptions() const;
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectTarget(FName TargetId);
+	bool BeginCommandSubmit(const FGuid& ActionId, FName ActorParticipantId, FName SkillId, FName TargetParticipantId);
+	void ResolveCommandSubmit(const FGuid& BattleId, const FHSRAbilityResolution& Resolution);
+	void ClearCommandLocks();
+	bool ShowBattleResult(const FHSRBattleResult& Result);
+	bool RequestBattleResultConfirm();
+	void RejectBattleResultConfirm(const FGuid& RequestId);
+	void ClearBattleResult();
 
 	void SetState(const FHSRBattleCommandViewState& InState);
 	void BindCoordinator(UHSRBattleCoordinator* InCoordinator);
 	void UnbindCoordinator();
 	FHSRBattleCommandStateChanged& OnChanged() { return Changed; }
+	FHSRBattleResultConfirmRequested& OnResultConfirmRequested() { return ResultConfirmRequested; }
+#if WITH_EDITOR
+	bool IsCommandPendingForDevelopmentTest() const { return bCommandPending; }
+	bool IsPresentationLockedForDevelopmentTest() const { return bPresentationLocked; }
+	FGuid GetPendingBattleIdForDevelopmentTest() const { return PendingBattleId; }
+	FGuid GetPendingActionIdForDevelopmentTest() const { return PendingActionId; }
+	bool HasObservedAttributeBindingsForDevelopmentTest() const { return ToughnessChangedHandle.IsValid() || MaxToughnessChangedHandle.IsValid(); }
+	bool HasBoundCoordinatorForDevelopmentTest() const { return Coordinator.IsValid(); }
+#endif
 
 private:
 	UPROPERTY()
@@ -64,14 +87,20 @@ private:
 	UPROPERTY() FName SelectedSkillId;
 	UPROPERTY() FName SelectedTargetId;
 	FHSRBattleCommandStateChanged Changed;
+	FHSRBattleResultConfirmRequested ResultConfirmRequested;
 	TWeakObjectPtr<UHSRBattleCoordinator> Coordinator;
 	TWeakObjectPtr<UAbilitySystemComponent> ObservedTargetASC;
 	FDelegateHandle ToughnessChangedHandle;
 	FDelegateHandle MaxToughnessChangedHandle;
+	FGuid PendingBattleId;
+	FGuid PendingActionId;
+	bool bCommandPending = false;
+	bool bPresentationLocked = false;
 
 	const FHSRBattleCommandSkillView* FindSelectedSkill() const;
 	void RefreshPresentationAndSelection();
 	void RefreshReadOnlyBattlePresentation();
 	void RebindTargetAttributes();
 	void HandleObservedToughnessChanged(const FOnAttributeChangeData& ChangeData);
+	void RefreshCommandState();
 };

@@ -15,7 +15,56 @@
 #include "../Data/HSRBreakTypes.h"
 #include "../UI/HSRBattleCommandViewModel.h"
 #include "../UI/HSRBattleCommandWidget.h"
+#include "../Player/HSRPlayerController.h"
 #include "Blueprint/UserWidget.h"
+
+namespace
+{
+	void ApplyP10004ResultInput(APlayerController* PlayerController, const FGuid& RequestId)
+	{
+		if (!PlayerController || !PlayerController->IsLocalController())
+		{
+			UE_LOG(LogTemp, Error, TEXT("P10-004 ResultInput Result=FAILED Reason=MissingOrNonLocalController RequestId=%s"), *RequestId.ToString());
+			return;
+		}
+		if (AHSRPlayerController* HSRPlayerController = Cast<AHSRPlayerController>(PlayerController))
+		{
+			HSRPlayerController->SetControlMode(EHSRPlayerControlMode::UIOnly);
+			if (HSRPlayerController->GetControlMode() == EHSRPlayerControlMode::UIOnly)
+			{
+				UE_LOG(LogTemp, Log, TEXT("P10-004 ResultInput Result=SUCCESS Path=HSRController Mode=%d Controller=%s RequestId=%s"), static_cast<int32>(HSRPlayerController->GetControlMode()), *HSRPlayerController->GetName(), *RequestId.ToString());
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("P10-004 ResultInput Result=FAILED Path=HSRController Mode=%d Controller=%s RequestId=%s"), static_cast<int32>(HSRPlayerController->GetControlMode()), *HSRPlayerController->GetName(), *RequestId.ToString());
+			}
+			return;
+		}
+		FInputModeUIOnly InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		PlayerController->SetInputMode(InputMode);
+		PlayerController->bShowMouseCursor = true;
+		PlayerController->SetIgnoreMoveInput(true);
+		PlayerController->SetIgnoreLookInput(true);
+		UE_LOG(LogTemp, Log, TEXT("P10-004 ResultInput Result=SUCCESS Path=GenericPlayerController Mode=UIOnly Controller=%s RequestId=%s"), *PlayerController->GetName(), *RequestId.ToString());
+	}
+
+	void RestoreP10004GameInput(APlayerController* PlayerController, const TCHAR* Reason)
+	{
+		if (!PlayerController || !PlayerController->IsLocalController()) return;
+		if (AHSRPlayerController* HSRPlayerController = Cast<AHSRPlayerController>(PlayerController))
+		{
+			HSRPlayerController->SetControlMode(EHSRPlayerControlMode::Exploration);
+			UE_LOG(LogTemp, Log, TEXT("P10-004 ResultInputRestore Result=SUCCESS Path=HSRController Reason=%s Controller=%s"), Reason, *HSRPlayerController->GetName());
+			return;
+		}
+		PlayerController->SetIgnoreMoveInput(false);
+		PlayerController->SetIgnoreLookInput(false);
+		PlayerController->SetInputMode(FInputModeGameOnly());
+		PlayerController->bShowMouseCursor = false;
+		UE_LOG(LogTemp, Log, TEXT("P10-004 ResultInputRestore Result=SUCCESS Path=GenericPlayerController Mode=GameOnly Reason=%s Controller=%s"), Reason, *PlayerController->GetName());
+	}
+}
 
 #if WITH_EDITOR
 namespace HSRBattleDevelopmentTest
@@ -1405,6 +1454,333 @@ void AHSRBattleGameMode::BeginPlay()
 		HSRBattleDevelopmentTest::RunP9StackHarness(Coordinator, AttackUpStackStatusDefinition, AttackUpStatusDefinition);
 		HSRBattleDevelopmentTest::RunP9StatusHarness(Coordinator);
 	}
+	if (bRunP10001AEnemyTurnHarness)
+	{
+		RunP10001AEnemyTurnHarness();
+	}
+	if (bRunP10004ResultHarness)
+	{
+		RunP10004ResultHarness();
+	}
+#endif
+
+#if WITH_EDITOR
+const auto RunP10001CommandHarnessLocal = [this]()
+{
+	int32 FailedCases = 0;
+	int32 SkippedCases = 0;
+	const auto Case = [&FailedCases](const TCHAR* Name, bool bPassed)
+	{
+		if (bPassed)
+		{
+			UE_LOG(LogTemp, Log, TEXT("P10-001 Harness Case=%s Result=PASS"), Name);
+		}
+		else
+		{
+			++FailedCases;
+			UE_LOG(LogTemp, Error, TEXT("P10-001 Harness Case=%s Result=FAIL"), Name);
+		}
+	};
+	const auto Skip = [&SkippedCases](const TCHAR* Name, const TCHAR* Reason)
+	{
+		++SkippedCases;
+		UE_LOG(LogTemp, Warning, TEXT("P10-001 Harness Case=%s Result=SKIPPED Reason=%s"), Name, Reason);
+	};
+	if (!Coordinator || !CommandViewModel || !BattleCommandWidget || !BattleCommandWidgetClass)
+	{
+		UE_LOG(LogTemp, Error, TEXT("P10-001 Harness=INCOMPLETE Reason=MissingCoordinatorViewModelOrWidget"));
+		return;
+	}
+
+	const auto SameSkillState = [](const FHSRBattleCommandViewState& A, const FHSRBattleCommandViewState& B)
+	{
+		if (A.Skills.Num() != B.Skills.Num()) return false;
+		for (int32 Index = 0; Index < A.Skills.Num(); ++Index)
+		{
+			const FHSRBattleCommandSkillView& L = A.Skills[Index];
+			const FHSRBattleCommandSkillView& R = B.Skills[Index];
+			if (L.SkillId != R.SkillId || L.Category != R.Category || L.TargetType != R.TargetType || L.CandidateTargetIds != R.CandidateTargetIds
+				|| L.bAvailable != R.bAvailable || L.DisabledReason != R.DisabledReason || L.SkillPointCost != R.SkillPointCost
+				|| !FMath::IsNearlyEqual(L.EnergyCost, R.EnergyCost) || L.bEnergyCostIsKnown != R.bEnergyCostIsKnown) return false;
+		}
+		return true;
+	};
+	struct FCommandSideEffectSnapshot
+	{
+		FName Turn;
+		int32 SkillPoints = 0;
+		int32 MaxSkillPoints = 0;
+		int32 Rng = 0;
+		TArray<float> Health;
+		TArray<float> Energy;
+		TArray<FHSRStatusPublicSnapshot> Statuses;
+		FHSRStatusPublicOperationEvent LastStatusOperation;
+	};
+	const auto CaptureSideEffects = [this]()
+	{
+		FCommandSideEffectSnapshot Snapshot;
+		Snapshot.Turn = Coordinator->GetTurnManager() ? Coordinator->GetTurnManager()->GetCurrentParticipantId() : NAME_None;
+		Snapshot.SkillPoints = Coordinator->GetTeamResourceState().CurrentSkillPoints;
+		Snapshot.MaxSkillPoints = Coordinator->GetTeamResourceState().MaxSkillPoints;
+		Snapshot.Rng = Coordinator->GetDevelopmentDamageConsumeCount();
+		for (const FHSRBattleParticipant& Participant : Coordinator->GetParticipants())
+		{
+			Snapshot.Health.Add(Participant.AbilitySystemComponent.IsValid() ? Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) : -1.0f);
+			Snapshot.Energy.Add(Participant.AbilitySystemComponent.IsValid() ? Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute()) : -1.0f);
+		}
+		const FHSRBattleCommandViewState State = Coordinator->GetCommandViewState();
+		Snapshot.Statuses = State.Statuses;
+		Snapshot.LastStatusOperation = State.LastStatusOperation;
+		return Snapshot;
+	};
+	const auto SameSideEffects = [](const FCommandSideEffectSnapshot& A, const FCommandSideEffectSnapshot& B)
+	{
+		if (A.Turn != B.Turn || A.SkillPoints != B.SkillPoints || A.MaxSkillPoints != B.MaxSkillPoints || A.Rng != B.Rng
+			|| A.Health.Num() != B.Health.Num() || A.Energy.Num() != B.Energy.Num() || A.Statuses.Num() != B.Statuses.Num()) return false;
+		for (int32 Index = 0; Index < A.Health.Num(); ++Index)
+		{
+			if (!FMath::IsNearlyEqual(A.Health[Index], B.Health[Index]) || !FMath::IsNearlyEqual(A.Energy[Index], B.Energy[Index])) return false;
+		}
+		for (int32 Index = 0; Index < A.Statuses.Num(); ++Index)
+		{
+			const FHSRStatusPublicSnapshot& L = A.Statuses[Index]; const FHSRStatusPublicSnapshot& R = B.Statuses[Index];
+			if (L.StatusId != R.StatusId || L.TargetParticipantId != R.TargetParticipantId || !L.DisplayName.EqualTo(R.DisplayName)
+				|| L.Classification != R.Classification || L.Stacks != R.Stacks || L.RemainingTurns != R.RemainingTurns || L.LastResult != R.LastResult) return false;
+		}
+		return A.LastStatusOperation.Operation == B.LastStatusOperation.Operation && A.LastStatusOperation.Result == B.LastStatusOperation.Result
+			&& A.LastStatusOperation.StatusId == B.LastStatusOperation.StatusId && A.LastStatusOperation.TargetParticipantId == B.LastStatusOperation.TargetParticipantId
+			&& A.LastStatusOperation.Sequence == B.LastStatusOperation.Sequence;
+	};
+	const FName TurnBeforePure = Coordinator->GetTurnManager() ? Coordinator->GetTurnManager()->GetCurrentParticipantId() : NAME_None;
+	const int32 RngBeforePure = Coordinator->GetDevelopmentDamageConsumeCount();
+	const int32 ReservationBeforePure = Coordinator->GetSkillPointReservationCountForDevelopmentTest();
+	const FHSRTeamResourceState ResourceBeforePure = Coordinator->GetTeamResourceState();
+	const FHSRAbilityResolution ResolutionBeforePure = Coordinator->GetLastActionResolutionForDevelopmentTest();
+	const FHSRBattleCommandViewState PureA = Coordinator->GetCommandViewState();
+	const FHSRBattleCommandViewState PureB = Coordinator->GetCommandViewState();
+	Case(TEXT("AvailabilityRepeatedQuery_StableAndPure"), SameSkillState(PureA, PureB)
+		&& TurnBeforePure == (Coordinator->GetTurnManager() ? Coordinator->GetTurnManager()->GetCurrentParticipantId() : NAME_None)
+		&& RngBeforePure == Coordinator->GetDevelopmentDamageConsumeCount() && ReservationBeforePure == Coordinator->GetSkillPointReservationCountForDevelopmentTest()
+		&& ResourceBeforePure.CurrentSkillPoints == Coordinator->GetTeamResourceState().CurrentSkillPoints
+		&& ResolutionBeforePure.ActionId == Coordinator->GetLastActionResolutionForDevelopmentTest().ActionId);
+	Case(TEXT("FourSlots_ConfiguredStableOrder"), PureA.Skills.Num() == 4
+		&& PureA.Skills[0].Category == EHSRSkillCategory::BasicAttack && PureA.Skills[1].Category == EHSRSkillCategory::Skill
+		&& PureA.Skills[2].Category == EHSRSkillCategory::Ultimate && PureA.Skills[3].Category == EHSRSkillCategory::Heal);
+
+	const auto TestNullSlot = [this, &Case](const TCHAR* Name, EHSRSkillCategory Category, UHSRSkillDefinition* Definition, const TFunction<void(UHSRSkillDefinition*)>& SetDefinition)
+	{
+		SetDefinition(nullptr);
+		const FHSRBattleCommandViewState MissingState = Coordinator->GetCommandViewState();
+		SetDefinition(Definition);
+		const FHSRBattleCommandViewState RestoredState = Coordinator->GetCommandViewState();
+		const FHSRBattleCommandSkillView* Missing = MissingState.Skills.FindByPredicate([Category](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == Category; });
+		const FHSRBattleCommandSkillView* Restored = RestoredState.Skills.FindByPredicate([Category](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == Category; });
+		Case(Name, Missing && Missing->SkillId.IsNone() && !Missing->bAvailable && Missing->DisabledReason == EHSRAbilityFailureReason::DefinitionMissing
+			&& Missing->CandidateTargetIds.IsEmpty() && Restored && Definition && Restored->SkillId == Definition->SkillId);
+	};
+	TestNullSlot(TEXT("NullDefinition_BasicFixedSlot"), EHSRSkillCategory::BasicAttack, BasicAttackSkillDefinition, [this](UHSRSkillDefinition* Value) { Coordinator->SetBasicAttackDefinition(Value); });
+	TestNullSlot(TEXT("NullDefinition_SkillFixedSlot"), EHSRSkillCategory::Skill, SkillSkillDefinition, [this](UHSRSkillDefinition* Value) { Coordinator->SetSkillDefinition(Value); });
+	TestNullSlot(TEXT("NullDefinition_UltimateFixedSlot"), EHSRSkillCategory::Ultimate, UltimateSkillDefinition, [this](UHSRSkillDefinition* Value) { Coordinator->SetUltimateDefinition(Value); });
+	TestNullSlot(TEXT("NullDefinition_HealFixedSlot"), EHSRSkillCategory::Heal, HealSkillDefinition, [this](UHSRSkillDefinition* Value) { Coordinator->SetHealDefinition(Value); });
+	Coordinator->SetBasicAttackDefinition(SkillSkillDefinition);
+	const FHSRBattleCommandViewState MismatchState = Coordinator->GetCommandViewState();
+	Coordinator->SetBasicAttackDefinition(BasicAttackSkillDefinition);
+	const FHSRBattleCommandViewState MismatchRestored = Coordinator->GetCommandViewState();
+	const FHSRBattleCommandSkillView* MismatchBasic = MismatchState.Skills.FindByPredicate([](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == EHSRSkillCategory::BasicAttack; });
+	const FHSRBattleCommandSkillView* MismatchSkill = MismatchState.Skills.FindByPredicate([](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == EHSRSkillCategory::Skill; });
+	const FHSRBattleCommandSkillView* RestoredBasic = MismatchRestored.Skills.FindByPredicate([](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == EHSRSkillCategory::BasicAttack; });
+	Case(TEXT("CategoryMismatch_DoesNotMigrateSlotAndRestores"), MismatchBasic && MismatchBasic->SkillId.IsNone()
+		&& !MismatchBasic->bAvailable && MismatchBasic->DisabledReason == EHSRAbilityFailureReason::DefinitionMissing
+		&& MismatchSkill && SkillSkillDefinition && MismatchSkill->SkillId == SkillSkillDefinition->SkillId
+		&& RestoredBasic && BasicAttackSkillDefinition && RestoredBasic->SkillId == BasicAttackSkillDefinition->SkillId);
+
+	const int32 SavedSkillPoints = Coordinator->GetTeamResourceState().CurrentSkillPoints;
+	Coordinator->SetTeamSkillPointsForDevelopmentTest(0, Coordinator->GetTeamResourceState().MaxSkillPoints);
+	const FHSRBattleCommandViewState NoSkillPointState = Coordinator->GetCommandViewState();
+	Coordinator->SetTeamSkillPointsForDevelopmentTest(SavedSkillPoints, Coordinator->GetTeamResourceState().MaxSkillPoints);
+	const FHSRBattleCommandSkillView* NoSkillPointView = NoSkillPointState.Skills.FindByPredicate([](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == EHSRSkillCategory::Skill; });
+	Case(TEXT("Availability_InsufficientSkillPoint_Restored"), NoSkillPointView && !NoSkillPointView->bAvailable
+		&& NoSkillPointView->DisabledReason == EHSRAbilityFailureReason::InsufficientSkillPoint
+		&& Coordinator->GetTeamResourceState().CurrentSkillPoints == SavedSkillPoints);
+
+	const FHSRBattleCommandViewState BeforeEnergyState = Coordinator->GetCommandViewState();
+	const FHSRBattleParticipant* EnergyActor = Coordinator->GetParticipants().FindByPredicate([&BeforeEnergyState](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == BeforeEnergyState.CurrentActorId; });
+	if (EnergyActor && EnergyActor->AbilitySystemComponent.IsValid())
+	{
+		const float SavedEnergy = EnergyActor->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
+		EnergyActor->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetEnergyAttribute(), 0.0f);
+		const FHSRBattleCommandViewState NoEnergyState = Coordinator->GetCommandViewState();
+		EnergyActor->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetEnergyAttribute(), SavedEnergy);
+		const FHSRBattleCommandSkillView* NoEnergyView = NoEnergyState.Skills.FindByPredicate([](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == EHSRSkillCategory::Ultimate; });
+		const bool bEnergyRestored = FMath::IsNearlyEqual(EnergyActor->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute()), SavedEnergy);
+		if (NoEnergyView && !NoEnergyView->bAvailable && NoEnergyView->DisabledReason == EHSRAbilityFailureReason::InsufficientEnergy)
+		{
+			Case(TEXT("Availability_InsufficientEnergy_Restored"), bEnergyRestored);
+		}
+		else
+		{
+			Skip(TEXT("Availability_InsufficientEnergy_Restored"), TEXT("FormalUltimateDidNotReturnExactInsufficientEnergy"));
+			Case(TEXT("Availability_InsufficientEnergy_RestoreIntegrity"), bEnergyRestored);
+		}
+	}
+	else Skip(TEXT("Availability_InsufficientEnergy_Restored"), TEXT("MissingCurrentActorASC"));
+	UE_LOG(LogTemp, Warning, TEXT("P10-001 Harness Case=UngrantedAbility Result=NOT_DYNAMICALLY_ASSESSED Evidence=STATICALLY_COVERED NonBlocking=1 Path=FindAbilitySpecFromClassNullOrInvalidPrimaryInstance"));
+
+	UHSRBattleCommandViewModel* TestViewModel = NewObject<UHSRBattleCommandViewModel>(this);
+	TestViewModel->BindCoordinator(Coordinator);
+	TestViewModel->SetState(Coordinator->GetCommandViewState());
+	const bool bBasicSelected = TestViewModel->SelectSkill(EHSRSkillCategory::BasicAttack);
+	const FName SelectedSkill = TestViewModel->GetSelectedSkillId();
+	const FName SelectedTarget = TestViewModel->GetSelectedTargetId();
+	const FName SelectionBeforeInvalid = SelectedTarget;
+	Case(TEXT("Selection_FirstCandidateAndInvalidTargetRejected"), bBasicSelected && !SelectedSkill.IsNone() && !SelectedTarget.IsNone()
+		&& !TestViewModel->SelectTarget(NAME_None) && TestViewModel->GetSelectedTargetId() == SelectionBeforeInvalid);
+	const FHSRBattleCommandViewState TestState = TestViewModel->GetStateCopy();
+	const FGuid PendingAction = FGuid::NewGuid();
+	const bool bPendingStarted = TestViewModel->BeginCommandSubmit(PendingAction, TestState.CurrentActorId, SelectedSkill, SelectedTarget);
+	const bool bDuplicateRejected = !TestViewModel->BeginCommandSubmit(FGuid::NewGuid(), TestState.CurrentActorId, SelectedSkill, SelectedTarget);
+	FHSRAbilityResolution WrongResolution; WrongResolution.ActionId = FGuid::NewGuid();
+	TestViewModel->ResolveCommandSubmit(TestState.BattleId, WrongResolution);
+	const bool bMatchingBattleWrongActionDidNotClear = TestViewModel->IsCommandPendingForDevelopmentTest();
+	FHSRAbilityResolution MatchingActionWrongBattle; MatchingActionWrongBattle.ActionId = PendingAction;
+	TestViewModel->ResolveCommandSubmit(FGuid::NewGuid(), MatchingActionWrongBattle);
+	const bool bWrongBattleMatchingActionDidNotClear = TestViewModel->IsCommandPendingForDevelopmentTest();
+	FHSRAbilityResolution MatchingResolution; MatchingResolution.ActionId = PendingAction; MatchingResolution.Status = EHSRAbilityResolutionStatus::Rejected;
+	TestViewModel->ResolveCommandSubmit(TestState.BattleId, MatchingResolution);
+	Case(TEXT("Pending_DoubleKeyCorrelationOnly"), bPendingStarted && bDuplicateRejected && bMatchingBattleWrongActionDidNotClear
+		&& bWrongBattleMatchingActionDidNotClear && !TestViewModel->IsCommandPendingForDevelopmentTest());
+	TestViewModel->BeginCommandSubmit(FGuid::NewGuid(), TestState.CurrentActorId, SelectedSkill, SelectedTarget);
+	TestViewModel->UnbindCoordinator();
+	Case(TEXT("Unbind_ClearsLocksAndAttributeHandles"), !TestViewModel->IsCommandPendingForDevelopmentTest() && !TestViewModel->IsPresentationLockedForDevelopmentTest()
+		&& !TestViewModel->HasObservedAttributeBindingsForDevelopmentTest() && !TestViewModel->HasBoundCoordinatorForDevelopmentTest());
+
+	UHSRBattleCommandWidget* LifecycleWidget = CreateWidget<UHSRBattleCommandWidget>(GetWorld(), BattleCommandWidgetClass);
+	if (LifecycleWidget)
+	{
+		LifecycleWidget->AddToViewport();
+		LifecycleWidget->BindViewModel(nullptr, nullptr);
+		const FHSRAbilityResolution EmptyBindingResolution = LifecycleWidget->SubmitCommand(FGuid::NewGuid(), NAME_None, NAME_None, NAME_None);
+		Case(TEXT("EmptyCoordinatorWidget_RejectsWithoutSubmit"), EmptyBindingResolution.Status == EHSRAbilityResolutionStatus::Rejected
+			&& EmptyBindingResolution.FailureReason == EHSRAbilityFailureReason::InvalidBattle && LifecycleWidget->GetSubmitCountForDevelopmentTest() == 0);
+		const int32 GenerationBefore = LifecycleWidget->GetBindGenerationForDevelopmentTest();
+		LifecycleWidget->BindViewModel(CommandViewModel, Coordinator);
+		LifecycleWidget->BindViewModel(CommandViewModel, Coordinator);
+		const bool bSingleBinding = LifecycleWidget->HasActiveViewModelBindingForDevelopmentTest()
+			&& LifecycleWidget->GetBindGenerationForDevelopmentTest() == GenerationBefore + 2;
+		LifecycleWidget->RemoveFromParent();
+		Case(TEXT("Widget_RebindAndDestructSingleBinding"), bSingleBinding && !LifecycleWidget->HasActiveViewModelBindingForDevelopmentTest());
+	}
+	else Skip(TEXT("Widget_RebindAndDestructSingleBinding"), TEXT("WidgetCreationFailed"));
+
+	const FHSRBattleCommandViewState StaleBase = Coordinator->GetCommandViewState();
+	const FHSRBattleCommandSkillView* StaleSkill = StaleBase.Skills.FindByPredicate([](const FHSRBattleCommandSkillView& Skill) { return Skill.bAvailable && !Skill.SkillId.IsNone() && !Skill.CandidateTargetIds.IsEmpty(); });
+	if (StaleSkill)
+	{
+		FHSRBattleActionCommand StaleCommand;
+		StaleCommand.ActionId = FGuid::NewGuid();
+		StaleCommand.BattleId = FGuid::NewGuid();
+		StaleCommand.ActorParticipantId = StaleBase.CurrentActorId;
+		StaleCommand.SkillId = StaleSkill->SkillId;
+		StaleCommand.TargetParticipantIds.Add(StaleSkill->CandidateTargetIds[0]);
+		const int32 StaleProcessedBefore = Coordinator->GetProcessedActionCountForDevelopmentTest();
+		const FCommandSideEffectSnapshot StaleBefore = CaptureSideEffects();
+		const FHSRAbilityResolution StaleResolution = Coordinator->RequestAction(StaleCommand);
+		const FCommandSideEffectSnapshot StaleAfter = CaptureSideEffects();
+		Case(TEXT("StaleBattleFreshAction_RejectsNoSideEffect"), StaleResolution.Status == EHSRAbilityResolutionStatus::Rejected
+			&& StaleResolution.FailureReason == EHSRAbilityFailureReason::InvalidBattle
+			&& Coordinator->GetProcessedActionCountForDevelopmentTest() == StaleProcessedBefore + 1
+			&& SameSideEffects(StaleBefore, StaleAfter));
+		FHSRBattleActionCommand UnknownSkillCommand = StaleCommand;
+		UnknownSkillCommand.ActionId = FGuid::NewGuid(); UnknownSkillCommand.BattleId = Coordinator->GetCurrentRequestId(); UnknownSkillCommand.SkillId = FName(TEXT("Unknown.Skill"));
+		const FCommandSideEffectSnapshot UnknownBefore = CaptureSideEffects();
+		const FHSRAbilityResolution UnknownSkillResolution = Coordinator->RequestAction(UnknownSkillCommand);
+		const FCommandSideEffectSnapshot UnknownAfter = CaptureSideEffects();
+		Case(TEXT("UnknownSkill_RejectsDefinitionMissing"), UnknownSkillResolution.Status == EHSRAbilityResolutionStatus::Rejected
+			&& UnknownSkillResolution.FailureReason == EHSRAbilityFailureReason::DefinitionMissing && SameSideEffects(UnknownBefore, UnknownAfter));
+		FHSRBattleActionCommand InvalidTargetCommand = StaleCommand;
+		InvalidTargetCommand.ActionId = FGuid::NewGuid(); InvalidTargetCommand.BattleId = Coordinator->GetCurrentRequestId(); InvalidTargetCommand.TargetParticipantIds[0] = FName(TEXT("Invalid.Target"));
+		const FCommandSideEffectSnapshot InvalidTargetBefore = CaptureSideEffects();
+		const FHSRAbilityResolution InvalidTargetResolution = Coordinator->RequestAction(InvalidTargetCommand);
+		const FCommandSideEffectSnapshot InvalidTargetAfter = CaptureSideEffects();
+		Case(TEXT("InvalidTarget_RejectsNoTurnAdvance"), InvalidTargetResolution.Status == EHSRAbilityResolutionStatus::Rejected
+			&& InvalidTargetResolution.FailureReason == EHSRAbilityFailureReason::InvalidTarget
+			&& SameSideEffects(InvalidTargetBefore, InvalidTargetAfter));
+	}
+	else Skip(TEXT("StaleBattleActionAndInvalidInputs"), TEXT("NoAvailableSkill"));
+
+	const auto RunFormalCategory = [this, &Case, &Skip, &CaptureSideEffects, &SameSideEffects](EHSRSkillCategory Category, const TCHAR* Name, bool bStartNewRound)
+	{
+		if (bStartNewRound)
+		{
+			const FHSRBattleInitResult Rebuild = Coordinator->ResetAndRebuildForDevelopmentTest(GetWorld());
+			if (!Rebuild.IsSuccess()) { Skip(Name, TEXT("RebuildFailed")); return; }
+			CommandViewModel->BindCoordinator(Coordinator);
+			HandleCommandStateReady(Coordinator->GetCommandViewState());
+			BattleCommandWidget->BindViewModel(CommandViewModel, Coordinator);
+		}
+		if (!BattleCommandWidget->SelectSkill(Category)) { Skip(Name, TEXT("SkillUnavailableOrMissing")); return; }
+		const FHSRBattleCommandViewState Before = BattleCommandWidget->GetCurrentViewState();
+		const FGuid ActionId = FGuid::NewGuid();
+		const int32 ProcessedBefore = Coordinator->GetProcessedActionCountForDevelopmentTest();
+		const FHSRAbilityResolution First = BattleCommandWidget->SubmitCommand(ActionId, Before.CurrentActorId, BattleCommandWidget->GetSelectedSkillId(), BattleCommandWidget->GetSelectedTargetId());
+		const int32 ProcessedAfterFirst = Coordinator->GetProcessedActionCountForDevelopmentTest();
+		const FCommandSideEffectSnapshot SideEffectsAfterFirst = CaptureSideEffects();
+		const FHSRAbilityResolution Replay = BattleCommandWidget->SubmitCommand(ActionId, Before.CurrentActorId, BattleCommandWidget->GetSelectedSkillId(), BattleCommandWidget->GetSelectedTargetId());
+		const FCommandSideEffectSnapshot SideEffectsAfterReplay = CaptureSideEffects();
+		const bool bSameResolutionPayload = Replay.ActionId == First.ActionId && Replay.Status == First.Status && Replay.FailureReason == First.FailureReason
+			&& Replay.ActorParticipantId == First.ActorParticipantId && Replay.SkillId == First.SkillId
+			&& Replay.bHasDamageResult == First.bHasDamageResult && Replay.bHasToughnessResult == First.bHasToughnessResult && Replay.bHasBreakResult == First.bHasBreakResult
+			&& (!First.bHasDamageResult || (Replay.DamageResult.Result == First.DamageResult.Result && Replay.DamageResult.ActionId == First.DamageResult.ActionId
+				&& Replay.DamageResult.DamageType == First.DamageResult.DamageType
+				&& FMath::IsNearlyEqual(Replay.DamageResult.Breakdown.NormalizedAttack, First.DamageResult.Breakdown.NormalizedAttack)
+				&& FMath::IsNearlyEqual(Replay.DamageResult.Breakdown.NormalizedDefense, First.DamageResult.Breakdown.NormalizedDefense)
+				&& FMath::IsNearlyEqual(Replay.DamageResult.Breakdown.RawDamage, First.DamageResult.Breakdown.RawDamage)
+				&& FMath::IsNearlyEqual(Replay.DamageResult.Breakdown.CritMultiplier, First.DamageResult.Breakdown.CritMultiplier)
+				&& Replay.DamageResult.Breakdown.bCritical == First.DamageResult.Breakdown.bCritical
+				&& FMath::IsNearlyEqual(Replay.DamageResult.Breakdown.FinalDamage, First.DamageResult.Breakdown.FinalDamage)
+				&& FMath::IsNearlyEqual(Replay.DamageResult.Breakdown.AppliedDamage, First.DamageResult.Breakdown.AppliedDamage)))
+			&& (!First.bHasToughnessResult || (Replay.ToughnessResult.FailureReason == First.ToughnessResult.FailureReason
+				&& Replay.ToughnessResult.bMatched == First.ToughnessResult.bMatched
+				&& FMath::IsNearlyEqual(Replay.ToughnessResult.Before, First.ToughnessResult.Before)
+				&& FMath::IsNearlyEqual(Replay.ToughnessResult.Damage, First.ToughnessResult.Damage)
+				&& FMath::IsNearlyEqual(Replay.ToughnessResult.After, First.ToughnessResult.After)
+				&& Replay.ToughnessResult.bReachedZero == First.ToughnessResult.bReachedZero))
+			&& (!First.bHasBreakResult || (Replay.BreakResult.FailureReason == First.BreakResult.FailureReason
+				&& Replay.BreakResult.ActionId == First.BreakResult.ActionId && Replay.BreakResult.TargetParticipantId == First.BreakResult.TargetParticipantId
+				&& FMath::IsNearlyEqual(Replay.BreakResult.ToughnessBefore, First.BreakResult.ToughnessBefore)
+				&& FMath::IsNearlyEqual(Replay.BreakResult.ToughnessAfter, First.BreakResult.ToughnessAfter)
+				&& Replay.BreakResult.bTriggered == First.BreakResult.bTriggered));
+		Case(Name, First.Succeeded() && bSameResolutionPayload && ProcessedAfterFirst == ProcessedBefore + 2
+			&& Coordinator->GetProcessedActionCountForDevelopmentTest() == ProcessedAfterFirst
+			&& SameSideEffects(SideEffectsAfterFirst, SideEffectsAfterReplay));
+	};
+	const int32 TwoRoundSubmitBefore = BattleCommandWidget->GetSubmitCountForDevelopmentTest();
+	const int32 TwoRoundBindBefore = BattleCommandWidget->GetBindGenerationForDevelopmentTest();
+	RunFormalCategory(EHSRSkillCategory::BasicAttack, TEXT("Round1_Basic_SubmitAndReplayNoSecondSideEffect"), true);
+	RunFormalCategory(EHSRSkillCategory::Skill, TEXT("Round1_Skill_LinearNoBindingMultiplier"), false);
+	RunFormalCategory(EHSRSkillCategory::Ultimate, TEXT("Round2_Ultimate_SubmitAndReplayNoSecondSideEffect"), true);
+	RunFormalCategory(EHSRSkillCategory::Heal, TEXT("Round2_Heal_LinearNoBindingMultiplier"), false);
+	Case(TEXT("TwoRounds_LinearSubmitAndBindCounts"), BattleCommandWidget->GetSubmitCountForDevelopmentTest() == TwoRoundSubmitBefore + 8
+		&& BattleCommandWidget->GetBindGenerationForDevelopmentTest() == TwoRoundBindBefore + 2
+		&& BattleCommandWidget->HasActiveViewModelBindingForDevelopmentTest());
+	const FHSRBattleInitResult FinalRestore = Coordinator->ResetAndRebuildForDevelopmentTest(GetWorld());
+	if (FinalRestore.IsSuccess())
+	{
+		CommandViewModel->BindCoordinator(Coordinator);
+		HandleCommandStateReady(Coordinator->GetCommandViewState());
+		BattleCommandWidget->BindViewModel(CommandViewModel, Coordinator);
+	}
+	Case(TEXT("Harness_FinalRebuildRestoresFormalRuntime"), FinalRestore.IsSuccess());
+
+	if (FailedCases == 0 && SkippedCases == 0)
+	{
+		UE_LOG(LogTemp, Log, TEXT("P10-001 Harness=COMPLETE"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("P10-001 Harness=INCOMPLETE FailedCases=%d SkippedCases=%d"), FailedCases, SkippedCases);
+	}
+};
 #endif
 
 #if WITH_EDITOR
@@ -1594,9 +1970,10 @@ void AHSRBattleGameMode::BeginPlay()
 	}
 #endif
 
-	Coordinator->OnBattleResultReady().AddUObject(this, &AHSRBattleGameMode::HandleBattleResultReady);
+	BattleResultReadyHandle = Coordinator->OnBattleResultReady().AddUObject(this, &AHSRBattleGameMode::HandleBattleResultReady);
 	CommandViewModel = NewObject<UHSRBattleCommandViewModel>(this);
 	CommandViewModel->BindCoordinator(Coordinator);
+	ResultConfirmRequestedHandle = CommandViewModel->OnResultConfirmRequested().AddUObject(this, &AHSRBattleGameMode::HandleBattleResultConfirmRequested);
 	CommandStateReadyHandle = Coordinator->OnCommandStateReady().AddUObject(this, &AHSRBattleGameMode::HandleCommandStateReady);
 	HandleCommandStateReady(Coordinator->GetCommandViewState());
 	if (BattleCommandWidgetClass)
@@ -1616,6 +1993,16 @@ void AHSRBattleGameMode::BeginPlay()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("P6-004A GameMode WidgetCreate Result=SKIPPED Reason=BattleCommandWidgetClassNotConfigured"));
 	}
+#if WITH_EDITOR
+	if (bRunP10001CommandHarness)
+	{
+		RunP10001CommandHarnessLocal();
+	}
+	if (bRunP10002ViewHarness)
+	{
+		RunP10002ViewHarness();
+	}
+#endif
 
 	// Log final state summary
 	const int32 NumParticipants = Coordinator->GetParticipants().Num();
@@ -1691,8 +2078,15 @@ void AHSRBattleGameMode::BeginPlay()
 
 void AHSRBattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	RestoreP10004GameInput(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr, TEXT("EndPlay"));
 	if (CommandViewModel)
 	{
+		if (ResultConfirmRequestedHandle.IsValid())
+		{
+			CommandViewModel->OnResultConfirmRequested().Remove(ResultConfirmRequestedHandle);
+			ResultConfirmRequestedHandle.Reset();
+		}
+		CommandViewModel->ClearBattleResult();
 		CommandViewModel->UnbindCoordinator();
 	}
 	if (BattleCommandWidget)
@@ -1702,6 +2096,11 @@ void AHSRBattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 	if (Coordinator)
 	{
+		if (BattleResultReadyHandle.IsValid())
+		{
+			Coordinator->OnBattleResultReady().Remove(BattleResultReadyHandle);
+			BattleResultReadyHandle.Reset();
+		}
 		if (CommandStateReadyHandle.IsValid())
 		{
 			Coordinator->OnCommandStateReady().Remove(CommandStateReadyHandle);
@@ -1730,29 +2129,65 @@ void AHSRBattleGameMode::HandleBattleResultReady(const FHSRBattleResult& Result)
 		return;
 	}
 
-	FHSRBattleResult ConsumedResult;
-	if (!Coordinator->ConsumeBattleResult(ConsumedResult))
+	if (!CommandViewModel || !CommandViewModel->ShowBattleResult(Result))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultReady - REJECTED duplicate result RequestId=%s"), *Result.RequestId.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultReady - REJECTED duplicate or stale result RequestId=%s"), *Result.RequestId.ToString());
+		return;
+	}
+	ApplyP10004ResultInput(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr, Result.RequestId);
+	UE_LOG(LogTemp, Log, TEXT("P10-004 ResultView Show RequestId=%s Outcome=%d"), *Result.RequestId.ToString(), static_cast<int32>(Result.Outcome));
+}
+
+void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& RequestId)
+{
+	if (!Coordinator || !CommandViewModel || RequestId != Coordinator->GetCurrentRequestId())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultConfirmRequested - REJECTED stale request RequestId=%s"), *RequestId.ToString());
 		return;
 	}
 
 	UHSRBattleTransitionSubsystem* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>() : nullptr;
 	if (!Subsystem)
 	{
-		UE_LOG(LogTemp, Error, TEXT("AHSRBattleGameMode::HandleBattleResultReady - FAILED missing transition subsystem"));
+		CommandViewModel->RejectBattleResultConfirm(RequestId);
+		UE_LOG(LogTemp, Error, TEXT("AHSRBattleGameMode::HandleBattleResultConfirmRequested - FAILED missing transition subsystem; confirm restored"));
 		return;
 	}
+
+	FHSRBattleResult PreviewResult;
+	PreviewResult.RequestId = RequestId;
+	// The Coordinator owns the authoritative payload; Validate uses only return data and must precede consume.
+	if (!Coordinator->GetBattleResultForPresentation(PreviewResult))
+	{
+		CommandViewModel->RejectBattleResultConfirm(RequestId);
+		UE_LOG(LogTemp, Error, TEXT("P10-004 ReturnPreflight Result=FAILED Reason=MissingAuthoritativeResult RequestId=%s"), *RequestId.ToString());
+		return;
+	}
+	const FHSRExplorationReturnResult Preflight = Subsystem->ValidateBattleReturn(PreviewResult);
+	if (Preflight.ResultType != EHSREncounterReturnResultType::Success)
+	{
+		CommandViewModel->RejectBattleResultConfirm(RequestId);
+		UE_LOG(LogTemp, Warning, TEXT("P10-004 ReturnPreflight Result=REJECTED Type=%d RequestId=%s ConfirmRestored=1"), static_cast<int32>(Preflight.ResultType), *RequestId.ToString());
+		return;
+	}
+
+	FHSRBattleResult ConsumedResult;
+	if (!Coordinator->ConsumeBattleResult(ConsumedResult))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultConfirmRequested - REJECTED duplicate RequestId=%s"), *RequestId.ToString());
+		return;
+	}
+	RestoreP10004GameInput(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr, TEXT("ConfirmedReturn"));
 
 	const FHSRExplorationReturnResult ReturnResult = Subsystem->RequestBattleReturn(ConsumedResult);
 	if (ReturnResult.ResultType == EHSREncounterReturnResultType::Success)
 	{
-		UE_LOG(LogTemp, Log, TEXT("AHSRBattleGameMode::HandleBattleResultReady - Return request type=%d Outcome=%d RequestId=%s"),
+		UE_LOG(LogTemp, Log, TEXT("AHSRBattleGameMode::HandleBattleResultConfirmRequested - Return request type=%d Outcome=%d RequestId=%s"),
 			static_cast<int32>(ReturnResult.ResultType), static_cast<int32>(ConsumedResult.Outcome), *ConsumedResult.RequestId.ToString());
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultReady - Return request type=%d Outcome=%d RequestId=%s"),
+		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultConfirmRequested - Return request type=%d Outcome=%d RequestId=%s"),
 			static_cast<int32>(ReturnResult.ResultType), static_cast<int32>(ConsumedResult.Outcome), *ConsumedResult.RequestId.ToString());
 	}
 }
@@ -1810,3 +2245,311 @@ void AHSRBattleGameMode::RunTerminalScenarioForDevelopment()
 	}
 #endif
 }
+
+#if WITH_EDITOR
+void AHSRBattleGameMode::RunP10001AEnemyTurnHarness()
+{
+	if (!Coordinator || !Coordinator->GetTurnManager())
+	{
+		UE_LOG(LogTemp, Error, TEXT("P10-001A Harness=SKIPPED Reason=MissingCoordinatorOrManager"));
+		return;
+	}
+	int32 FailedCases = 0;
+	const auto Case = [&FailedCases](const TCHAR* Name, bool bPassed)
+	{
+		if (bPassed)
+		{
+			UE_LOG(LogTemp, Log, TEXT("P10-001A Harness Case=%s Result=PASS"), Name);
+		}
+		else
+		{
+			++FailedCases;
+			UE_LOG(LogTemp, Error, TEXT("P10-001A Harness Case=%s Result=FAIL"), Name);
+		}
+	};
+
+	const TArray<FHSRBattleParticipant>& ProductionParticipants = Coordinator->GetParticipants();
+	const FHSRBattleParticipant* ProductionEnemy = ProductionParticipants.FindByPredicate([](const FHSRBattleParticipant& Participant)
+	{
+		return Participant.Team == EHSRBattleParticipantTeam::Enemy;
+	});
+	const FHSRBattleParticipant* ProductionPlayer = ProductionParticipants.FindByPredicate([](const FHSRBattleParticipant& Participant)
+	{
+		return Participant.Team == EHSRBattleParticipantTeam::Player;
+	});
+	if (!ProductionEnemy || !ProductionPlayer || !ProductionEnemy->AbilitySystemComponent.IsValid() || !ProductionPlayer->AbilitySystemComponent.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("P10-001A Harness=SKIPPED Reason=InvalidProductionParticipants"));
+		return;
+	}
+
+	const int32 PublicDepth = Coordinator->GetMaxPublicRequestActionDepthForDevelopmentTest();
+	const int32 CoreDepth = Coordinator->GetMaxCoreExecutionDepthForDevelopmentTest();
+	Case(TEXT("DispatcherDepth_NoPublicOrCoreNesting"), PublicDepth <= 1 && CoreDepth <= 1);
+
+	// Manager identity is part of the canonical key. Two isolated managers both
+	// begin at epoch/sequence 1; only the explicitly bound manager may enqueue.
+	UHSRTurnManager* ProductionManager = Coordinator->GetTurnManager();
+	const bool bProductionHadPending = Coordinator->HasPendingEnemyTurnForDevelopmentTest();
+	const int32 ProductionConsumedCount = Coordinator->GetConsumedEnemyTurnCountForDevelopmentTest();
+	UHSRTurnManager* ManagerA = NewObject<UHSRTurnManager>(Coordinator);
+	UHSRTurnManager* ManagerB = NewObject<UHSRTurnManager>(Coordinator);
+	const bool bManagersInitialized = ManagerA && ManagerB && ManagerA->Initialize(ProductionParticipants) && ManagerB->Initialize(ProductionParticipants);
+	const int32 QueueBeforeAudit = Coordinator->GetEnemyTurnQueueCountForDevelopmentTest();
+	bool bAuditBegan = bManagersInitialized && Coordinator->BeginEnemyTurnAutomationAuditForDevelopmentTest(ManagerA);
+	bool bWrongManagerRejected = false;
+	bool bRightManagerQueuedOnce = false;
+	if (bAuditBegan)
+	{
+		FHSRTurnLifecycleEvent Event;
+		Event.EventType = EHSRTurnLifecycleEventType::TurnStarted;
+		Event.BattleEpoch = ManagerA->GetBattleEpoch();
+		Event.TurnSequence = ManagerA->GetTurnSequence();
+		Event.ParticipantId = ManagerA->GetCurrentParticipantId();
+		Coordinator->InjectEnemyTurnStartedForDevelopmentTest(ManagerB, Event);
+		bWrongManagerRejected = Coordinator->GetEnemyTurnQueueCountForDevelopmentTest() == QueueBeforeAudit && !Coordinator->HasPendingEnemyTurnForDevelopmentTest();
+		Coordinator->InjectEnemyTurnStartedForDevelopmentTest(ManagerA, Event);
+		Coordinator->InjectEnemyTurnStartedForDevelopmentTest(ManagerA, Event);
+		bRightManagerQueuedOnce = Coordinator->GetEnemyTurnQueueCountForDevelopmentTest() == QueueBeforeAudit + 1 && Coordinator->HasPendingEnemyTurnForDevelopmentTest();
+		Coordinator->EndEnemyTurnAutomationAuditForDevelopmentTest();
+	}
+	const bool bProductionRestored = !Coordinator->IsEnemyTurnAutomationAuditActiveForDevelopmentTest()
+		&& Coordinator->GetBoundEnemyTurnManagerForDevelopmentTest() == ProductionManager
+		&& Coordinator->HasEnemyTurnStartedBindingForDevelopmentTest()
+		&& Coordinator->HasPendingEnemyTurnForDevelopmentTest() == bProductionHadPending
+		&& Coordinator->GetConsumedEnemyTurnCountForDevelopmentTest() == ProductionConsumedCount;
+	Case(TEXT("OldManagerSameEpoch_IdentityRejected"), bAuditBegan && bWrongManagerRejected);
+	Case(TEXT("BoundManager_DuplicateQueuedOnce"), bAuditBegan && bRightManagerQueuedOnce);
+	Case(TEXT("AuditEnd_RestoresProductionState"), bAuditBegan && bProductionRestored);
+
+	// Isolated three-participant lifecycle: duplicate the enemy as a pure test
+	// participant. TurnManager owns only copied values/weak runtime references.
+	FHSRBattleParticipant EnemyB = *ProductionEnemy;
+	EnemyB.ParticipantId = FName(TEXT("EnemyB"));
+	FHSRBattleParticipant EnemyC = *ProductionEnemy;
+	EnemyC.ParticipantId = FName(TEXT("EnemyC"));
+	TArray<FHSRBattleParticipant> FourParticipants;
+	FourParticipants.Add(*ProductionEnemy);
+	FourParticipants.Add(EnemyB);
+	FourParticipants.Add(EnemyC);
+	FourParticipants.Add(*ProductionPlayer);
+
+	UHSRTurnManager* ThreeManager = NewObject<UHSRTurnManager>(Coordinator);
+	TArray<FHSRTurnLifecycleEvent> ThreeStarts;
+	FDelegateHandle ThreeHandle;
+	if (ThreeManager)
+	{
+		ThreeHandle = ThreeManager->OnTurnStarted().AddLambda([&ThreeStarts](const FHSRTurnLifecycleEvent& Event) { ThreeStarts.Add(Event); });
+	}
+	const bool bThreeInitialized = ThreeManager && ThreeManager->Initialize(FourParticipants);
+	const bool bFirstEnemyResolved = bThreeInitialized && ThreeManager->ResolveAction(ThreeManager->GetCurrentParticipantId());
+	const bool bSecondEnemyResolved = bFirstEnemyResolved && ThreeManager->ResolveAction(ThreeManager->GetCurrentParticipantId());
+	const bool bThirdEnemyResolved = bSecondEnemyResolved && ThreeManager->ResolveAction(ThreeManager->GetCurrentParticipantId());
+	const bool bConsecutiveEnemyOrder = ThreeStarts.Num() >= 4
+		&& ThreeStarts[0].ParticipantId == ProductionEnemy->ParticipantId
+		&& ThreeStarts[1].ParticipantId == EnemyB.ParticipantId
+		&& ThreeStarts[2].ParticipantId == EnemyC.ParticipantId
+		&& ThreeStarts[3].ParticipantId == ProductionPlayer->ParticipantId
+		&& ThreeStarts[0].TurnSequence < ThreeStarts[1].TurnSequence
+		&& ThreeStarts[1].TurnSequence < ThreeStarts[2].TurnSequence
+		&& ThreeStarts[2].TurnSequence < ThreeStarts[3].TurnSequence;
+	if (ThreeManager && ThreeHandle.IsValid()) ThreeManager->OnTurnStarted().Remove(ThreeHandle);
+	Case(TEXT("FourParticipants_ThreeConsecutiveEnemySequence"), bThirdEnemyResolved && bConsecutiveEnemyOrder);
+
+	UHSRTurnManager* DelayManager = NewObject<UHSRTurnManager>(Coordinator);
+	TArray<FHSRTurnLifecycleEvent> DelayStarts;
+	FDelegateHandle DelayHandle;
+	if (DelayManager)
+	{
+		DelayHandle = DelayManager->OnTurnStarted().AddLambda([&DelayStarts](const FHSRTurnLifecycleEvent& Event) { DelayStarts.Add(Event); });
+	}
+	TArray<FHSRBattleParticipant> DelayParticipants;
+	DelayParticipants.Add(*ProductionEnemy);
+	DelayParticipants.Add(EnemyB);
+	DelayParticipants.Add(*ProductionPlayer);
+	const bool bDelayInitialized = DelayManager && DelayManager->Initialize(DelayParticipants);
+	FHSRTurnDelayRequest DelayRequest;
+	DelayRequest.ActionId = FGuid::NewGuid();
+	DelayRequest.TargetParticipantId = EnemyB.ParticipantId;
+	const bool bDelayRegistered = bDelayInitialized && DelayManager->ConsumeBreakDelay(DelayRequest);
+	const bool bDelaySourceResolved = bDelayRegistered && DelayManager->ResolveAction(DelayManager->GetCurrentParticipantId());
+	const bool bDelayedEnemySkipped = bDelaySourceResolved && DelayStarts.Num() >= 2
+		&& DelayStarts[0].ParticipantId == ProductionEnemy->ParticipantId
+		&& DelayStarts[1].ParticipantId == ProductionPlayer->ParticipantId
+		&& DelayStarts[0].TurnSequence < DelayStarts[1].TurnSequence;
+	if (DelayManager && DelayHandle.IsValid()) DelayManager->OnTurnStarted().Remove(DelayHandle);
+	Case(TEXT("ThreeParticipants_DelaySkipsEnemyB"), bDelayedEnemySkipped);
+
+	if (FailedCases == 0)
+	{
+		UE_LOG(LogTemp, Log, TEXT("P10-001A Harness=COMPLETE"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("P10-001A Harness=INCOMPLETE FailedCases=%d"), FailedCases);
+	}
+}
+
+void AHSRBattleGameMode::RunP10002ViewHarness()
+{
+	if (!Coordinator || !Coordinator->GetTurnManager() || Coordinator->GetParticipants().Num() < 2)
+	{
+		UE_LOG(LogTemp, Error, TEXT("P10-002 Harness=SKIPPED Reason=MissingCoordinatorManagerOrParticipants"));
+		return;
+	}
+	int32 FailedCases = 0;
+	const auto Case = [&FailedCases](const TCHAR* Name, bool bPassed)
+	{
+		if (bPassed)
+		{
+			UE_LOG(LogTemp, Log, TEXT("P10-002 Harness Case=%s Result=PASS"), Name);
+		}
+		else
+		{
+			++FailedCases;
+			UE_LOG(LogTemp, Error, TEXT("P10-002 Harness Case=%s Result=FAIL"), Name);
+		}
+	};
+
+	const FHSRBattleCommandViewState InitialState = Coordinator->GetCommandViewState();
+	Case(TEXT("ActiveView_CurrentActorFirst"), InitialState.CurrentActorId.IsNone()
+		|| (InitialState.TurnOrderParticipantIds.Num() > 0 && InitialState.TurnOrderParticipantIds[0] == InitialState.CurrentActorId));
+	Case(TEXT("ActiveView_InvalidParticipantsExcluded"), InitialState.TurnOrderParticipantIds.Num() <= Coordinator->GetParticipants().Num());
+
+	const TArray<FHSRBattleParticipant>& ProductionParticipants = Coordinator->GetParticipants();
+	FHSRBattleParticipant Extra = ProductionParticipants[1];
+	Extra.ParticipantId = FName(TEXT("HarnessEnemyB"));
+	TArray<FHSRBattleParticipant> ThreeParticipants = ProductionParticipants;
+	ThreeParticipants.Add(Extra);
+	UHSRTurnManager* ThreeManager = NewObject<UHSRTurnManager>(Coordinator);
+	TArray<FName> Starts;
+	FDelegateHandle StartHandle;
+	if (ThreeManager) StartHandle = ThreeManager->OnTurnStarted().AddLambda([&Starts](const FHSRTurnLifecycleEvent& Event) { Starts.Add(Event.ParticipantId); });
+	const bool bThreeInit = ThreeManager && ThreeManager->Initialize(ThreeParticipants);
+	const bool bThreeResolve = bThreeInit && ThreeManager->ResolveAction(ThreeManager->GetCurrentParticipantId());
+	Case(TEXT("ThreeParticipants_StableOrderProgresses"), bThreeResolve && Starts.Num() >= 2 && Starts[0] != Starts[1]);
+	if (ThreeManager && StartHandle.IsValid()) ThreeManager->OnTurnStarted().Remove(StartHandle);
+
+	UHSRTurnManager* DelayManager = NewObject<UHSRTurnManager>(Coordinator);
+	const bool bDelayInit = DelayManager && DelayManager->Initialize(ThreeParticipants);
+	FHSRTurnDelayRequest DelayRequest;
+	DelayRequest.ActionId = FGuid::NewGuid();
+	DelayRequest.TargetParticipantId = Extra.ParticipantId;
+	const bool bDelay = bDelayInit && DelayManager->ConsumeBreakDelay(DelayRequest);
+	const bool bDelayAdvance = bDelay && DelayManager->ResolveAction(DelayManager->GetCurrentParticipantId());
+	Case(TEXT("ThreeParticipants_DelayAcceptedAndAdvances"), bDelayAdvance);
+
+	UHSRBattleCommandViewModel* RepairViewModel = NewObject<UHSRBattleCommandViewModel>(this);
+	FHSRBattleCommandViewState RepairState;
+	RepairState.BattleId = FGuid::NewGuid();
+	RepairState.CurrentActorId = FName(TEXT("HarnessPlayer"));
+	RepairState.bCurrentActorPlayerControlled = true;
+	FHSRBattleCommandSkillView& RepairSkill = RepairState.Skills.AddDefaulted_GetRef();
+	RepairSkill.SkillId = FName(TEXT("HarnessSkill"));
+	RepairSkill.Category = EHSRSkillCategory::Skill;
+	RepairSkill.bAvailable = true;
+	RepairSkill.CandidateTargetIds = { FName(TEXT("HarnessEnemyA")), FName(TEXT("HarnessEnemyB")) };
+	RepairViewModel->SetState(RepairState);
+	const bool bSelectedSecond = RepairViewModel->SelectSkill(EHSRSkillCategory::Skill)
+		&& RepairViewModel->SelectTarget(FName(TEXT("HarnessEnemyB")));
+	RepairState.Skills[0].CandidateTargetIds = { FName(TEXT("HarnessEnemyA")) };
+	RepairViewModel->SetState(RepairState);
+	const bool bRepairedToFirst = bSelectedSecond && RepairViewModel->GetSelectedTargetId() == FName(TEXT("HarnessEnemyA"));
+	RepairState.Skills[0].CandidateTargetIds.Empty();
+	RepairViewModel->SetState(RepairState);
+	Case(TEXT("TargetRepair_ReselectsThenClears"), bRepairedToFirst && RepairViewModel->GetSelectedTargetId().IsNone());
+
+	UHSRTurnManager* ProductionManager = Coordinator->GetTurnManager();
+	ProductionManager->FinishBattle();
+	const FHSRBattleCommandViewState FinishedState = Coordinator->GetCommandViewState();
+	Case(TEXT("Finished_EmptyTurnOrder"), FinishedState.CurrentActorId.IsNone() && FinishedState.TurnOrderParticipantIds.IsEmpty());
+
+	bool bObservedResetEmpty = false;
+	const FDelegateHandle ResetStateHandle = Coordinator->OnCommandStateReady().AddLambda([&bObservedResetEmpty](const FHSRBattleCommandViewState& State)
+	{
+		if (!State.BattleId.IsValid() && State.CurrentActorId.IsNone() && State.TurnOrderParticipantIds.IsEmpty())
+		{
+			bObservedResetEmpty = true;
+		}
+	});
+	const FHSRBattleInitResult RebuildResult = Coordinator->ResetAndRebuildForDevelopmentTest(GetWorld());
+	Coordinator->OnCommandStateReady().Remove(ResetStateHandle);
+	const FHSRBattleCommandViewState RebuiltState = Coordinator->GetCommandViewState();
+	const bool bRebuiltActive = RebuildResult.IsSuccess() && Coordinator->GetTurnManager() && Coordinator->GetTurnManager() != ProductionManager
+		&& RebuiltState.BattleId.IsValid() && !RebuiltState.CurrentActorId.IsNone()
+		&& RebuiltState.TurnOrderParticipantIds.Num() > 0 && RebuiltState.TurnOrderParticipantIds[0] == RebuiltState.CurrentActorId;
+	Case(TEXT("Reset_PublishesEmptyAndRebuildsFresh"), bObservedResetEmpty && bRebuiltActive);
+
+	if (FailedCases == 0)
+	{
+		UE_LOG(LogTemp, Log, TEXT("P10-002 Harness=COMPLETE"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("P10-002 Harness=INCOMPLETE FailedCases=%d"), FailedCases);
+	}
+}
+
+void AHSRBattleGameMode::RunP10004ResultHarness()
+{
+	UHSRBattleCommandViewModel* TestViewModel = NewObject<UHSRBattleCommandViewModel>(this);
+	if (!TestViewModel)
+	{
+		UE_LOG(LogTemp, Error, TEXT("P10-004 Harness=INCOMPLETE Reason=MissingViewModel"));
+		return;
+	}
+
+	int32 FailedCases = 0;
+	const auto Case = [&FailedCases](const TCHAR* Name, bool bPassed)
+	{
+		if (bPassed)
+		{
+			UE_LOG(LogTemp, Log, TEXT("P10-004 Harness Case=%s Result=PASS"), Name);
+		}
+		else
+		{
+			++FailedCases;
+			UE_LOG(LogTemp, Error, TEXT("P10-004 Harness Case=%s Result=FAIL"), Name);
+		}
+	};
+	FHSRBattleCommandViewState State;
+	State.BattleId = FGuid::NewGuid();
+	State.CurrentActorId = FName(TEXT("HarnessPlayer"));
+	State.bCurrentActorPlayerControlled = true;
+	TestViewModel->SetState(State);
+
+	FHSRBattleResult Result;
+	Result.RequestId = State.BattleId;
+	Result.Outcome = EHSRBattleOutcome::PlayerVictory;
+	Result.DefeatedParticipantId = FName(TEXT("HarnessEnemy"));
+	const bool bFirstShow = TestViewModel->ShowBattleResult(Result);
+	const FHSRBattleCommandViewState Shown = TestViewModel->GetStateCopy();
+	Case(TEXT("FirstMatchingResult_LocksAndShowsOnce"), bFirstShow && Shown.ResultViewState.bVisible && !Shown.ResultViewState.bConfirmPending
+		&& Shown.ResultViewState.RequestId == Result.RequestId && !Shown.bCanSubmit);
+	Case(TEXT("DuplicateAndOldResult_Rejected"), !TestViewModel->ShowBattleResult(Result) && !TestViewModel->ShowBattleResult(FHSRBattleResult()));
+
+	int32 ConfirmCount = 0;
+	FGuid ConfirmedId;
+	const FDelegateHandle ConfirmHandle = TestViewModel->OnResultConfirmRequested().AddLambda([&ConfirmCount, &ConfirmedId](const FGuid& RequestId)
+	{
+		++ConfirmCount;
+		ConfirmedId = RequestId;
+	});
+	const bool bFirstConfirm = TestViewModel->RequestBattleResultConfirm();
+	const bool bDuplicateConfirmRejected = !TestViewModel->RequestBattleResultConfirm();
+	Case(TEXT("ConfirmIntent_ExactlyOnce"), bFirstConfirm && bDuplicateConfirmRejected && ConfirmCount == 1 && ConfirmedId == Result.RequestId
+		&& TestViewModel->GetStateCopy().ResultViewState.bConfirmPending);
+	TestViewModel->OnResultConfirmRequested().Remove(ConfirmHandle);
+	TestViewModel->ClearBattleResult();
+	Case(TEXT("Teardown_ClearsResultAndLocks"), !TestViewModel->GetStateCopy().ResultViewState.bVisible && !TestViewModel->GetStateCopy().ResultViewState.RequestId.IsValid());
+
+	if (FailedCases == 0)
+	{
+		UE_LOG(LogTemp, Log, TEXT("P10-004 Harness=COMPLETE"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("P10-004 Harness=INCOMPLETE FailedCases=%d"), FailedCases);
+	}
+}
+#endif

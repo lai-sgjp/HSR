@@ -33,6 +33,16 @@ EHSRAbilityFailureReason UHSRGameplayAbilityBase::GetPreActivationFailureReason(
 	return EHSRAbilityFailureReason::None;
 }
 
+EHSRAbilityFailureReason UHSRGameplayAbilityBase::GetAvailabilityFailureReason(const FGameplayAbilitySpecHandle& Handle, const FGameplayAbilityActorInfo* ActorInfo, const UAbilitySystemComponent* CandidateTargetAbilitySystem) const
+{
+#if WITH_EDITOR
+	++AvailabilityQueryCount;
+#endif
+	// Target identity is already validated by FHSRTargetingPolicy.  Do not call
+	// SetPendingTarget here: availability refreshes must be observationally pure.
+	return CandidateTargetAbilitySystem ? GetPreActivationFailureReason(Handle, ActorInfo) : EHSRAbilityFailureReason::InvalidTarget;
+}
+
 bool UHSRGameplayAbilityBase::ConfigureFromSkillDefinition(const UHSRSkillDefinition& Definition)
 {
 	return true;

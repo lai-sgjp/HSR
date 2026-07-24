@@ -323,6 +323,42 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestTestReturn(con
 
 FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(const FHSRBattleResult& BattleResult)
 {
+	const FHSRExplorationReturnResult Validation = ValidateBattleReturn(BattleResult);
+	if (Validation.ResultType != EHSREncounterReturnResultType::Success)
+	{
+		return Validation;
+	}
+
+	const FHSRBattleReturnContext& BattleReturnContext = BattleResult.ReturnContext;
+	FHSRExplorationReturnContext ReturnCtx;
+	ReturnCtx.RequestId = BattleReturnContext.RequestId;
+	ReturnCtx.ExplorationMapPath = BattleReturnContext.ExplorationMapPath;
+	ReturnCtx.ReturnTransform = BattleReturnContext.ReturnTransform;
+
+	PendingReturnContext = ReturnCtx;
+	bReturnPending = true;
+	bReturnConsumed = false;
+
+	TravelKind = EHSRTravelKind::Return;
+	TravelRequestId = ReturnCtx.RequestId;
+	TravelTargetMap = ReturnCtx.ExplorationMapPath;
+	TravelCompletedEncounterId = BattleResult.EncounterId;
+	if (!TravelCompletedEncounterId.IsNone())
+	{
+		ResolvedEncounterIds.Add(TravelCompletedEncounterId);
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - SUCCESS RequestId=%s ExplorationMap=%s (kind=Return)"),
+		*ReturnCtx.RequestId.ToString(), *ReturnCtx.ExplorationMapPath.ToString());
+
+	UGameplayStatics::OpenLevel(GetWorld(), ReturnCtx.ExplorationMapPath, true);
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - Traveling back to %s"), *ReturnCtx.ExplorationMapPath.ToString());
+
+	return FHSRExplorationReturnResult::MakeSuccess();
+}
+
+FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::ValidateBattleReturn(const FHSRBattleResult& BattleResult) const
+{
 	const FHSRBattleReturnContext& BattleReturnContext = BattleResult.ReturnContext;
 	// Validate BEFORE writing (must not pollute Pending)
 	if (bReturnPending)
@@ -350,15 +386,9 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(c
 			FText::FromString(TEXT("Invalid RequestId in return context.")));
 	}
 
-	// Build pure-data return context from consumed request
-	FHSRExplorationReturnContext ReturnCtx;
-	ReturnCtx.RequestId = BattleReturnContext.RequestId;
-	ReturnCtx.ExplorationMapPath = BattleReturnContext.ExplorationMapPath;
-	ReturnCtx.ReturnTransform = BattleReturnContext.ReturnTransform;
-
-	if (!FPackageName::DoesPackageExist(ReturnCtx.ExplorationMapPath.ToString()))
+	if (!FPackageName::DoesPackageExist(BattleReturnContext.ExplorationMapPath.ToString()))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestBattleReturn - FAILED invalid map=%s"), *ReturnCtx.ExplorationMapPath.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestBattleReturn - FAILED invalid map=%s"), *BattleReturnContext.ExplorationMapPath.ToString());
 		return FHSRExplorationReturnResult::MakeFailure(EHSREncounterReturnResultType::InvalidReturnContext, FText::FromString(TEXT("Exploration map package does not exist.")));
 	}
 
@@ -371,25 +401,6 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(c
 			EHSREncounterReturnResultType::InvalidReturnContext,
 			FText::FromString(TEXT("Cannot resolve World for travel.")));
 	}
-
-	PendingReturnContext = ReturnCtx;
-	bReturnPending = true;
-	bReturnConsumed = false;
-
-	TravelKind = EHSRTravelKind::Return;
-	TravelRequestId = ReturnCtx.RequestId;
-	TravelTargetMap = ReturnCtx.ExplorationMapPath;
-	TravelCompletedEncounterId = BattleResult.EncounterId;
-	if (!TravelCompletedEncounterId.IsNone())
-	{
-		ResolvedEncounterIds.Add(TravelCompletedEncounterId);
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - SUCCESS RequestId=%s ExplorationMap=%s (kind=Return)"),
-		*ReturnCtx.RequestId.ToString(), *ReturnCtx.ExplorationMapPath.ToString());
-
-	UGameplayStatics::OpenLevel(World, ReturnCtx.ExplorationMapPath, true);
-	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - Traveling back to %s"), *ReturnCtx.ExplorationMapPath.ToString());
 
 	return FHSRExplorationReturnResult::MakeSuccess();
 }

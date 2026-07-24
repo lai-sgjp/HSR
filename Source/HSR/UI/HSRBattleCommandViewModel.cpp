@@ -2,6 +2,7 @@
 
 #include "../Battle/HSRBattleCoordinator.h"
 #include "../Battle/HSRBattleParticipant.h"
+#include "../Battle/HSRBattleTypes.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "AbilitySystemComponent.h"
 
@@ -14,7 +15,15 @@ void UHSRBattleCommandViewModel::BeginDestroy()
 void UHSRBattleCommandViewModel::SetState(const FHSRBattleCommandViewState& InState)
 {
 	State = InState;
+	if (bCommandPending && (!PendingBattleId.IsValid() || State.BattleId != PendingBattleId || !State.BattleId.IsValid()
+		|| (State.LastResolution.ActionId == PendingActionId && PendingActionId.IsValid())))
+	{
+		bCommandPending = false;
+		PendingBattleId.Invalidate();
+		PendingActionId.Invalidate();
+	}
 	RefreshPresentationAndSelection();
+	RefreshCommandState();
 	RefreshReadOnlyBattlePresentation();
 	Changed.Broadcast(State);
 }
@@ -36,6 +45,7 @@ void UHSRBattleCommandViewModel::UnbindCoordinator()
 		if (MaxToughnessChangedHandle.IsValid()) ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetMaxToughnessAttribute()).Remove(MaxToughnessChangedHandle);
 	}
 	ToughnessChangedHandle.Reset(); MaxToughnessChangedHandle.Reset(); ObservedTargetASC.Reset(); Coordinator.Reset();
+	ClearCommandLocks();
 	UE_LOG(LogTemp, Log, TEXT("P8-005 ViewModel Unbind"));
 }
 
@@ -61,6 +71,31 @@ void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
 	StatusOperationText = Operation.Sequence > 0
 		? FText::FromString(FString::Printf(TEXT("%s | %s | op=%d | result=%d | #%lld"), *Operation.TargetParticipantId.ToString(), *Operation.StatusId.ToString(), static_cast<int32>(Operation.Operation), static_cast<int32>(Operation.Result), Operation.Sequence))
 		: FText::GetEmpty();
+	TArray<FString> OrderLines;
+	for (const FName ParticipantId : State.TurnOrderParticipantIds) OrderLines.Add(ParticipantId.ToString());
+	TurnOrderText = FText::FromString(FString::Join(OrderLines, TEXT(" -> ")));
+	TArray<FString> ParticipantLines;
+	for (const FHSRBattleParticipantView& Participant : State.Participants)
+	{
+		TArray<FString> WeaknessNames;
+		for (const FGameplayTag& WeaknessTag : Participant.WeaknessTags)
+		{
+			WeaknessNames.Add(WeaknessTag.ToString());
+		}
+		WeaknessNames.Sort();
+		const FString ParticipantWeaknessText = WeaknessNames.IsEmpty() ? TEXT("None") : FString::Join(WeaknessNames, TEXT(", "));
+		ParticipantLines.Add(FString::Printf(TEXT("%s | HP %.0f/%.0f | Energy %.0f/%.0f | Toughness %.0f/%.0f | Weakness %s%s"),
+			*Participant.ParticipantId.ToString(), Participant.Health, Participant.MaxHealth, Participant.Energy, Participant.MaxEnergy,
+			Participant.Toughness, Participant.MaxToughness, *ParticipantWeaknessText, Participant.bDefeated ? TEXT(" | Defeated") : TEXT("")));
+	}
+	ParticipantsText = FText::FromString(FString::Join(ParticipantLines, TEXT("\n")));
+	TArray<FString> PresentationLines;
+	for (const FHSRBattlePresentationEvent& Event : State.PresentationEvents)
+	{
+		const TCHAR* Label = Event.EventType == EHSRPresentationEventType::Damage ? TEXT("Damage") : Event.EventType == EHSRPresentationEventType::Toughness ? TEXT("Toughness") : Event.EventType == EHSRPresentationEventType::Break ? TEXT("Break") : TEXT("Heal");
+		PresentationLines.Add(FString::Printf(TEXT("%s -> %s | %s %.0f%s%s"), *Event.SourceParticipantId.ToString(), *Event.TargetParticipantId.ToString(), Label, Event.Value, Event.bCritical ? TEXT(" | Critical") : TEXT(""), Event.bBreak ? TEXT(" | Break") : TEXT("")));
+	}
+	PresentationText = FText::FromString(FString::Join(PresentationLines, TEXT("\n")));
 
 	const FHSRBattleCommandSkillView* SelectedSkill = FindSelectedSkill();
 	if (!SelectedSkill)
@@ -73,6 +108,7 @@ void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
 		SelectedTargetId = SelectedSkill && SelectedSkill->CandidateTargetIds.Num() > 0 ? SelectedSkill->CandidateTargetIds[0] : NAME_None;
 	}
 	RebindTargetAttributes();
+	RefreshCommandState();
 }
 
 bool UHSRBattleCommandViewModel::SelectSkill(EHSRSkillCategory Category)
@@ -81,7 +117,7 @@ bool UHSRBattleCommandViewModel::SelectSkill(EHSRSkillCategory Category)
 	if (!Skill) return false;
 	SelectedSkillId = Skill->SkillId;
 	SelectedTargetId = Skill->CandidateTargetIds.Num() > 0 ? Skill->CandidateTargetIds[0] : NAME_None;
-	RebindTargetAttributes(); RefreshReadOnlyBattlePresentation(); Changed.Broadcast(State);
+	RebindTargetAttributes(); RefreshReadOnlyBattlePresentation(); RefreshCommandState(); Changed.Broadcast(State);
 	return true;
 }
 
@@ -95,8 +131,89 @@ bool UHSRBattleCommandViewModel::SelectTarget(FName TargetId)
 {
 	if (!GetTargetOptions().Contains(TargetId)) return false;
 	SelectedTargetId = TargetId;
-	RebindTargetAttributes(); RefreshReadOnlyBattlePresentation(); Changed.Broadcast(State);
+	RebindTargetAttributes(); RefreshReadOnlyBattlePresentation(); RefreshCommandState(); Changed.Broadcast(State);
 	return true;
+}
+
+bool UHSRBattleCommandViewModel::BeginCommandSubmit(const FGuid& ActionId, FName ActorParticipantId, FName SkillId, FName TargetParticipantId)
+{
+	const FHSRBattleCommandSkillView* Skill = State.Skills.FindByPredicate([SkillId](const FHSRBattleCommandSkillView& Candidate) { return Candidate.SkillId == SkillId; });
+	if (!ActionId.IsValid() || !State.BattleId.IsValid() || !State.bCurrentActorPlayerControlled || bCommandPending || bPresentationLocked || ActorParticipantId != State.CurrentActorId
+		|| !Skill || !Skill->bAvailable || SkillId != SelectedSkillId || TargetParticipantId != SelectedTargetId || !Skill->CandidateTargetIds.Contains(TargetParticipantId)) return false;
+	PendingBattleId = State.BattleId;
+	PendingActionId = ActionId;
+	bCommandPending = true;
+	RefreshCommandState();
+	Changed.Broadcast(State);
+	return true;
+}
+
+void UHSRBattleCommandViewModel::ResolveCommandSubmit(const FGuid& BattleId, const FHSRAbilityResolution& Resolution)
+{
+	if (bCommandPending && BattleId == PendingBattleId && Resolution.ActionId == PendingActionId)
+	{
+		bCommandPending = false;
+		PendingBattleId.Invalidate();
+		PendingActionId.Invalidate();
+		RefreshCommandState();
+		Changed.Broadcast(State);
+	}
+}
+
+void UHSRBattleCommandViewModel::ClearCommandLocks()
+{
+	bCommandPending = false; bPresentationLocked = false; PendingBattleId.Invalidate(); PendingActionId.Invalidate();
+	RefreshCommandState();
+}
+
+bool UHSRBattleCommandViewModel::ShowBattleResult(const FHSRBattleResult& Result)
+{
+	if (!Result.IsValid() || State.BattleId != Result.RequestId || State.ResultViewState.bVisible || State.ResultViewState.RequestId.IsValid()) return false;
+	State.ResultViewState.RequestId = Result.RequestId;
+	State.ResultViewState.Outcome = Result.Outcome;
+	State.ResultViewState.DefeatedParticipantId = Result.DefeatedParticipantId;
+	State.ResultViewState.bVisible = true;
+	State.ResultViewState.bConfirmPending = false;
+	ClearCommandLocks();
+	RefreshCommandState();
+	Changed.Broadcast(State);
+	return true;
+}
+
+bool UHSRBattleCommandViewModel::RequestBattleResultConfirm()
+{
+	if (!State.ResultViewState.bVisible || State.ResultViewState.bConfirmPending || !State.ResultViewState.RequestId.IsValid()) return false;
+	State.ResultViewState.bConfirmPending = true;
+	RefreshCommandState();
+	Changed.Broadcast(State);
+	ResultConfirmRequested.Broadcast(State.ResultViewState.RequestId);
+	return true;
+}
+
+void UHSRBattleCommandViewModel::RejectBattleResultConfirm(const FGuid& RequestId)
+{
+	if (!State.ResultViewState.bVisible || !State.ResultViewState.bConfirmPending || State.ResultViewState.RequestId != RequestId) return;
+	State.ResultViewState.bConfirmPending = false;
+	RefreshCommandState();
+	Changed.Broadcast(State);
+}
+
+void UHSRBattleCommandViewModel::ClearBattleResult()
+{
+	State.ResultViewState = FHSRBattleResultViewState();
+	RefreshCommandState();
+}
+
+void UHSRBattleCommandViewModel::RefreshCommandState()
+{
+	State.SelectedSkillId = SelectedSkillId;
+	State.SelectedTargetId = SelectedTargetId;
+	State.bCommandPending = bCommandPending;
+	State.bPresentationLocked = bPresentationLocked;
+	State.PendingActionId = PendingActionId;
+	const FHSRBattleCommandSkillView* Skill = FindSelectedSkill();
+	State.bCanSubmit = !State.ResultViewState.bVisible && !bCommandPending && !bPresentationLocked && Coordinator.IsValid() && State.BattleId.IsValid() && State.bCurrentActorPlayerControlled
+		&& Skill && Skill->bAvailable && Skill->CandidateTargetIds.Contains(SelectedTargetId);
 }
 
 void UHSRBattleCommandViewModel::RebindTargetAttributes()

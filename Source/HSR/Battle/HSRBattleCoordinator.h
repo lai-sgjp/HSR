@@ -11,6 +11,7 @@
 
 class UWorld;
 class AActor;
+class UAbilitySystemComponent;
 class UHSRTurnManager;
 class UHSRSkillDefinition;
 class UHSRDamageRuleDefinition;
@@ -107,6 +108,8 @@ public:
 
 	/** Exactly-once read of the terminal pure-value result. */
 	bool ConsumeBattleResult(FHSRBattleResult& OutResult);
+	/** Read-only terminal result inspection for preflight; it never consumes or changes authority. */
+	bool GetBattleResultForPresentation(FHSRBattleResult& OutResult) const;
 	FHSRBattleResultReadyDelegate& OnBattleResultReady() { return BattleResultReady; }
 
 	/** Reset to Idle for a fresh battle session. */
@@ -128,6 +131,45 @@ private:
 	 * this immutable Resolution and never re-enter Ability, GE, or Turn logic. */
 	TMap<FGuid, FHSRAbilityResolution> ProcessedActionResolutions;
 	FHSRAbilityResolution LastActionResolution;
+	TArray<FHSRBattlePresentationEvent> PresentationEvents;
+	/** The manager currently allowed to enqueue deterministic enemy turns. */
+	TWeakObjectPtr<UHSRTurnManager> BoundEnemyTurnManager;
+	FDelegateHandle EnemyTurnStartedHandle;
+	TOptional<FString> PendingEnemyTurnKey;
+	TSet<FString> ConsumedEnemyTurnKeys;
+	int32 RequestActionDispatchDepth = 0;
+	bool bDrainingEnemyTurns = false;
+#if WITH_EDITOR
+	int32 PublicRequestActionDepth = 0;
+	int32 MaxPublicRequestActionDepth = 0;
+	int32 CoreExecutionDepth = 0;
+	int32 MaxCoreExecutionDepth = 0;
+	int32 EnemyTurnQueueCount = 0;
+	int32 EnemyTurnDispatchCount = 0;
+	int32 EnemyTurnRejectedCount = 0;
+public:
+	int32 GetMaxPublicRequestActionDepthForDevelopmentTest() const { return MaxPublicRequestActionDepth; }
+	int32 GetMaxCoreExecutionDepthForDevelopmentTest() const { return MaxCoreExecutionDepth; }
+	int32 GetEnemyTurnQueueCountForDevelopmentTest() const { return EnemyTurnQueueCount; }
+	int32 GetEnemyTurnDispatchCountForDevelopmentTest() const { return EnemyTurnDispatchCount; }
+	int32 GetEnemyTurnRejectedCountForDevelopmentTest() const { return EnemyTurnRejectedCount; }
+	int32 GetProcessedActionCountForDevelopmentTest() const { return ProcessedActionResolutions.Num(); }
+	int32 GetSkillPointReservationCountForDevelopmentTest() const { return SkillPointReservations.Num(); }
+	const FHSRAbilityResolution& GetLastActionResolutionForDevelopmentTest() const { return LastActionResolution; }
+	bool BeginEnemyTurnAutomationAuditForDevelopmentTest(UHSRTurnManager* IsolatedManager);
+	void EndEnemyTurnAutomationAuditForDevelopmentTest();
+	void InjectEnemyTurnStartedForDevelopmentTest(UHSRTurnManager* SourceManager, const struct FHSRTurnLifecycleEvent& Event);
+	bool IsEnemyTurnAutomationAuditActiveForDevelopmentTest() const { return bEnemyTurnAutomationAuditActive; }
+	bool HasPendingEnemyTurnForDevelopmentTest() const { return PendingEnemyTurnKey.IsSet(); }
+	int32 GetConsumedEnemyTurnCountForDevelopmentTest() const { return ConsumedEnemyTurnKeys.Num(); }
+	UHSRTurnManager* GetBoundEnemyTurnManagerForDevelopmentTest() const { return BoundEnemyTurnManager.Get(); }
+	bool HasEnemyTurnStartedBindingForDevelopmentTest() const { return EnemyTurnStartedHandle.IsValid(); }
+private:
+	TWeakObjectPtr<UHSRTurnManager> SavedEnemyTurnManagerForAudit;
+	TOptional<FString> SavedPendingEnemyTurnKeyForAudit;
+	TSet<FString> SavedConsumedEnemyTurnKeysForAudit;
+	bool bEnemyTurnAutomationAuditActive = false;
+#endif
 	FHSRTeamResourceState TeamResourceState;
 	bool bLastBreakDelayRegistered = false;
 	FGuid LastBreakDelayActionId;
@@ -180,9 +222,17 @@ private:
 	bool GrantSkillAbility(const FHSRBattleParticipant& Participant);
 	bool GrantHealAbility(const FHSRBattleParticipant& Participant);
 	const UHSRSkillDefinition* FindSkillDefinition(FName SkillId) const;
+	FHSRAbilityResolution RequestActionCore(const FHSRBattleActionCommand& Command);
+	void BindEnemyTurnManager(UHSRTurnManager* InManager);
+	void ClearEnemyTurnAutomation();
+	void RecordEnemyTurnIfCurrent(UHSRTurnManager* SourceManager, const struct FHSRTurnLifecycleEvent& Event);
+	void RecordCurrentEnemyTurnIfNeeded();
+	void DrainPendingEnemyTurns();
+	FString MakeEnemyTurnKey(const UHSRTurnManager* Manager, uint64 BattleEpoch, uint64 TurnSequence, FName ParticipantId) const;
 	bool ReserveSkillPoints(const FGuid& ActionId, int32 Delta);
 	void RollbackSkillPoints(const FGuid& ActionId);
 	void CommitSkillPoints(const FGuid& ActionId);
+	void CommitActionEnergyGain(const FGuid& ActionId, const UHSRSkillDefinition& ActionSkillDefinition, UAbilitySystemComponent& SourceASC);
 	FHSRBattleInitResult BuildAndValidateParticipantDefinitions();
 	void BindHealthObserver(const FHSRBattleParticipant& Participant);
 	void HandleHealthChanged(const FOnAttributeChangeData& ChangeData, FName ParticipantId);

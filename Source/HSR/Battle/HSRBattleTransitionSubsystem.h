@@ -45,6 +45,8 @@ public:
 	FHSRExplorationReturnResult RequestTestReturn(const FHSREncounterRequest& FromConsumedRequest);
 	/** Starts return travel from a pure battle result and resolves its encounter on success. */
 	FHSRExplorationReturnResult RequestBattleReturn(const FHSRBattleResult& BattleResult);
+	/** Read-only preflight for the return transaction; it never writes pending return state or travels. */
+	FHSRExplorationReturnResult ValidateBattleReturn(const FHSRBattleResult& BattleResult) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Return")
 	FHSRExplorationReturnResult ConsumeReturnContext();

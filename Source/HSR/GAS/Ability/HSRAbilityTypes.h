@@ -107,5 +107,11 @@ struct FHSRAbilityResolution
 	UPROPERTY(BlueprintReadOnly, Category = "Battle")
 	FHSRBreakResult BreakResult;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Heal")
+	bool bHasHealResult = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Heal")
+	float HealAmount = 0.0f;
+
 	bool Succeeded() const { return Status == EHSRAbilityResolutionStatus::Succeeded; }
 };
