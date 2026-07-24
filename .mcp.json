@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "unreal-mcpython": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "E:/work/unreal_projects/HSR/Tools/mcp-server",
+        "run",
+        "src/unreal_mcp/main.py"
+      ]
+    }
+  }
+}
