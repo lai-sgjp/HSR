@@ -18,6 +18,8 @@ Saved/
 # Logs and temporary files
 *.log
 *.tmp
+__pycache__/
+*.pyc
 
 # Local-only experimental assets
 Content/ModResources/
