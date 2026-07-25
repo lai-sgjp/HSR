@@ -17,6 +17,8 @@ HSR 是一个全新的 Unreal Engine 5.6 C++ 单机 JRPG 学习与作品集项�
 
 Phase 7、Phase 8、Phase 9 与 Phase 10 均处于 `Ready with inherited follow-ups`。P10-005 已归档为 `PASS WITH FOLLOW-UP`，不自动开始 Phase 11。动态与资产字段证据仍按 `USER PROVIDED` 分级，P10-002/003 部分矩阵按 `USER ACCEPTED / STATIC REVIEW / inherited follow-up` 保留；1920x1080 为用户视觉观察，1280x720 为 `USER ACCEPTED / NOT VERIFIED`，物理手柄、完整导航、双分辨率验证及注入式 preflight 拒绝/重试仍为 follow-ups。
 
+Phase 11 功能主链为 `Ready with inherited follow-ups`，并已推送至 `origin/main=42c32e0`。Phase 12 为 `Ready with inherited follow-ups`：Definition/Instance authority、纯值聚合、InstanceId/SetSourceId 来源追踪 Infinite GE、套装阈值、Save v2 原子恢复、只读详情 UI 与 Development PIE Harness 均有 Build/Automation/用户 PIE 证据，P12-005 Independent Reviewer 为 `PASS WITH FOLLOW-UP`。Phase 13 正式背包、奖励或掉落 UI 尚未开始。
+
 ## MVP 范围
 
 MVP 是一个灰盒 1v1 闭环：

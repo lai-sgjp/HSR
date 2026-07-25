@@ -1839,3 +1839,55 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Battle Command 与 Character Detail 改为互斥显示：默认 Battle；C 键和蓝图按钮双向切换动态通过，连续三轮未见重复绑定或 Blueprint Runtime Error。
 - Selected Viewport PIE 抢占 Esc 并停止 PIE；Standalone Esc 未验证。详情页中终局自动恢复 ResultView 已通过静态审查，动态证据未提供。两项均保留为非阻断 follow-up。
 - P11-005/P11-006 三件套已归档；当前只剩提交前 provenance/allowlist 审计和阶段收尾 commit。本轮没有清理或认领既有噪声。
+
+# 2026-07-25｜Phase 12 Gate 0 四角色规划
+
+- 用户明确进入 Phase 12；按项目强制门禁运行 Coordinator、Independent Reviewer、Teacher、Implementation 四角色只读规划审查。
+- 创建 `docs/phase-12-execution-plan.md`，冻结 Definition/Instance/Authority/Aggregator/Runtime Handle/UI 边界、来源顺序、candidate-first 事务、Save DTO、4 个工程包和 1 个收尾包。
+- 四角色一致结论为 `REVISE`：Phase 11 功能证据足够，但 `main` ahead 3，provenance/allowlist 交付审计未闭合，且 `origin/main..HEAD` 含已跟踪 `Plugins/UnrealMCPython/Content/Python/UnrealMCPython/__pycache__/vision_actions.cpython-311.pyc`。
+- `.claude/settings.local.json` 和其余未跟踪 `__pycache__` 不归 Phase 12 认领。本轮未删除文件、未修改 Gameplay/Config/Content、未 Build/Automation/PIE、未 stage/commit/push，P12-001 未创建。
+
+# 2026-07-25｜Phase 11 远端交付与 Phase 12 Gate 0 PASS
+
+- 用户明确授权删除误跟踪 pycache 并将 Phase 11 推送远端。删除 `vision_actions.cpython-311.pyc`，`.gitignore` 增加 `__pycache__/` 与 `*.pyc`；独立提交为 `42c32e0`。
+- 首次 push 因全局 `http.proxy=http://127.0.0.1:7890` 无服务失败；使用一次性空代理参数重试成功，未修改全局 Git 配置。
+- `origin/main` 从 `234ffb4` 前进至 `42c32e0`，包含 Phase 11 的 `e331b32`、`dc70688`、`0da4660` 与清理提交。未跟踪 `.claude/settings.local.json` 保持不动，缓存文件现由 ignore 规则排除。
+- Phase 12 Gate 0 阻断闭合并改判 `PASS`；创建唯一活动任务 P12-001。本记录不表示 P12-001 工程实现、Build、Automation 或 Editor 资产已完成。
+
+# 2026-07-25｜P12-001 Definition/Instance 事务归档
+
+- P12-001 在 allowlist 内完成 Equipment/Relic Definition、纯值 Instance/Loadout、GameInstance authority、candidate-first Equip/Replace/Unequip/强化和 InstanceId 全局占用。
+- 首次 Build 首错（include、`TNumericLimits<float>::Infinity()`）与首次 Automation invalid GameInstanceSubsystem Outer 均已修正并保留；最终 `HSREditor Win64 Development` Build 的 UHT/C++/lib/dll/metadata 成功。
+- 最终无头 Automation `HSR.Equipment.Transactions`、`HSR.Equipment.Validation` 均 `Success`，exit code 0。Independent Reviewer 最终结论 `PASS`；P12-001 三件套已归档。
+- 本包未创建 GE、Battle、Save、UI 或正式 Content 资产；下一相邻包为 P12-002，当前无活动任务。
+
+# 2026-07-25｜P12-002 User Editor Asset Gate
+
+- 用户在 Editor 创建并确认保存重开：`/Game/GameplayEffects/GE_Equipment_P12` 与 `/Game/GameplayEffects/GE_Relic_P12`。
+- 用户确认四组属性与 `Equipment.Bonus.MaxHealth/Attack/Defense/Speed` Tag 配对正确，Editor 重开后未丢失；证据等级为 `USER PROVIDED PASS`。
+- P12-002 从 Asset Gate 阻塞转入 Runtime implementation；Codex 不修改两个 `.uasset`。
+
+# 2026-07-25｜P12-002 归档与 P12-003 启动
+
+- P12-002 完成 EquipmentStatAggregator、InstanceId-keyed EffectBridge、BattleCoordinator participant-ASC 接线；最终 Build 和 3 项 `HSR.Equipment` Automation 通过。
+- Independent Reviewer 结论 `PASS WITH FOLLOW-UP`；动态 PIE 成功 Apply/no-op/Replace/Remove 和 Reset RemoveAll 保留为非阻断 follow-up。P12-002 三件套已归档。
+- 自动创建 P12-003 任务卡，当前等待四角色 Gate 0；尚未创建套装资产或修改套装 Gameplay。
+
+# 2026-07-25｜P12-003A Asset Gate 与 P12-003B 启动
+
+- 用户确认 6 个 Relic Definition、`DA_RelicSet_P12_A`、`GE_RelicSet_P12_A` 均按指引创建，保存并重开 Editor 后未丢失；证据等级为 `USER PROVIDED PASS`。
+- P12-003A schema/Resolver 已 `PASS WITH FOLLOW-UP`；自动创建 P12-003B，当前等待四角色 Gate 0。
+
+# 2026-07-25｜P12-004 Equipment Detail UI Asset Gate
+
+- 用户确认 `/Game/UI/WBP_EquipmentDetail_P12` 按指引创建，Editor 重开后保持，且无 Blueprint compile/runtime error；证据等级为 `USER PROVIDED PASS`。
+- Codex 未修改该资产。P12-004 当前只剩 Save/Equipment Automation 重跑与 Independent Review。
+
+# 2026-07-26｜Phase 12 P12-004C 与 P12-005 收尾
+
+- Development PIE Harness 补齐 Phase 12 缺少人工装备入口的问题，不扩展为正式 Inventory 或可写 Equipment UI。
+- 用户提供的最终 PIE 日志中 Setup、ShowDetail、RemoveSecondRelic、RestoreSecondRelic、Save、Clear、两次 Load 和 Cleanup 均为 `SUCCESS`，未出现 Projection/Bridge error。
+- EffectBridge 修正为：数值指纹一致时仅在同 ASC、同 GE Class、Handle 有效且 Active 时幂等复用；stale handle 会重新 Apply。专项 Automation 覆盖外部移除后的自愈。
+- 最终 Build、`HSR.Equipment`、`HSR.Save`、`HSR.UI.EquipmentDetail` 和 diff-check 通过；P12-004C Independent Reviewer 最终 `PASS`。
+- 教学首次作答 5/6；用户经一次差量 Load 指引后正确说明相同有效来源不会重复 Apply，Teaching Gate 为 `PASS WITH GUIDED CORRECTION`。
+- Phase 13 Inventory、Reward、Drop 和正式背包/装备交互 UI 明确不属于本阶段。

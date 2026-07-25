@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～11 均为 `Ready with inherited follow-ups`。P11-005/P11-006 已归档；当前不自动开始 Phase 12。Phase 11 保留 Standalone Esc、详情页中终局自动返回 ResultView 的动态验证，以及 Phase 2/5～10 完整专项回归。
+> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～11 均为 `Ready with inherited follow-ups`。Phase 12 工程、用户 PIE 与教学主链已闭合，当前处于 P12-005 最终独立复审、归档和远端交付；尚未进入 Phase 13。Phase 11 保留 Standalone Esc、详情页中终局自动返回 ResultView 的动态验证，以及 Phase 2/5～10 完整专项回归。
 
 ## 已完成的规划工作
 
@@ -250,9 +250,22 @@
 
 ## Phase 12：装备与遗器
 
-- [ ] 建立 Equipment/Relic Definition、实例、槽位、词条、套装和强化。
-- [ ] 建立 StatAggregator 和属性来源分解。
-- [ ] 使用可移除 Infinite GE 应用装备效果。
+- [x] 完成 Coordinator、Independent Reviewer、Teacher、Implementation 四角色 Gate 0 规划并创建 `docs/phase-12-execution-plan.md`。
+- [x] Gate 0：Phase 11 provenance/allowlist 审计、误跟踪缓存处置与远端同步已闭合；`origin/main=42c32e0`，Gate 改判 `PASS`。
+- [x] P12-001：Definition、Instance 与纯值 Equip/Replace/Unequip/强化事务；最终 Reviewer `PASS`，Build/Automation 通过。
+- [ ] P12-002：属性来源分解与可逆 Equipment Infinite GE；四角色 Gate 0 与 User Editor Asset Gate 已通过，Runtime implementation 进行中。
+- [x] P12-002：属性来源分解与可逆 Equipment Infinite GE；最终 Reviewer `PASS WITH FOLLOW-UP`，Build/Automation 通过。
+- [ ] P12-003：遗器套装阈值与固定强化；先完成四角色 Gate 0 和 User Editor Asset Gate。
+- [x] P12-003A：Relic Set schema 与纯值阈值 Resolver；Reviewer `PASS WITH FOLLOW-UP`，Build/Automation 通过。
+- [x] P12-003A 归档边界：该项是 P12-003B 的内部前置段，没有独立三件套；证据随 P12-003B 与阶段收尾保留。
+- [x] P12-003B：套装来源重建与固定强化；Reviewer `PASS WITH FOLLOW-UP`，Build/Automation 通过。
+- [ ] P12-004：Save v2、装备来源快照与只读详情 UI；先完成四角色 Gate 0 和 User Editor Asset Gate。
+- [x] P12-004：Save v2、原子装备来源恢复与只读 Equipment Detail UI；Reviewer `PASS WITH FOLLOW-UP`，纠偏 Harness P12-004C 最终 `PASS`。
+- [x] P12-004C：Development PIE Harness 覆盖固定装备、2->1->2、Save/Clear/重复 Load、Detail 生命周期与 cleanup；Build/Automation/用户 PIE 通过。
+- [x] P12-005：教学 Gate、阶段文档、最终 Independent Review `PASS WITH FOLLOW-UP` 与归档完成；等待 commit/push。
+- [x] 建立 Equipment/Relic Definition、实例、槽位、词条、套装和强化。
+- [x] 建立 StatAggregator 和属性来源分解。
+- [x] 使用 InstanceId/SetSourceId 跟踪的可移除 Infinite GE 应用装备效果。
 
 ## Phase 13：背包、奖励与掉落
 

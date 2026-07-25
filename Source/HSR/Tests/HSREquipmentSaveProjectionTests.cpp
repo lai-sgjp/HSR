@@ -1,0 +1,19 @@
+#if WITH_DEV_AUTOMATION_TESTS
+#include "Misc/AutomationTest.h"
+#include "../Battle/HSRBattleCoordinator.h"
+#include "../Equipment/HSREquipmentSubsystem.h"
+#include "../Data/Definitions/HSREquipmentDefinition.h"
+#include "../GAS/HSRAbilitySystemComponent.h"
+#include "GameplayEffect.h"
+#include "GameFramework/Actor.h"
+#include "Engine/World.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSREquipmentProjectionTest,"HSR.Save.EquipmentProjection",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FHSREquipmentProjectionTest::RunTest(const FString&)
+{
+	UWorld* World=UWorld::CreateWorld(EWorldType::GamePreview,false);AActor* Owner=World->SpawnActor<AActor>();UHSRBattleCoordinator* C=NewObject<UHSRBattleCoordinator>();UHSRAbilitySystemComponent* ASC=NewObject<UHSRAbilitySystemComponent>(Owner);Owner->AddInstanceComponent(ASC);ASC->RegisterComponent();ASC->InitAbilityActorInfo(Owner,Owner);FHSRBattleParticipant P;P.ParticipantId=TEXT("Player");P.AbilitySystemComponent=ASC;C->SetPlayerCharacterDefinition(TEXT("Character.A"),nullptr);C->SetParticipantsForEquipmentProjectionDevelopmentTest({P});C->SetEquipmentGameplayEffect(UGameplayEffect::StaticClass());C->SetRelicSetGameplayEffect(UGameplayEffect::StaticClass());
+	const FGuid CharacterGuid=HSRCharacterGuidFromProfileName(TEXT("Character.A"));FHSREquipmentRestoreState State;State.Revision=1;FHSREquipmentInstance Head;Head.InstanceId=FGuid(1,2,3,4);Head.DefinitionId=TEXT("Relic.Head");Head.Kind=EHSREquipmentKind::Relic;Head.Modifiers.Add({EHSREquipmentStat::Attack,10});FHSREquipmentInstance Hands=Head;Hands.InstanceId=FGuid(5,6,7,8);Hands.DefinitionId=TEXT("Relic.Hands");Hands.Modifiers[0].Value=4;State.Loadout.Relics.Add(EHSRRelicSlot::Head,Head);State.Loadout.Relics.Add(EHSRRelicSlot::Hands,Hands);State.RelicSetCounts.Add(TEXT("Set.A"),2);FHSREquipmentRestoreMap Candidate;Candidate.Add(CharacterGuid,State);
+	TestTrue(TEXT("profile character projects to Player participant"),C->ProjectEquipmentRestore(Candidate));TestEqual(TEXT("two instances plus set source"),C->GetEquipmentProjectionSourceCountForDevelopmentTest(),3);TestTrue(TEXT("repeat succeeds"),C->ProjectEquipmentRestore(Candidate));TestEqual(TEXT("repeat no stack"),C->GetEquipmentProjectionSourceCountForDevelopmentTest(),3);
+	FHSREquipmentRestoreState Reduced=State;Reduced.Revision=2;Reduced.Loadout.Relics.Remove(EHSRRelicSlot::Hands);Reduced.RelicSetCounts[TEXT("Set.A")]=1;Candidate[CharacterGuid]=Reduced;C->SetEquipmentRestoreProjectionFailureAfterOperationsForDevelopmentTest(1);AddExpectedError(TEXT("HSR.EquipmentProjection FAIL"),EAutomationExpectedErrorFlags::Contains,1);TestFalse(TEXT("mid-transaction failure"),C->ProjectEquipmentRestore(Candidate));TestEqual(TEXT("all old sources restored"),C->GetEquipmentProjectionSourceCountForDevelopmentTest(),3);C->SetEquipmentRestoreProjectionFailureAfterOperationsForDevelopmentTest(-1);TestTrue(TEXT("single relic and set removal succeed"),C->ProjectEquipmentRestore(Candidate));TestEqual(TEXT("only retained relic remains"),C->GetEquipmentProjectionSourceCountForDevelopmentTest(),1);World->DestroyWorld(false);return true;
+}
+#endif

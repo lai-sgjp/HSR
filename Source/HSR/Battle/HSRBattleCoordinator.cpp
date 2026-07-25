@@ -11,6 +11,7 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
+#include "Engine/GameInstance.h"
 #include "AbilitySystemComponent.h"
 #include "AttributeSet.h"
 #include "GameplayEffectTypes.h"
@@ -111,6 +112,8 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			FText::FromString(TEXT("Battle World is null."))
 		);
 	}
+	if (!EquipmentGameplayEffect) EquipmentGameplayEffect=LoadClass<UGameplayEffect>(nullptr,TEXT("/Game/GameplayEffects/GE_Equipment_P12.GE_Equipment_P12_C"));
+	if (!RelicSetGameplayEffect) RelicSetGameplayEffect=LoadClass<UGameplayEffect>(nullptr,TEXT("/Game/GameplayEffects/GE_RelicSet_P12_A.GE_RelicSet_P12_A_C"));
 
 	// Build and validate participant definitions from request
 	FHSRBattleInitResult DefResult = BuildAndValidateParticipantDefinitions();
@@ -239,6 +242,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 
 	// Atomically transition to Spawned
 	CurrentState = EHSRBattleCoordinatorState::Spawned;
+	if (UGameInstance* GI=BattleWorld->GetGameInstance()) if (UHSREquipmentSubsystem* Equipment=GI->GetSubsystem<UHSREquipmentSubsystem>()) Equipment->SetRestoreProjection(FHSREquipmentRestoreProjection::CreateUObject(this,&ThisClass::ProjectEquipmentRestore));
 	BindEnemyTurnManager(TurnManager);
 	DevelopmentDamageRandomStream.Initialize(DevelopmentDamageSeed);
 	DevelopmentDamageConsumeCount = 0;
@@ -1180,6 +1184,11 @@ void UHSRBattleCoordinator::Reset()
 
 	ClearRuntimeDelegates();
 	ClearProgressionGameplayEffects();
+	if (EquipmentEffectBridge) EquipmentEffectBridge->RemoveAll();
+	EquipmentProjectionStates.Empty();
+	EquipmentProjectionParticipants.Empty();
+	EquipmentSetProjectionStates.Empty();
+	EquipmentSetProjectionParticipants.Empty();
 	CurrentState = EHSRBattleCoordinatorState::Idle;
 	CurrentRequestId = FGuid();
 	CurrentEncounterId = NAME_None;
@@ -1865,6 +1874,80 @@ bool UHSRBattleCoordinator::RefreshCharacterProgression(FName ParticipantId,cons
 	bLastProgressionRefreshResultForTest=true;
 #endif
 	return true;}if(Previous.IsSet())CharacterProgressionContexts.Add(ParticipantId,Previous.GetValue());else CharacterProgressionContexts.Remove(ParticipantId);return false;
+}
+
+bool UHSRBattleCoordinator::ApplyEquipmentSource(FName ParticipantId,const FGuid& InstanceId,const FHSREquipmentAggregate& Aggregate,int64 Revision)
+{
+	if (!EquipmentGameplayEffect || !InstanceId.IsValid() || Revision < 0) return false;
+	const FHSRBattleParticipant* P=Participants.FindByPredicate([&](const FHSRBattleParticipant& V){return V.ParticipantId==ParticipantId;});
+	if (!P || !P->AbilitySystemComponent.IsValid()) return false;
+	FHSREquipmentAggregate A=Aggregate; A.Revision=Revision;
+	if (!EquipmentEffectBridge) EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
+	return EquipmentEffectBridge->Apply(InstanceId,P->AbilitySystemComponent.Get(),EquipmentGameplayEffect,A);
+}
+bool UHSRBattleCoordinator::RemoveEquipmentSource(FName ParticipantId,const FGuid& InstanceId)
+{
+	if (!EquipmentEffectBridge) return false;
+	const FHSRBattleParticipant* P=Participants.FindByPredicate([&](const FHSRBattleParticipant& V){return V.ParticipantId==ParticipantId;});
+	return P && EquipmentEffectBridge->Remove(InstanceId);
+}
+bool UHSRBattleCoordinator::ApplyEquipmentSetSource(FName ParticipantId,FName SetSourceId,const FHSREquipmentAggregate& Aggregate,int64 Revision)
+{
+	if (!RelicSetGameplayEffect || SetSourceId.IsNone() || Revision < 0) return false;
+	const FHSRBattleParticipant* P=Participants.FindByPredicate([&](const FHSRBattleParticipant& V){return V.ParticipantId==ParticipantId;});
+	if (!P || !P->AbilitySystemComponent.IsValid()) return false;
+	if (!EquipmentEffectBridge) EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
+	FHSREquipmentAggregate A=Aggregate; A.Revision=Revision;
+	return EquipmentEffectBridge->ApplySetSource(SetSourceId,P->AbilitySystemComponent.Get(),RelicSetGameplayEffect,A);
+}
+bool UHSRBattleCoordinator::RemoveEquipmentSetSource(FName ParticipantId,FName SetSourceId)
+{
+	if (SetSourceId.IsNone() || !EquipmentEffectBridge) return false;
+	const FHSRBattleParticipant* P=Participants.FindByPredicate([&](const FHSRBattleParticipant& V){return V.ParticipantId==ParticipantId;});
+	return P && EquipmentEffectBridge->RemoveSetSource(SetSourceId);
+}
+bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipmentRestoreState>& Candidate)
+{
+#if WITH_EDITOR
+	if (bForceEquipmentRestoreProjectionFailure) return false;
+#endif
+	if (!EquipmentGameplayEffect || !RelicSetGameplayEffect) return false;
+	const TMap<FGuid,FHSREquipmentAggregate> OldStates=EquipmentProjectionStates;
+	const TMap<FGuid,FName> OldParticipants=EquipmentProjectionParticipants;
+	const TMap<FName,FHSREquipmentAggregate> OldSetStates=EquipmentSetProjectionStates;
+	const TMap<FName,FName> OldSetParticipants=EquipmentSetProjectionParticipants;
+	TMap<FGuid,FHSREquipmentAggregate> DesiredStates;
+	TMap<FGuid,FName> DesiredParticipants;
+	TMap<FName,FHSREquipmentAggregate> DesiredSetStates;
+	TMap<FName,FName> DesiredSetParticipants;
+	for (const auto& Pair : Candidate)
+	{
+		const FGuid PlayerCharacterGuid = HSRCharacterGuidFromProfileName(PlayerCharacterId);
+		const FHSRBattleParticipant* Participant = Pair.Key == PlayerCharacterGuid
+			? Participants.FindByPredicate([](const FHSRBattleParticipant& P) { return P.ParticipantId == FName(TEXT("Player")); })
+			: nullptr;
+		if (!Participant || !Participant->AbilitySystemComponent.IsValid()) continue;
+		const auto AddInstance=[&](const FHSREquipmentInstance& Instance){FHSREquipmentLoadout Single; if(Instance.Kind==EHSREquipmentKind::Equipment)Single.Equipment.Add(EHSREquipmentSlot::Weapon,Instance);else Single.Relics.Add(EHSRRelicSlot::Head,Instance);FHSREquipmentAggregate Aggregate;if(!UHSREquipmentStatAggregator::Aggregate(Single,Pair.Value.Revision,Aggregate))return false;DesiredStates.Add(Instance.InstanceId,Aggregate);DesiredParticipants.Add(Instance.InstanceId,Participant->ParticipantId);return true;};
+		for(const auto& Item:Pair.Value.Loadout.Equipment)if(!AddInstance(Item.Value))return false;
+		for(const auto& Item:Pair.Value.Loadout.Relics)if(!AddInstance(Item.Value))return false;
+		for(const auto& Set:Pair.Value.RelicSetCounts)if(Set.Value>=2){FHSREquipmentAggregate Aggregate;Aggregate.Revision=Pair.Value.Revision;DesiredSetStates.Add(Set.Key,Aggregate);DesiredSetParticipants.Add(Set.Key,Participant->ParticipantId);}
+	}
+	const auto RestoreOld=[&](){for(const auto& Old:OldStates)ApplyEquipmentSource(OldParticipants.FindRef(Old.Key),Old.Key,Old.Value,Old.Value.Revision);for(const auto& Old:OldSetStates)ApplyEquipmentSetSource(OldSetParticipants.FindRef(Old.Key),Old.Key,Old.Value,Old.Value.Revision);for(const auto& Desired:DesiredStates)if(!OldStates.Contains(Desired.Key))RemoveEquipmentSource(DesiredParticipants.FindRef(Desired.Key),Desired.Key);for(const auto& Desired:DesiredSetStates)if(!OldSetStates.Contains(Desired.Key))RemoveEquipmentSetSource(DesiredSetParticipants.FindRef(Desired.Key),Desired.Key);};
+	int32 CompletedOperations=0;
+	const auto InjectFailure=[&](){
+#if WITH_EDITOR
+		return EquipmentRestoreFailureAfterOperations>=0&&CompletedOperations>=EquipmentRestoreFailureAfterOperations;
+#else
+		return false;
+#endif
+	};
+	for(const auto& Desired:DesiredStates){if(InjectFailure()||!ApplyEquipmentSource(DesiredParticipants.FindRef(Desired.Key),Desired.Key,Desired.Value,Desired.Value.Revision)){UE_LOG(LogTemp,Error,TEXT("HSR.EquipmentProjection FAIL Apply Instance=%s Revision=%lld"),*Desired.Key.ToString(),Desired.Value.Revision);RestoreOld();return false;}++CompletedOperations;}
+	for(const auto& Desired:DesiredSetStates){if(InjectFailure()||!ApplyEquipmentSetSource(DesiredSetParticipants.FindRef(Desired.Key),Desired.Key,Desired.Value,Desired.Value.Revision)){UE_LOG(LogTemp,Error,TEXT("HSR.EquipmentProjection FAIL ApplySet Set=%s Revision=%lld"),*Desired.Key.ToString(),Desired.Value.Revision);RestoreOld();return false;}++CompletedOperations;}
+	for(const auto& Old:OldStates)if(!DesiredStates.Contains(Old.Key)){if(InjectFailure()||!RemoveEquipmentSource(OldParticipants.FindRef(Old.Key),Old.Key)){UE_LOG(LogTemp,Error,TEXT("HSR.EquipmentProjection FAIL Remove Instance=%s Revision=%lld"),*Old.Key.ToString(),Old.Value.Revision);RestoreOld();return false;}++CompletedOperations;}
+	for(const auto& Old:OldSetStates)if(!DesiredSetStates.Contains(Old.Key)){if(InjectFailure()||!RemoveEquipmentSetSource(OldSetParticipants.FindRef(Old.Key),Old.Key)){UE_LOG(LogTemp,Error,TEXT("HSR.EquipmentProjection FAIL RemoveSet Set=%s Revision=%lld"),*Old.Key.ToString(),Old.Value.Revision);RestoreOld();return false;}++CompletedOperations;}
+	EquipmentProjectionStates=MoveTemp(DesiredStates);EquipmentProjectionParticipants=MoveTemp(DesiredParticipants);
+	EquipmentSetProjectionStates=MoveTemp(DesiredSetStates);EquipmentSetProjectionParticipants=MoveTemp(DesiredSetParticipants);
+	return true;
 }
 
 #if WITH_EDITOR

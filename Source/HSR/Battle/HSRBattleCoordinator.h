@@ -9,6 +9,8 @@
 #include "../Status/HSRStatusTypes.h"
 #include "GameplayEffectTypes.h"
 #include "../Progression/HSRCharacterDerivedStats.h"
+#include "../Equipment/HSREquipmentEffectBridge.h"
+#include "../Equipment/HSREquipmentSubsystem.h"
 #include "HSRBattleCoordinator.generated.h"
 
 class UWorld;
@@ -85,6 +87,14 @@ public:
 	static bool ValidateCharacterProgressionEffectContract(const UGameplayEffect* Effect);
 	static bool HasSameProgressionFingerprint(const FHSRCharacterProgressionContext& A, const FHSRCharacterProgressionContext& B);
 	bool RefreshCharacterProgression(FName ParticipantId, const FHSRCharacterProgressionContext& Context);
+	void SetEquipmentGameplayEffect(TSubclassOf<UGameplayEffect> InEffect) { EquipmentGameplayEffect=InEffect; }
+	void SetRelicSetGameplayEffect(TSubclassOf<UGameplayEffect> InEffect) { RelicSetGameplayEffect=InEffect; }
+	bool ApplyEquipmentSource(FName ParticipantId, const FGuid& InstanceId, const FHSREquipmentAggregate& Aggregate, int64 Revision);
+	bool RemoveEquipmentSource(FName ParticipantId, const FGuid& InstanceId);
+	bool ApplyEquipmentSetSource(FName ParticipantId, FName SetSourceId, const FHSREquipmentAggregate& Aggregate, int64 Revision);
+	bool RemoveEquipmentSetSource(FName ParticipantId, FName SetSourceId);
+	bool ProjectEquipmentRestore(const TMap<FGuid,FHSREquipmentRestoreState>& Candidate);
+	bool SetEquipmentSource(FName ParticipantId,const FGuid& InstanceId,const FHSREquipmentAggregate& Aggregate,int64 Revision) { return ApplyEquipmentSource(ParticipantId,InstanceId,Aggregate,Revision); }
 #if WITH_EDITOR
 	bool HasProgressionPrimaryHandleForDevelopmentTest(FName Id) const;
 	FString GetProgressionPrimaryHandleForDevelopmentTest(FName Id) const;
@@ -96,6 +106,10 @@ public:
 	/** Editor-only fault injection for P11-006 transactional refresh audits. */
 	void SetProgressionApplyFailureForDevelopmentTest(bool bForce) { bForceProgressionApplyFailureForTest=bForce; }
 	void SetProgressionOldRemoveFailureForDevelopmentTest(bool bForce) { bForceProgressionOldRemoveFailureForTest=bForce; }
+	void SetEquipmentRestoreProjectionFailureForDevelopmentTest(bool bForce) { bForceEquipmentRestoreProjectionFailure=bForce; }
+	void SetEquipmentRestoreProjectionFailureAfterOperationsForDevelopmentTest(int32 Count) { EquipmentRestoreFailureAfterOperations=Count; }
+	void SetParticipantsForEquipmentProjectionDevelopmentTest(const TArray<FHSRBattleParticipant>& InParticipants) { Participants=InParticipants; }
+	int32 GetEquipmentProjectionSourceCountForDevelopmentTest() const { return EquipmentEffectBridge?EquipmentEffectBridge->GetActiveSourceCount():0; }
 	EHSRStatusOperationResult AddStatusForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId);
 	EHSRStatusOperationResult AddDamageOverTimeForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId = FGuid());
 	EHSRStatusOperationResult AddSpecificStatusForDevelopmentTest(const UHSRStatusDefinition* Definition, FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId = FGuid());
@@ -211,6 +225,17 @@ private:
 	TMap<FName, FHSRCharacterProgressionContext> CharacterProgressionContexts;
 	struct FHSRProgressionEffectState { TWeakObjectPtr<UAbilitySystemComponent> AbilitySystemComponent; TSubclassOf<UGameplayEffect> EffectClass; FName CharacterId; FHSRCharacterDerivedStats Bonuses; FActiveGameplayEffectHandle ActiveHandle; TArray<FActiveGameplayEffectHandle> SecondaryOwnedHandles; uint64 Epoch = 0; int64 Revision = 0; };
 	TMap<FName, FHSRProgressionEffectState> ProgressionEffects;
+	UPROPERTY() TSubclassOf<UGameplayEffect> EquipmentGameplayEffect;
+	UPROPERTY() TSubclassOf<UGameplayEffect> RelicSetGameplayEffect;
+	UPROPERTY() TObjectPtr<UHSREquipmentEffectBridge> EquipmentEffectBridge;
+	TMap<FGuid,FHSREquipmentAggregate> EquipmentProjectionStates;
+	TMap<FGuid,FName> EquipmentProjectionParticipants;
+	TMap<FName,FHSREquipmentAggregate> EquipmentSetProjectionStates;
+	TMap<FName,FName> EquipmentSetProjectionParticipants;
+#if WITH_EDITOR
+	bool bForceEquipmentRestoreProjectionFailure=false;
+	int32 EquipmentRestoreFailureAfterOperations=-1;
+#endif
 	FName PlayerCharacterId;
 	TSubclassOf<APawn> PlayerCharacterClass;
 	uint64 ProgressionEpoch = 0;

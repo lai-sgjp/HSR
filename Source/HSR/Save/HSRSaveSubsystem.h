@@ -4,6 +4,7 @@
 #include "HSRSaveTypes.h"
 #include "../Progression/HSRCharacterProfileSubsystem.h"
 #include "../Party/HSRPartySubsystem.h"
+#include "../Equipment/HSREquipmentSubsystem.h"
 #include "HSRSaveSubsystem.generated.h"
 
 UCLASS()
@@ -20,7 +21,7 @@ public:
 	void SetDiskFailureInjection(bool bCreate, bool bSave, bool bLoad) { bInjectCreateFailure=bCreate;bInjectSaveFailure=bSave;bInjectLoadFailure=bLoad; }
 #endif
 #if WITH_EDITOR
-	void InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles, UHSRPartySubsystem* InParty) { Profiles=InProfiles; Party=InParty; }
+	void InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles, UHSRPartySubsystem* InParty, UHSREquipmentSubsystem* InEquipment=nullptr) { Profiles=InProfiles; Party=InParty; Equipment=InEquipment; }
 	int64 GetRestoreTransactionRevisionForDevelopmentTest() const { return RestoreTransactionRevision; }
 #endif
 private:
@@ -28,6 +29,7 @@ private:
 	UPROPERTY() FHSRSaveData Current;
 	TWeakObjectPtr<UHSRCharacterProfileSubsystem> Profiles;
 	TWeakObjectPtr<UHSRPartySubsystem> Party;
+	TWeakObjectPtr<UHSREquipmentSubsystem> Equipment;
 	int64 RestoreTransactionRevision=0;
 	FHSRRestoreCommitted RestoreCommitted;
 #if WITH_DEV_AUTOMATION_TESTS

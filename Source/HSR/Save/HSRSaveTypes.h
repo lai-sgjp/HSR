@@ -2,6 +2,7 @@
 #include "CoreMinimal.h"
 #include "../Progression/HSRCharacterProgressionTypes.h"
 #include "../Party/HSRPartyTypes.h"
+#include "../Equipment/HSREquipmentTypes.h"
 #include "HSRSaveTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -14,11 +15,25 @@ struct HSR_API FHSRSaveProfileDto { GENERATED_BODY()
 };
 
 USTRUCT(BlueprintType)
+struct HSR_API FHSREquipmentSaveDto { GENERATED_BODY()
+	UPROPERTY(BlueprintReadWrite) FName DefinitionId;
+	UPROPERTY(BlueprintReadWrite) FGuid InstanceId;
+	UPROPERTY(BlueprintReadWrite) FGuid CharacterId;
+	UPROPERTY(BlueprintReadWrite) int32 Kind = 0;
+	UPROPERTY(BlueprintReadWrite) int32 Slot = 0;
+	UPROPERTY(BlueprintReadWrite) int32 EnhancementLevel = 0;
+	UPROPERTY(BlueprintReadWrite) TArray<FHSREquipmentModifier> Modifiers;
+	UPROPERTY(BlueprintReadWrite) FName SetId;
+	UPROPERTY(BlueprintReadWrite) int32 AuthorityRevision = 0;
+};
+
+USTRUCT(BlueprintType)
 struct HSR_API FHSRSaveData { GENERATED_BODY()
-	UPROPERTY(BlueprintReadWrite) int32 SchemaVersion = 1;
+	UPROPERTY(BlueprintReadWrite) int32 SchemaVersion = 2;
 	UPROPERTY(BlueprintReadWrite) TArray<FHSRSaveProfileDto> Profiles;
 	UPROPERTY(BlueprintReadWrite) TArray<FHSRPartySlot> PartySlots;
 	UPROPERTY(BlueprintReadWrite) int64 PartyRevision = 0;
+	UPROPERTY(BlueprintReadWrite) TArray<FHSREquipmentSaveDto> Equipment;
 };
 
 USTRUCT(BlueprintType)

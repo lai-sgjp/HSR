@@ -1,10 +1,11 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-07-25
+> 最后更新：2026-07-26
 > 作用：CC-SWITCH 切换模型后的快速恢复快照。高级模型负责维护；低级模型不得把本文件作为执行入口。
 
 ## 当前 Phase
 
+- **Phase 12 为 `Ready with inherited follow-ups`：P12-005 最终 Independent Reviewer 为 `PASS WITH FOLLOW-UP`，工程、用户 PIE、教学与归档 Gate 已闭合，当前仅执行精确 commit/push 交付。正式 Inventory/Reward/Drop 和可写装备 UI 属于 Phase 13。**
 - **Phase 11 为 `Ready with inherited follow-ups`：Definition/Profile/Party、唯一且幂等的 Progression GE、Save v1、Editor 重开 Load、Character Detail UI 与 Battle/Detail 互斥切换主链已闭合。最新 Development Build 与 8 项 HSR Automation 通过；Apply/Remove 失败回滚、完整战斗结果消费/返回、Closeout cleanup、C 键和蓝图按钮双向切换均有证据。**
 - Phase 11 follow-ups：Standalone `Esc` 未验证（Selected Viewport PIE 会拦截并停止 PIE）；详情页打开时终局自动回到 ResultView 仅静态审查；完整 Phase 2/5～10 专项回归不由单次主链烟雾替代。
 
@@ -16,6 +17,8 @@
 
 ## 当前任务
 
+- 当前唯一活动任务为 `TASK-P12-005`：Teaching Gate 已 `PASS WITH GUIDED CORRECTION`，等待最终 Independent Review、归档、精确 stage、commit 和 push。P12-003A 是 P12-003B 前置的内部 schema/Resolver 段，没有独立三件套；不得宣称其存在独立归档。
+- P12-005 Git 排除项：`.claude/settings.local.json`、`learn/AI.md`、`learn/CppEngineDepth.md`。提交前必须核对 staged path 清单，禁止 broad staging。
 - 当前无 Phase 9 活动任务。P9-006 已完成 Teacher 六题掌握、Reviewer Gate、provenance、Config EOF 修复、全局 diff-check、四个角色提交和三件套归档；Coordinator closeout Markdown 等待单独提交。
 - Phase 9 角色提交：User `2a2eb3d`、Implementation `a996475`、Teacher `39e0449`、Independent Reviewer `db383b3`。`.agents/CLAUDE.md` 经用户确认纳入 User/project-owned 交付集合。
 - Inherited follow-ups：Epoch 仅 manager-local；用户资产字段级证据仍为 `USER PROVIDED`；P9-000 `InvalidTarget` 诊断粒度、既有 MSVC/AIModule warnings、网络、Save 与 Phase 10 完整 UI 均未由 Phase 9 关闭。
@@ -529,3 +532,11 @@
 - 用户完成 Coordinator/TurnManager/GameplayAbility、激活与结算、稳定排序、跨 World DTO、终局幂等和通用 Ability 管线教学问答；职责边界和 TargetPolicy 继续作为 Phase 6 复习项。
 - 当前 Build 命令 exit 0 但目标 up-to-date，未虚报新的 fresh UHT/C++/Link actions；P5-002～004 PIE 证据主要为用户提供。
 - 唯一活动任务已切换为 `TASK-P6-001`，状态为 `PLANNED — 等待用户确认执行`；本轮不修改 Gameplay。
+
+## 2026-07-26 Phase 12 P12-005 收尾
+
+- P12-001～P12-004C 已归档；P12-004C 最终 Independent Reviewer 为 `PASS`。
+- 最终 Development Editor Build、`HSR.Equipment`、`HSR.Save`、`HSR.UI.EquipmentDetail` 与 `git diff --check` 通过。
+- 用户提供的 PIE 日志证明 Setup、Detail、2->1->2、Save、Clear、重复 Load 与 Cleanup 全部成功；证据等级保持 `USER PROVIDED`。
+- Teaching Gate 为 `PASS WITH GUIDED CORRECTION`：用户掌握四层边界、candidate-first、Save 边界、InstanceId 精确移除和独立 Set Source；差量 Load 幂等在一次引导修正后达到要求。
+- 当前唯一活动任务为 P12-005 最终独立复审、归档、commit/push；未进入 Phase 13，正式 Inventory/Reward/Drop 与可写装备 UI 仍属下一阶段。
