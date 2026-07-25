@@ -136,4 +136,144 @@ TurnSequence → 每步递增（防同一回合重复消耗）
 
 ## Break / Toughness 系统
 
-待补充
+### 架构分层
+
+```
+① 韧性伤害计算（在 RequestActionCore 中，HP 伤害确定后才执行）
+② Break 判断（是否触发 Break）
+③ Break 效果（挂状态 + 行动延后）
+```
+
+### 韧性计算（后处理）
+
+韧性计算是独立的后处理——即使失败也不回滚 HP 伤害。
+
+```
+检查技能元素（Element.Arc）
+  → 构建对应的弱点 Tag（Weakness.Arc）
+  → 检查目标 WeaknessTags 是否有精确匹配
+    → 匹配 → 韧性伤害生效
+    → 不匹配 → 韧性伤害为 0
+  → 应用韧性伤害 GE（SetByCaller 传递伤害值）
+  → 记录 ToughnessResult（Before, Damage, After, bReachedZero）
+```
+
+### Break 判断
+
+同时满足所有条件才触发：
+
+```
+ToughnessResult.bReachedZero == true    // 韧性打到 0
+&& ToughnessResult.Before > 0           // 之前有韧性
+&& After ≈ 0                            // 几乎为 0
+&& !Target->bBreakResultPublished       // 还没触发过 Break（整场只能一次）
+&& 战斗还在进行中
+&& 目标有效
+```
+
+### Break 效果
+
+```
+发布 BreakResult
+  ├── 挂 Break 状态（RequestBreakStatus → Status.Debuff.Break）
+  └── 注册行动延迟（TurnManager->ConsumeBreakDelay）
+       → 目标下次轮到时不行动（跳过一次）
+```
+
+### 元素匹配过程
+
+```
+技能 ElementTag = "Element.Arc"
+  ↓
+构建弱点 Tag = "Weakness.Arc"
+  ↓
+检查 HasTagExact("Weakness.Arc") → 命中与否
+```
+
+元素和弱点是两套独立的 Tag 树，通过字符串替换（`Element.` → `Weakness.`）来匹配。
+
+### 已知问题
+
+- `bBreakResultPublished` 限制每个角色整场战斗只能 Break 一次
+  但 HSR 原版设计中韧性可以恢复并再次 Break——这是未实现的
+
+---
+
+## TransitionSubsystem（地图往返）
+
+### 完整流程
+
+```
+探索世界                         TransitionSubsystem              战斗世界
+  │                                    │                            │
+  ├─ RequestEncounter(定义) ──────────►│                            │
+  │   生成 RequestId                    │                            │
+  │   保存 ReturnTransform             │                            │
+  │   记录 ExplorationMapPath          │                            │
+  │                                    │                            │
+  │  OpenLevel(BattleMap) ────────────────────────────────────────► │
+  │                                    │                            │
+  │                                    │  ├─ ConsumePendingEncounter
+  │                                    │  ├─ BuildParticipants
+  │                                    │  ├─ 战斗...
+  │                                    │  └─  CombatResult
+  │◄─ RequestBattleReturn(Result) ─────│◄───────────────────────────┤
+  │  (ResolvedEncounterIds.Add)        │                            │
+  │                                    │                            │
+  │  OpenLevel(ExplorationMap)         │                            │
+  │  ├─ ConsumeReturnContext            │                            │
+  │  └─ 放回原来位置                    │                            │
+```
+
+### 为什么是 GameInstanceSubsystem
+
+```cpp
+UCLASS()
+class UHSRBattleTransitionSubsystem : public UGameInstanceSubsystem
+```
+
+GameInstanceSubsystem 跨地图存活。如果放在 GameMode 或 World 上，OpenLevel 一调用就被销毁了。
+
+### 状态机
+
+```
+Empty → Pending → Traveling → Consumed
+```
+
+| 状态 | 含义 | 操作 |
+|---|---|---|
+| Empty | 无请求 | RequestEncounter |
+| Pending | 已请求，等待旅行 | 不可操作 |
+| Traveling | 旅行中 | ConsumePendingEncounter |
+| Consumed | 已消费，幂等保护 | 不可重复消费 |
+
+### 返回数据流
+
+```
+RequestEncounter 时保存：
+  → ExplorationMapPath（当前地图路径，Strip PIE 前缀）
+  → ReturnTransform（角色的位置和朝向）
+
+RequestBattleReturn 时使用：
+  → OpenLevel(ExplorationMapPath)
+  → ConsumeReturnContext 拿到 ReturnTransform
+  → 放回原来位置
+```
+
+### 故障恢复
+
+`HandleTravelFailure` 处理 OpenLevel 失败：
+
+```
+引擎 OnTravelFailure → 匹配 TravelTargetMap
+  → 匹配 → 清除状态，允许重试
+  → 不匹配 → 忽略（可能是其他系统的旅行）
+```
+
+### ResolvedEncounterIds 防重复
+
+```cpp
+TSet<FName> ResolvedEncounterIds;
+```
+
+战斗成功返回后，EncounterId 被加入此集合。同一次游戏中同一个遭遇不可重复触发。

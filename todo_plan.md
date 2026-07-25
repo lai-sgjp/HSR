@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～10 均为 `Ready with inherited follow-ups`。P10-005 已归档为 `PASS WITH FOLLOW-UP`；不自动开始 Phase 11。1920x1080 为用户视觉观察，1280x720 为 `USER ACCEPTED / NOT VERIFIED`；物理手柄、完整导航、双分辨率和注入式 preflight 拒绝/重试保留为 follow-ups。
+> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～11 均为 `Ready with inherited follow-ups`。P11-005/P11-006 已归档；当前不自动开始 Phase 12。Phase 11 保留 Standalone Esc、详情页中终局自动返回 ResultView 的动态验证，以及 Phase 2/5～10 完整专项回归。
 
 ## 已完成的规划工作
 
@@ -303,3 +303,10 @@
 - [ ] 完成技能、击破、状态、装备、遗器、背包、奖励和 Save/Load。
 - [ ] 完成从主菜单到任务结束的可重复演示流程。
 - [ ] 完成授权清单、README、架构图、视频、截图、测试和个人贡献说明。
+# Phase 11 closeout（2026-07-25）
+
+- [x] P11-001～004：Character Definition/EXP、Profile authority、唯一 Progression GE 与双角色 Party 主链完成。
+- [x] P11-005：Save v1、原子 Load/Restore、ASC 成长层刷新与 Character Detail UI，归档为 `READY WITH FOLLOW-UP`。
+- [x] P11-006：fresh Build、8 项 HSR Automation、失败注入、Editor 重开 Load、完整战斗返回、C/蓝图按钮 UI 切换与归档完成。
+- [ ] Follow-up：Standalone `Esc` 返回；详情页打开时终局自动显示 ResultView；完整 Phase 2/5～10 专项回归。
+- [ ] Phase 11 提交前 provenance/allowlist 审计及阶段收尾 commit；不得提交 `.claude/settings.local.json`、插件 `__pycache__`、Binaries、Intermediate 或 Saved。

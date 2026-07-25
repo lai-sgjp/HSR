@@ -94,3 +94,18 @@ bool UHSRCharacterProfileSubsystem::GetDefinition(FName CharacterId, const UHSRC
 {
 	const TObjectPtr<const UHSRCharacterDefinition>* Found = Definitions.Find(CharacterId); OutDefinition = Found ? Found->Get() : nullptr; return OutDefinition != nullptr;
 }
+
+void UHSRCharacterProfileSubsystem::ExportProfiles(TArray<FHSRCharacterProfileSnapshot>& OutProfiles) const
+{
+	Profiles.GenerateValueArray(OutProfiles);
+	OutProfiles.Sort([](const auto& A,const auto& B){ return A.RuntimeState.CharacterId.LexicalLess(B.RuntimeState.CharacterId); });
+}
+
+bool UHSRCharacterProfileSubsystem::PrepareRestore(const TArray<FHSRCharacterProfileSnapshot>& Saved, TMap<FName,FHSRCharacterProfileSnapshot>& Out) const
+{
+	if(Saved.Num()!=Profiles.Num()) return false; TMap<FName,FHSRCharacterProfileSnapshot> Candidate;
+	for(const auto& P:Saved){ const auto* D=Definitions.Find(P.RuntimeState.CharacterId); if(!D||Candidate.Contains(P.RuntimeState.CharacterId)||P.RuntimeRevision<0||UHSRCharacterProgressionLibrary::ValidateRuntimeState(D->Get(),P.RuntimeState)!=EHSRCharacterProgressionResult::Success)return false; Candidate.Add(P.RuntimeState.CharacterId,P); }
+	Out=MoveTemp(Candidate); return true;
+}
+
+void UHSRCharacterProfileSubsystem::NotifyRestored(const TArray<FName>& Ids){ for(FName Id:Ids){if(const auto* P=Profiles.Find(Id))ProfileChanged.Broadcast(Id,P->RuntimeRevision);} }

@@ -1803,13 +1803,24 @@ bool UHSRBattleCoordinator::ApplyCharacterProgressionGameplayEffect(const FHSRBa
 	Spec.Data->SetSetByCallerMagnitude(HSRProgressionTags::BonusDefense, Context.ProgressionBonuses.Defense);
 	Spec.Data->SetSetByCallerMagnitude(HSRProgressionTags::BonusSpeed, Context.ProgressionBonuses.Speed);
 	const float OldHealth = ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+#if WITH_EDITOR
+	if (bForceProgressionApplyFailureForTest) return false;
+#endif
 	const FActiveGameplayEffectHandle NewHandle = ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 	if (!NewHandle.WasSuccessfullyApplied() || !ASC->GetActiveGameplayEffect(NewHandle)) return false;
 	if (FHSRProgressionEffectState* Existing = ProgressionEffects.Find(Participant.ParticipantId))
 	{
 		if (Existing->AbilitySystemComponent.IsValid() && Existing->ActiveHandle.IsValid()
 			&& Existing->AbilitySystemComponent->GetActiveGameplayEffect(Existing->ActiveHandle)
-			&& !Existing->AbilitySystemComponent->RemoveActiveGameplayEffect(Existing->ActiveHandle))
+			&&
+#if WITH_EDITOR
+			(bForceProgressionOldRemoveFailureForTest ||
+#endif
+			!Existing->AbilitySystemComponent->RemoveActiveGameplayEffect(Existing->ActiveHandle)
+#if WITH_EDITOR
+			)
+#endif
+			)
 		{
 			const bool bRolledBack = ASC->RemoveActiveGameplayEffect(NewHandle);
 			if (!bRolledBack)
@@ -1842,6 +1853,27 @@ bool UHSRBattleCoordinator::ValidateCharacterProgressionEffectContract(const UGa
 	const auto Has = [Effect](const FGameplayAttribute& Attribute, FGameplayTag Tag) { int32 N=0; for (const FGameplayModifierInfo& M:Effect->Modifiers) if(M.Attribute==Attribute&&M.ModifierOp==EGameplayModOp::Additive&&M.ModifierMagnitude.GetMagnitudeCalculationType()==EGameplayEffectMagnitudeCalculation::SetByCaller&&M.ModifierMagnitude.GetSetByCallerFloat().DataTag==Tag)++N; return N==1; };
 	return Has(UHSRCoreAttributeSet::GetMaxHealthAttribute(),HSRProgressionTags::BonusMaxHealth)&&Has(UHSRCoreAttributeSet::GetAttackAttribute(),HSRProgressionTags::BonusAttack)&&Has(UHSRCoreAttributeSet::GetDefenseAttribute(),HSRProgressionTags::BonusDefense)&&Has(UHSRCoreAttributeSet::GetSpeedAttribute(),HSRProgressionTags::BonusSpeed);
 }
+
+bool UHSRBattleCoordinator::RefreshCharacterProgression(FName ParticipantId,const FHSRCharacterProgressionContext& Context)
+{
+#if WITH_EDITOR
+	++ProgressionRefreshCountForTest;bLastProgressionRefreshResultForTest=false;
+#endif
+	const FHSRBattleParticipant* Participant=Participants.FindByPredicate([ParticipantId](const FHSRBattleParticipant& P){return P.ParticipantId==ParticipantId;});if(!Participant||Participant->Team==EHSRBattleParticipantTeam::Enemy)return false;
+	const FHSRCharacterProgressionContext* Existing=CharacterProgressionContexts.Find(ParticipantId);const TOptional<FHSRCharacterProgressionContext> Previous=Existing?TOptional<FHSRCharacterProgressionContext>(*Existing):TOptional<FHSRCharacterProgressionContext>();CharacterProgressionContexts.Add(ParticipantId,Context);if(ApplyCharacterProgressionGameplayEffect(*Participant)){
+#if WITH_EDITOR
+	bLastProgressionRefreshResultForTest=true;
+#endif
+	return true;}if(Previous.IsSet())CharacterProgressionContexts.Add(ParticipantId,Previous.GetValue());else CharacterProgressionContexts.Remove(ParticipantId);return false;
+}
+
+#if WITH_EDITOR
+bool UHSRBattleCoordinator::HasProgressionPrimaryHandleForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S&&S->ActiveHandle.IsValid();}
+FString UHSRBattleCoordinator::GetProgressionPrimaryHandleForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S?S->ActiveHandle.ToString():FString();}
+int32 UHSRBattleCoordinator::GetProgressionSecondaryCountForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S?S->SecondaryOwnedHandles.Num():0;}
+int32 UHSRBattleCoordinator::GetProgressionActiveHandleCountForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);UAbilitySystemComponent* A=S?S->AbilitySystemComponent.Get():nullptr;if(!S||!A)return 0;int32 N=A->GetActiveGameplayEffect(S->ActiveHandle)?1:0;for(auto H:S->SecondaryOwnedHandles)if(A->GetActiveGameplayEffect(H))++N;return N;}
+FString UHSRBattleCoordinator::GetProgressionFingerprintForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S?FString::Printf(TEXT("Character=%s Revision=%lld Bonus=%.3f/%.3f/%.3f/%.3f"),*S->CharacterId.ToString(),S->Revision,S->Bonuses.MaxHealth,S->Bonuses.Attack,S->Bonuses.Defense,S->Bonuses.Speed):TEXT("None");}
+#endif
 
 bool UHSRBattleCoordinator::HasSameProgressionFingerprint(const FHSRCharacterProgressionContext& A, const FHSRCharacterProgressionContext& B)
 {

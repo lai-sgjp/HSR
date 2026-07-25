@@ -1,8 +1,8 @@
 # Phase 11 详细执行计划：角色定义、成长、队伍与最小存档
 
-> 当前状态：`PHASE 11 IN PROGRESS / PLAN BACKFILLED / NOT YET VERIFIED`
+> 当前状态：`READY WITH FOLLOW-UP / P11-005～006 ARCHIVED / 2026-07-25`
 >
-> 前置基线：Phase 10 为 `Ready with inherited follow-ups`。当前工作树已经出现 P11-001 与 P11-003 的 C++ 和用户资产产物，但尚未形成完整的 Phase 11 任务卡、Automation 运行、角色提交与阶段归档，因此不得写成工作包完成。
+> 前置基线：Phase 10 为 `Ready with inherited follow-ups`。Phase 11 的 Definition、Profile、Party、唯一 Progression GE、Save v1 与 Character Detail UI 主链已经实现并取得 Build、Automation、失败注入、Editor 重开 Load、完整战斗和 UI 切换证据；未验证边界继续作为 follow-up 保留。
 
 ## 1. 当前事实、证据与 Gate 0
 
@@ -35,6 +35,15 @@
 - 同 revision 重建不叠加、revision 更新替换或异常 remove/rollback；
 - Character Runtime 数值已经写入 Progression GE；
 - Save/Load、Party 或角色详情 UI 已实现。
+
+## 2026-07-25 closeout record
+
+- P11-005 Save/Profile/Party/ASC restore and pure-value Character Detail C++ gates are complete; snapshots contain no Actor, ASC, AttributeSet, GameplayEffect, or handle reference.
+- `HSR.CloseoutLoad` reported `Result=0 (Success)` after reopening. Full battle ResultView, result consumption, and return-to-exploration succeeded. Cleanup succeeded and confirmed the fixed slot was absent.
+- Development build, eight HSR automation tests, and `git diff --check` passed.
+- Three two-way `C` switch cycles passed without duplicate widgets, and the Blueprint screen-button round trip passed.
+- Standalone `Esc` remains `NOT VERIFIED / USER ACCEPTED NONBLOCKING`. Automatic return when a terminal result arrives while detail is open passed static review but is not dynamically verified.
+- Phase 11 is `READY WITH FOLLOW-UP`; the two pending dynamic cases are not labeled runtime PASS.
 
 ### 1.3 Gate 0
 
@@ -320,4 +329,4 @@ Phase 16 的备份、迁移链、损坏恢复和全系统 Save 明确延后。
 
 ## 9. 当前唯一下一步
 
-创建并执行 `P11-000` 状态校准任务：只整理当前 P11-001/P11-003 的 provenance、证据和字段契约，不继续扩大 Gameplay。P11-000 通过后，首先补齐 P11-001 Automation 与两个 Character Definition/EXP Curve 资产门禁，再进入 P11-002 Profile authority。
+完成 Phase 11 提交前 provenance/allowlist 审计并创建阶段收尾 commit。Standalone 环境中的 `Esc` 返回、详情页打开时终局自动切回 ResultView、完整 Phase 2/5～10 专项回归继续明确标记为 follow-up；不因此回写为动态 PASS，也不自动进入 Phase 12。

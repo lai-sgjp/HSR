@@ -25,6 +25,11 @@ public:
 	FHSRCharacterProfileChanged& OnProfileChanged() { return ProfileChanged; }
 
 private:
+	friend class UHSRSaveSubsystem;
+	void ExportProfiles(TArray<FHSRCharacterProfileSnapshot>& OutProfiles) const;
+	bool PrepareRestore(const TArray<FHSRCharacterProfileSnapshot>& SavedProfiles, TMap<FName, FHSRCharacterProfileSnapshot>& OutCandidate) const;
+	void CommitRestoreSilent(TMap<FName, FHSRCharacterProfileSnapshot>&& Candidate) { Profiles=MoveTemp(Candidate); }
+	void NotifyRestored(const TArray<FName>& ChangedIds);
 	UPROPERTY() TMap<FName, TObjectPtr<const UHSRCharacterDefinition>> Definitions;
 	UPROPERTY() TMap<FName, FHSRCharacterProfileSnapshot> Profiles;
 	FHSRCharacterProfileChanged ProfileChanged;

@@ -84,7 +84,18 @@ public:
 	FHSRBattleCommandViewState GetCommandViewState() const;
 	static bool ValidateCharacterProgressionEffectContract(const UGameplayEffect* Effect);
 	static bool HasSameProgressionFingerprint(const FHSRCharacterProgressionContext& A, const FHSRCharacterProgressionContext& B);
+	bool RefreshCharacterProgression(FName ParticipantId, const FHSRCharacterProgressionContext& Context);
 #if WITH_EDITOR
+	bool HasProgressionPrimaryHandleForDevelopmentTest(FName Id) const;
+	FString GetProgressionPrimaryHandleForDevelopmentTest(FName Id) const;
+	int32 GetProgressionSecondaryCountForDevelopmentTest(FName Id) const;
+	int32 GetProgressionActiveHandleCountForDevelopmentTest(FName Id) const;
+	FString GetProgressionFingerprintForDevelopmentTest(FName Id) const;
+	int32 GetProgressionRefreshCountForDevelopmentTest() const { return ProgressionRefreshCountForTest; }
+	bool GetLastProgressionRefreshResultForDevelopmentTest() const { return bLastProgressionRefreshResultForTest; }
+	/** Editor-only fault injection for P11-006 transactional refresh audits. */
+	void SetProgressionApplyFailureForDevelopmentTest(bool bForce) { bForceProgressionApplyFailureForTest=bForce; }
+	void SetProgressionOldRemoveFailureForDevelopmentTest(bool bForce) { bForceProgressionOldRemoveFailureForTest=bForce; }
 	EHSRStatusOperationResult AddStatusForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId);
 	EHSRStatusOperationResult AddDamageOverTimeForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId = FGuid());
 	EHSRStatusOperationResult AddSpecificStatusForDevelopmentTest(const UHSRStatusDefinition* Definition, FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId = FGuid());
@@ -203,6 +214,12 @@ private:
 	FName PlayerCharacterId;
 	TSubclassOf<APawn> PlayerCharacterClass;
 	uint64 ProgressionEpoch = 0;
+#if WITH_EDITOR
+	int32 ProgressionRefreshCountForTest=0;
+	bool bLastProgressionRefreshResultForTest=false;
+	bool bForceProgressionApplyFailureForTest=false;
+	bool bForceProgressionOldRemoveFailureForTest=false;
+#endif
 	FHSRBattleResultReadyDelegate BattleResultReady;
 	FHSRBattleCommandStateReadyDelegate CommandStateReady;
 	FRandomStream DevelopmentDamageRandomStream;

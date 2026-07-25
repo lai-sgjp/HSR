@@ -56,7 +56,19 @@ Every color pairing introduced in a UMG widget must come from the legal pairings
 - Skill button size: 120×60px minimum
 - Overall density: compact, information-dense — this is a real-time battle UI, not a reading experience
 
-## Positioning conventions
+## Positioning conventions — Character Detail Screen (P11)
+
+- Background overlay: full canvas fill, dark semi-transparent (`#0D1117` @ 85%)
+- Character portrait: left-anchored, 400×600, X=60, Y=60
+- Info panel: right-anchored, 460×640, X=500, Y=60
+- CharacterId: body-small (12px), text-secondary
+- DisplayName: heading (20px) or title (26px), text-primary
+- Level value: accent-energy (cyan-blue `#4FC3F7`), large (24px)
+- Stat values: text-primary, label (16px)
+- Stat labels: color-coded (HP green, Attack red, Defense blue-indigo, Speed cyan)
+- Skills header: accent-energy, heading (20px)
+
+## Positioning conventions — Battle HUD
 
 - Player status: top-left anchored
 - Enemy status: top-right anchored

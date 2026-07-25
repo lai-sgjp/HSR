@@ -1,6 +1,7 @@
 #include "HSRBattleGameMode.h"
 #include "HSRBattleCoordinator.h"
 #include "../Progression/HSRCharacterProfileSubsystem.h"
+#include "../Save/HSRSaveSubsystem.h"
 #include "../Progression/HSRCharacterDerivedStats.h"
 #include "../Data/Definitions/HSRCharacterCatalog.h"
 #include "../Data/Definitions/HSRCharacterDefinition.h"
@@ -22,6 +23,7 @@
 #include "../UI/HSRBattleCommandWidget.h"
 #include "../Player/HSRPlayerController.h"
 #include "Blueprint/UserWidget.h"
+#include "InputCoreTypes.h"
 
 namespace
 {
@@ -1375,6 +1377,7 @@ void AHSRBattleGameMode::BeginPlay()
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("AHSRBattleGameMode::BeginPlay - Coordinator created"));
+	if(UGameInstance* GI=GetGameInstance())if(UHSRSaveSubsystem* Save=GI->GetSubsystem<UHSRSaveSubsystem>())RestoreCommittedHandle=Save->OnRestoreCommitted().AddUObject(this,&AHSRBattleGameMode::HandleRestoreCommitted);
 
 	// Access the Transition Subsystem to consume the pending encounter
 	UHSRBattleTransitionSubsystem* Subsystem = GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>();
@@ -1452,6 +1455,7 @@ void AHSRBattleGameMode::BeginPlay()
 			*BuildResult.Message.ToString(), static_cast<int32>(BuildResult.FailureType), *BuildResult.TargetDefinitionId.ToString());
 		return;
 	}
+	TryConsumePendingRestore();
 
 #if WITH_EDITOR
 	if (bRunP8ContractHarness)
@@ -2018,6 +2022,33 @@ const auto RunP10001CommandHarnessLocal = [this]()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("P6-004A GameMode WidgetCreate Result=SKIPPED Reason=BattleCommandWidgetClassNotConfigured"));
 	}
+	if (CharacterDetailWidgetClass)
+	{
+		CharacterDetailWidget = CreateWidget<UUserWidget>(GetWorld(), CharacterDetailWidgetClass);
+		if (CharacterDetailWidget)
+		{
+			CharacterDetailWidget->AddToViewport();
+			CharacterDetailWidget->SetVisibility(ESlateVisibility::Collapsed);
+			UE_LOG(LogTemp, Log, TEXT("P11-005 CharacterDetailWidgetCreate Result=SUCCESS Class=%s Widget=%s"), *CharacterDetailWidgetClass->GetName(), *CharacterDetailWidget->GetName());
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("P11-005 CharacterDetailWidgetCreate Result=FAIL Class=%s"), *CharacterDetailWidgetClass->GetName());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("P11-005 CharacterDetailWidgetCreate Result=SKIPPED Reason=CharacterDetailWidgetClassNotConfigured"));
+	}
+	if (APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
+	{
+		EnableInput(PlayerController);
+		if (InputComponent)
+		{
+			InputComponent->BindKey(EKeys::C, IE_Pressed, this, &AHSRBattleGameMode::HandleCharacterDetailToggleInput);
+			InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AHSRBattleGameMode::HandleCharacterDetailBackInput);
+		}
+	}
 #if WITH_EDITOR
 	if (bRunP10001CommandHarness)
 	{
@@ -2103,6 +2134,11 @@ const auto RunP10001CommandHarnessLocal = [this]()
 
 void AHSRBattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
+	{
+		DisableInput(PlayerController);
+	}
+	if(RestoreCommittedHandle.IsValid())if(UGameInstance* GI=GetGameInstance())if(UHSRSaveSubsystem* Save=GI->GetSubsystem<UHSRSaveSubsystem>()){Save->OnRestoreCommitted().Remove(RestoreCommittedHandle);RestoreCommittedHandle.Reset();}PendingRestoreTransaction=0;PendingRestoreCharacterId=NAME_None;
 	RestoreP10004GameInput(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr, TEXT("EndPlay"));
 	if (CommandViewModel)
 	{
@@ -2118,6 +2154,11 @@ void AHSRBattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		BattleCommandWidget->RemoveFromParent();
 		BattleCommandWidget = nullptr;
+	}
+	if (CharacterDetailWidget)
+	{
+		CharacterDetailWidget->RemoveFromParent();
+		CharacterDetailWidget = nullptr;
 	}
 	if (Coordinator)
 	{
@@ -2154,6 +2195,9 @@ void AHSRBattleGameMode::HandleBattleResultReady(const FHSRBattleResult& Result)
 		return;
 	}
 
+	// The result view is hosted by the battle command widget. If battle ends
+	// while the detail screen is open, restore that widget before publishing it.
+	ShowBattleCommands();
 	if (!CommandViewModel || !CommandViewModel->ShowBattleResult(Result))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultReady - REJECTED duplicate or stale result RequestId=%s"), *Result.RequestId.ToString());
@@ -2161,6 +2205,59 @@ void AHSRBattleGameMode::HandleBattleResultReady(const FHSRBattleResult& Result)
 	}
 	ApplyP10004ResultInput(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr, Result.RequestId);
 	UE_LOG(LogTemp, Log, TEXT("P10-004 ResultView Show RequestId=%s Outcome=%d"), *Result.RequestId.ToString(), static_cast<int32>(Result.Outcome));
+}
+
+void AHSRBattleGameMode::ShowCharacterDetail()
+{
+	if (!CharacterDetailWidget || (CommandViewModel && CommandViewModel->GetStateCopy().ResultViewState.bVisible))
+	{
+		return;
+	}
+	if (BattleCommandWidget)
+	{
+		BattleCommandWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	CharacterDetailWidget->SetVisibility(ESlateVisibility::Visible);
+	bCharacterDetailVisible = true;
+	UE_LOG(LogTemp, Log, TEXT("P11-005 BattleUIScreen View=CharacterDetail"));
+}
+
+void AHSRBattleGameMode::ShowBattleCommands()
+{
+	if (!bCharacterDetailVisible)
+	{
+		return;
+	}
+	if (CharacterDetailWidget)
+	{
+		CharacterDetailWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	if (BattleCommandWidget)
+	{
+		BattleCommandWidget->SetVisibility(ESlateVisibility::Visible);
+	}
+	bCharacterDetailVisible = false;
+	UE_LOG(LogTemp, Log, TEXT("P11-005 BattleUIScreen View=BattleCommands"));
+}
+
+void AHSRBattleGameMode::HandleCharacterDetailToggleInput()
+{
+	if (bCharacterDetailVisible) ShowBattleCommands(); else ShowCharacterDetail();
+}
+
+void AHSRBattleGameMode::HandleCharacterDetailBackInput()
+{
+	ShowBattleCommands();
+}
+
+void AHSRBattleGameMode::HandleRestoreCommitted(const FHSRRestoreCommitInfo& Info)
+{
+	if(Info.TransactionRevision<=LastHandledRestoreTransaction||!Info.ChangedCharacterIds.Contains(PlayerCharacterId))return;PendingRestoreTransaction=Info.TransactionRevision;PendingRestoreCharacterId=PlayerCharacterId;TryConsumePendingRestore();
+}
+
+void AHSRBattleGameMode::TryConsumePendingRestore()
+{
+	if(PendingRestoreTransaction<=LastHandledRestoreTransaction||PendingRestoreCharacterId.IsNone())return;UGameInstance* GI=GetGameInstance();UHSRCharacterProfileSubsystem* Profiles=GI?GI->GetSubsystem<UHSRCharacterProfileSubsystem>():nullptr;FHSRCharacterProgressionContext Context;const bool bSuccess=Coordinator&&Profiles&&Profiles->GetProgressionContext(PendingRestoreCharacterId,Context)&&Coordinator->RefreshCharacterProgression(TEXT("Player"),Context);if(bSuccess){UE_LOG(LogTemp,Log,TEXT("P11-005 RestoreRefresh Tx=%lld Character=%s Result=SUCCESS"),PendingRestoreTransaction,*PendingRestoreCharacterId.ToString());}else{UE_LOG(LogTemp,Warning,TEXT("P11-005 RestoreRefresh Tx=%lld Character=%s Result=FAILED"),PendingRestoreTransaction,*PendingRestoreCharacterId.ToString());}if(bSuccess){LastHandledRestoreTransaction=PendingRestoreTransaction;PendingRestoreTransaction=0;PendingRestoreCharacterId=NAME_None;}
 }
 
 void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& RequestId)

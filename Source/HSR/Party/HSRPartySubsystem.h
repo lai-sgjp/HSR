@@ -23,6 +23,10 @@ public:
 #endif
 
 private:
+	friend class UHSRSaveSubsystem;
+	bool PrepareRestore(const FHSRPartySnapshot& Saved, FHSRPartySnapshot& OutCandidate) const;
+	void CommitRestoreSilent(FHSRPartySnapshot&& Candidate) { Slots=MoveTemp(Candidate.Slots); Revision=Candidate.Revision; }
+	void NotifyRestored() { PartyChanged.Broadcast(Revision); }
 	bool IsValidSlot(int32 Slot) const { return Slot >= 0 && Slot < Capacity; }
 	bool IsKnownProfile(FName CharacterId) const;
 	bool IsDuplicate(const TArray<FHSRPartySlot>& Candidate, FName CharacterId, int32 IgnoreSlot = INDEX_NONE) const;

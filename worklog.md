@@ -7,7 +7,7 @@
 - User accepts P10-002 equal-speed/death and P10-003 replay/reset/Finished/two-round matrices as inherited static-review follow-ups, not dynamic PIE PASS.
 - Final P10-005 `HSREditor Win64 Development -Rebuild` succeeded: exit 0, 26 actions, relevant HSR UI/Battle/Ability compilation, HSR DLL/LIB link, plugin build, WriteMetadata, 121.32s. The initial sandbox run failed only on AppData permission; an external target-up-to-date run was not treated as authoritative.
 - P10-005 Teacher and Independent Reviewer Gates are `PASS WITH FOLLOW-UP`; Phase 5–9 regression claims are indexed to retained task/log evidence, while absent dynamic cases remain explicitly labelled.
-- Phase 10 is `Ready with inherited follow-ups`; Phase 11 is not started. 1920x1080 is `USER PROVIDED / VISUALLY OBSERVED`; 1280x720 is `USER ACCEPTED / NOT VERIFIED`; physical gamepad, full navigation, dual-resolution, and injected preflight rejection/retry checks remain open. No Source/Content/Config/Git action is implied by this worklog entry.
+- At the time of this Phase 10 closeout, Phase 11 had not started. Phase 11 was subsequently completed on 2026-07-25 as recorded in its own closeout entry. The Phase 10 follow-ups remain historical and are not rewritten.
 
 ## 2026-07-15｜规则迁移与项目文档基线
 
@@ -1830,3 +1830,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 本轮未修改 Source、Config、Content，未 stage、commit 或 push。
 - 2026-07-24：P10-005 分辨率证据更新：用户确认已在 1920x1080 下观察战斗 UI，证据等级为 `USER PROVIDED / VISUALLY OBSERVED`；1280x720 未观察，继续明确标记为未验证，不将单一分辨率改写为双分辨率通过。
 - 2026-07-24：用户明确接受 1280x720 保留为 `USER ACCEPTED / NOT VERIFIED / inherited follow-up`；该项不再阻断 P10-005，但不会被记录为分辨率 PASS。
+# 2026-07-25｜Phase 11 P11-005/P11-006 收尾
+
+- 完成 Save v1 纯 DTO、Profile/Party candidate-first 原子恢复、RestoreCommitted→Battle progression refresh，以及 Character Detail Snapshot/ViewModel/UMG 主链。
+- Progression Apply/Remove 故障注入验证通过：失败保留旧层，解除注入后重试收敛为 `Matching=1 / Secondary=0`。
+- 最新 `HSREditor Win64 Development` Build 成功；8 项 `HSR.*` Automation 全部 `Success`；`git diff --check` 通过。
+- 用户回传证明 Editor 重开后的 `HSR.CloseoutLoad Result=0`（枚举 `Success`）、完整 ResultView→Consume→Return、CloseoutCleanup 成功。
+- Battle Command 与 Character Detail 改为互斥显示：默认 Battle；C 键和蓝图按钮双向切换动态通过，连续三轮未见重复绑定或 Blueprint Runtime Error。
+- Selected Viewport PIE 抢占 Esc 并停止 PIE；Standalone Esc 未验证。详情页中终局自动恢复 ResultView 已通过静态审查，动态证据未提供。两项均保留为非阻断 follow-up。
+- P11-005/P11-006 三件套已归档；当前只剩提交前 provenance/allowlist 审计和阶段收尾 commit。本轮没有清理或认领既有噪声。

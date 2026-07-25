@@ -112,3 +112,9 @@ bool UHSRPartySubsystem::GetSnapshot(FHSRPartySnapshot& OutSnapshot) const
 {
 	OutSnapshot.Slots = Slots; OutSnapshot.Revision = Revision; return true;
 }
+
+bool UHSRPartySubsystem::PrepareRestore(const FHSRPartySnapshot& Saved,FHSRPartySnapshot& Out) const
+{
+	if(Saved.Slots.Num()!=Capacity||Saved.Revision<0)return false; TSet<FName> Seen;
+	for(const auto& Slot:Saved.Slots){ if(Slot.IsEmpty())continue; if(Seen.Contains(Slot.CharacterId)||!IsKnownProfile(Slot.CharacterId))return false; Seen.Add(Slot.CharacterId); } Out=Saved; return true;
+}

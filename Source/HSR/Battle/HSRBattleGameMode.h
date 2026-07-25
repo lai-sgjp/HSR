@@ -9,12 +9,14 @@ class UHSRBattleCoordinator;
 class UHSRSkillDefinition;
 class UHSRBattleCommandViewModel;
 class UHSRBattleCommandWidget;
+class UUserWidget;
 class UHSRDamageRuleDefinition;
 class UGameplayEffect;
 class UHSREnemyDefinition;
 class UHSRStatusDefinition;
 class UHSRCharacterCatalog;
 struct FHSRBattleResult;
+struct FHSRRestoreCommitInfo;
 
 UENUM(BlueprintType)
 enum class EHSRP5TerminalTestScenario : uint8
@@ -43,6 +45,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Battle")
 	UHSRBattleCoordinator* GetCoordinator() const { return Coordinator; }
 	UFUNCTION(BlueprintPure, Category = "Battle") UHSRBattleCommandViewModel* GetCommandViewModel() const { return CommandViewModel; }
+	UFUNCTION(BlueprintCallable, Category = "Battle|UI") void ShowCharacterDetail();
+	UFUNCTION(BlueprintCallable, Category = "Battle|UI") void ShowBattleCommands();
+	UFUNCTION(BlueprintPure, Category = "Battle|UI") bool IsCharacterDetailVisible() const { return bCharacterDetailVisible; }
 
 protected:
 	/** User-created SkillDefinition used by the Battle runtime; this is not owned by the exploration character. */
@@ -77,6 +82,9 @@ protected:
 	/** User-owned /Game/UI/Battle/WBP_BattleCommandPanel class. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|UI")
 	TSubclassOf<UHSRBattleCommandWidget> BattleCommandWidgetClass;
+	/** Optional user-owned detail widget. It owns its ViewModel setup; GameMode owns only viewport lifetime. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|UI")
+	TSubclassOf<UUserWidget> CharacterDetailWidgetClass;
 
 #if WITH_EDITORONLY_DATA
 	/** Opt-in legacy P5/P6 harnesses. Keep disabled for normal editor PIE. */
@@ -135,9 +143,19 @@ protected:
 	TObjectPtr<UHSRBattleCoordinator> Coordinator;
 	UPROPERTY() TObjectPtr<UHSRBattleCommandViewModel> CommandViewModel;
 	UPROPERTY() TObjectPtr<UHSRBattleCommandWidget> BattleCommandWidget;
+	UPROPERTY() TObjectPtr<UUserWidget> CharacterDetailWidget;
 	FDelegateHandle CommandStateReadyHandle;
 	FDelegateHandle BattleResultReadyHandle;
 	FDelegateHandle ResultConfirmRequestedHandle;
+	FDelegateHandle RestoreCommittedHandle;
+	void HandleRestoreCommitted(const FHSRRestoreCommitInfo& Info);
+	void TryConsumePendingRestore();
+	int64 LastHandledRestoreTransaction=0;
+	int64 PendingRestoreTransaction=0;
+	FName PendingRestoreCharacterId;
+	bool bCharacterDetailVisible=false;
+	void HandleCharacterDetailToggleInput();
+	void HandleCharacterDetailBackInput();
 
 	void HandleBattleResultReady(const FHSRBattleResult& Result);
 	void HandleBattleResultConfirmRequested(const FGuid& RequestId);

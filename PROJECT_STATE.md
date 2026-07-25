@@ -1,9 +1,12 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-07-22
+> 最后更新：2026-07-25
 > 作用：CC-SWITCH 切换模型后的快速恢复快照。高级模型负责维护；低级模型不得把本文件作为执行入口。
 
 ## 当前 Phase
+
+- **Phase 11 为 `Ready with inherited follow-ups`：Definition/Profile/Party、唯一且幂等的 Progression GE、Save v1、Editor 重开 Load、Character Detail UI 与 Battle/Detail 互斥切换主链已闭合。最新 Development Build 与 8 项 HSR Automation 通过；Apply/Remove 失败回滚、完整战斗结果消费/返回、Closeout cleanup、C 键和蓝图按钮双向切换均有证据。**
+- Phase 11 follow-ups：Standalone `Esc` 未验证（Selected Viewport PIE 会拦截并停止 PIE）；详情页打开时终局自动回到 ResultView 仅静态审查；完整 Phase 2/5～10 专项回归不由单次主链烟雾替代。
 
 - **Phase 1 与 Phase 2 均为 `Ready`。P2-003 最终处置为 `USER ACCEPTED`：Reviewer 的唯一结论仍为 `REVISE`，用户明确接受未完全掌握的学习项作为非阻断复习项。**
 - **Phase 3 为 `Ready`：P3-003 最终 Reviewer commit `3b3fbeb` 为 `PASS WITH FOLLOW-UP`，且用户已明确接受三个工程证据缺口；所有 follow-up 原样保留。**
