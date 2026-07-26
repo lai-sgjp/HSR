@@ -2049,3 +2049,32 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Return Consumer 统一 Pawn/commit failure 的 10 次有限 retry，耗尽后 `ClearReturn` 回滚胜利 resolved；普通 Teleport 增加 Battle Return pending preflight。
 - BattleTransition 记录 source/target package，以 CoreTicker 提供跨 World 5 秒 timeout；source/target/null failure 清理事务，无关 failure 忽略。
 - 补充 source/target/PIE-prefix/unrelated failure matcher 测试；Development Editor 11/11，`HSR.Map` 与 `HSR.BattleReturn` 均 exit 0，提交最终复审。
+
+# 2026-07-26｜P15-004 Save v5 地图状态投影
+
+- Save schema 升级为 v5，Map DTO 保存稳定 Map location、Region/Teleport 解锁、探索 Flag 与 revision；不保存 World/Actor/UObject，不在 Load 中旅行。
+- MapSubsystem 新增 export/prepare/difference/silent commit，candidate-first 拒绝重复/未知 ID、非法 Transform 和 travel pending；v1-v4 迁移为空 Map 状态。
+- Development Editor 最终 4/4 actions 成功；`HSR.Map` 4/4 与 `HSR.Save` 8/8 Automation Success，exit code 0。
+- 新增 P15 Editor-only Save/Clear/Load/Cleanup 控制台命令，等待用户完成关闭并重开 Editor 的冷恢复 Gate。
+
+# 2026-07-26｜P15-004 Review Correction
+
+- 首轮 Independent Review=`REVISE`：Map restore 未拒绝 Battle Return pending；SaveSubsystem 集成、v1-v4 迁移和 malformed DTO 证据不足。
+- Map candidate prepare 现同时拒绝普通 Map travel 与 Battle Return pending；新增实际 preflight 与纯策略 Automation seam。
+- `HSR.Save.MapV5Integration` 覆盖 v5 capture、changed load exactly-once、repeat no-op、bad Map 全局零污染/no travel、v1-v4 empty Map 迁移和 legacy nonempty Map 拒绝。
+- Map DTO 补齐 duplicate Region/Flag、unknown Region/Teleport、None、negative revision、empty-map residue 等失败矩阵。
+- 修订后 Development Editor 14/14；`HSR.Map` 4/4、`HSR.Save` 10/10 Success，均 exit code 0；等待用户冷恢复 Gate 与最终复审。
+
+# 2026-07-26｜P15-004 Editor 冷恢复 PASS
+
+- 用户从 Map A 经 `Teleport.AB` 到 Map B，arrival commit 为 `Arrival.FromA (-460,430,0)`；设置 `Exploration.P15.EditorGate` 后保存 schema 5。
+- 保存内容：Map.B、Arrival.FromA、2 Regions、2 Teleports、1 Flag、Revision 7、RestoreTx 0。
+- 完全关闭并重开 Editor 后，两次 Load 均恢复相同内容，RestoreTx 均为 1；证明第二次 Load no-op；期间无新 Map travel issued，Cleanup 成功。
+- P15-004 工程 Re-review 与用户 Gate 均通过并归档；活动任务切换到 P15-005 阶段收尾。
+
+# 2026-07-26｜Phase 15 最终验证与 Teacher Gate
+
+- Final fresh Development Editor Rebuild 24/24 成功；`HSR.Map` 4/4、`HSR.Save` 10/10、`HSR.BattleReturn` 1/1 均 Success、exit code 0。
+- 用户完成 Definition/Runtime、World/GI 生命周期、旅行事务、Map/Battle 权威、Result/Return/Map 生命周期、Save v5 与证据边界七组复述。
+- Teacher=`PASS WITH GUIDED CORRECTION`；FName 稳定来源、Arrival Consumer 实际机制与 Save/启动旅行边界已校准并写入 learning journal。
+- Phase 15 仍不外推 Standalone、packaged、真实注入式 travel failure、包损坏/强杀进程恢复或多人旅行。

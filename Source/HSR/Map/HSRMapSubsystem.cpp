@@ -9,6 +9,50 @@
 #include "../Battle/HSRBattleTransitionSubsystem.h"
 #include "Misc/PackageName.h"
 
+namespace
+{
+bool IsValidMapTransform(const FTransform& Transform)
+{
+	const FVector Location = Transform.GetLocation();
+	const FVector Scale = Transform.GetScale3D();
+	const FQuat Rotation = Transform.GetRotation();
+	return !Transform.ContainsNaN()
+		&& FMath::IsFinite(Location.X) && FMath::IsFinite(Location.Y) && FMath::IsFinite(Location.Z)
+		&& FMath::IsFinite(Scale.X) && FMath::IsFinite(Scale.Y) && FMath::IsFinite(Scale.Z)
+		&& FMath::IsFinite(Rotation.X) && FMath::IsFinite(Rotation.Y)
+		&& FMath::IsFinite(Rotation.Z) && FMath::IsFinite(Rotation.W);
+}
+
+bool AddUniqueNames(const TArray<FName>& Source, TSet<FName>& Target)
+{
+	for (const FName Id : Source)
+	{
+		if (Id.IsNone() || Target.Contains(Id))
+		{
+			return false;
+		}
+		Target.Add(Id);
+	}
+	return true;
+}
+
+bool NameSetsEqual(const TSet<FName>& Left, const TSet<FName>& Right)
+{
+	if (Left.Num() != Right.Num())
+	{
+		return false;
+	}
+	for (const FName Id : Left)
+	{
+		if (!Right.Contains(Id))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+}
+
 void UHSRMapSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
@@ -155,6 +199,21 @@ EHSRMapOperationResult UHSRMapSubsystem::UnlockTeleport(const FName TeleportId)
 		return EHSRMapOperationResult::NoOp;
 	}
 	Snapshot.UnlockedTeleportIds.Add(TeleportId);
+	CommitStateChange();
+	return EHSRMapOperationResult::Success;
+}
+
+EHSRMapOperationResult UHSRMapSubsystem::SetExplorationFlag(const FName FlagId)
+{
+	if (FlagId.IsNone())
+	{
+		return EHSRMapOperationResult::InvalidDefinition;
+	}
+	if (Snapshot.ExplorationFlags.Contains(FlagId))
+	{
+		return EHSRMapOperationResult::NoOp;
+	}
+	Snapshot.ExplorationFlags.Add(FlagId);
 	CommitStateChange();
 	return EHSRMapOperationResult::Success;
 }
@@ -436,6 +495,92 @@ bool UHSRMapSubsystem::IsRegionUnlocked(const FName RegionId) const
 bool UHSRMapSubsystem::IsTeleportUnlocked(const FName TeleportId) const
 {
 	return Snapshot.UnlockedTeleportIds.Contains(TeleportId);
+}
+
+void UHSRMapSubsystem::ExportSaveData(FHSRMapSaveData& OutData) const
+{
+	OutData = FHSRMapSaveData();
+	OutData.CurrentLocation = Snapshot.CurrentLocation;
+	OutData.UnlockedRegionIds = Snapshot.UnlockedRegionIds.Array();
+	OutData.UnlockedTeleportIds = Snapshot.UnlockedTeleportIds.Array();
+	OutData.ExplorationFlags = Snapshot.ExplorationFlags.Array();
+	OutData.UnlockedRegionIds.Sort(FNameLexicalLess());
+	OutData.UnlockedTeleportIds.Sort(FNameLexicalLess());
+	OutData.ExplorationFlags.Sort(FNameLexicalLess());
+	OutData.Revision = Snapshot.Revision;
+}
+
+bool UHSRMapSubsystem::PrepareRestore(const FHSRMapSaveData& Data, FHSRMapRuntimeSnapshot& OutCandidate) const
+{
+	const UHSRBattleTransitionSubsystem* BattleTravel = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>() : nullptr;
+	if (!CanRestoreState(bTravelPending, BattleTravel && BattleTravel->HasReturnPending())
+		|| Data.Revision < 0 || !IsValidMapTransform(Data.CurrentLocation.WorldTransform))
+	{
+		return false;
+	}
+	FHSRMapRuntimeSnapshot Candidate;
+	Candidate.CurrentLocation = Data.CurrentLocation;
+	Candidate.Revision = Data.Revision;
+	if (!AddUniqueNames(Data.UnlockedRegionIds, Candidate.UnlockedRegionIds)
+		|| !AddUniqueNames(Data.UnlockedTeleportIds, Candidate.UnlockedTeleportIds)
+		|| !AddUniqueNames(Data.ExplorationFlags, Candidate.ExplorationFlags))
+	{
+		return false;
+	}
+	if (Candidate.CurrentLocation.MapId.IsNone())
+	{
+		if (!Candidate.CurrentLocation.ArrivalId.IsNone() || !Candidate.UnlockedRegionIds.IsEmpty()
+			|| !Candidate.UnlockedTeleportIds.IsEmpty() || !Candidate.ExplorationFlags.IsEmpty())
+		{
+			return false;
+		}
+		OutCandidate = MoveTemp(Candidate);
+		return true;
+	}
+	if (!Maps.Contains(Candidate.CurrentLocation.MapId))
+	{
+		return false;
+	}
+	for (const FName RegionId : Candidate.UnlockedRegionIds)
+	{
+		bool bKnown = false;
+		for (const TPair<FName, FRegisteredMap>& Pair : Maps)
+		{
+			bKnown |= Pair.Value.RegionId == RegionId;
+		}
+		if (!bKnown)
+		{
+			return false;
+		}
+	}
+	for (const FName TeleportId : Candidate.UnlockedTeleportIds)
+	{
+		if (!Teleports.Contains(TeleportId))
+		{
+			return false;
+		}
+	}
+	OutCandidate = MoveTemp(Candidate);
+	return true;
+}
+
+bool UHSRMapSubsystem::IsRestoreDifferent(const FHSRMapRuntimeSnapshot& Candidate) const
+{
+	return !(Snapshot.CurrentLocation == Candidate.CurrentLocation)
+		|| !NameSetsEqual(Snapshot.UnlockedRegionIds, Candidate.UnlockedRegionIds)
+		|| !NameSetsEqual(Snapshot.UnlockedTeleportIds, Candidate.UnlockedTeleportIds)
+		|| !NameSetsEqual(Snapshot.ExplorationFlags, Candidate.ExplorationFlags)
+		|| Snapshot.Revision != Candidate.Revision;
+}
+
+void UHSRMapSubsystem::CommitRestore(FHSRMapRuntimeSnapshot&& Candidate, const bool bNotify)
+{
+	Snapshot = MoveTemp(Candidate);
+	if (bNotify)
+	{
+		MapStateChanged.Broadcast(Snapshot);
+	}
 }
 
 void UHSRMapSubsystem::CommitStateChange()

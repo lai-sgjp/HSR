@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include <limits>
 #include "Engine/GameInstance.h"
 #include "../Data/Definitions/HSRMapDefinition.h"
 #include "../Data/Definitions/HSRTeleportDefinition.h"
@@ -177,6 +178,74 @@ bool FHSRMapTravelTransactionTest::RunTest(const FString&)
 		TEXT("Region.Missing"), TEXT("Arrival.Missing")));
 	TestTrue(TEXT("existing registered map package found"), PackageMaps->DoesRegisteredMapPackageExistForAutomation(TEXT("Map.RealA")));
 	TestFalse(TEXT("missing registered map package rejected"), PackageMaps->DoesRegisteredMapPackageExistForAutomation(TEXT("Map.Missing")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRMapSaveProjectionTest, "HSR.Map.SaveV5Projection",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRMapSaveProjectionTest::RunTest(const FString&)
+{
+	using namespace HSR::P15::Tests;
+	UGameInstance* GameInstance = NewObject<UGameInstance>();
+	UHSRMapSubsystem* Maps = NewObject<UHSRMapSubsystem>(GameInstance);
+	Maps->RegisterMapDefinition(*MakeMap(TEXT("Map.A"), TEXT("/Game/Maps/Map_A.Map_A"), TEXT("Region.A"), TEXT("Arrival.A")));
+	Maps->RegisterMapDefinition(*MakeMap(TEXT("Map.B"), TEXT("/Game/Maps/Map_B.Map_B"), TEXT("Region.B"), TEXT("Arrival.B")));
+	Maps->RegisterTeleportDefinition(*MakeTeleport(TEXT("Teleport.AB"), TEXT("Map.A"), TEXT("Map.B"), TEXT("Arrival.FromA"), false));
+	Maps->SetCurrentLocation(TEXT("Map.B"));
+	Maps->UnlockRegion(TEXT("Region.B"));
+	Maps->UnlockTeleport(TEXT("Teleport.AB"));
+	Maps->SetExplorationFlag(TEXT("Exploration.Chest.B"));
+
+	FHSRMapSaveData Saved;
+	Maps->ExportSaveData(Saved);
+	FHSRMapRuntimeSnapshot Candidate;
+	TestTrue(TEXT("valid map save prepares"), Maps->PrepareRestore(Saved, Candidate));
+	TestFalse(TEXT("same candidate is no-op"), Maps->IsRestoreDifferent(Candidate));
+
+	FHSRMapSaveData Duplicate = Saved;
+	Duplicate.UnlockedTeleportIds.Add(TEXT("Teleport.AB"));
+	TestFalse(TEXT("duplicate teleport id rejected"), Maps->PrepareRestore(Duplicate, Candidate));
+	Duplicate = Saved;
+	Duplicate.UnlockedRegionIds.Add(TEXT("Region.B"));
+	TestFalse(TEXT("duplicate region id rejected"), Maps->PrepareRestore(Duplicate, Candidate));
+	Duplicate = Saved;
+	Duplicate.ExplorationFlags.Add(TEXT("Exploration.Chest.B"));
+	TestFalse(TEXT("duplicate flag rejected"), Maps->PrepareRestore(Duplicate, Candidate));
+	FHSRMapSaveData Unknown = Saved;
+	Unknown.CurrentLocation.MapId = TEXT("Map.Unknown");
+	TestFalse(TEXT("unknown map rejected"), Maps->PrepareRestore(Unknown, Candidate));
+	Unknown = Saved;
+	Unknown.UnlockedRegionIds.Add(TEXT("Region.Unknown"));
+	TestFalse(TEXT("unknown region rejected"), Maps->PrepareRestore(Unknown, Candidate));
+	Unknown = Saved;
+	Unknown.UnlockedTeleportIds.Add(TEXT("Teleport.Unknown"));
+	TestFalse(TEXT("unknown teleport rejected"), Maps->PrepareRestore(Unknown, Candidate));
+	FHSRMapSaveData NoneId = Saved;
+	NoneId.ExplorationFlags.Add(NAME_None);
+	TestFalse(TEXT("none flag rejected"), Maps->PrepareRestore(NoneId, Candidate));
+	FHSRMapSaveData NegativeRevision = Saved;
+	NegativeRevision.Revision = -1;
+	TestFalse(TEXT("negative revision rejected"), Maps->PrepareRestore(NegativeRevision, Candidate));
+	FHSRMapSaveData EmptyWithResidue;
+	EmptyWithResidue.CurrentLocation.ArrivalId = TEXT("Arrival.Residue");
+	TestFalse(TEXT("empty map with arrival rejected"), Maps->PrepareRestore(EmptyWithResidue, Candidate));
+	FHSRMapSaveData BadTransform = Saved;
+	BadTransform.CurrentLocation.WorldTransform.SetLocation(FVector(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0));
+	TestFalse(TEXT("non-finite transform rejected"), Maps->PrepareRestore(BadTransform, Candidate));
+	TestTrue(TEXT("failed candidates preserve runtime"), Maps->GetSnapshot().CurrentLocation.MapId == Saved.CurrentLocation.MapId);
+
+	FHSRMapSaveData Different = Saved;
+	Different.ExplorationFlags.Add(TEXT("Exploration.Story.B"));
+	Different.Revision++;
+	TestTrue(TEXT("different valid candidate prepares"), Maps->PrepareRestore(Different, Candidate));
+	TestTrue(TEXT("different candidate detected"), Maps->IsRestoreDifferent(Candidate));
+	int32 Broadcasts = 0;
+	Maps->OnMapStateChanged().AddLambda([&Broadcasts](const FHSRMapRuntimeSnapshot&) { ++Broadcasts; });
+	Maps->CommitRestore(MoveTemp(Candidate), true);
+	TestEqual(TEXT("restore notifies once"), Broadcasts, 1);
+	FHSRMapRuntimeSnapshot Repeat;
+	TestTrue(TEXT("repeat candidate prepares"), Maps->PrepareRestore(Different, Repeat));
+	TestFalse(TEXT("repeat load detected as no-op"), Maps->IsRestoreDifferent(Repeat));
 	return true;
 }
 

@@ -79,6 +79,30 @@ struct FHSRMapRuntimeSnapshot
 	TSet<FName> UnlockedTeleportIds;
 
 	UPROPERTY(BlueprintReadOnly)
+	TSet<FName> ExplorationFlags;
+
+	UPROPERTY(BlueprintReadOnly)
+	int64 Revision = 0;
+};
+
+USTRUCT(BlueprintType)
+struct FHSRMapSaveData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite)
+	FHSRMapLocation CurrentLocation;
+
+	UPROPERTY(BlueprintReadWrite)
+	TArray<FName> UnlockedRegionIds;
+
+	UPROPERTY(BlueprintReadWrite)
+	TArray<FName> UnlockedTeleportIds;
+
+	UPROPERTY(BlueprintReadWrite)
+	TArray<FName> ExplorationFlags;
+
+	UPROPERTY(BlueprintReadWrite)
 	int64 Revision = 0;
 };
 

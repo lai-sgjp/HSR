@@ -30,6 +30,7 @@ public:
 	EHSRMapOperationResult UnlockRegion(FName RegionId);
 	UFUNCTION(BlueprintCallable, Category="HSR|Map")
 	EHSRMapOperationResult UnlockTeleport(FName TeleportId);
+	EHSRMapOperationResult SetExplorationFlag(FName FlagId);
 	EHSRMapOperationResult BuildTeleportRequest(FName TeleportId, FHSRTeleportRequest& OutRequest) const;
 	UFUNCTION(BlueprintCallable, Category="HSR|Map")
 	EHSRMapOperationResult RequestTeleportTravel(FName TeleportId);
@@ -47,6 +48,14 @@ public:
 	bool IsTeleportUnlocked(FName TeleportId) const;
 	const FHSRMapRuntimeSnapshot& GetSnapshot() const { return Snapshot; }
 	FHSRMapStateChanged& OnMapStateChanged() { return MapStateChanged; }
+	void ExportSaveData(FHSRMapSaveData& OutData) const;
+	bool PrepareRestore(const FHSRMapSaveData& Data, FHSRMapRuntimeSnapshot& OutCandidate) const;
+	bool IsRestoreDifferent(const FHSRMapRuntimeSnapshot& Candidate) const;
+	void CommitRestore(FHSRMapRuntimeSnapshot&& Candidate, bool bNotify);
+	static bool CanRestoreState(bool bOrdinaryTravelPending, bool bBattleReturnPending)
+	{
+		return !bOrdinaryTravelPending && !bBattleReturnPending;
+	}
 
 #if WITH_DEV_AUTOMATION_TESTS
 	EHSRMapOperationResult StageTeleportForAutomation(FName TeleportId);

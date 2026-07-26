@@ -44,7 +44,7 @@ Codex allowlist：
 
 用户 Editor Gate：C++/Automation 后创建两个原创灰盒探索 Map、两个 Map DataAsset 和至少一项 Teleport DataAsset；保存并重开核对稳定 ID、软地图引用和 ArrivalId。资产由用户创建和提交。
 
-### P15-002：双探索图旅行与 Battle Return 适配
+### P15-002（原计划）：双探索图旅行与 Battle Return 适配
 
 唯一验收结果：A -> B -> A 普通传送及 B -> Battle -> B 返回均使用稳定 ID；成功放置后单次消费；重复请求/消费、无效目标和旅行失败不污染状态，BattleResult/Return 保持 exactly-once。
 
@@ -52,7 +52,7 @@ Codex allowlist：
 
 用户 Editor Gate：在 A/B 放唯一 ArrivalId 与传送交互物；配置反向传送；运行 A -> B -> A、B -> Battle -> B，并提供 RequestId、Pending/Consume 和最终 Transform 日志。至少验证一次无效 ID 或缺落点后仍可重试。
 
-### P15-003：Save v5 地图状态投影
+### P15-003（原计划）：Save v5 地图状态投影
 
 唯一验收结果：当前 MapId、稳定位置、区域/传送解锁和最小探索 Flag 可 candidate-first 保存/恢复；v1-v4 保守迁移为空 Map 状态；坏 Map/Teleport/Transform/重复 ID 拒绝且旧 Runtime 零污染；重复 Load 无重复通知。
 
@@ -60,7 +60,7 @@ Codex allowlist：
 
 用户 Editor Gate：在 B 非默认位置解锁一个传送点，Save，关闭并重开 Editor，Load 后恢复 Map/位置/解锁；重复 Load 不重复改变状态。
 
-### P15-004：阶段验证、教学、审查与归档
+### P15-004（原计划）：阶段验证、教学、审查与归档
 
 唯一验收结果：P15-001～003 的 Build、Automation、Editor 资产、PIE、失败路径、Save 冷恢复、Teacher、Independent Review、provenance 和三件套均可独立复核；不新增 Gameplay。
 
@@ -83,7 +83,7 @@ Codex allowlist：
 - P15-001 的 ArrivalId 是非空稳定标识但不解析场景 Actor；P15-002 由目的图 Arrival registry 校验其存在性、唯一性和可放置性。
 - MapTypes 与 BattleTypes 按值 USTRUCT 互含会导致 UHT include cycle；稳定 Map DTO 独立定义，Battle 单向依赖。
 - GI Subsystem 跨 World 存活不等于 Actor/ASC 存活；目的图必须重建 Actor Info/ASC。
-- 现有 Return Consumer 在重试耗尽时清 Context、并在放置前消费；P15-002 必须冻结更安全的 commit/retry 政策。
+- 历史风险（已关闭）：旧 Return Consumer 曾在放置前消费；最终由实际 P15-003 改为 placement-before-consume、有限 retry/rollback 与旅行互斥。
 - Definition registry 的强/软持有和 GC 策略必须明确并测试。
 
 ## 7. 教学 Gate
@@ -100,4 +100,6 @@ Codex allowlist：
 
 P15-001～004 全部归档；两探索地图和一 Battle Map 稳定往返；无效旅行不破坏状态；Return/Result 单次消费；Save v5 可冷恢复；Build/Automation/PIE/Editor/教学/审查证据齐全。满足前不得进入 Phase 16。
 
-当前唯一下一步：执行 P15-001，仅建立 Map 领域契约、Definition、纯值 Authority 与 Automation；不旅行、不改 Battle/Save/Config/Content。
+最终执行拓扑（实施中经独立失败边界拆分）：P15-001 Map/Teleport 契约；P15-002 A↔B 普通旅行；P15-003 Battle Return；P15-004 Save v5；P15-005 阶段收尾。五个工作包均最终 `PASS` 并归档。
+
+最终状态：Phase 15=`Ready with inherited follow-ups`。未外推 Standalone、packaged、真实注入式 travel failure、包损坏/强杀进程恢复或多人旅行；这些不阻塞进入 Phase 16 Gate 0。

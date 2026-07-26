@@ -1375,3 +1375,15 @@ UI 像银行对账屏：它订阅 Attribute/Resolution 事件并显示 Weakness�
 - 多地图不应做成任意两图全连接，只配置世界中真实存在的出口。运行时按稳定 `TeleportId` 建索引，因此地图数量增加不会要求两两组合。
 - 内容量增大后的主要问题是编辑效率和资产校验，而不是 Runtime 模型。后续可增加反向连接提示、批量创建和悬空目标检查，但不把双向语义强塞进底层事务。
 - 物理出口和快速传送是两个入口：物理出口要求当前 SourceMap 匹配；未来快速传送可从已解锁目的地构造请求，但仍复用同一旅行事务、稳定 ID 和落点校验。
+
+## 2026-07-26｜Phase 15 最终学习复盘
+
+- 用户已能区分 Definition 静态配置与 Runtime/Save 状态，并解释稳定 ID 相比 Actor 指针、显示名和数组下标的跨 World 优势。
+- 用户已能解释 OpenLevel 会重建 World/Actor，而 GameInstanceSubsystem 仅适合携带纯值 DTO；GI 存活不代表 Pawn、ASC 或场景 Actor 存活。
+- 用户完整复述 `Preflight → Pending → OpenLevel → authority World/Arrival/Pawn → placement → Commit/Consume`，理解 OpenLevel issued 不等于成功，以及失败零污染、成功后消费和 exactly-once 的关系。
+- 用户能区分 MapSubsystem 普通导航权威与 BattleTransition 战斗/Return 权威，并解释两种旅行事务必须互斥。
+- 用户能区分 BattleResult、一次性 ReturnContext 与持久 Map State，理解 defeat 可重试、victory resolved 与异常 return rollback。
+- 用户能解释 Save v5 纯值 DTO、candidate-first、v1-v4 空 Map 保守迁移、重复 Load no-op 和 Load 不直接旅行。
+- 用户能区分 Automation、Selected Viewport PIE、Editor 冷重启的证据边界，并明确 Standalone、packaged、真实 travel failure/包损坏/强杀进程与多人环境未验证。
+- Guided corrections：`FName` 稳定来自项目 ID 约定而非编译器自动保证；实际 Arrival Consumer 使用 BeginPlay/有限 Timer retry；未来启动旅行必须由独立启动流程显式授权，不能从 Save Load 隐式推导。
+- Teacher Gate：`PASS WITH GUIDED CORRECTION`。

@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～14 均为 `Ready with inherited follow-ups`。Phase 15 Gate 0 四角色计划已通过，当前唯一活动任务为 P15-001；既有 inherited follow-ups 原样保留。
+> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～15 均为 `Ready with inherited follow-ups`。Phase 15 已完成，准备进入 Phase 16 Gate 0；既有 inherited follow-ups 原样保留。
 
 ## 已完成的规划工作
 
@@ -291,9 +291,10 @@
 - [x] P15-001：建立 Map/Teleport Definition、稳定 DTO 和纯值 MapSubsystem；Build、Automation、用户 Editor Gate 与 Independent Review `PASS`。
 - [x] P15-002：完成 A↔B 普通地图旅行、authority World/Arrival 校验、失败取消/重试；Build、Automation、两轮双向 PIE、失败 PIE 与 Independent Review `PASS`。
 - [x] P15-003：Battle Return 已接入稳定 MapId/Return Context；胜负、重试、resolved、失败回滚与 B→Battle→B exactly-once 均通过最终复审。
-- [ ] P15-004：Save v5 地图状态投影与冷恢复。
-- [ ] 保存区域解锁、当前地图、玩家位置和探索状态。
-- [ ] 验证两个探索地图与独立 Battle Map 稳定往返。
+- [x] P15-004：Save v5 地图状态投影、v1-v4 保守迁移与 Editor 冷恢复已通过。
+- [x] 保存区域解锁、当前地图、玩家位置和探索状态。
+- [x] 验证两个探索地图与独立 Battle Map 稳定往返。
+- [x] P15-005：fresh Rebuild、Automation、Teacher、Independent Review、归档与阶段 Git 收尾。
 
 ## Phase 16：存档系统总整合
 
