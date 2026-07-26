@@ -4,6 +4,11 @@
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
 #include "Engine/Engine.h"
+#include "../Data/Definitions/HSRDropTableDefinition.h"
+#include "../Data/Definitions/HSRItemDefinition.h"
+#include "../Data/Definitions/HSRRewardDefinition.h"
+#include "../Inventory/HSRInventorySubsystem.h"
+#include "../Reward/HSRRewardSubsystem.h"
 
 void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -110,6 +115,24 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 			ReturnTransform = PC->GetPawn()->GetActorTransform();
 		}
 	}
+	else
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::TravelInitiationFailed, FText::FromString(TEXT("Cannot resolve World for travel.")));
+	}
+
+	if (Definition->VictoryRewardDefinition)
+	{
+		UHSRRewardSubsystem* Reward = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRRewardSubsystem>() : nullptr;
+		if (!Reward || !Definition->RewardDropTable)
+		{
+			return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidDefinition, FText::FromString(TEXT("Encounter reward bundle is incomplete.")));
+		}
+		const EHSRRewardOperationResult BundleResult = Reward->RegisterBundle(Definition->RewardItemDefinitions, *Definition->RewardDropTable, *Definition->VictoryRewardDefinition);
+		if (BundleResult != EHSRRewardOperationResult::Success && BundleResult != EHSRRewardOperationResult::NoOp)
+		{
+			return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidDefinition, FText::FromString(TEXT("Encounter reward bundle registration failed.")));
+		}
+	}
 
 	FHSREncounterRequest NewRequest;
 	NewRequest.RequestId = NewRequestId;
@@ -124,6 +147,11 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 	{
 		FString WorldPath = World->GetOutermost()->GetPathName();
 		NewRequest.ExplorationMapPath = FName(*UWorld::RemovePIEPrefix(WorldPath));
+	}
+	if (Definition->VictoryRewardDefinition)
+	{
+		NewRequest.RewardDefinitionId = Definition->VictoryRewardDefinition->RewardDefinitionId;
+		NewRequest.RewardSeed = Definition->RewardSeed;
 	}
 
 	PendingRequest = NewRequest;

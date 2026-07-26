@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～11 均为 `Ready with inherited follow-ups`。Phase 12 工程、用户 PIE 与教学主链已闭合，当前处于 P12-005 最终独立复审、归档和远端交付；尚未进入 Phase 13。Phase 11 保留 Standalone Esc、详情页中终局自动返回 ResultView 的动态验证，以及 Phase 2/5～10 完整专项回归。
+> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～13 均为 `Ready with inherited follow-ups`。Phase 13 P13-001～005 已完成最终独立复审与归档，当前无活动任务；Phase 14 尚未开始。Phase 11 inherited follow-ups 原样保留。
 
 ## 已完成的规划工作
 
@@ -269,9 +269,12 @@
 
 ## Phase 13：背包、奖励与掉落
 
-- [ ] 建立 ItemDefinition、ItemInstance 和 InventorySubsystem。
-- [ ] 建立幂等 RewardTransaction 和掉落表。
-- [ ] 接入敌人、宝箱、战斗奖励和背包 UI。
+- [x] 完成 Coordinator、Independent Reviewer、Teacher、Implementation 四角色 Gate 0 规划并创建 `docs/phase-13-execution-plan.md`。
+- [x] P13-001：ItemDefinition、ItemInstance 与 candidate-first InventorySubsystem 纯值事务；Build/Automation/Independent Review 和 User Editor 保存重开 Gate 通过。
+- [x] P13-002：幂等 RewardTransaction、确定性 DropTable、资源上限和 User Editor 保存重开 Gate；最终 Build/7 项回归通过，保留修订后独立复审未重签 follow-up。
+- [x] P13-003：Encounter/Battle victory 与 Reward Chest 统一接入 RewardSubsystem，producer exactly-once 与失败重试通过。
+- [x] P13-004：Save v3、只读 Inventory/Reward UI、Editor 重开 Load；修订后 Build、17/17 Automation 和 Independent Review `PASS WITH FOLLOW-UP`。
+- [x] P13-005：Phase 13 教学、provenance、最终 Independent Review `PASS WITH FOLLOW-UP` 与归档；Git delivery 随阶段收尾执行。
 
 ## Phase 14：任务与对话
 

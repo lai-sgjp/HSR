@@ -3,6 +3,8 @@
 #include "../Progression/HSRCharacterProgressionTypes.h"
 #include "../Party/HSRPartyTypes.h"
 #include "../Equipment/HSREquipmentTypes.h"
+#include "../Inventory/HSRItemTypes.h"
+#include "../Reward/HSRRewardTypes.h"
 #include "HSRSaveTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -29,17 +31,21 @@ struct HSR_API FHSREquipmentSaveDto { GENERATED_BODY()
 
 USTRUCT(BlueprintType)
 struct HSR_API FHSRSaveData { GENERATED_BODY()
-	UPROPERTY(BlueprintReadWrite) int32 SchemaVersion = 2;
+	UPROPERTY(BlueprintReadWrite) int32 SchemaVersion = 3;
 	UPROPERTY(BlueprintReadWrite) TArray<FHSRSaveProfileDto> Profiles;
 	UPROPERTY(BlueprintReadWrite) TArray<FHSRPartySlot> PartySlots;
 	UPROPERTY(BlueprintReadWrite) int64 PartyRevision = 0;
 	UPROPERTY(BlueprintReadWrite) TArray<FHSREquipmentSaveDto> Equipment;
+	UPROPERTY(BlueprintReadWrite) FHSRInventorySaveData Inventory;
+	UPROPERTY(BlueprintReadWrite) FHSRRewardSaveData Rewards;
 };
 
 USTRUCT(BlueprintType)
 struct HSR_API FHSRRestoreCommitInfo { GENERATED_BODY()
 	UPROPERTY(BlueprintReadOnly) TArray<FName> ChangedCharacterIds;
 	UPROPERTY(BlueprintReadOnly) bool bPartyChanged = false;
+	UPROPERTY(BlueprintReadOnly) bool bInventoryChanged = false;
+	UPROPERTY(BlueprintReadOnly) bool bRewardsChanged = false;
 	UPROPERTY(BlueprintReadOnly) int64 TransactionRevision = 0;
 };
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRRestoreCommitted,const FHSRRestoreCommitInfo&);

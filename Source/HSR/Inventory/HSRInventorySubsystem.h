@@ -1,0 +1,55 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Subsystems/GameInstanceSubsystem.h"
+#include "HSRItemTypes.h"
+#include "HSRInventorySubsystem.generated.h"
+
+class UHSRItemDefinition;
+class UHSRRewardSubsystem;
+
+UCLASS()
+class HSR_API UHSRInventorySubsystem : public UGameInstanceSubsystem
+{
+	GENERATED_BODY()
+
+public:
+	EHSRInventoryOperationResult CanRegisterDefinition(const UHSRItemDefinition& Definition) const;
+	EHSRInventoryOperationResult RegisterDefinition(const UHSRItemDefinition& Definition);
+	EHSRInventoryOperationResult AddStack(FName ItemId, int32 Quantity);
+	EHSRInventoryOperationResult RemoveStack(FName ItemId, int32 Quantity);
+	EHSRInventoryOperationResult AddUnique(const FHSRItemInstance& Instance);
+	EHSRInventoryOperationResult RemoveUnique(const FGuid& InstanceId);
+	EHSRInventoryOperationResult ApplyGrants(const TArray<FHSRInventoryGrant>& Grants);
+	bool GetDefinitionInfo(FName ItemId, EHSRItemStorageKind& OutStorageKind, int32& OutMaxStack) const;
+	void GetSnapshot(FHSRInventorySnapshot& OutSnapshot) const;
+	void ExportSaveData(FHSRInventorySaveData& OutData) const;
+	bool PrepareRestore(const FHSRInventorySaveData& Data, FHSRInventoryRestoreState& OutCandidate) const;
+	bool IsRestoreDifferent(const FHSRInventoryRestoreState& Candidate) const;
+	void CommitRestore(FHSRInventoryRestoreState&& Candidate, bool bNotify);
+	FHSRInventoryChanged& OnInventoryChanged() { return InventoryChanged; }
+
+#if WITH_DEV_AUTOMATION_TESTS
+	bool SetCapacityForAutomation(int32 NewCapacity);
+#endif
+
+private:
+	friend class UHSRRewardSubsystem;
+	struct FDefinitionRule
+	{
+		EHSRItemStorageKind StorageKind = EHSRItemStorageKind::Stackable;
+		int32 MaxStack = 1;
+	};
+
+	int32 GetUsedSlots(const TMap<FName, int32>& CandidateStacks, const TMap<FGuid, FHSRItemInstance>& CandidateUniqueItems) const;
+	EHSRInventoryOperationResult ApplyGrantsInternal(const TArray<FHSRInventoryGrant>& Grants, bool bBroadcast, int64& OutRevision);
+	void BroadcastRevision(int64 CommittedRevision) { InventoryChanged.Broadcast(CommittedRevision); }
+	void Commit(TMap<FName, int32>&& CandidateStacks, TMap<FGuid, FHSRItemInstance>&& CandidateUniqueItems);
+
+	TMap<FName, FDefinitionRule> Definitions;
+	TMap<FName, int32> Stacks;
+	TMap<FGuid, FHSRItemInstance> UniqueItems;
+	int32 Capacity = 100;
+	int64 Revision = 0;
+	FHSRInventoryChanged InventoryChanged;
+};

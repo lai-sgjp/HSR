@@ -5,6 +5,10 @@
 #include "Engine/World.h"
 #include "HSREncounterDefinition.generated.h"
 
+class UHSRDropTableDefinition;
+class UHSRItemDefinition;
+class UHSRRewardDefinition;
+
 UCLASS(BlueprintType)
 class HSR_API UHSREncounterDefinition : public UPrimaryDataAsset
 {
@@ -19,4 +23,16 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter")
 	TSoftObjectPtr<UWorld> BattleMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter|Reward")
+	TArray<TObjectPtr<UHSRItemDefinition>> RewardItemDefinitions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter|Reward")
+	TObjectPtr<UHSRDropTableDefinition> RewardDropTable;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter|Reward")
+	TObjectPtr<UHSRRewardDefinition> VictoryRewardDefinition;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter|Reward")
+	int32 RewardSeed = 0;
 };

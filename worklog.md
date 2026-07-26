@@ -1891,3 +1891,62 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 最终 Build、`HSR.Equipment`、`HSR.Save`、`HSR.UI.EquipmentDetail` 和 diff-check 通过；P12-004C Independent Reviewer 最终 `PASS`。
 - 教学首次作答 5/6；用户经一次差量 Load 指引后正确说明相同有效来源不会重复 Apply，Teaching Gate 为 `PASS WITH GUIDED CORRECTION`。
 - Phase 13 Inventory、Reward、Drop 和正式背包/装备交互 UI 明确不属于本阶段。
+
+# 2026-07-26｜Phase 13 Gate 0 四角色规划
+
+- 用户明确进入 Phase 13 并授权推进；按强制门禁完成 Coordinator、Independent Reviewer、Teacher、Implementation 四角色只读规划审查。
+- `HEAD=origin/main=7606235`，Phase 12 提交/推送已闭合；旧状态文档中的“等待 commit/push”按 Git 与归档证据校准。Phase 12 保持 `Ready with inherited follow-ups`，不改写 `USER PROVIDED` PIE 或 Teaching correction 边界。
+- 创建 `docs/phase-13-execution-plan.md`，冻结 Item/Inventory/Equipment possession、Reward Claim ledger、固定 seed、producer、Save v3 与 UI 边界，并规划 P13-001～005。
+- 四角色结论收敛为 Gate 0 `PASS`；当前唯一活动任务为 P13-001。`.claude/settings.local.json`、`learn/AI.md`、`learn/CppEngineDepth.md` 为用户既有改动，Phase 13 不认领。
+- 本轮规划尚未修改 Gameplay/Config/Content，未 Build、Automation、PIE、stage、commit 或 push。
+
+# 2026-07-26｜P13-001 Engineering Gate
+
+- 完成 `UHSRItemDefinition`、stack/unique 纯值模型、slot 容量、candidate-first Inventory Add/Remove、revision/delegate 和确定性 Snapshot 排序。
+- 首轮 Independent Review `REVISE` 指出 no-op 不可达、负数/zero-remove/空 remove 与失败广播矩阵不足；修订后相同 unique 重放为 no-op、冲突 GUID 明确拒绝并补齐失败矩阵。
+- 最终 `HSREditor Win64 Development` Build 成功；`HSR.Inventory.Ordering/Transactions/Validation` 三项 Automation 全部 `Success`，exit code 0；`git diff --check` 通过。
+- 修订 Independent Review 为 `PASS WITH FOLLOW-UP`。当前唯一未闭合项是两个 Item Definition 的 User Editor 保存重开 Gate；P13-001 暂不归档，不进入 P13-002。
+
+# 2026-07-26｜P13-001 User Editor Gate 与归档
+
+- 用户确认 `Content/Data/Items/DA_Item_LumenShard_P13.uasset` 与 `DA_Item_ArchiveToken_P13.uasset` 按约定字段创建，保存并关闭/重开 Editor 后保持；证据等级为 `USER PROVIDED / SAVED AND REOPENED`。
+- 文件系统核对确认两个精确资产路径存在；不将该检查冒充为 `.uasset` 字段独立解析。
+- P13-001 最终状态为 `PASS` 并归档；创建唯一活动任务 P13-002，尚未接入 Battle/Chest/Enemy、Save 或 UI。
+
+# 2026-07-26｜P13-002 Reward/Drop Engineering
+
+- 完成 Reward/Drop Definition、纯值 Resolver、RewardSubsystem Claim ledger 和 Inventory 整批 grant seam；同 Claim/payload 重放 no-op，不同 payload 冲突。
+- 修正可观察事务时序：Inventory 静默提交后先写 Receipt ledger，再广播 Inventory 和 Reward，Inventory 回调内可查询完整 Receipt。
+- Drop 使用显式 Seed、稳定 ItemId 排序和局部 `FRandomStream`；unique InstanceId 使用 ClaimId、ItemId 稳定字符串 CRC 与 ordinal 派生，不依赖 FName runtime hash。
+- 增加 DropRolls=100 上限、unique 分配前容量预检、非法权重/范围/重复 entry、候选反序、不同 seed、容量原子失败和注入失败重试矩阵。
+- 最终 Build 成功；`HSR.Reward` 4 项和 `HSR.Inventory` 3 项 Automation 全部 `Success`，exit code 0；`git diff --check` 通过。
+- 当前等待 Independent Review 与 User Editor Reward/Drop DataAsset 保存重开 Gate；未接入 Battle/Chest/Enemy、Save 或 UI。
+
+# 2026-07-26｜P13-002 User Editor Asset Gate
+
+- 用户确认 `Content/Data/Drops/DA_Drop_P13_Standard.uasset` 与 `Content/Data/Rewards/DA_Reward_P13_Standard.uasset` 按约定字段创建，保存并关闭/重开 Editor 后保持；证据等级为 `USER PROVIDED / SAVED AND REOPENED`。
+- 文件系统核对确认两个精确路径存在；不将该检查冒充为 `.uasset` 字段独立解析。
+- 当前只等待 P13-002 Independent Review；尚未接入 Battle/Chest/Enemy、Save 或 UI。
+
+# 2026-07-26｜P13-002 审查修订与归档
+
+- Independent Reviewer 首轮 `REVISE` 的无界 Definition/grant、失败双 delegate 与固定重复 entry 三项 blocking 已修正；另主动补齐稳定 CRC InstanceId、ledger-before-broadcast、注册 no-op/conflict 和资源预分配边界。
+- 修订 Automation 曾因测试自身 `Array.Add(Array[0])` 扩容别名触发 UE 断言，已保留并修正；最终 Build 与 7 项 Reward/Inventory Automation 全部通过。
+- P13-002 归档为 `PASS WITH FOLLOW-UP`：Reviewer 首轮 findings 已由 Coordinator 逐项核对闭合，但修订后未获得第二次 Independent Reviewer 签名；不改写为独立复审 PASS。
+- 创建唯一活动任务 P13-003；尚未修改 Battle/Encounter/Chest、Save 或 UI。
+
+# 2026-07-26｜P13-004 Save v3、UI 与独立复审
+
+- 用户提供的首轮 PIE 日志证明 Reward Chest Claim 后 `Save -> Clear -> Load -> repeated Load` 成功且 revision 稳定；关闭并重开 Editor 后第二轮日志证明磁盘 Load 恢复 `Stacks=1/Claims=1`，Cleanup 成功。
+- 两个 P13 Widget Blueprint 保存重开和 HUD 指派为 `USER PROVIDED`；日志未直接记录 Widget 内容回调，且本次掉落 `Unique=0`，两项动态范围不外推。
+- Independent Reviewer 首轮 `REVISE` 指出 Equipment 投影时序、ViewModel 同 revision 内容去重和 frozen ledger 全局唯一性问题；修订后全部由新增 Automation 覆盖。
+- 修订后的 `HSREditor Win64 Development` Build 成功；组合 `HSR.Save+HSR.Inventory+HSR.Reward+HSR.UI.InventoryReward` Automation 17/17 `Success`；全局 `git diff --check` 通过。
+- Independent Reviewer 二审为 `PASS WITH FOLLOW-UP`，无阻塞项；P13-004 已归档，当前唯一活动任务切换为 P13-005 阶段收尾。
+- 敌人手写状态机迁移到 Behavior Tree/Blackboard 已写入 Phase 0-20 完成后的改进清单，本阶段不实施。
+- P13-005 一致性检查发现 P13-003 三件套缺失；依据此前用户日志恢复归档：Chest success/repeat NoCandidate、BattleReward success、Result 单次消费/返回和 resolved Encounter rejection 均有证据。未找到 P13-003 最终 Independent Reviewer 签名，因此明确保留到阶段最终审查，不补造结论。
+- Phase 13 Teaching Gate 为 `PASS WITH GUIDED CORRECTION`：用户掌握稳定 ID、ownership、原子 Reward、Claim 幂等、Seed/排序、Save 纯值与只读 UI；校准唯一实例 Map 类型、Frozen Grants 持久化和 Widget 不拥有 Backend 半事务。
+- provenance 候选与排除项已核对；`.claude/settings.local.json`、`learn/AI.md`、`learn/CppEngineDepth.md` 继续排除，未执行 stage/commit/push，等待最终 Independent Review。
+- 网络中断后检测到新的用户变化：`Content/UI/WBP_BattleCommandPanel.uasset` 修改和额外 `Content/UI/WBP_Reward_Summary_P13.uasset`。用户随后明确授权前者作为独立 UI 布局调整随本次交付，但不计入 P13 功能证据；后者保持不动并排除。P13 已验收路径仍是无中间下划线的 `Content/UI/WBP_RewardSummary_P13.uasset`。
+- Phase 13 最终首轮审查为 `REVISE`：清理 `PROJECT_STATE.md` 的旧 P12 当前任务冲突；将计划从未交付的三个 producer 校准为 Battle victory/Reward Chest 两条路径；冻结逐路径 Git manifest。`DA_Encounter_Phase5Test` 有 P13 PIE 证据并纳入，`DA_Encounter_Phase4Test` 无本轮绑定证据并排除。
+- 17/17 Automation 的最终证据索引校准为 rotated log `Saved/Logs/HSR-backup-2026.07.26-04.15.56.log`；日志不进入 Git。
+- Phase 13 最终独立复审为 `PASS WITH FOLLOW-UP`，首轮四项文档/provenance 阻断全部闭合；P13-005 与 Phase 13 已归档，当前无活动任务且未进入 Phase 14。

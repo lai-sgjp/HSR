@@ -2,6 +2,10 @@
 #include "HSRUserWidget.h"
 #include "HSRAttributeViewModel.h"
 #include "HSRInteractionViewModel.h"
+#include "HSRInventoryRewardViewModel.h"
+#include "HSRInventoryRewardWidget.h"
+#include "../Inventory/HSRInventorySubsystem.h"
+#include "../Reward/HSRRewardSubsystem.h"
 #include "../Interaction/HSRInteractionComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/World.h"
@@ -42,6 +46,24 @@ void AHSRHUD::ShowExplorationHUD()
 	}
 
 	ExplorationWidgetInstance->AddToViewport();
+	UGameInstance* GameInstance = GetGameInstance();
+	UHSRInventorySubsystem* Inventory = GameInstance ? GameInstance->GetSubsystem<UHSRInventorySubsystem>() : nullptr;
+	UHSRRewardSubsystem* Reward = GameInstance ? GameInstance->GetSubsystem<UHSRRewardSubsystem>() : nullptr;
+	if (Inventory && Reward)
+	{
+		InventoryRewardViewModel = NewObject<UHSRInventoryRewardViewModel>(this);
+		InventoryRewardViewModel->Initialize(Inventory, Reward);
+		if (InventoryWidgetClass)
+		{
+			InventoryWidgetInstance = CreateWidget<UHSRInventoryWidget>(PC, InventoryWidgetClass);
+			if (InventoryWidgetInstance) { InventoryWidgetInstance->SetViewModel(InventoryRewardViewModel); InventoryWidgetInstance->AddToViewport(); }
+		}
+		if (RewardSummaryWidgetClass)
+		{
+			RewardSummaryWidgetInstance = CreateWidget<UHSRRewardSummaryWidget>(PC, RewardSummaryWidgetClass);
+			if (RewardSummaryWidgetInstance) { RewardSummaryWidgetInstance->SetViewModel(InventoryRewardViewModel); RewardSummaryWidgetInstance->AddToViewport(); }
+		}
+	}
 
 	// Set up interaction observation for current pawn
 	RefreshInteractionObserver();
@@ -152,6 +174,9 @@ void AHSRHUD::RequestRebuildExplorationHUDForPhase2Test()
 void AHSRHUD::RemoveExplorationHUD()
 {
 	ClearInteractionObserverInstance();
+	if (InventoryWidgetInstance) { InventoryWidgetInstance->RemoveFromParent(); InventoryWidgetInstance = nullptr; }
+	if (RewardSummaryWidgetInstance) { RewardSummaryWidgetInstance->RemoveFromParent(); RewardSummaryWidgetInstance = nullptr; }
+	if (InventoryRewardViewModel) { InventoryRewardViewModel->Shutdown(); InventoryRewardViewModel = nullptr; }
 
 	if (!ExplorationWidgetInstance)
 	{

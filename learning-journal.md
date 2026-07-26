@@ -1324,3 +1324,26 @@ UI 像银行对账屏：它订阅 Attribute/Resolution 事件并显示 Weakness�
 - 本结论仅说明 Teacher 已完成教学、原始回答保存、纠正与真实掌握度分类；不替代工程 Build、UHT、PIE、provenance 或 Independent Reviewer Gate。
 - P8-006 Build Gate 已由 Reviewer 确认为完整 `PASS`：ForceHeaderGeneration fresh UHT 与 Rebuild C++/Link/metadata 均有证据；全文件 provenance ledger 仍为 `UNRESOLVED`。provenance 仍是 Coordinator/Reviewer 的独立项目阻断，第四批被用户跳过不会关闭、降级或改写该阻断。
 - Teacher 不建议在本子任务中继续出题；未来可在实际 UI teardown、Reset/terminal 或不同队列情境中自然复习第三批 follow-up。
+
+## 2026-07-26｜Phase 13 Inventory/Reward/Save/UI Teaching Gate
+
+### 用户原始理解摘要
+
+- `DefinitionId` 表示静态物品/奖励规则，`InstanceId` 表示一个具体唯一物品，Reward/Drop DefinitionId 表示奖励结构，`ClaimId` 表示一次领取事件并用于持久幂等。
+- Inventory 是未装备物品真源，Equipment 是已装备 Loadout 真源；相同 `InstanceId` 不能同时存在于两边，否则位置、卸装和存档所有权产生冲突。
+- 用户正确复述 `Validate -> Resolve/Freeze -> Candidate/Capacity Check -> Commit Inventory + Ledger -> Broadcast -> Save`，并分别说明先写 Ledger、先改 Inventory 或先广播会造成丢奖励、重复奖励或 UI 显示未提交事实。
+- 用户正确区分 BattleResult 的 runtime consumed-once 与 Reward Claim ledger 的跨 World/重启持久幂等。
+- 用户正确说明固定 Seed 不替代候选稳定排序，失败重试不得重掷同一奖励。
+- 用户正确坚持 Save 只保存稳定 ID 和纯值，Load 后从 Definition 重建 Runtime；UI 只提交意图并读取 Backend 广播的 Snapshot。
+
+### Guided Correction
+
+- Inventory 唯一实例真源的实际类型是 `TMap<FGuid, FHSRItemInstance>`，不是 `TMap<InstanceId, FGuid>`。
+- 本项目 Reward 重试/恢复保存的是 Seed、Claim/Definition ID 和已经解析的 `Frozen Grants` Receipt；不是保存 `FRandomStream` 内部状态或“Seed + 已消耗次数”。
+- “Widget 销毁导致 Backend RemoveItem 半完成”不是本架构允许的路径；真正边界是 Widget 不拥有事务，命令由稳定 authority 完整验证/提交，Widget 生命周期不能改变结果。
+
+### Teacher Verdict
+
+`PASS WITH GUIDED CORRECTION`。
+
+用户已掌握 Definition/Instance/Claim、Inventory/Equipment ownership、Reward 原子事务、持久幂等、确定性掉落、Save 纯值边界和只读 UI。上述三点已校准，不阻塞 Phase 13 收尾。

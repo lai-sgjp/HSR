@@ -44,6 +44,9 @@ class HSR_API UHSRBattleCoordinator : public UObject
 public:
 	EHSRBattleCoordinatorState GetCurrentState() const { return CurrentState; }
 	FGuid GetCurrentRequestId() const { return CurrentRequestId; }
+	FName GetCurrentRewardDefinitionId() const { return CurrentRewardDefinitionId; }
+	int32 GetCurrentRewardSeed() const { return CurrentRewardSeed; }
+	bool BuildVictoryRewardRequest(const struct FHSRBattleResult& Result, struct FHSRRewardRequest& OutRequest) const;
 
 	/** Submit a consumed encounter request exactly once. Rejects duplicate RequestId. */
 	bool SubmitBattleRequest(const struct FHSREncounterRequest& InRequest);
@@ -151,6 +154,8 @@ public:
 private:
 	EHSRBattleCoordinatorState CurrentState = EHSRBattleCoordinatorState::Idle;
 	FGuid CurrentRequestId;
+	FName CurrentRewardDefinitionId;
+	int32 CurrentRewardSeed = 0;
 	FName CurrentEncounterId;
 	FName CurrentEnemyDefinitionId;
 	FHSRBattleReturnContext ReturnContext;

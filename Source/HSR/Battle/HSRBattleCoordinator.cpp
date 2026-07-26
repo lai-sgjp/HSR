@@ -1,4 +1,5 @@
 #include "HSRBattleCoordinator.h"
+#include "../Reward/HSRRewardTypes.h"
 #include "../Data/Definitions/HSREnemyDefinition.h"
 #include "HSRTurnManager.h"
 #include "HSREncounterTypes.h"
@@ -73,6 +74,8 @@ bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRe
 	CurrentRequestId = InRequest.RequestId;
 	CurrentEncounterId = InRequest.EncounterId;
 	CurrentEnemyDefinitionId = InRequest.EnemyDefinitionId;
+	CurrentRewardDefinitionId = InRequest.RewardDefinitionId;
+	CurrentRewardSeed = InRequest.RewardSeed;
 	ReturnContext = RetCtx;
 	CurrentState = EHSRBattleCoordinatorState::Consuming;
 #if WITH_EDITOR
@@ -1193,6 +1196,8 @@ void UHSRBattleCoordinator::Reset()
 	CurrentRequestId = FGuid();
 	CurrentEncounterId = NAME_None;
 	CurrentEnemyDefinitionId = NAME_None;
+	CurrentRewardDefinitionId = NAME_None;
+	CurrentRewardSeed = 0;
 	ReturnContext = FHSRBattleReturnContext();
 	Participants.Empty();
 	ParticipantDefinitions.Empty();
@@ -2091,4 +2096,16 @@ void UHSRBattleCoordinator::CommitSkillPoints(const FGuid& ActionId)
 		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::CommitSkillPoints - ActionId=%s Delta=%d Current=%d"), *ActionId.ToString(), Reservation->Delta, TeamResourceState.CurrentSkillPoints);
 		SkillPointReservations.Remove(ActionId);
 	}
+}
+bool UHSRBattleCoordinator::BuildVictoryRewardRequest(const FHSRBattleResult& Result, FHSRRewardRequest& OutRequest) const
+{
+	if (Result.RequestId != CurrentRequestId || Result.Outcome != EHSRBattleOutcome::PlayerVictory || CurrentRewardDefinitionId.IsNone())
+	{
+		return false;
+	}
+
+	OutRequest.ClaimId = CurrentRequestId;
+	OutRequest.RewardDefinitionId = CurrentRewardDefinitionId;
+	OutRequest.Seed = CurrentRewardSeed;
+	return true;
 }

@@ -5,6 +5,8 @@
 #include "../Progression/HSRCharacterProfileSubsystem.h"
 #include "../Party/HSRPartySubsystem.h"
 #include "../Equipment/HSREquipmentSubsystem.h"
+#include "../Inventory/HSRInventorySubsystem.h"
+#include "../Reward/HSRRewardSubsystem.h"
 #include "HSRSaveSubsystem.generated.h"
 
 UCLASS()
@@ -21,7 +23,7 @@ public:
 	void SetDiskFailureInjection(bool bCreate, bool bSave, bool bLoad) { bInjectCreateFailure=bCreate;bInjectSaveFailure=bSave;bInjectLoadFailure=bLoad; }
 #endif
 #if WITH_EDITOR
-	void InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles, UHSRPartySubsystem* InParty, UHSREquipmentSubsystem* InEquipment=nullptr) { Profiles=InProfiles; Party=InParty; Equipment=InEquipment; }
+	void InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles, UHSRPartySubsystem* InParty, UHSREquipmentSubsystem* InEquipment=nullptr, UHSRInventorySubsystem* InInventory=nullptr, UHSRRewardSubsystem* InReward=nullptr);
 	int64 GetRestoreTransactionRevisionForDevelopmentTest() const { return RestoreTransactionRevision; }
 #endif
 private:
@@ -30,6 +32,14 @@ private:
 	TWeakObjectPtr<UHSRCharacterProfileSubsystem> Profiles;
 	TWeakObjectPtr<UHSRPartySubsystem> Party;
 	TWeakObjectPtr<UHSREquipmentSubsystem> Equipment;
+	TWeakObjectPtr<UHSRInventorySubsystem> Inventory;
+	TWeakObjectPtr<UHSRRewardSubsystem> Reward;
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(Transient)
+	TObjectPtr<UHSRInventorySubsystem> DevelopmentInventory;
+	UPROPERTY(Transient)
+	TObjectPtr<UHSRRewardSubsystem> DevelopmentReward;
+#endif
 	int64 RestoreTransactionRevision=0;
 	FHSRRestoreCommitted RestoreCommitted;
 #if WITH_DEV_AUTOMATION_TESTS

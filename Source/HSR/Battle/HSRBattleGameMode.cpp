@@ -24,6 +24,7 @@
 #include "../Player/HSRPlayerController.h"
 #include "Blueprint/UserWidget.h"
 #include "InputCoreTypes.h"
+#include "../Reward/HSRRewardSubsystem.h"
 
 namespace
 {
@@ -2291,6 +2292,21 @@ void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& Request
 		CommandViewModel->RejectBattleResultConfirm(RequestId);
 		UE_LOG(LogTemp, Warning, TEXT("P10-004 ReturnPreflight Result=REJECTED Type=%d RequestId=%s ConfirmRestored=1"), static_cast<int32>(Preflight.ResultType), *RequestId.ToString());
 		return;
+	}
+
+	FHSRRewardRequest RewardRequest;
+	if (Coordinator->BuildVictoryRewardRequest(PreviewResult, RewardRequest))
+	{
+		UHSRRewardSubsystem* RewardSubsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRRewardSubsystem>() : nullptr;
+		FHSRRewardReceipt Receipt;
+		const EHSRRewardOperationResult RewardResult = RewardSubsystem ? RewardSubsystem->SubmitReward(RewardRequest, Receipt) : EHSRRewardOperationResult::InventoryRejected;
+		if (RewardResult != EHSRRewardOperationResult::Success && RewardResult != EHSRRewardOperationResult::NoOp)
+		{
+			CommandViewModel->RejectBattleResultConfirm(RequestId);
+			UE_LOG(LogTemp, Warning, TEXT("P13-003 BattleReward Result=REJECTED Type=%d RequestId=%s ConfirmRestored=1"), static_cast<int32>(RewardResult), *RequestId.ToString());
+			return;
+		}
+		UE_LOG(LogTemp, Log, TEXT("P13-003 BattleReward Result=%s RequestId=%s Revision=%lld"), RewardResult == EHSRRewardOperationResult::Success ? TEXT("SUCCESS") : TEXT("NOOP"), *RequestId.ToString(), Receipt.Revision);
 	}
 
 	FHSRBattleResult ConsumedResult;

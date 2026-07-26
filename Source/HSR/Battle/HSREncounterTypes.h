@@ -69,6 +69,12 @@ struct FHSREncounterRequest
 	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
 	FName ExplorationMapPath;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Encounter|Reward")
+	FName RewardDefinitionId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Encounter|Reward")
+	int32 RewardSeed = 0;
+
 	FHSREncounterRequest() = default;
 };
 

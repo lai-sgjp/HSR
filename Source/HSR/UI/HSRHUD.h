@@ -6,6 +6,9 @@
 
 class UHSRUserWidget;
 class UHSRInteractionViewModel;
+class UHSRInventoryRewardViewModel;
+class UHSRInventoryWidget;
+class UHSRRewardSummaryWidget;
 
 UCLASS()
 class HSR_API AHSRHUD : public AHUD
@@ -41,4 +44,15 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UHSRInteractionViewModel> InteractionViewModel;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P13")
+	TSubclassOf<UHSRInventoryWidget> InventoryWidgetClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P13")
+	TSubclassOf<UHSRRewardSummaryWidget> RewardSummaryWidgetClass;
+	UPROPERTY(Transient)
+	TObjectPtr<UHSRInventoryRewardViewModel> InventoryRewardViewModel;
+	UPROPERTY(Transient)
+	TObjectPtr<UHSRInventoryWidget> InventoryWidgetInstance;
+	UPROPERTY(Transient)
+	TObjectPtr<UHSRRewardSummaryWidget> RewardSummaryWidgetInstance;
 };
