@@ -1967,3 +1967,85 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 用户 Editor Gate 已提供 Quest/Dialogue/Reward DataAsset 字段证据，并完成 NPC 交互 PIE。
 - PIE 真实日志确认 `BP_P14_DialogueNPC_C_1` 注册为候选、显示 `Talk`，F 键调用成功，读取 `Dialogue.P14.EditorNPC / Start`。
 - Independent Review 更新为 `PASS WITH FOLLOW-UP`；分支选择的可视化奖励结果和 Teacher 复盘仍保留为 follow-up。
+# 2026-07-26｜Phase 15 Gate 0 与 P15-001 启动
+
+- 用户明确授权进入 Phase 15 并开始工作；按 Phase 11+ 规则先运行 Coordinator、Independent Reviewer、Teacher、Implementation 四角色规划。
+- 四角色确认 Phase 14 为 `Ready with inherited follow-ups`，Phase 15 可进入；旧状态摘要已校准，可视奖励 follow-up 不阻塞本阶段。
+- `docs/phase-15-execution-plan.md` 已冻结 Map/Battle/Save 所有权、旅行事务、失败矩阵、UE5.6 风险、Editor/PIE/教学门禁和 P15-001～004；Gate 0=`PASS`。
+- 当前唯一活动任务为 P15-001；尚未修改 Gameplay、运行 Build/Automation 或创建 Content/Config。
+# 2026-07-26｜P15-001 C++ 与 Automation
+
+- 新增 Map/Teleport DataAsset Definition、稳定 MapLocation/TeleportRequest/Snapshot DTO、`UHSRMapSubsystem` 注册/位置/解锁/请求预检和两项定向 Automation；未调用 OpenLevel，未触碰 Battle/Save/Config/Content。
+- 首轮 Development Editor Build 完成 UHT 9 个反射文件与 11/11 动作；Automation 首次因 Subsystem 测试 Outer 非 GameInstance 触发 ensure，最小修正夹具后 4/4 增量构建成功。
+- `HSR.Map.Definitions` 与 `HSR.Map.StateAndRequest` 均 Success，最终 exit code 0；`git diff --check` 通过。
+- P15-001 保持活动状态，等待用户 Editor Gate；尚未创建资产、运行真实旅行/PIE 或进入 P15-002。
+# 2026-07-26｜P15-001 用户 Editor Gate
+
+- 用户创建并保存两个探索 Map、两个 Map Definition 及 `Teleport.AB`/`Teleport.BA`，重开 Editor 后确认均正常；字段结论为 `USER PROVIDED`，文件存在由 Agent 静态核对。
+- 双向连接继续建模为两条有向边，以保留独立落点、解锁条件和单向出口能力；该设计取舍已写入 `learning-journal.md`。
+- P15-001 工程、Automation 与 Editor Gate 已齐，等待 Independent Review；尚未实现 OpenLevel 或真实 A→B→A PIE。
+# 2026-07-26｜P15-001 Review Correction
+
+- 首轮 Independent Review=`REVISE`：package existence、Region gate、ArrivalId 策略与 malformed/duplicate 测试矩阵需闭合。
+- 已冻结静态注册仅检查软引用非空、package existence 延迟至 P15-002 travel preflight；目标 Region 未解锁时拒绝传送；ArrivalId 在 P15-001 为非空 opaque ID，场景唯一性由 P15-002 校验。
+- 补齐关键 Definition/Teleport/Region 失败测试后 Development Editor 5/5 构建成功，`HSR.Map` 2/2 Success、exit code 0，diff-check 通过；等待最终复审。
+# 2026-07-26｜P15-001 PASS 与 P15-002 启动
+
+- P15-001 最终 Independent Review=`PASS`；三件套已归档。该结论仅覆盖纯值 Authority，不外推 OpenLevel 或真实旅行。
+- 唯一活动任务切换为 P15-002：A↔B 普通旅行，冻结 package preflight、单 Pending、目标 World 确认、唯一 Arrival、放置成功后提交和失败回滚。
+- Battle Return、Save v5、Config/Content 与通用交互 Actor 不进入本任务。
+# 2026-07-26｜P15-002 C++ 旅行事务
+
+- 实现 MapSubsystem 单 Pending、package/World preflight、OpenLevel、目的图/Arrival/Pawn 校验、放置后 commit、匹配取消与 TravelFailure 清理；ArrivalConsumer 采用无 Tick 的有限 timer retry。
+- 新增 Blueprint 薄桥接供用户注册 DataAsset、初始化位置/解锁并发起请求；规则权威仍在 C++。
+- Development Editor 构建连续通过；`HSR.Map` 3/3 Automation Success、exit code 0。真实 A→B→A、目标 World 生命周期和 Pawn 放置等待用户 Editor/PIE Gate。
+# 2026-07-26｜P15-002 双向 PIE
+
+- 用户提供 Selected Viewport PIE 日志；两轮 A→B→A 共四个唯一 RequestId 均由 `travel issued` 对应一次 `arrival committed`。
+- B 稳定落点为 `Arrival.FromA (-460,430,0)`，A 稳定落点为 `Arrival.FromB (-400,-110,0)`；World teardown/reload、PlayerController/Input/HUD/ASC 均重建。
+- 日志没有 arrival retry/cancel 或 TravelFailure。证据不外推 Standalone、packaged、注入加载失败或 Battle Return；P15-002 等待最终 Independent Review。
+# 2026-07-26｜P15-002 Review Correction
+
+- 首轮 Reviewer=`REVISE`：Consumer 可编辑 MapId 不能替代当前 World package 权威校验；TravelFailure 不能无条件清任意 pending；失败 seam 不足。
+- MapSubsystem 已加入注册目标 package↔当前 World package 校验与 PIE prefix 规范化；无关 failure 忽略，目标/null failure 清理，源图失败由 5 秒 timeout 恢复；Arrival missing/duplicate/wrong-world 有限重试后取消。
+- Development Editor 7/7，`HSR.Map` 3/3 Success、exit code 0，diff-check 通过。由于 happy path 增加权威校验，等待用户一轮 A→B→A PIE 回归后再复审。
+# 2026-07-26｜P15-002 修订后 PIE 回归
+
+- 用户在权威 World package 校验版本上再次完成两轮 A→B→A；四个新 RequestId 均 exactly-once issued/commit，A/B 落点与修订前一致。
+- 无 wrong-world、arrival waiting、timeout、cancel 或 TravelFailure；P15-002 工程、失败 Automation 与 happy-path PIE 已齐，提交最终 Independent Re-review。
+# 2026-07-26｜P15-002 PASS 与 P15-003 启动
+
+- 用户确认测试用 Broken Arrival 已恢复为 `Arrival.FromA`，临时失败接线已删除，Map B 保存并重开正常。
+- P15-002 Independent Review=`PASS`；工程、3/3 Automation、双向 happy path、真实 10 次 retry/cancel、同会话新 Request issued 和最终资产恢复均闭合，三件套已归档。
+- 唯一活动任务切换为 P15-003：复用现有 BattleTransition 权威，将 Battle Return 升级为稳定 MapId/Return Context，并与 Map arrival commit 对齐；不修改 Battle 规则或 Save。
+# 2026-07-26｜P15-003 初始实现
+
+- Return DTO 增加稳定 MapId；BattleTransition 通过 MapSubsystem 注册 package 反查，并把消费推迟到 authority World 验证、Pawn 放置和 Map location commit 之后；失败清理回滚 resolved encounter。
+- 首次 Development Editor UHT 10、16/16 成功；`HSR.Map` 3/3 回归通过。
+- `HSR.Battle` 过滤器因仓库原本无匹配测试而 exit 1；新增 `Source/HSR/Tests/HSRBattleMapReturnTests.cpp` 作为精确 Map/Return contract 测试，待构建运行。
+# 2026-07-26｜P15-003 Build 与 Automation
+
+- 新增 Battle Return Map contract 后 Development Editor 4/4 增量构建成功；`HSR.BattleReturn.MapContract` 1/1 Success、exit code 0，Map package/PIE prefix→稳定 MapId 与纯值 Return DTO 通过。
+- `git diff --check` 通过；P15-003 C++ 工程 Gate 完成，等待用户在 Map B 复用既有 Encounter/Battle 资产执行 B→Battle→B PIE。
+
+# 2026-07-26｜P15-003 失败回归证据与重试规则修正
+
+- 用户日志确认 Map B 战败后成功回归：稳定 `Map.B` 与 ReturnTransform 均恢复，Return commit exactly-once，第二次消费正确返回 `AlreadyConsumed`。
+- 日志审查发现旧实现会对战败结果无条件写入 `ResolvedEncounterIds`，与“失败/中断不得永久锁死 Encounter”门禁冲突。
+- 修正为仅 `PlayerVictory` 解决 Encounter；`PlayerDefeat`/`None` 保持可重试，并清理 TravelFailure 中一处重复 reset。
+- 新增 victory/defeat/incomplete 三项策略断言；Development Editor 9/9 actions 成功，`HSR.BattleReturn.MapContract` 1/1 Success、exit code 0。
+- 等待用户在新 DLL 上完成同会话“战败后再次触发同一 Encounter → 胜利后同一 Encounter 不再触发”的最终 PIE 门禁。
+
+# 2026-07-26｜P15-003 最终 PIE 门禁
+
+- 同一 PIE 会话首次挑战 `Enc_Test_Phase5`：RequestId `5FEBF93440C024A0890DFB92DC3ADAD8`，PlayerDefeat/Outcome=2，成功返回 `Map.B` 并 exactly-once commit。
+- 未停止 PIE 再次挑战同一 Encounter：生成新 RequestId `50B4746049550A131B5A1EAD618FBD74`，证明战败没有永久锁死 Encounter。
+- 第二次 PlayerVictory/Outcome=1，成功返回 `Map.B` 并 exactly-once commit；第三次交互得到 `RequestEncounter - REJECTED resolved EncounterId=Enc_Test_Phase5`。
+- 两次 Return 的重复消费均为 `AlreadyConsumed`。P15-003 工程与用户 PIE 门禁齐备，提交最终 Independent Review。
+
+# 2026-07-26｜P15-003 Independent Review 修订
+
+- 首轮复审 `REVISE`：异常 commit 可能永久 pending、普通 Map travel 未反向阻止 Battle Return、Battle travel 缺少 source failure 与跨 World timeout。
+- Return Consumer 统一 Pawn/commit failure 的 10 次有限 retry，耗尽后 `ClearReturn` 回滚胜利 resolved；普通 Teleport 增加 Battle Return pending preflight。
+- BattleTransition 记录 source/target package，以 CoreTicker 提供跨 World 5 秒 timeout；source/target/null failure 清理事务，无关 failure 忽略。
+- 补充 source/target/PIE-prefix/unrelated failure matcher 测试；Development Editor 11/11，`HSR.Map` 与 `HSR.BattleReturn` 均 exit 0，提交最终复审。

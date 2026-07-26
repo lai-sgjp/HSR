@@ -73,6 +73,9 @@ struct FHSRBattleReturnContext
 	FName ExplorationMapPath;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FName ExplorationMapId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
 	FTransform ReturnTransform = FTransform::Identity;
 
 	FHSRBattleReturnContext() = default;

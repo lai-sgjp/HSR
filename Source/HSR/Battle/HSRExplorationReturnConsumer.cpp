@@ -46,11 +46,8 @@ void AHSRExplorationReturnConsumer::TryConsumeAndReturn()
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	APawn* PlayerPawn = PC ? PC->GetPawn() : nullptr;
 
-	if (!PlayerPawn && RetryCount < MaxRetries)
+	if (!PlayerPawn && ScheduleRetry(TEXT("player pawn unavailable")))
 	{
-		RetryCount++;
-		GetWorld()->GetTimerManager().SetTimer(ReturnTimerHandle, this, &AHSRExplorationReturnConsumer::TryConsumeAndReturn, RetryInterval, false);
-		UE_LOG(LogTemp, Log, TEXT("AHSRExplorationReturnConsumer::TryConsumeAndReturn - waiting for pawn (attempt %d/%d)"), RetryCount, MaxRetries);
 		return;
 	}
 
@@ -61,20 +58,16 @@ void AHSRExplorationReturnConsumer::TryConsumeAndReturn()
 		return;
 	}
 
-	// Consume return context and get full DTO from the Result.
-	// Do NOT use GetReturnContext() - it no longer exists; consume atomically returns the data.
-	FHSRExplorationReturnResult Result = Subsystem->ConsumeReturnContext();
+	// Commit only after MapSubsystem validates the loaded World and places the pawn.
+	FHSRExplorationReturnResult Result = Subsystem->CommitReturnContext(PlayerPawn);
 
 	if (Result.ResultType == EHSREncounterReturnResultType::Success)
 	{
-	// Apply the return transform to the player pawn using ConsumedContext from the Result
-	PlayerPawn->SetActorTransform(Result.ConsumedContext.ReturnTransform, false, nullptr, ETeleportType::TeleportPhysics);
-
 	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationReturnConsumer::TryConsumeAndReturn - SUCCESS: Teleported pawn to %s"),
 		*Result.ConsumedContext.ReturnTransform.GetLocation().ToString());
 
 	// A4c: Test second ConsumeReturnContext — must return AlreadyConsumed
-	FHSRExplorationReturnResult SecondResult = Subsystem->ConsumeReturnContext();
+	FHSRExplorationReturnResult SecondResult = Subsystem->CommitReturnContext(PlayerPawn);
 	if (SecondResult.ResultType == EHSREncounterReturnResultType::AlreadyConsumed)
 	{
 		UE_LOG(LogTemp, Log, TEXT("A4c: Second ConsumeReturnContext correctly returned AlreadyConsumed"));
@@ -89,5 +82,24 @@ else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AHSRExplorationReturnConsumer::TryConsumeAndReturn - FAILED: ConsumeReturnContext returned type=%d"),
 			static_cast<int32>(Result.ResultType));
+		if (!ScheduleRetry(TEXT("return commit rejected")))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("AHSRExplorationReturnConsumer::TryConsumeAndReturn - retries exhausted; clearing return for retry"));
+			Subsystem->ClearReturn();
+		}
 	}
+}
+
+bool AHSRExplorationReturnConsumer::ScheduleRetry(const TCHAR* Reason)
+{
+	if (RetryCount >= MaxRetries || !GetWorld())
+	{
+		return false;
+	}
+	++RetryCount;
+	GetWorld()->GetTimerManager().SetTimer(ReturnTimerHandle, this,
+		&AHSRExplorationReturnConsumer::TryConsumeAndReturn, RetryInterval, false);
+	UE_LOG(LogTemp, Log, TEXT("AHSRExplorationReturnConsumer::TryConsumeAndReturn - waiting: %s (attempt %d/%d)"),
+		Reason, RetryCount, MaxRetries);
+	return true;
 }

@@ -17,6 +17,7 @@ public:
 
 protected:
 	void TryConsumeAndReturn();
+	bool ScheduleRetry(const TCHAR* Reason);
 
 	FTimerHandle ReturnTimerHandle;
 	int32 RetryCount;

@@ -2,12 +2,12 @@
 
 > 最后更新：2026-07-26
 
-## Phase 14 当前状态
+## Phase 15 当前状态
 
-- Phase 14 当前为 `Ready with inherited follow-ups`，尚未进入 Phase 15。
+- Phase 15 Gate 0=`PASS`；P15-001～003 均最终复审为 `PASS` 并归档，当前进入 P15-004 Save v5 地图状态投影。
 - P14-001～003 核心 Quest/Dialogue/Save v4 链路已通过自动化；P14-004 的 `HSREditor Win64 Development`、`HSR.QuestDialogue`、`HSR.Save` 8/8 已通过。
 - 用户 PIE 已确认 Dialogue NPC 候选注册、`Talk` 提示、F 键交互成功及 `StartNode=Start`。
-- Independent Reviewer 为 `PASS WITH FOLLOW-UP`；分支选择后的可视化奖励结果、Teacher 复盘和最终归档仍未闭合。
+- Phase 14 Independent Reviewer 为 `PASS WITH FOLLOW-UP`；分支选择后的可视化奖励结果继续作为 inherited follow-up，不阻塞 Phase 15。
 - Teacher Gate 已完成：`PASS WITH GUIDED CORRECTION`；P14-001 已归档为 `PASS WITH FOLLOW-UP`。分支选择后的可视化奖励结果继续作为 inherited follow-up。
 > 作用：CC-SWITCH 切换模型后的快速恢复快照。高级模型负责维护；低级模型不得把本文件作为执行入口。
 
@@ -28,7 +28,7 @@
 
 ## 当前任务
 
-- 当前没有活动任务。Phase 13 已归档；Phase 14 尚未规划或实施。
+- 当前唯一活动任务为 `TASK-P15-004`：Save v5 地图状态投影；Save 只处理纯值 DTO，不直接旅行。
 
 - 当前无 Phase 9 活动任务。P9-006 已完成 Teacher 六题掌握、Reviewer Gate、provenance、Config EOF 修复、全局 diff-check、四个角色提交和三件套归档；Coordinator closeout Markdown 等待单独提交。
 - Phase 9 角色提交：User `2a2eb3d`、Implementation `a996475`、Teacher `39e0449`、Independent Reviewer `db383b3`。`.agents/CLAUDE.md` 经用户确认纳入 User/project-owned 交付集合。

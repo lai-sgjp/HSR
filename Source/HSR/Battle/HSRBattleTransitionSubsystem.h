@@ -5,9 +5,11 @@
 #include "HSREncounterTypes.h"
 #include "HSRBattleTypes.h"
 #include "Engine/EngineBaseTypes.h"
+#include "Containers/Ticker.h"
 #include "HSRBattleTransitionSubsystem.generated.h"
 
 class UHSREncounterDefinition;
+class APawn;
 
 UENUM()
 enum class EHSRTravelKind : uint8
@@ -45,11 +47,14 @@ public:
 	FHSRExplorationReturnResult RequestTestReturn(const FHSREncounterRequest& FromConsumedRequest);
 	/** Starts return travel from a pure battle result and resolves its encounter on success. */
 	FHSRExplorationReturnResult RequestBattleReturn(const FHSRBattleResult& BattleResult);
+	/** Only a victory permanently resolves an encounter; defeat and interruption remain retryable. */
+	static bool ShouldResolveEncounter(EHSRBattleOutcome Outcome);
 	/** Read-only preflight for the return transaction; it never writes pending return state or travels. */
 	FHSRExplorationReturnResult ValidateBattleReturn(const FHSRBattleResult& BattleResult) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Return")
 	FHSRExplorationReturnResult ConsumeReturnContext();
+	FHSRExplorationReturnResult CommitReturnContext(APawn* PlayerPawn);
 
 	UFUNCTION(BlueprintCallable, Category = "Return")
 	void ClearReturn();
@@ -58,8 +63,12 @@ public:
 	bool HasReturnPending() const { return bReturnPending; }
 
 	void HandleTravelFailure(UWorld* InWorld, ETravelFailure::Type FailureType, const FString& ErrorString);
+	static bool DoesTravelFailureMatch(const FString& FailureWorldPackage, const FString& SourcePackage, const FString& TargetPackage);
 
 private:
+	void StartTravelTimeout();
+	void ClearTravelTimeout();
+	bool HandleTravelTimeout(float DeltaTime);
 	EHSREncounterState CurrentState;
 	FHSREncounterRequest PendingRequest;
 	FHSRExplorationReturnContext PendingReturnContext;
@@ -68,6 +77,8 @@ private:
 	EHSRTravelKind TravelKind;
 	FGuid TravelRequestId;
 	FName TravelTargetMap;
+	FName TravelSourceMap;
 	FName TravelCompletedEncounterId;
+	FTSTicker::FDelegateHandle TravelTimeoutHandle;
 	TSet<FName> ResolvedEncounterIds;
 };

@@ -1368,3 +1368,10 @@ UI 像银行对账屏：它订阅 Attribute/Resolution 事件并显示 Weakness�
 - 已掌握：Definition/Runtime/Save DTO 分层、稳定 ID、GameInstanceSubsystem 跨地图生命周期、candidate-first、旧 schema 空迁移、Reward Claim ledger、失败/重复测试必要性，以及 Choice → Event → Complete → Reward → Save/Load 链路。
 - Guided correction：`UPROPERTY` 是反射/序列化/GC 可追踪边界；真正的强引用语义由 `TObjectPtr` 等成员类型配合 UPROPERTY 提供，`TWeakObjectPtr` 不拥有对象；Reward ledger 负责 ClaimId 幂等与事务记录，不替代 Inventory authority。
 - Teacher Verdict：`PASS WITH GUIDED CORRECTION`，不阻断 Phase 14 收尾。
+# 2026-07-26｜Phase 15：地图节点与有向传送边
+
+- `MapDefinition` 表示地图节点，`TeleportDefinition` 表示一条有方向的连接边。系统不是只能 A→B；B→A 由独立的 `Teleport.BA` 表达。
+- 双向通道保留两条有向边，是为了让两个方向分别拥有落点、解锁条件、交互入口和失败策略；单向门、坠落点、剧情出口也无需增加特殊分支。
+- 多地图不应做成任意两图全连接，只配置世界中真实存在的出口。运行时按稳定 `TeleportId` 建索引，因此地图数量增加不会要求两两组合。
+- 内容量增大后的主要问题是编辑效率和资产校验，而不是 Runtime 模型。后续可增加反向连接提示、批量创建和悬空目标检查，但不把双向语义强塞进底层事务。
+- 物理出口和快速传送是两个入口：物理出口要求当前 SourceMap 匹配；未来快速传送可从已解锁目的地构造请求，但仍复用同一旅行事务、稳定 ID 和落点校验。

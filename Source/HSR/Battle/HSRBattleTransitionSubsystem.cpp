@@ -9,6 +9,7 @@
 #include "../Data/Definitions/HSRRewardDefinition.h"
 #include "../Inventory/HSRInventorySubsystem.h"
 #include "../Reward/HSRRewardSubsystem.h"
+#include "../Map/HSRMapSubsystem.h"
 
 void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -18,6 +19,7 @@ void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collect
 	bReturnConsumed = false;
 	TravelKind = EHSRTravelKind::None;
 	TravelRequestId = FGuid();
+	TravelSourceMap = NAME_None;
 	TravelCompletedEncounterId = NAME_None;
 
 	if (GEngine)
@@ -30,6 +32,7 @@ void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collect
 
 void UHSRBattleTransitionSubsystem::Deinitialize()
 {
+	ClearTravelTimeout();
 	if (GEngine)
 	{
 		GEngine->OnTravelFailure().RemoveAll(this);
@@ -170,7 +173,9 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 		CurrentState = EHSREncounterState::Traveling;
 		TravelKind = EHSRTravelKind::Encounter;
 		TravelRequestId = NewRequestId;
+		TravelSourceMap = NewRequest.ExplorationMapPath;
 		TravelTargetMap = FName(*Definition->BattleMap.GetLongPackageName());
+		StartTravelTimeout();
 		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - Traveling to %s (kind=Encounter, map=%s)"),
 			*Definition->BattleMap.GetLongPackageName(), *TravelTargetMap.ToString());
 
@@ -229,6 +234,8 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::ConsumePendingEncounter()
 	TravelKind = EHSRTravelKind::None;
 	TravelRequestId = FGuid();
 	TravelTargetMap = NAME_None;
+	TravelSourceMap = NAME_None;
+	ClearTravelTimeout();
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ConsumePendingEncounter - SUCCESS RequestId=%s EncounterId=%s EnemyDefId=%s"),
 		*Consumed.RequestId.ToString(), *Consumed.EncounterId.ToString(), *Consumed.EnemyDefinitionId.ToString());
@@ -256,6 +263,8 @@ void UHSRBattleTransitionSubsystem::ClearPending()
 	TravelKind = EHSRTravelKind::None;
 	TravelRequestId = FGuid();
 	TravelTargetMap = NAME_None;
+	TravelSourceMap = NAME_None;
+	ClearTravelTimeout();
 }
 
 bool UHSRBattleTransitionSubsystem::HasPending() const
@@ -266,12 +275,18 @@ bool UHSRBattleTransitionSubsystem::HasPending() const
 void UHSRBattleTransitionSubsystem::ClearReturn()
 {
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ClearReturn - Clearing Return context"));
+	if (!TravelCompletedEncounterId.IsNone())
+	{
+		ResolvedEncounterIds.Remove(TravelCompletedEncounterId);
+	}
 	PendingReturnContext = FHSRExplorationReturnContext();
 	bReturnPending = false;
 	bReturnConsumed = false;
 	TravelKind = EHSRTravelKind::None;
 	TravelRequestId = FGuid();
 	TravelTargetMap = NAME_None;
+	TravelSourceMap = NAME_None;
+	ClearTravelTimeout();
 }
 
 void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravelFailure::Type FailureType, const FString& ErrorString)
@@ -293,10 +308,9 @@ void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravel
 	{
 		FailureWorldPath = UWorld::RemovePIEPrefix(InWorld->GetOutermost()->GetPathName());
 	}
-	bool bWorldMatchesMap = !TravelTargetMap.IsNone() && !FailureWorldPath.IsEmpty() &&
-		(FailureWorldPath == TravelTargetMap.ToString() || FailureWorldPath.EndsWith(TravelTargetMap.ToString()));
 	bool bWorldIsNull = (InWorld == nullptr);
-	bool bMatchesOurTransaction = bWorldIsNull || bWorldMatchesMap;
+	bool bMatchesOurTransaction = bWorldIsNull || DoesTravelFailureMatch(
+		FailureWorldPath, TravelSourceMap.ToString(), TravelTargetMap.ToString());
 
 	UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - MatchCheck: WorldPath=%s TargetMap=%s RequestId=%s bMatch=%d"),
 		*FailureWorldPath, *TravelTargetMap.ToString(), *TravelRequestId.ToString(), bMatchesOurTransaction ? 1 : 0);
@@ -331,7 +345,9 @@ void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravel
 	TravelKind = EHSRTravelKind::None;
 	TravelRequestId = FGuid();
 	TravelTargetMap = NAME_None;
+	TravelSourceMap = NAME_None;
 	TravelCompletedEncounterId = NAME_None;
+	ClearTravelTimeout();
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - State clean. New requests can proceed."));
 	return;
 }
@@ -361,6 +377,12 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(c
 	FHSRExplorationReturnContext ReturnCtx;
 	ReturnCtx.RequestId = BattleReturnContext.RequestId;
 	ReturnCtx.ExplorationMapPath = BattleReturnContext.ExplorationMapPath;
+	UHSRMapSubsystem* MapSubsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRMapSubsystem>() : nullptr;
+	if (!MapSubsystem || !MapSubsystem->ResolveMapIdByPackage(BattleReturnContext.ExplorationMapPath, ReturnCtx.ExplorationMapId))
+	{
+		return FHSRExplorationReturnResult::MakeFailure(EHSREncounterReturnResultType::InvalidReturnContext,
+			FText::FromString(TEXT("Exploration map path is not registered with MapSubsystem.")));
+	}
 	ReturnCtx.ReturnTransform = BattleReturnContext.ReturnTransform;
 
 	PendingReturnContext = ReturnCtx;
@@ -370,7 +392,12 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(c
 	TravelKind = EHSRTravelKind::Return;
 	TravelRequestId = ReturnCtx.RequestId;
 	TravelTargetMap = ReturnCtx.ExplorationMapPath;
-	TravelCompletedEncounterId = BattleResult.EncounterId;
+	if (UWorld* World = GetWorld())
+	{
+		TravelSourceMap = FName(*UWorld::RemovePIEPrefix(World->GetOutermost()->GetPathName()));
+	}
+	StartTravelTimeout();
+	TravelCompletedEncounterId = ShouldResolveEncounter(BattleResult.Outcome) ? BattleResult.EncounterId : NAME_None;
 	if (!TravelCompletedEncounterId.IsNone())
 	{
 		ResolvedEncounterIds.Add(TravelCompletedEncounterId);
@@ -383,6 +410,55 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(c
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - Traveling back to %s"), *ReturnCtx.ExplorationMapPath.ToString());
 
 	return FHSRExplorationReturnResult::MakeSuccess();
+}
+
+bool UHSRBattleTransitionSubsystem::ShouldResolveEncounter(const EHSRBattleOutcome Outcome)
+{
+	return Outcome == EHSRBattleOutcome::PlayerVictory;
+}
+
+bool UHSRBattleTransitionSubsystem::DoesTravelFailureMatch(const FString& FailureWorldPackage,
+	const FString& SourcePackage, const FString& TargetPackage)
+{
+	if (FailureWorldPackage.IsEmpty())
+	{
+		return false;
+	}
+	const FString NormalizedFailure = UWorld::RemovePIEPrefix(FailureWorldPackage);
+	return (!SourcePackage.IsEmpty() && NormalizedFailure == UWorld::RemovePIEPrefix(SourcePackage))
+		|| (!TargetPackage.IsEmpty() && NormalizedFailure == UWorld::RemovePIEPrefix(TargetPackage));
+}
+
+void UHSRBattleTransitionSubsystem::StartTravelTimeout()
+{
+	ClearTravelTimeout();
+	TravelTimeoutHandle = FTSTicker::GetCoreTicker().AddTicker(
+		FTickerDelegate::CreateUObject(this, &UHSRBattleTransitionSubsystem::HandleTravelTimeout), 5.0f);
+}
+
+void UHSRBattleTransitionSubsystem::ClearTravelTimeout()
+{
+	if (TravelTimeoutHandle.IsValid())
+	{
+		FTSTicker::GetCoreTicker().RemoveTicker(TravelTimeoutHandle);
+		TravelTimeoutHandle.Reset();
+	}
+}
+
+bool UHSRBattleTransitionSubsystem::HandleTravelTimeout(float)
+{
+	TravelTimeoutHandle.Reset();
+	if (TravelKind == EHSRTravelKind::Encounter)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HSR Battle encounter travel timed out RequestId=%s; cleared for retry"), *TravelRequestId.ToString());
+		ClearPending();
+	}
+	else if (TravelKind == EHSRTravelKind::Return)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HSR Battle return travel timed out RequestId=%s; cleared for retry"), *TravelRequestId.ToString());
+		ClearReturn();
+	}
+	return false;
 }
 
 FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::ValidateBattleReturn(const FHSRBattleResult& BattleResult) const
@@ -419,6 +495,14 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::ValidateBattleReturn(
 		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestBattleReturn - FAILED invalid map=%s"), *BattleReturnContext.ExplorationMapPath.ToString());
 		return FHSRExplorationReturnResult::MakeFailure(EHSREncounterReturnResultType::InvalidReturnContext, FText::FromString(TEXT("Exploration map package does not exist.")));
 	}
+	UHSRMapSubsystem* MapSubsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRMapSubsystem>() : nullptr;
+	FName ResolvedMapId;
+	if (!MapSubsystem || MapSubsystem->HasPendingTravel()
+		|| !MapSubsystem->ResolveMapIdByPackage(BattleReturnContext.ExplorationMapPath, ResolvedMapId))
+	{
+		return FHSRExplorationReturnResult::MakeFailure(EHSREncounterReturnResultType::InvalidReturnContext,
+			FText::FromString(TEXT("MapSubsystem cannot authorize the exploration return.")));
+	}
 
 	// Check World availability BEFORE writing Pending
 	UWorld* World = GetWorld();
@@ -431,6 +515,43 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::ValidateBattleReturn(
 	}
 
 	return FHSRExplorationReturnResult::MakeSuccess();
+}
+
+FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::CommitReturnContext(APawn* PlayerPawn)
+{
+	if (!bReturnPending)
+	{
+		return FHSRExplorationReturnResult::MakeFailure(bReturnConsumed
+			? EHSREncounterReturnResultType::AlreadyConsumed : EHSREncounterReturnResultType::NothingPending);
+	}
+	UHSRMapSubsystem* Maps = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRMapSubsystem>() : nullptr;
+	if (!Maps || PendingReturnContext.ExplorationMapId.IsNone())
+	{
+		return FHSRExplorationReturnResult::MakeFailure(EHSREncounterReturnResultType::InvalidReturnContext);
+	}
+	const EHSRMapOperationResult PlacementResult = Maps->CommitBattleReturnLocation(
+		PendingReturnContext.ExplorationMapId, PlayerPawn, PendingReturnContext.ReturnTransform);
+	if (PlacementResult != EHSRMapOperationResult::Success)
+	{
+		return FHSRExplorationReturnResult::MakeFailure(EHSREncounterReturnResultType::InvalidReturnContext,
+			FText::FromString(TEXT("Battle return placement has not committed.")));
+	}
+
+	FHSRExplorationReturnResult Result = FHSRExplorationReturnResult::MakeSuccess();
+	Result.ConsumedContext = PendingReturnContext;
+	UE_LOG(LogTemp, Log, TEXT("HSR Battle return committed RequestId=%s MapId=%s Location=%s"),
+		*PendingReturnContext.RequestId.ToString(), *PendingReturnContext.ExplorationMapId.ToString(),
+		*PendingReturnContext.ReturnTransform.GetLocation().ToString());
+	PendingReturnContext = FHSRExplorationReturnContext();
+	bReturnPending = false;
+	bReturnConsumed = true;
+	TravelKind = EHSRTravelKind::None;
+	TravelRequestId = FGuid();
+	TravelTargetMap = NAME_None;
+	TravelSourceMap = NAME_None;
+	TravelCompletedEncounterId = NAME_None;
+	ClearTravelTimeout();
+	return Result;
 }
 
 FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::ConsumeReturnContext()
@@ -459,7 +580,9 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::ConsumeReturnContext(
 	TravelKind = EHSRTravelKind::None;
 	TravelRequestId = FGuid();
 	TravelTargetMap = NAME_None;
+	TravelSourceMap = NAME_None;
 	TravelCompletedEncounterId = NAME_None;
+	ClearTravelTimeout();
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::ConsumeReturnContext - SUCCESS RequestId=%s ReturnLoc=%s"),
 		*Consumed.RequestId.ToString(), *Consumed.ReturnTransform.GetLocation().ToString());

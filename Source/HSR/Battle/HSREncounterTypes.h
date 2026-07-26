@@ -126,6 +126,9 @@ struct FHSRExplorationReturnContext
 	FName ExplorationMapPath;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Return")
+	FName ExplorationMapId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Return")
 	FTransform ReturnTransform = FTransform::Identity;
 
 	FHSRExplorationReturnContext() = default;
