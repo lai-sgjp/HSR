@@ -7,6 +7,7 @@
 #include "../Equipment/HSREquipmentSubsystem.h"
 #include "../Inventory/HSRInventorySubsystem.h"
 #include "../Reward/HSRRewardSubsystem.h"
+#include "../Quest/HSRQuestSubsystem.h"
 #include "HSRSaveSubsystem.generated.h"
 
 UCLASS()
@@ -23,7 +24,7 @@ public:
 	void SetDiskFailureInjection(bool bCreate, bool bSave, bool bLoad) { bInjectCreateFailure=bCreate;bInjectSaveFailure=bSave;bInjectLoadFailure=bLoad; }
 #endif
 #if WITH_EDITOR
-	void InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles, UHSRPartySubsystem* InParty, UHSREquipmentSubsystem* InEquipment=nullptr, UHSRInventorySubsystem* InInventory=nullptr, UHSRRewardSubsystem* InReward=nullptr);
+	void InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles, UHSRPartySubsystem* InParty, UHSREquipmentSubsystem* InEquipment=nullptr, UHSRInventorySubsystem* InInventory=nullptr, UHSRRewardSubsystem* InReward=nullptr, UHSRQuestSubsystem* InQuest=nullptr);
 	int64 GetRestoreTransactionRevisionForDevelopmentTest() const { return RestoreTransactionRevision; }
 #endif
 private:
@@ -34,11 +35,14 @@ private:
 	TWeakObjectPtr<UHSREquipmentSubsystem> Equipment;
 	TWeakObjectPtr<UHSRInventorySubsystem> Inventory;
 	TWeakObjectPtr<UHSRRewardSubsystem> Reward;
+	TWeakObjectPtr<UHSRQuestSubsystem> Quest;
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRInventorySubsystem> DevelopmentInventory;
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRRewardSubsystem> DevelopmentReward;
+	UPROPERTY(Transient)
+	TObjectPtr<UHSRQuestSubsystem> DevelopmentQuest;
 #endif
 	int64 RestoreTransactionRevision=0;
 	FHSRRestoreCommitted RestoreCommitted;

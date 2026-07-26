@@ -1347,3 +1347,24 @@ UI 像银行对账屏：它订阅 Attribute/Resolution 事件并显示 Weakness�
 `PASS WITH GUIDED CORRECTION`。
 
 用户已掌握 Definition/Instance/Claim、Inventory/Equipment ownership、Reward 原子事务、持久幂等、确定性掉落、Save 纯值边界和只读 UI。上述三点已校准，不阻塞 Phase 13 收尾。
+## 2026-07-26｜Phase 14 Teacher Gate（等待用户复盘）
+
+请用自己的话回答以下 8 题；回答后将据此记录掌握度，不要求逐字匹配：
+
+1. Quest Definition、Quest Runtime State、Dialogue Definition、Save DTO 分别保存什么？
+2. 为什么 QuestId/DialogueId/NodeId/ChoiceId 使用稳定 `FName`，而不是显示文本、数组下标或 Actor 指针？
+3. 为什么 `UGameInstanceSubsystem` 适合保存本地单机跨地图 Quest 状态？未来联网时需要重新审查什么？
+4. `UPROPERTY`、`TObjectPtr`、`TWeakObjectPtr` 在本 Phase 的 GC/生命周期边界上分别解决什么问题？
+5. UHT 对 `USTRUCT`/`UCLASS`、`GENERATED_BODY()`、`*.generated.h` include 顺序和 Blueprint 暴露有什么要求？
+6. 为什么 Quest 发奖必须复用 RewardSubsystem 的 Claim ledger，而不能直接写 Inventory？
+7. Save v4 为什么要 candidate-first restore？v1-v3 为什么迁移为空 Quest 状态而不是伪造进行中的任务？
+8. 为什么 Automation 必须覆盖失败路径、重复事件、重复 Claim 和重复 Load，而不只测一次成功路径？请额外复述：Dialogue Choice → QuestEvent → Complete → Reward once → Save/Load → repeat。
+
+状态：`WAITING FOR USER ANSWERS`。在收到回答前，P14-005 Teacher Gate 不判定为完成。
+
+### Teacher 复盘结果
+
+- 用户已回答 8 个知识点并复述端到端链路。
+- 已掌握：Definition/Runtime/Save DTO 分层、稳定 ID、GameInstanceSubsystem 跨地图生命周期、candidate-first、旧 schema 空迁移、Reward Claim ledger、失败/重复测试必要性，以及 Choice → Event → Complete → Reward → Save/Load 链路。
+- Guided correction：`UPROPERTY` 是反射/序列化/GC 可追踪边界；真正的强引用语义由 `TObjectPtr` 等成员类型配合 UPROPERTY 提供，`TWeakObjectPtr` 不拥有对象；Reward ledger 负责 ClaimId 幂等与事务记录，不替代 Inventory authority。
+- Teacher Verdict：`PASS WITH GUIDED CORRECTION`，不阻断 Phase 14 收尾。

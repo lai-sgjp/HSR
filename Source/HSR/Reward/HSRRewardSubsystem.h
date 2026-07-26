@@ -35,7 +35,7 @@ public:
 	void SetCommitFailureForAutomation(bool bValue) { bInjectCommitFailure = bValue; }
 #endif
 #if WITH_EDITOR
-	void InitializeForDevelopmentTest(UHSRInventorySubsystem* InInventory) { Inventory = InInventory; }
+	void InitializeForDevelopmentTest(UHSRInventorySubsystem* InInventory);
 #endif
 
 private:

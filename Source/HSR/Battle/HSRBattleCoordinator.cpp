@@ -1482,7 +1482,10 @@ AActor* UHSRBattleCoordinator::SpawnParticipantActor(UWorld* World, const FHSRBa
 		return nullptr;
 	}
 
-	Pawn->SetActorLabel(Definition.Team == EHSRBattleParticipantTeam::Player ? TEXT("BattlePlayerPawn") : TEXT("BattleEnemyPawn"));
+	if (AActor* SpawnedActor = Cast<AActor>(Pawn))
+	{
+		SpawnedActor->SetActorLabel(Definition.Team == EHSRBattleParticipantTeam::Player ? TEXT("BattlePlayerPawn") : TEXT("BattleEnemyPawn"));
+	}
 
 	UE_LOG(LogTemp, Log,
 		TEXT("UHSRBattleCoordinator::SpawnParticipantActor - SUCCESS Actor=%s Team=%d DefId=%s"),

@@ -1950,3 +1950,20 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Phase 13 最终首轮审查为 `REVISE`：清理 `PROJECT_STATE.md` 的旧 P12 当前任务冲突；将计划从未交付的三个 producer 校准为 Battle victory/Reward Chest 两条路径；冻结逐路径 Git manifest。`DA_Encounter_Phase5Test` 有 P13 PIE 证据并纳入，`DA_Encounter_Phase4Test` 无本轮绑定证据并排除。
 - 17/17 Automation 的最终证据索引校准为 rotated log `Saved/Logs/HSR-backup-2026.07.26-04.15.56.log`；日志不进入 Git。
 - Phase 13 最终独立复审为 `PASS WITH FOLLOW-UP`，首轮四项文档/provenance 阻断全部闭合；P13-005 与 Phase 13 已归档，当前无活动任务且未进入 Phase 14。
+# 2026-07-26｜P14-001 Phase 14 Gate 0 Planning Correction
+
+- 用户授权进入 Phase 14，并指出 Phase 11+ 阶段开始必须先写详细子任务规划；本轮先冻结后续实现，补建 `docs/phase-14-execution-plan.md`。
+- 过程纠偏：上一轮已产生 Quest/Dialogue/Save v4 C++ 草稿，但 Development Editor build 和 Automation 尚未通过；该草稿不能作为 Phase 14 已开始合规证据，后续必须先完成 Gate 0 再继续修正。
+- 当前 Gate 0 状态为 `REVISE / CORRECTION IN PROGRESS`：Coordinator 计划已写入；Independent Reviewer、Teacher、Implementation 审查结论仍需汇总并闭合。
+- 用户 Editor Gate 已明确列入 Phase 14：需要创建/保存/重开 Quest DataAsset、Dialogue DataAsset 和一个 NPC/Blueprint PIE 交互证据；文件存在不能替代字段和 PIE 证据。
+# 2026-07-26｜P14-001 Build 与定向 Automation
+
+- 用户授权扩大到构建首错涉及的最小基线文件；修正 `HSRBattleCoordinator.cpp` 的 `AActor::SetActorLabel` 调用。
+- 正确运行 `HSREditor Win64 Development`：UHT 169 个反射文件，7/7 构建动作成功。
+- 定向 Automation 成功：`HSR.QuestDialogue.BranchingReward`、`HSR.Save.QuestV4` 均退出码 0。
+- 仍未完成全量 Automation、Editor DataAsset/PIE、Teacher 复盘和修复后的 Independent Review；Phase 14 不标记 Ready。
+# 2026-07-26｜P14-005 初步收尾
+
+- 用户 Editor Gate 已提供 Quest/Dialogue/Reward DataAsset 字段证据，并完成 NPC 交互 PIE。
+- PIE 真实日志确认 `BP_P14_DialogueNPC_C_1` 注册为候选、显示 `Talk`，F 键调用成功，读取 `Dialogue.P14.EditorNPC / Start`。
+- Independent Review 更新为 `PASS WITH FOLLOW-UP`；分支选择的可视化奖励结果和 Teacher 复盘仍保留为 follow-up。

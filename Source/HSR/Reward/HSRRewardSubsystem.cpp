@@ -43,6 +43,13 @@ void UHSRRewardSubsystem::InitializeForAutomation(UHSRInventorySubsystem* InInve
 }
 #endif
 
+#if WITH_EDITOR
+void UHSRRewardSubsystem::InitializeForDevelopmentTest(UHSRInventorySubsystem* InInventory)
+{
+	Inventory = InInventory;
+}
+#endif
+
 EHSRRewardOperationResult UHSRRewardSubsystem::RegisterDropTable(const UHSRDropTableDefinition& Definition)
 {
 	const EHSRRewardOperationResult Validation = CanRegisterDropTable(Definition);

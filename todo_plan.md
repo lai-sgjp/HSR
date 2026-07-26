@@ -278,6 +278,9 @@
 
 ## Phase 14：任务与对话
 
+- [x] P14-001～003：Quest/Dialogue/Save v4 核心链路与定向 Automation 已通过。
+- [x] P14-004：HSREditor Build、Quest/Dialogue Automation、Save 8/8 Automation 和 NPC PIE 交互入口已通过。
+- [x] P14-005：Teacher 复盘 `PASS WITH GUIDED CORRECTION`、Independent Review `PASS WITH FOLLOW-UP`、任务归档完成；分支选择/奖励 PIE 保留为 inherited follow-up。
 - [ ] 建立 Quest/Dialogue DataAsset 和 Runtime State。
 - [ ] 使用类型化领域事件推进任务。
 - [ ] 完成一个 NPC、一个分支对话和一个任务奖励闭环。

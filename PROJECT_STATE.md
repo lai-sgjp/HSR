@@ -1,6 +1,14 @@
 ﻿# HSR Project State
 
 > 最后更新：2026-07-26
+
+## Phase 14 当前状态
+
+- Phase 14 当前为 `Ready with inherited follow-ups`，尚未进入 Phase 15。
+- P14-001～003 核心 Quest/Dialogue/Save v4 链路已通过自动化；P14-004 的 `HSREditor Win64 Development`、`HSR.QuestDialogue`、`HSR.Save` 8/8 已通过。
+- 用户 PIE 已确认 Dialogue NPC 候选注册、`Talk` 提示、F 键交互成功及 `StartNode=Start`。
+- Independent Reviewer 为 `PASS WITH FOLLOW-UP`；分支选择后的可视化奖励结果、Teacher 复盘和最终归档仍未闭合。
+- Teacher Gate 已完成：`PASS WITH GUIDED CORRECTION`；P14-001 已归档为 `PASS WITH FOLLOW-UP`。分支选择后的可视化奖励结果继续作为 inherited follow-up。
 > 作用：CC-SWITCH 切换模型后的快速恢复快照。高级模型负责维护；低级模型不得把本文件作为执行入口。
 
 ## 当前 Phase
