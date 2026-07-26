@@ -2078,3 +2078,10 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 用户完成 Definition/Runtime、World/GI 生命周期、旅行事务、Map/Battle 权威、Result/Return/Map 生命周期、Save v5 与证据边界七组复述。
 - Teacher=`PASS WITH GUIDED CORRECTION`；FName 稳定来源、Arrival Consumer 实际机制与 Save/启动旅行边界已校准并写入 learning journal。
 - Phase 15 仍不外推 Standalone、packaged、真实注入式 travel failure、包损坏/强杀进程恢复或多人旅行。
+# 2026-07-26｜Phase 16 Gate 0
+
+- 四角色完成只读规划；Teacher=`PASS`，Implementation=`PASS for detailed planning`。
+- Reviewer 首轮=`REVISE / PLANNING REQUIRED`，指出 v5 直接槽位读写不足以证明 envelope、真实逐版兼容、完整性、backup/recovery 或中断安全。
+- Coordinator 冻结 authority coverage、Primary/Staging/Backup、candidate-first、失败矩阵、golden fixture 与证据边界；窄范围复核要求 on-disk contract 精确到字节，已补充 format v1 固定布局、canonical codec、上限、SHA-256 scope 与分类顺序，等待最终复核。
+- 已创建 P16-001 卡，仅规划 Header、v6、版本分类和相邻迁移；未修改 Source、未构建、未运行测试、未实施备份写盘。
+- 最终 Independent Review=`PASS`；on-disk format v1 已精确到外层 bytes、offset、canonical codec、上限、SHA-256 scope、分类与 lineage 规则。Gate 0 通过，但 P16-001 仍等待用户授权。
