@@ -22,6 +22,7 @@ public:
 	EHSRRewardOperationResult RegisterBundle(const TArray<TObjectPtr<UHSRItemDefinition>>& ItemDefinitions, const UHSRDropTableDefinition& DropTable, const UHSRRewardDefinition& RewardDefinition);
 	EHSRRewardOperationResult SubmitReward(const FHSRRewardRequest& Request, FHSRRewardReceipt& OutReceipt);
 	bool GetReceipt(const FGuid& ClaimId, FHSRRewardReceipt& OutReceipt) const;
+	bool HasDefinition(FName RewardId) const { return Rewards.Contains(RewardId); }
 	void GetReceipts(TArray<FHSRRewardReceipt>& OutReceipts) const;
 	void ExportSaveData(FHSRRewardSaveData& OutData) const;
 	bool PrepareRestore(const FHSRRewardSaveData& Data, FHSRRewardRestoreState& OutCandidate) const;

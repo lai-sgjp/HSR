@@ -42,6 +42,7 @@ public:
 	bool ProjectRestore(const FHSREquipmentRestoreMap& Candidate) const { return !RestoreProjection.IsBound() || RestoreProjection.Execute(Candidate); }
 	EHSREquipmentOperationResult RegisterDefinition(const UHSREquipmentDefinition& Definition);
 	EHSREquipmentOperationResult RegisterDefinition(const UHSRRelicDefinition& Definition);
+	bool HasDefinition(FName DefinitionId) const { return Definitions.Contains(DefinitionId); }
 
 	EHSREquipmentOperationResult Equip(const FGuid& CharacterId, const FHSREquipmentInstance& Instance);
 	EHSREquipmentOperationResult Replace(const FGuid& CharacterId, const FHSREquipmentInstance& Instance);

@@ -5,7 +5,14 @@
 
 FORCEINLINE FGuid HSRCharacterGuidFromProfileName(const FName& CharacterId)
 {
-	return FGuid(0, GetTypeHash(CharacterId), 0, 1);
+	const FTCHARToUTF8 Utf8(*CharacterId.ToString());
+	uint32 StableHash = 2166136261u;
+	for (int32 Index = 0; Index < Utf8.Length(); ++Index)
+	{
+		StableHash ^= static_cast<uint8>(Utf8.Get()[Index]);
+		StableHash *= 16777619u;
+	}
+	return FGuid(0, StableHash, 0, 1);
 }
 
 UENUM(BlueprintType)

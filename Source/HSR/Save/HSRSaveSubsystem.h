@@ -2,6 +2,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "HSRSaveTypes.h"
+#include "HSRSaveVersion.h"
 #include "../Progression/HSRCharacterProfileSubsystem.h"
 #include "../Party/HSRPartySubsystem.h"
 #include "../Equipment/HSREquipmentSubsystem.h"
@@ -19,10 +20,17 @@ public:
 	EHSRSaveResult LoadSnapshot(const FHSRSaveData& Candidate);
 	EHSRSaveResult SaveToSlot(const FString& SlotName, int32 UserIndex = 0);
 	EHSRSaveResult LoadFromSlot(const FString& SlotName, int32 UserIndex = 0);
+	const FHSRSaveLoadResult& GetLastLoadResult() const { return LastLoadResult; }
 	const FHSRSaveData& GetSnapshot() const { return Current; }
 	FHSRRestoreCommitted& OnRestoreCommitted() { return RestoreCommitted; }
+	EHSRSaveFailureStage GetLastWriteFailureStage() const { return LastWriteFailureStage; }
+	bool HadLastWriteCleanupWarning() const { return bLastWriteCleanupWarning; }
+	const FHSRSaveEnvelopeHeader& GetLastWriteHeader() const { return LastWriteHeader; }
 #if WITH_DEV_AUTOMATION_TESTS
 	void SetDiskFailureInjection(bool bCreate, bool bSave, bool bLoad) { bInjectCreateFailure=bCreate;bInjectSaveFailure=bSave;bInjectLoadFailure=bLoad; }
+	void SetTransactionFailureInjection(EHSRSaveFailureStage InStage) { InjectedTransactionStage=InStage; }
+	void SetOperationBusyForAutomation(bool bBusy) { bOperationInProgress=bBusy; }
+	void SetRestoreBlockedForAutomation(bool bMapTravel, bool bBattleReturn) { bInjectMapTravelPending=bMapTravel;bInjectBattleReturnPending=bBattleReturn; }
 #endif
 #if WITH_EDITOR
 	void InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles, UHSRPartySubsystem* InParty, UHSREquipmentSubsystem* InEquipment=nullptr, UHSRInventorySubsystem* InInventory=nullptr, UHSRRewardSubsystem* InReward=nullptr, UHSRQuestSubsystem* InQuest=nullptr, UHSRMapSubsystem* InMap=nullptr);
@@ -30,6 +38,7 @@ public:
 #endif
 private:
 	bool Validate(const FHSRSaveData& Candidate) const;
+	bool CanPrepareSnapshot(const FHSRSaveData& Candidate) const;
 	UPROPERTY() FHSRSaveData Current;
 	TWeakObjectPtr<UHSRCharacterProfileSubsystem> Profiles;
 	TWeakObjectPtr<UHSRPartySubsystem> Party;
@@ -50,7 +59,14 @@ private:
 #endif
 	int64 RestoreTransactionRevision=0;
 	FHSRRestoreCommitted RestoreCommitted;
+	FHSRSaveLoadResult LastLoadResult;
+	bool bOperationInProgress=false;
+	EHSRSaveFailureStage LastWriteFailureStage=EHSRSaveFailureStage::None;
+	bool bLastWriteCleanupWarning=false;
+	FHSRSaveEnvelopeHeader LastWriteHeader;
 #if WITH_DEV_AUTOMATION_TESTS
 	bool bInjectCreateFailure=false,bInjectSaveFailure=false,bInjectLoadFailure=false;
+	EHSRSaveFailureStage InjectedTransactionStage=EHSRSaveFailureStage::None;
+	bool bInjectMapTravelPending=false,bInjectBattleReturnPending=false;
 #endif
 };

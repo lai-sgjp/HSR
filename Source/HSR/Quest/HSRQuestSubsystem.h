@@ -21,6 +21,7 @@ public:
 	EHSRQuestOperationResult SubmitEvent(const FHSRQuestDomainEvent& Event, TArray<FHSRQuestRuntimeState>& OutChangedStates);
 	EHSRQuestOperationResult ClaimQuestReward(FName QuestId, FHSRQuestRewardClaimResult& OutResult);
 	bool GetQuestState(FName QuestId, FHSRQuestRuntimeState& OutState) const;
+	bool HasDefinition(FName QuestId) const { return QuestDefinitions.Contains(QuestId); }
 	void GetQuestStates(TArray<FHSRQuestRuntimeState>& OutStates) const;
 	void ExportSaveData(FHSRQuestSaveData& OutData) const;
 	bool PrepareRestore(const FHSRQuestSaveData& Data, FHSRQuestRestoreState& OutCandidate) const;

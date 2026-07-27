@@ -22,6 +22,7 @@ public:
 	bool GetProfileSnapshot(FName CharacterId, FHSRCharacterProfileSnapshot& OutSnapshot) const;
 	bool GetProgressionContext(FName CharacterId, FHSRCharacterProgressionContext& OutContext) const;
 	bool GetDefinition(FName CharacterId, const UHSRCharacterDefinition*& OutDefinition) const;
+	bool HasDefinition(FName CharacterId) const { return Definitions.Contains(CharacterId); }
 	FHSRCharacterProfileChanged& OnProfileChanged() { return ProfileChanged; }
 
 private:

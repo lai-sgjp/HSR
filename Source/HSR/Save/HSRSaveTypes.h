@@ -10,7 +10,28 @@
 #include "HSRSaveTypes.generated.h"
 
 UENUM(BlueprintType)
-enum class EHSRSaveResult : uint8 { Success, InvalidArgument, SlotNotFound, CreateFailed, SaveFailed, LoadFailed, ClassMismatch, UnsupportedSchema, InvalidData };
+enum class EHSRSaveResult : uint8 { Success, InvalidArgument, SlotNotFound, CreateFailed, SaveFailed, LoadFailed, ClassMismatch, UnsupportedSchema, InvalidData, InvalidEnvelope, IntegrityFailed, SlotIdentityMismatch, LegacyData };
+
+UENUM(BlueprintType)
+enum class EHSRSaveFailureStage : uint8 { None, Capture, Encode, StagingWrite, StagingReadback, BackupWrite, BackupReadback, PrimaryWrite, PrimaryReadback, Cleanup };
+
+enum class EHSRSaveLoadSource : uint8 { None, Primary, Backup, LegacyPrimary };
+enum class EHSRSaveLoadReason : uint8 { None, Missing, InvalidArgument, Busy, TravelPending, LegacyInvalid, PrepareFailed, ProjectionFailed, LineageMismatch, InvalidGeneration, DecodeFailure };
+struct FHSRSaveLoadResult
+{
+	EHSRSaveResult Result = EHSRSaveResult::LoadFailed;
+	EHSRSaveLoadSource Source = EHSRSaveLoadSource::None;
+	uint8 PrimaryReason = 0;
+	uint8 BackupReason = 0;
+	EHSRSaveLoadReason PrimaryStageReason = EHSRSaveLoadReason::None;
+	EHSRSaveLoadReason BackupStageReason = EHSRSaveLoadReason::None;
+	FGuid SaveId;
+	uint64 Generation = 0;
+	bool bPrimaryHeaderTrusted = false;
+	bool bRecoveredFromBackup = false;
+	bool bPrimaryUntrusted = false;
+	bool bRuntimeChanged = false;
+};
 
 USTRUCT(BlueprintType)
 struct HSR_API FHSRSaveProfileDto { GENERATED_BODY()

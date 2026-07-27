@@ -188,6 +188,18 @@ EHSRMapOperationResult UHSRMapSubsystem::UnlockRegion(const FName RegionId)
 	return EHSRMapOperationResult::Success;
 }
 
+bool UHSRMapSubsystem::HasRegionDefinition(const FName RegionId) const
+{
+	for (const TPair<FName, FRegisteredMap>& Pair : Maps)
+	{
+		if (Pair.Value.RegionId == RegionId)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 EHSRMapOperationResult UHSRMapSubsystem::UnlockTeleport(const FName TeleportId)
 {
 	if (!Teleports.Contains(TeleportId))

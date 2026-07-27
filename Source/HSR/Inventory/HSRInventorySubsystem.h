@@ -22,6 +22,7 @@ public:
 	EHSRInventoryOperationResult RemoveUnique(const FGuid& InstanceId);
 	EHSRInventoryOperationResult ApplyGrants(const TArray<FHSRInventoryGrant>& Grants);
 	bool GetDefinitionInfo(FName ItemId, EHSRItemStorageKind& OutStorageKind, int32& OutMaxStack) const;
+	bool HasDefinition(FName ItemId) const { return Definitions.Contains(ItemId); }
 	void GetSnapshot(FHSRInventorySnapshot& OutSnapshot) const;
 	void ExportSaveData(FHSRInventorySaveData& OutData) const;
 	bool PrepareRestore(const FHSRInventorySaveData& Data, FHSRInventoryRestoreState& OutCandidate) const;

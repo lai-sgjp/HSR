@@ -2,7 +2,9 @@
 #include "../Progression/HSRCharacterProfileSubsystem.h"
 #include "../Party/HSRPartySubsystem.h"
 #include "HSRSaveGame.h"
+#include "HSRSaveVersion.h"
 #include "Kismet/GameplayStatics.h"
+#include "../Battle/HSRBattleTransitionSubsystem.h"
 #if WITH_EDITOR
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -142,7 +144,7 @@ void UHSRSaveSubsystem::InitializeForDevelopmentTest(UHSRCharacterProfileSubsyst
 #endif
 
 bool UHSRSaveSubsystem::Validate(const FHSRSaveData& C) const {
-	if((C.SchemaVersion<1 || C.SchemaVersion>5) || C.PartyRevision<0 || C.PartySlots.Num()!=UHSRPartySubsystem::Capacity) return false;
+	if((C.SchemaVersion<1 || C.SchemaVersion>HSRSaveVersion::CurrentSchema) || C.PartyRevision<0 || C.PartySlots.Num()!=UHSRPartySubsystem::Capacity) return false;
 	TSet<FName> Seen;
 	TMap<FGuid,FName> GuidOwners;
 	for(const FHSRSaveProfileDto& P:C.Profiles){ const auto& S=P.State; if(S.CharacterId.IsNone()||S.Level<1||S.Experience<0||S.Ascension<0)return false; if(Seen.Contains(S.CharacterId))return false; Seen.Add(S.CharacterId); const FGuid Guid=HSRCharacterGuidFromProfileName(S.CharacterId); if(const FName* Owner=GuidOwners.Find(Guid)){if(*Owner!=S.CharacterId)return false;}else GuidOwners.Add(Guid,S.CharacterId); for(const auto& K:S.SkillLevels) if(K.Key.IsNone()||K.Value<0)return false; }
@@ -153,8 +155,39 @@ bool UHSRSaveSubsystem::Validate(const FHSRSaveData& C) const {
 	if(C.SchemaVersion<5 && (!C.Map.CurrentLocation.MapId.IsNone() || !C.Map.CurrentLocation.ArrivalId.IsNone()
 		|| !C.Map.UnlockedRegionIds.IsEmpty() || !C.Map.UnlockedTeleportIds.IsEmpty()
 		|| !C.Map.ExplorationFlags.IsEmpty() || C.Map.Revision!=0))return false;
-	for(const FHSREquipmentSaveDto& D:C.Equipment){const FName* Owner=GuidOwners.Find(D.CharacterId);if(!Owner||HSRCharacterGuidFromProfileName(*Owner)!=D.CharacterId)return false;}
+	TSet<FGuid> OwnedInstances;
+	for(const FHSREquipmentSaveDto& D:C.Equipment){const FName* Owner=GuidOwners.Find(D.CharacterId);if(!Owner||HSRCharacterGuidFromProfileName(*Owner)!=D.CharacterId||!D.InstanceId.IsValid()||OwnedInstances.Contains(D.InstanceId))return false;OwnedInstances.Add(D.InstanceId);}
+	for(const FHSRItemInstance& I:C.Inventory.UniqueItems){if(!I.InstanceId.IsValid()||OwnedInstances.Contains(I.InstanceId))return false;OwnedInstances.Add(I.InstanceId);}
+	// Read-only cross-domain preflight: this must complete before any domain PrepareRestore or equipment projection.
+	if(!Profiles.IsValid()||!Equipment.IsValid()||!Inventory.IsValid()||!Reward.IsValid()||!Quest.IsValid()||!Map.IsValid())return false;
+	for(const FHSRSaveProfileDto& P:C.Profiles)if(!Profiles->HasDefinition(P.State.CharacterId))return false;
+	for(const FHSREquipmentSaveDto& D:C.Equipment)if(!Equipment->HasDefinition(D.DefinitionId))return false;
+	for(const FHSRItemStackSnapshot& S:C.Inventory.Stacks)if(!Inventory->HasDefinition(S.ItemId))return false;
+	for(const FHSRItemInstance& I:C.Inventory.UniqueItems)if(!Inventory->HasDefinition(I.DefinitionId))return false;
+	for(const FHSRRewardReceipt& R:C.Rewards.Receipts){if(!Reward->HasDefinition(R.Request.RewardDefinitionId))return false;for(const FHSRInventoryGrant& G:R.Grants)if(!Inventory->HasDefinition(G.ItemId))return false;}
+	for(const FHSRQuestRuntimeState& Q:C.Quests.States)if(!Quest->HasDefinition(Q.QuestId))return false;
+	if(!C.Map.CurrentLocation.MapId.IsNone()&&!Map->HasMapDefinition(C.Map.CurrentLocation.MapId))return false;
+	for(const FName& R:C.Map.UnlockedRegionIds)if(!Map->HasRegionDefinition(R))return false;
+	for(const FName& T:C.Map.UnlockedTeleportIds)if(!Map->HasTeleportDefinition(T))return false;
 	return true;
+}
+bool UHSRSaveSubsystem::CanPrepareSnapshot(const FHSRSaveData& Candidate) const
+{
+	if(Candidate.SchemaVersion<1||Candidate.SchemaVersion>5||!Profiles.IsValid()||!Party.IsValid()||!Equipment.IsValid()||!Inventory.IsValid()||!Reward.IsValid()||!Quest.IsValid()||!Map.IsValid()||!Validate(Candidate))
+	{
+#if WITH_DEV_AUTOMATION_TESTS
+		UE_LOG(LogTemp,Warning,TEXT("HSR Save prepare rejected by prerequisites/validation"));
+#endif
+		return false;
+	}
+	TArray<FHSRCharacterProfileSnapshot> SavedProfiles;for(const FHSRSaveProfileDto& D:Candidate.Profiles){FHSRCharacterProfileSnapshot P;P.RuntimeState=D.State;P.RuntimeRevision=D.RuntimeRevision;SavedProfiles.Add(MoveTemp(P));}
+	TMap<FName,FHSRCharacterProfileSnapshot> ProfileCandidate;FHSRPartySnapshot PartySaved;PartySaved.Slots=Candidate.PartySlots;PartySaved.Revision=Candidate.PartyRevision;FHSRPartySnapshot PartyCandidate;FHSREquipmentRestoreMap EquipmentCandidate;FHSRInventoryRestoreState InventoryCandidate;FHSRRewardRestoreState RewardCandidate;FHSRQuestRestoreState QuestCandidate;FHSRMapRuntimeSnapshot MapCandidate;
+	const TArray<FHSREquipmentSaveDto> EmptyEquipment;const FHSRInventorySaveData EmptyInventory;const FHSRRewardSaveData EmptyRewards;const FHSRQuestSaveData EmptyQuests;const FHSRMapSaveData EmptyMap;
+	const bool bProfiles=Profiles->PrepareRestore(SavedProfiles,ProfileCandidate);const bool bParty=Party->PrepareRestore(PartySaved,PartyCandidate);const bool bEquipment=Equipment->PrepareRestore(Candidate.SchemaVersion==1?EmptyEquipment:Candidate.Equipment,EquipmentCandidate);const bool bInventory=Inventory->PrepareRestore(Candidate.SchemaVersion<3?EmptyInventory:Candidate.Inventory,InventoryCandidate);const bool bReward=Reward->PrepareRestore(Candidate.SchemaVersion<3?EmptyRewards:Candidate.Rewards,RewardCandidate);const bool bQuest=Quest->PrepareRestore(Candidate.SchemaVersion<4?EmptyQuests:Candidate.Quests,QuestCandidate);const bool bMap=Map->PrepareRestore(Candidate.SchemaVersion<5?EmptyMap:Candidate.Map,MapCandidate);
+#if WITH_DEV_AUTOMATION_TESTS
+	if(!(bProfiles&&bParty&&bEquipment&&bInventory&&bReward&&bQuest&&bMap))UE_LOG(LogTemp,Warning,TEXT("HSR Save prepare rejected Profiles=%d Party=%d Equipment=%d Inventory=%d Reward=%d Quest=%d Map=%d"),bProfiles,bParty,bEquipment,bInventory,bReward,bQuest,bMap);
+#endif
+	return bProfiles&&bParty&&bEquipment&&bInventory&&bReward&&bQuest&&bMap;
 }
 EHSRSaveResult UHSRSaveSubsystem::SaveSnapshot(FHSRSaveData& Out) { if(!Party.IsValid()||!Profiles.IsValid()||!Equipment.IsValid()||!Inventory.IsValid()||!Reward.IsValid()||!Quest.IsValid()||!Map.IsValid()) return EHSRSaveResult::InvalidData; FHSRSaveData Captured; Captured.SchemaVersion=5; TArray<FHSRCharacterProfileSnapshot> P; Profiles->ExportProfiles(P); for(const auto& Entry:P){ FHSRSaveProfileDto D;D.State=Entry.RuntimeState;D.RuntimeRevision=Entry.RuntimeRevision;Captured.Profiles.Add(MoveTemp(D)); } FHSRPartySnapshot PS;Party->GetSnapshot(PS);Captured.PartySlots=PS.Slots;Captured.PartyRevision=PS.Revision;Equipment->ExportSaveData(Captured.Equipment);Inventory->ExportSaveData(Captured.Inventory);Reward->ExportSaveData(Captured.Rewards);Quest->ExportSaveData(Captured.Quests);Map->ExportSaveData(Captured.Map);if(!Validate(Captured))return EHSRSaveResult::InvalidData;Current=Captured;Out=Captured;return EHSRSaveResult::Success; }
 EHSRSaveResult UHSRSaveSubsystem::LoadSnapshot(const FHSRSaveData& Candidate)
@@ -165,7 +198,6 @@ EHSRSaveResult UHSRSaveSubsystem::LoadSnapshot(const FHSRSaveData& Candidate)
 	TMap<FGuid,FHSREquipmentRestoreState> EquipmentCandidate;const TArray<FHSREquipmentSaveDto> EmptyEquipment;
 	FHSRInventoryRestoreState InventoryCandidate;FHSRRewardRestoreState RewardCandidate;FHSRQuestRestoreState QuestCandidate;FHSRMapRuntimeSnapshot MapCandidate;const FHSRInventorySaveData EmptyInventory;const FHSRRewardSaveData EmptyRewards;const FHSRQuestSaveData EmptyQuests;const FHSRMapSaveData EmptyMap;
 	if(!Profiles->PrepareRestore(SavedProfiles,ProfileCandidate)||!Party->PrepareRestore(PartySaved,PartyCandidate)||!Equipment->PrepareRestore(Candidate.SchemaVersion==1?EmptyEquipment:Candidate.Equipment,EquipmentCandidate)||!Inventory->PrepareRestore(Candidate.SchemaVersion<3?EmptyInventory:Candidate.Inventory,InventoryCandidate)||!Reward->PrepareRestore(Candidate.SchemaVersion<3?EmptyRewards:Candidate.Rewards,RewardCandidate)||!Quest->PrepareRestore(Candidate.SchemaVersion<4?EmptyQuests:Candidate.Quests,QuestCandidate)||!Map->PrepareRestore(Candidate.SchemaVersion<5?EmptyMap:Candidate.Map,MapCandidate))return EHSRSaveResult::InvalidData;
-	TSet<FGuid> OwnedInstances;for(const FHSREquipmentSaveDto& D:Candidate.Equipment){if(!D.InstanceId.IsValid()||OwnedInstances.Contains(D.InstanceId))return EHSRSaveResult::InvalidData;OwnedInstances.Add(D.InstanceId);}for(const auto& P:InventoryCandidate.UniqueItems){if(OwnedInstances.Contains(P.Key))return EHSRSaveResult::InvalidData;OwnedInstances.Add(P.Key);}
 	if(!Equipment->ProjectRestore(EquipmentCandidate))return EHSRSaveResult::InvalidData;
 	TArray<FName> ChangedIds;for(const auto& It:ProfileCandidate){FHSRCharacterProfileSnapshot Old;if(!Profiles->GetProfileSnapshot(It.Key,Old)||Old.RuntimeRevision!=It.Value.RuntimeRevision||Old.RuntimeState.Level!=It.Value.RuntimeState.Level||Old.RuntimeState.Experience!=It.Value.RuntimeState.Experience||Old.RuntimeState.Ascension!=It.Value.RuntimeState.Ascension||!Old.RuntimeState.SkillLevels.OrderIndependentCompareEqual(It.Value.RuntimeState.SkillLevels))ChangedIds.Add(It.Key);}ChangedIds.Sort(FNameLexicalLess());FHSRPartySnapshot OldParty;Party->GetSnapshot(OldParty);bool PartyChanged=OldParty.Revision!=PartyCandidate.Revision;for(int32 I=0;!PartyChanged&&I<OldParty.Slots.Num();++I)PartyChanged=OldParty.Slots[I].CharacterId!=PartyCandidate.Slots[I].CharacterId;
 	TSet<FGuid> EquipmentChanged;TArray<FHSREquipmentSaveDto> ExistingEquipment;Equipment->ExportSaveData(ExistingEquipment);TSet<FGuid> ExistingCharacters;for(const FHSREquipmentSaveDto& D:ExistingEquipment)ExistingCharacters.Add(D.CharacterId);for(const FGuid& Id:ExistingCharacters)if(!EquipmentCandidate.Contains(Id))EquipmentChanged.Add(Id);for(const auto& P:EquipmentCandidate){TArray<FHSREquipmentSaveDto> OldRows;for(const FHSREquipmentSaveDto& D:ExistingEquipment)if(D.CharacterId==P.Key)OldRows.Add(D);TArray<FHSREquipmentSaveDto> NewRows;for(const FHSREquipmentSaveDto& D:Candidate.Equipment)if(D.CharacterId==P.Key)NewRows.Add(D);if(OldRows.Num()!=NewRows.Num()){EquipmentChanged.Add(P.Key);continue;}OldRows.Sort([](const auto& A,const auto& B){return A.InstanceId<B.InstanceId;});NewRows.Sort([](const auto& A,const auto& B){return A.InstanceId<B.InstanceId;});for(int32 I=0;I<OldRows.Num();++I){bool bDifferent=OldRows[I].InstanceId!=NewRows[I].InstanceId||OldRows[I].DefinitionId!=NewRows[I].DefinitionId||OldRows[I].Kind!=NewRows[I].Kind||OldRows[I].Slot!=NewRows[I].Slot||OldRows[I].EnhancementLevel!=NewRows[I].EnhancementLevel||OldRows[I].AuthorityRevision!=NewRows[I].AuthorityRevision||OldRows[I].SetId!=NewRows[I].SetId||OldRows[I].Modifiers.Num()!=NewRows[I].Modifiers.Num();for(int32 M=0;!bDifferent&&M<OldRows[I].Modifiers.Num();++M)bDifferent=OldRows[I].Modifiers[M].Stat!=NewRows[I].Modifiers[M].Stat||OldRows[I].Modifiers[M].Value!=NewRows[I].Modifiers[M].Value;if(bDifferent){EquipmentChanged.Add(P.Key);break;}}}
@@ -175,25 +207,97 @@ EHSRSaveResult UHSRSaveSubsystem::LoadSnapshot(const FHSRSaveData& Candidate)
 
 EHSRSaveResult UHSRSaveSubsystem::SaveToSlot(const FString& SlotName,int32 UserIndex)
 {
-	if(SlotName.TrimStartAndEnd().IsEmpty()||UserIndex<0)return EHSRSaveResult::InvalidArgument;
-	const FHSRSaveData Previous=Current;FHSRSaveData Captured;if(SaveSnapshot(Captured)!=EHSRSaveResult::Success)return EHSRSaveResult::InvalidData;
+	LastWriteFailureStage=EHSRSaveFailureStage::None;bLastWriteCleanupWarning=false;LastWriteHeader=FHSRSaveEnvelopeHeader();
+	if(!HSRSaveVersion::IsValidSlot(SlotName,UserIndex)||SlotName.Contains(TEXT(".__hsr_")))return EHSRSaveResult::InvalidArgument;
+	if(bOperationInProgress)return EHSRSaveResult::InvalidArgument;TGuardValue<bool> OperationGuard(bOperationInProgress,true);
+	const FString Staging=SlotName+TEXT(".__hsr_staging_v1"),Backup=SlotName+TEXT(".__hsr_backup_v1");const FHSRSaveData Previous=Current;
 #if WITH_DEV_AUTOMATION_TESTS
-	if(bInjectCreateFailure){Current=Previous;return EHSRSaveResult::CreateFailed;}
+	if(bInjectCreateFailure||InjectedTransactionStage==EHSRSaveFailureStage::Capture){LastWriteFailureStage=EHSRSaveFailureStage::Capture;return bInjectCreateFailure?EHSRSaveResult::CreateFailed:EHSRSaveResult::InvalidData;}
 #endif
-	UHSRSaveGame* Object=Cast<UHSRSaveGame>(UGameplayStatics::CreateSaveGameObject(UHSRSaveGame::StaticClass()));if(!Object){Current=Previous;return EHSRSaveResult::CreateFailed;}Object->Data=Captured;
+	FHSRSaveData Captured;if(SaveSnapshot(Captured)!=EHSRSaveResult::Success){LastWriteFailureStage=EHSRSaveFailureStage::Capture;return EHSRSaveResult::InvalidData;}Captured.SchemaVersion=HSRSaveVersion::CurrentSchema;
+	auto Fail=[&](EHSRSaveFailureStage Stage,EHSRSaveResult Result){LastWriteFailureStage=Stage;Current=Previous;return Result;};
+	auto ReadValid=[&](const FString& Physical,TArray<uint8>& Out,FHSRSaveData& Data,FHSRSaveEnvelopeHeader& Header){return UGameplayStatics::LoadDataFromSlot(Out,Physical,UserIndex)&&HSRSaveVersion::DecodeEnvelope(Out,SlotName,UserIndex,Data,&Header)==EHSRSaveDecodeResult::Success&&Validate(Data);};
+	FGuid Id=FGuid::NewGuid();uint64 Gen=1;TArray<uint8> Old;FHSRSaveData OldData;FHSRSaveEnvelopeHeader OldHeader;const bool bOldPrimaryValid=UGameplayStatics::DoesSaveGameExist(SlotName,UserIndex)&&ReadValid(SlotName,Old,OldData,OldHeader);
+	if(bOldPrimaryValid){if(OldHeader.Generation==MAX_uint64)return Fail(EHSRSaveFailureStage::Encode,EHSRSaveResult::InvalidEnvelope);Id=OldHeader.SaveId;Gen=OldHeader.Generation+1;}
+	else{TArray<uint8> ExistingBackup;FHSRSaveData BackupData;FHSRSaveEnvelopeHeader BackupHeader;if(UGameplayStatics::DoesSaveGameExist(Backup,UserIndex)&&ReadValid(Backup,ExistingBackup,BackupData,BackupHeader)){if(BackupHeader.Generation==MAX_uint64)return Fail(EHSRSaveFailureStage::Encode,EHSRSaveResult::InvalidEnvelope);Id=BackupHeader.SaveId;Gen=BackupHeader.Generation+1;}}
 #if WITH_DEV_AUTOMATION_TESTS
-	if(bInjectSaveFailure){Current=Previous;return EHSRSaveResult::SaveFailed;}
+	if(InjectedTransactionStage==EHSRSaveFailureStage::Encode)return Fail(EHSRSaveFailureStage::Encode,EHSRSaveResult::InvalidData);
 #endif
-	if(!UGameplayStatics::SaveGameToSlot(Object,SlotName,UserIndex)){Current=Previous;return EHSRSaveResult::SaveFailed;}return EHSRSaveResult::Success;
+	TArray<uint8> Bytes;if(!HSRSaveVersion::EncodeEnvelope(Captured,SlotName,UserIndex,Id,Gen,Bytes))return Fail(EHSRSaveFailureStage::Encode,EHSRSaveResult::InvalidData);
+#if WITH_DEV_AUTOMATION_TESTS
+	if(bInjectSaveFailure||InjectedTransactionStage==EHSRSaveFailureStage::StagingWrite)return Fail(EHSRSaveFailureStage::StagingWrite,EHSRSaveResult::SaveFailed);
+#endif
+	if(!UGameplayStatics::SaveDataToSlot(Bytes,Staging,UserIndex))return Fail(EHSRSaveFailureStage::StagingWrite,EHSRSaveResult::SaveFailed);TArray<uint8> Check;FHSRSaveData CheckData;FHSRSaveEnvelopeHeader CheckHeader;
+#if WITH_DEV_AUTOMATION_TESTS
+	if(InjectedTransactionStage==EHSRSaveFailureStage::StagingReadback)return Fail(EHSRSaveFailureStage::StagingReadback,EHSRSaveResult::LoadFailed);
+#endif
+	const bool bStagingLoaded=UGameplayStatics::LoadDataFromSlot(Check,Staging,UserIndex);const EHSRSaveDecodeResult StagingDecode=bStagingLoaded?HSRSaveVersion::DecodeEnvelope(Check,SlotName,UserIndex,CheckData,&CheckHeader):EHSRSaveDecodeResult::TooShort;const bool bStagingValid=StagingDecode==EHSRSaveDecodeResult::Success&&Validate(CheckData);if(!bStagingValid||Check!=Bytes||CheckHeader.SaveId!=Id||CheckHeader.Generation!=Gen){UE_LOG(LogTemp,Warning,TEXT("HSR save staging validation failed Loaded=%d Decode=%d Valid=%d Bytes=%d Id=%d Gen=%d"),bStagingLoaded?1:0,static_cast<int32>(StagingDecode),bStagingValid?1:0,Check==Bytes?1:0,CheckHeader.SaveId==Id?1:0,CheckHeader.Generation==Gen?1:0);return Fail(EHSRSaveFailureStage::StagingReadback,EHSRSaveResult::LoadFailed);}
+	if(bOldPrimaryValid){
+#if WITH_DEV_AUTOMATION_TESTS
+		if(InjectedTransactionStage==EHSRSaveFailureStage::BackupWrite)return Fail(EHSRSaveFailureStage::BackupWrite,EHSRSaveResult::SaveFailed);
+#endif
+		if(!UGameplayStatics::SaveDataToSlot(Old,Backup,UserIndex))return Fail(EHSRSaveFailureStage::BackupWrite,EHSRSaveResult::SaveFailed);
+#if WITH_DEV_AUTOMATION_TESTS
+		if(InjectedTransactionStage==EHSRSaveFailureStage::BackupReadback)return Fail(EHSRSaveFailureStage::BackupReadback,EHSRSaveResult::LoadFailed);
+#endif
+		TArray<uint8> BackupCheck;FHSRSaveData BackupCheckData;FHSRSaveEnvelopeHeader BackupCheckHeader;if(!ReadValid(Backup,BackupCheck,BackupCheckData,BackupCheckHeader)||BackupCheck!=Old||BackupCheckHeader.SaveId!=OldHeader.SaveId||BackupCheckHeader.Generation!=OldHeader.Generation)return Fail(EHSRSaveFailureStage::BackupReadback,EHSRSaveResult::LoadFailed);
+	}
+#if WITH_DEV_AUTOMATION_TESTS
+	if(InjectedTransactionStage==EHSRSaveFailureStage::PrimaryWrite)return Fail(EHSRSaveFailureStage::PrimaryWrite,EHSRSaveResult::SaveFailed);
+#endif
+	if(!UGameplayStatics::SaveDataToSlot(Bytes,SlotName,UserIndex))return Fail(EHSRSaveFailureStage::PrimaryWrite,EHSRSaveResult::SaveFailed);
+#if WITH_DEV_AUTOMATION_TESTS
+	if(InjectedTransactionStage==EHSRSaveFailureStage::PrimaryReadback)return Fail(EHSRSaveFailureStage::PrimaryReadback,EHSRSaveResult::LoadFailed);
+#endif
+	if(!ReadValid(SlotName,Check,CheckData,CheckHeader)||Check!=Bytes||CheckHeader.SaveId!=Id||CheckHeader.Generation!=Gen)return Fail(EHSRSaveFailureStage::PrimaryReadback,EHSRSaveResult::LoadFailed);LastWriteHeader=CheckHeader;
+#if WITH_DEV_AUTOMATION_TESTS
+	if(InjectedTransactionStage==EHSRSaveFailureStage::Cleanup){bLastWriteCleanupWarning=true;return EHSRSaveResult::Success;}
+#endif
+	if(UGameplayStatics::DoesSaveGameExist(Staging,UserIndex)&&!UGameplayStatics::DeleteGameInSlot(Staging,UserIndex))bLastWriteCleanupWarning=true;return EHSRSaveResult::Success;
 }
 EHSRSaveResult UHSRSaveSubsystem::LoadFromSlot(const FString& SlotName,int32 UserIndex)
 {
-	if(SlotName.TrimStartAndEnd().IsEmpty()||UserIndex<0)return EHSRSaveResult::InvalidArgument;
-	if(!UGameplayStatics::DoesSaveGameExist(SlotName,UserIndex))return EHSRSaveResult::SlotNotFound;
+	LastLoadResult=FHSRSaveLoadResult();
+	if(!HSRSaveVersion::IsValidSlot(SlotName,UserIndex)||SlotName.Contains(TEXT(".__hsr_"))){LastLoadResult.Result=EHSRSaveResult::InvalidArgument;LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::InvalidArgument;return LastLoadResult.Result;}
+	if(bOperationInProgress){LastLoadResult.Result=EHSRSaveResult::InvalidArgument;LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::Busy;return LastLoadResult.Result;}
+	const UHSRBattleTransitionSubsystem* Battle=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>():nullptr;
 #if WITH_DEV_AUTOMATION_TESTS
-	if(bInjectLoadFailure)return EHSRSaveResult::LoadFailed;
+	const bool bMapBlocked=bInjectMapTravelPending||(Map.IsValid()&&Map->HasPendingTravel());const bool bBattleBlocked=bInjectBattleReturnPending||(Battle&&Battle->HasReturnPending());
+#else
+	const bool bMapBlocked=Map.IsValid()&&Map->HasPendingTravel();const bool bBattleBlocked=Battle&&Battle->HasReturnPending();
 #endif
-	USaveGame* Loaded=UGameplayStatics::LoadGameFromSlot(SlotName,UserIndex);if(!Loaded)return EHSRSaveResult::LoadFailed;
-	const UHSRSaveGame* Typed=Cast<UHSRSaveGame>(Loaded);if(!Typed)return EHSRSaveResult::ClassMismatch;
-	return LoadSnapshot(Typed->Data);
+	if(bMapBlocked||bBattleBlocked){LastLoadResult.Result=EHSRSaveResult::InvalidData;LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::TravelPending;return LastLoadResult.Result;}
+	TGuardValue<bool> OperationGuard(bOperationInProgress,true);
+#if WITH_DEV_AUTOMATION_TESTS
+	if(bInjectLoadFailure){LastLoadResult.Result=EHSRSaveResult::LoadFailed;return LastLoadResult.Result;}
+#endif
+	const FString BackupSlot=SlotName+TEXT(".__hsr_backup_v1");FHSRSaveData Selected;FHSRSaveEnvelopeHeader PrimaryHeader,BackupHeader;bool bHaveSelected=false;bool bPrimaryTrusted=false;EHSRSaveResult PrimaryFailureResult=EHSRSaveResult::InvalidEnvelope;
+	if(UGameplayStatics::DoesSaveGameExist(SlotName,UserIndex))
+	{
+		TArray<uint8> PrimaryBytes;FHSRSaveData PrimaryData;if(UGameplayStatics::LoadDataFromSlot(PrimaryBytes,SlotName,UserIndex))
+		{
+			const EHSRSaveDecodeResult Reason=HSRSaveVersion::DecodeEnvelope(PrimaryBytes,SlotName,UserIndex,PrimaryData,&PrimaryHeader);LastLoadResult.PrimaryReason=static_cast<uint8>(Reason);bPrimaryTrusted=PrimaryHeader.SaveId.IsValid();LastLoadResult.bPrimaryHeaderTrusted=bPrimaryTrusted;
+			if(Reason==EHSRSaveDecodeResult::Success){PrimaryData.SchemaVersion=5;if(CanPrepareSnapshot(PrimaryData)){Selected=MoveTemp(PrimaryData);bHaveSelected=true;LastLoadResult.Source=EHSRSaveLoadSource::Primary;LastLoadResult.SaveId=PrimaryHeader.SaveId;LastLoadResult.Generation=PrimaryHeader.Generation;}else LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::PrepareFailed;}
+			else if(Reason==EHSRSaveDecodeResult::BadMagic)
+			{
+				USaveGame* LegacyObject=UGameplayStatics::LoadGameFromSlot(SlotName,UserIndex);const UHSRSaveGame* Legacy=Cast<UHSRSaveGame>(LegacyObject);if(Legacy&&Legacy->Data.SchemaVersion>=1&&Legacy->Data.SchemaVersion<=5&&CanPrepareSnapshot(Legacy->Data)){Selected=Legacy->Data;bHaveSelected=true;LastLoadResult.Source=EHSRSaveLoadSource::LegacyPrimary;}else{LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::LegacyInvalid;PrimaryFailureResult=!LegacyObject?EHSRSaveResult::LoadFailed:!Legacy?EHSRSaveResult::ClassMismatch:Legacy->Data.SchemaVersion>5?EHSRSaveResult::UnsupportedSchema:EHSRSaveResult::InvalidData;}
+			}
+			else LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::DecodeFailure;
+		}
+		else LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::DecodeFailure;
+	}
+	else{LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::Missing;LastLoadResult.PrimaryReason=static_cast<uint8>(EHSRSaveDecodeResult::TooShort);}
+	if(!bHaveSelected&&UGameplayStatics::DoesSaveGameExist(BackupSlot,UserIndex))
+	{
+		TArray<uint8> BackupBytes;FHSRSaveData BackupData;const bool bRead=UGameplayStatics::LoadDataFromSlot(BackupBytes,BackupSlot,UserIndex);const EHSRSaveDecodeResult Reason=bRead?HSRSaveVersion::DecodeEnvelope(BackupBytes,SlotName,UserIndex,BackupData,&BackupHeader):EHSRSaveDecodeResult::TooShort;LastLoadResult.BackupReason=static_cast<uint8>(Reason);
+		if(Reason==EHSRSaveDecodeResult::Success)
+		{
+			bool bLineageValid=true;if(bPrimaryTrusted){if(BackupHeader.SaveId!=PrimaryHeader.SaveId){bLineageValid=false;LastLoadResult.BackupStageReason=EHSRSaveLoadReason::LineageMismatch;}else if(BackupHeader.Generation>=PrimaryHeader.Generation){bLineageValid=false;LastLoadResult.BackupStageReason=EHSRSaveLoadReason::InvalidGeneration;}}
+			BackupData.SchemaVersion=5;if(bLineageValid&&CanPrepareSnapshot(BackupData)){Selected=MoveTemp(BackupData);bHaveSelected=true;LastLoadResult.Source=EHSRSaveLoadSource::Backup;LastLoadResult.SaveId=BackupHeader.SaveId;LastLoadResult.Generation=BackupHeader.Generation;LastLoadResult.bRecoveredFromBackup=true;LastLoadResult.bPrimaryUntrusted=!bPrimaryTrusted;}else if(bLineageValid)LastLoadResult.BackupStageReason=EHSRSaveLoadReason::PrepareFailed;
+		}
+		else LastLoadResult.BackupStageReason=EHSRSaveLoadReason::DecodeFailure;
+	}
+	else if(!bHaveSelected){LastLoadResult.BackupStageReason=EHSRSaveLoadReason::Missing;LastLoadResult.BackupReason=static_cast<uint8>(EHSRSaveDecodeResult::TooShort);}
+	if(!bHaveSelected){LastLoadResult.Result=LastLoadResult.PrimaryStageReason==EHSRSaveLoadReason::Missing&&LastLoadResult.BackupStageReason==EHSRSaveLoadReason::Missing?EHSRSaveResult::SlotNotFound:LastLoadResult.PrimaryStageReason==EHSRSaveLoadReason::LegacyInvalid?PrimaryFailureResult:EHSRSaveResult::InvalidEnvelope;return LastLoadResult.Result;}
+	const int64 BeforeRevision=RestoreTransactionRevision;LastLoadResult.Result=LoadSnapshot(Selected);LastLoadResult.bRuntimeChanged=RestoreTransactionRevision!=BeforeRevision;if(LastLoadResult.Result!=EHSRSaveResult::Success&&LastLoadResult.Source!=EHSRSaveLoadSource::None){if(LastLoadResult.Source==EHSRSaveLoadSource::Backup)LastLoadResult.BackupStageReason=EHSRSaveLoadReason::ProjectionFailed;else LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::ProjectionFailed;}return LastLoadResult.Result;
 }

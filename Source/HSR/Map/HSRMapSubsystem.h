@@ -46,6 +46,9 @@ public:
 
 	bool IsRegionUnlocked(FName RegionId) const;
 	bool IsTeleportUnlocked(FName TeleportId) const;
+	bool HasMapDefinition(FName MapId) const { return Maps.Contains(MapId); }
+	bool HasRegionDefinition(FName RegionId) const;
+	bool HasTeleportDefinition(FName TeleportId) const { return Teleports.Contains(TeleportId); }
 	const FHSRMapRuntimeSnapshot& GetSnapshot() const { return Snapshot; }
 	FHSRMapStateChanged& OnMapStateChanged() { return MapStateChanged; }
 	void ExportSaveData(FHSRMapSaveData& OutData) const;
