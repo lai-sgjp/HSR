@@ -3,32 +3,22 @@
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `38d868e`
-- Result: `REVISE`
+- Reviewed revision: `69c1b83`
+- Result: `PASS WITH FOLLOW-UP`
 - Date: 2026-07-27
 
-## Verified evidence
+## Verified
 
-- Revision provenance is limited to the allowlisted controller `.h/.cpp` and `tasks/execution-result.md`; no user `.uasset` is part of `38d868e`.
-- `Saved/Logs/HSR.log` independently confirms one discovered `HSR.Exploration.Patch.BehaviorTreeAdapter` test, `Test Completed. Result={Success}`, `TEST COMPLETE. EXIT CODE: 0`, and normal engine exit.
-- The execution report records the post-fix editor build as six actions with exit `0`. Stage B assets and PIE behavior remain unverified and must not be marked complete.
-- The revision correctly removes the BeginPlay patrol timer, perception `MoveToActor`, and SpawnOrigin `MoveToLocation` call added by the first Stage-A implementation.
+- `StartPatrol`, `MoveToLocation`, `MoveToActor`, `SetTimer`, and `TimerHandle` have zero matches in the Controller header/implementation. The old patrol function, timer handles/callbacks, and navigation dependency were removed.
+- `OnMoveCompleted` no longer schedules patrol or issues movement. It only routes failed movement to the existing recovery-state/Blackboard publisher and checks weak-target validity; no movement owner remains in C++.
+- Revision provenance is confined to the allowlisted Controller files and `tasks/execution-result.md`. No `Content/AI/**` user asset was modified or submitted.
+- `Saved/Logs/HSR.log` records `HSR.Exploration.Patch.BehaviorTreeAdapter` as `Test Completed. Result={Success}` and `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- The execution report records the post-revision editor Build as 6 actions, exit `0`, with only the pre-existing engine deprecation warning.
 
-## Blocking finding
+## Follow-up boundary
 
-`Source/HSR/Enemy/HSREnemyAIController.cpp` still contains the legacy `StartPatrol()` implementation. It calls `MoveToLocation` directly and schedules itself through `PatrolWaitTimerHandle`. The `OnMoveCompleted` override also still interprets movement completion by exploration state and, for `MovingToPatrol`, schedules `StartPatrol` again. Consequently a Stage-B stock Behavior Tree `Move To` completion can enter this legacy timer path and later issue a second C++ movement request. The claim that stock `Move To`/`Wait` is the sole movement driver is therefore not yet true.
-
-## Minimum required correction
-
-- Remove the `StartPatrol` declaration and implementation, including all timer callbacks to it and its direct `MoveToLocation` call.
-- Make `OnMoveCompleted` incapable of scheduling or issuing movement. If it is retained as the event adapter, it may only publish state/Blackboard recovery intent; Stage-B stock nodes must remain the only owner of Move To and Wait execution.
-- Remove any now-dead legacy timer/handler storage only where it is no longer used, staying inside the existing controller allowlist.
-- Rebuild and rerun `HSR.Exploration.Patch.BehaviorTreeAdapter`. Add a static/automation assertion that the Stage-A controller cannot reintroduce legacy movement ownership if feasible within the existing test allowlist.
-
-## Scope guard
-
-Do not edit or submit `Content/AI/**`, the Enemy Blueprint, or any other user asset during this correction. Stage B has not begun and PATCH-02 as a whole is not complete.
+Stage A C++ movement ownership is now closed, but PATCH-02 as a whole is not complete. Stage B remains user-owned and pending: the five stock-node branches (Patrol, Chasing, LostTarget, MoveFailed, EncounterPending), saved/reopened asset evidence, and PIE/runtime behavior matrix have not been verified. The successful adapter automation is a contract test, not proof of those runtime behaviors.
 
 ## Conclusion
 
-`REVISE`: the explicit Stage-A single-movement-owner contract is still violated by reachable legacy patrol code. The correction is confined to the existing allowlist and needs no new user authorization.
+`PASS WITH FOLLOW-UP`: the requested Stage-A correction is accepted. Proceed only to the user-owned Stage-B Editor gate; do not mark the overall Behavior Tree migration complete until its asset and PIE evidence is supplied.
