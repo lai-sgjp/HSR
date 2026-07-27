@@ -38,8 +38,14 @@ bool FHSRActionDistancePatchTest::RunTest(const FString& Parameters)
 	const FName Current = Manager->GetCurrentParticipantId();
 	const uint64 Epoch = Manager->GetBattleEpoch(); const uint64 Sequence = Manager->GetTurnSequence();
 	FHSRActionDistanceRequest Delay; Delay.BattleEpoch = Epoch; Delay.OperationId = FGuid::NewGuid(); Delay.TargetParticipantId = Current; Delay.Ratio = 0.3f; Delay.Kind = EHSRActionDistanceAdjustmentKind::Delay;
-	TestEqual(TEXT("Current actor delay is accepted as ordered pending"), Manager->RequestActionDistanceAdjustment(Delay).Result, EHSRActionDistanceAdjustmentResult::Accepted);
+	const FHSRActionDistanceResult DelayResult = Manager->RequestActionDistanceAdjustment(Delay);
+	TestEqual(TEXT("Current actor delay is accepted as ordered pending"), DelayResult.Result, EHSRActionDistanceAdjustmentResult::Accepted);
+	TestEqual(TEXT("Accepted current pending reports real old/new counts"), DelayResult.NewPendingOperationCount, DelayResult.OldPendingOperationCount + 1);
 	TestEqual(TEXT("Duplicate operation has zero mutation"), Manager->RequestActionDistanceAdjustment(Delay).Result, EHSRActionDistanceAdjustmentResult::DuplicateOperation);
+	FHSRActionDistanceRequest InvalidKind = Delay; InvalidKind.OperationId = FGuid::NewGuid(); InvalidKind.Kind = static_cast<EHSRActionDistanceAdjustmentKind>(255);
+	TestEqual(TEXT("Unknown adjustment kind is rejected before consuming id"), Manager->RequestActionDistanceAdjustment(InvalidKind).Result, EHSRActionDistanceAdjustmentResult::InvalidRequest);
+	InvalidKind.Kind = EHSRActionDistanceAdjustmentKind::Advance;
+	TestEqual(TEXT("Unknown-kind operation id remains usable"), Manager->RequestActionDistanceAdjustment(InvalidKind).Result, EHSRActionDistanceAdjustmentResult::Accepted);
 	TestEqual(TEXT("Adjustment does not advance lifecycle"), Manager->GetTurnSequence(), Sequence);
 	TestTrue(TEXT("Current action resolves after pending delay"), Manager->ResolveAction(Current));
 	TestEqual(TEXT("Resolve emits exactly one successor turn"), Manager->GetTurnSequence(), Sequence + 1);

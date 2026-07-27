@@ -111,9 +111,10 @@ bool UHSRTurnManager::ApplyCurrentPendingAfterRecharge()
 	return true;
 }
 
-FHSRActionDistanceResult UHSRTurnManager::RequestActionDistanceAdjustment(const FHSRActionDistanceRequest& Request, bool bAllowPendingDeferredDefeat)
+FHSRActionDistanceResult UHSRTurnManager::RequestActionDistanceAdjustment(const FHSRActionDistanceRequest& Request)
 {
-	if (!Request.OperationId.IsValid() || Request.TargetParticipantId.IsNone() || !FMath::IsFinite(Request.Ratio) || Request.Ratio < 0.0f || Request.Ratio > 1.0f) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::InvalidRequest);
+	if (!Request.OperationId.IsValid() || Request.TargetParticipantId.IsNone() || !FMath::IsFinite(Request.Ratio) || Request.Ratio < 0.0f || Request.Ratio > 1.0f
+		|| (Request.Kind != EHSRActionDistanceAdjustmentKind::Advance && Request.Kind != EHSRActionDistanceAdjustmentKind::Delay)) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::InvalidRequest);
 	if (ConsumedOperationIds.Contains(Request.OperationId)) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::DuplicateOperation);
 	ConsumedOperationIds.Add(Request.OperationId);
 	if (Request.BattleEpoch != BattleEpoch || BattleEpoch == 0) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::InvalidEpoch);
@@ -122,9 +123,10 @@ FHSRActionDistanceResult UHSRTurnManager::RequestActionDistanceAdjustment(const 
 	if (!OrderedParticipants.IsValidIndex(Index)) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::InvalidTarget);
 	FHSRBattleParticipant& Target = OrderedParticipants[Index];
 	if (!Target.IsValid()) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::InvalidTarget, Index);
-	if (!IsParticipantTurnEligible(Target) && !bAllowPendingDeferredDefeat) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::DefeatedTarget, Index);
+	if (!IsParticipantTurnEligible(Target)) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::DefeatedTarget, Index);
 	const float Distance = Target.BaseActionDistance * Request.Ratio;
 	if (!FMath::IsFinite(Distance)) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::ArithmeticFailure, Index);
+	const FHSRActionDistanceResult Before = MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::Accepted, Index);
 	if (Index == CurrentTurnIndex)
 	{
 		// A future speed callback can make recharge as large as 10000; prove the entire ordered queue first.
@@ -140,13 +142,27 @@ FHSRActionDistanceResult UHSRTurnManager::RequestActionDistanceAdjustment(const 
 		if (!FMath::IsFinite(Value)) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::ArithmeticFailure, Index);
 		Target.RemainingActionDistance = FMath::Abs(Value) <= DistanceEpsilon ? 0.0f : Value;
 	}
-	return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::Accepted, Index);
+	return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::Accepted, Index, &Before);
 }
 
-bool UHSRTurnManager::ConsumeBreakDelay(const FHSRTurnDelayRequest& Request, bool bAllowPendingDeferredDefeat)
+bool UHSRTurnManager::ConsumeBreakDelay(const FHSRTurnDelayRequest& Request)
 {
 	FHSRActionDistanceRequest DistanceRequest; DistanceRequest.BattleEpoch = BattleEpoch; DistanceRequest.OperationId = Request.ActionId; DistanceRequest.TargetParticipantId = Request.TargetParticipantId; DistanceRequest.Ratio = 1.0f; DistanceRequest.Kind = EHSRActionDistanceAdjustmentKind::Delay;
-	return RequestActionDistanceAdjustment(DistanceRequest, bAllowPendingDeferredDefeat).Result == EHSRActionDistanceAdjustmentResult::Accepted;
+	return RequestActionDistanceAdjustment(DistanceRequest).Result == EHSRActionDistanceAdjustmentResult::Accepted;
+}
+
+bool UHSRTurnManager::ConsumeAdmittedBreakDelay(const FHSRTurnDelayRequest& Request)
+{
+	FHSRActionDistanceRequest DistanceRequest; DistanceRequest.BattleEpoch = BattleEpoch; DistanceRequest.OperationId = Request.ActionId; DistanceRequest.TargetParticipantId = Request.TargetParticipantId; DistanceRequest.Ratio = 1.0f; DistanceRequest.Kind = EHSRActionDistanceAdjustmentKind::Delay;
+	if (!DistanceRequest.OperationId.IsValid() || DistanceRequest.TargetParticipantId.IsNone() || State == EHSRTurnManagerState::Finished || ConsumedOperationIds.Contains(DistanceRequest.OperationId)) return false;
+	const int32 Index = FindParticipantIndex(DistanceRequest.TargetParticipantId);
+	if (!OrderedParticipants.IsValidIndex(Index) || !OrderedParticipants[Index].IsValid()) return false;
+	const float Distance = OrderedParticipants[Index].BaseActionDistance;
+	if (!FMath::IsFinite(Distance) || !FMath::IsFinite(OrderedParticipants[Index].RemainingActionDistance + Distance)) return false;
+	ConsumedOperationIds.Add(DistanceRequest.OperationId);
+	if (Index == CurrentTurnIndex) PendingPostActionOperations.Add({ EHSRActionDistanceAdjustmentKind::Delay, Distance });
+	else OrderedParticipants[Index].RemainingActionDistance += Distance;
+	return true;
 }
 
 void UHSRTurnManager::FinishBattle() { PendingPostActionOperations.Empty(); UnbindSpeedDelegates(); State = EHSRTurnManagerState::Finished; CurrentTurnIndex = INDEX_NONE; }
@@ -179,7 +195,7 @@ void UHSRTurnManager::BroadcastLifecycleEvent(EHSRTurnLifecycleEventType Type, F
 }
 bool UHSRTurnManager::IsCurrentParticipantValid() const { return OrderedParticipants.IsValidIndex(CurrentTurnIndex) && IsParticipantTurnEligible(OrderedParticipants[CurrentTurnIndex]); }
 bool UHSRTurnManager::IsParticipantTurnEligible(const FHSRBattleParticipant& P) { return P.IsValid() && P.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) > 0.0f; }
-FHSRActionDistanceResult UHSRTurnManager::MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult Result, int32 Index) const { FHSRActionDistanceResult Out; Out.Result = Result; Out.BattleEpoch = BattleEpoch; Out.TurnSequence = TurnSequence; Out.CurrentParticipantId = GetCurrentParticipantId(); Out.NextParticipantId = GetCurrentParticipantId(); Out.PendingOperationCount = PendingPostActionOperations.Num(); if (OrderedParticipants.IsValidIndex(Index)) { const FHSRBattleParticipant& P = OrderedParticipants[Index]; Out.OldBase = Out.NewBase = P.BaseActionDistance; Out.OldRemaining = Out.NewRemaining = P.RemainingActionDistance; } return Out; }
+FHSRActionDistanceResult UHSRTurnManager::MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult Result, int32 Index, const FHSRActionDistanceResult* OldSnapshot) const { FHSRActionDistanceResult Out; Out.Result = Result; Out.BattleEpoch = BattleEpoch; Out.TurnSequence = TurnSequence; Out.CurrentParticipantId = GetCurrentParticipantId(); Out.NextParticipantId = GetCurrentParticipantId(); Out.PendingOperationCount = PendingPostActionOperations.Num(); Out.OldPendingOperationCount = Out.NewPendingOperationCount = Out.PendingOperationCount; if (OrderedParticipants.IsValidIndex(Index)) { const FHSRBattleParticipant& P = OrderedParticipants[Index]; Out.OldBase = P.BaseActionDistance; Out.NewBase = P.BaseActionDistance; Out.OldRemaining = P.RemainingActionDistance; Out.NewRemaining = P.RemainingActionDistance; } if (OldSnapshot) { Out.OldBase = OldSnapshot->OldBase; Out.OldRemaining = OldSnapshot->OldRemaining; Out.OldPendingOperationCount = OldSnapshot->PendingOperationCount; } return Out; }
 #if WITH_EDITOR
 bool UHSRTurnManager::InvalidateCurrentParticipantForDevelopmentTest() { if (!OrderedParticipants.IsValidIndex(CurrentTurnIndex)) return false; OrderedParticipants[CurrentTurnIndex].Actor.Reset(); return true; }
 #endif

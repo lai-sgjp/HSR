@@ -6,6 +6,7 @@
 #include "HSRTurnManager.generated.h"
 
 class UAbilitySystemComponent;
+class UHSRBattleCoordinator;
 
 UENUM(BlueprintType)
 enum class EHSRTurnManagerState : uint8 { Waiting, PlayerTurn, EnemyTurn, Finished };
@@ -33,9 +34,9 @@ class HSR_API UHSRTurnManager : public UObject
 public:
 	bool Initialize(const TArray<FHSRBattleParticipant>& InParticipants);
 	bool ResolveAction(FName ResolvingParticipantId);
-	FHSRActionDistanceResult RequestActionDistanceAdjustment(const FHSRActionDistanceRequest& Request, bool bAllowPendingDeferredDefeat = false);
+	FHSRActionDistanceResult RequestActionDistanceAdjustment(const FHSRActionDistanceRequest& Request);
 	/** P8 compatibility bridge. It keeps no second delay state. */
-	bool ConsumeBreakDelay(const FHSRTurnDelayRequest& Request, bool bAllowPendingDeferredDefeat = false);
+	bool ConsumeBreakDelay(const FHSRTurnDelayRequest& Request);
 	void FinishBattle();
 	void Reset();
 
@@ -57,6 +58,9 @@ public:
 #endif
 
 private:
+	friend class UHSRBattleCoordinator;
+	/** The only defeated-target exception: Coordinator's same synchronous admitted-alive transaction. */
+	bool ConsumeAdmittedBreakDelay(const FHSRTurnDelayRequest& Request);
 	struct FPendingPostActionOperation { EHSRActionDistanceAdjustmentKind Kind = EHSRActionDistanceAdjustmentKind::Advance; float Distance = 0.0f; };
 	struct FSpeedDelegateBinding { FName ParticipantId; TWeakObjectPtr<UAbilitySystemComponent> AbilitySystemComponent; FDelegateHandle Handle; uint64 Epoch = 0; };
 
@@ -72,7 +76,7 @@ private:
 	void HandleSpeedChanged(FName ParticipantId, UAbilitySystemComponent* SourceASC, uint64 BoundEpoch, float NewSpeed);
 	bool ApplyCurrentPendingAfterRecharge();
 	int32 FindParticipantIndex(FName ParticipantId) const;
-	FHSRActionDistanceResult MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult Result, int32 ParticipantIndex = INDEX_NONE) const;
+	FHSRActionDistanceResult MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult Result, int32 ParticipantIndex = INDEX_NONE, const FHSRActionDistanceResult* OldSnapshot = nullptr) const;
 
 	TArray<FHSRBattleParticipant> OrderedParticipants;
 	TArray<FPendingPostActionOperation> PendingPostActionOperations;

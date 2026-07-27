@@ -640,7 +640,9 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 			DelayRequest.ActionId = BreakResult.ActionId;
 			DelayRequest.TargetParticipantId = BreakResult.TargetParticipantId;
 			LastBreakDelayActionId = DelayRequest.ActionId;
-			bLastBreakDelayRegistered = TurnManager->ConsumeBreakDelay(DelayRequest, bAllowPendingDeferredDefeat);
+			bLastBreakDelayRegistered = bAllowPendingDeferredDefeat
+				? TurnManager->ConsumeAdmittedBreakDelay(DelayRequest)
+				: TurnManager->ConsumeBreakDelay(DelayRequest);
 #if WITH_EDITOR
 			bLastBreakDelayAcceptedForTest = bLastBreakDelayRegistered;
 			if (bLastBreakDelayRegistered)

@@ -83,6 +83,8 @@ struct HSR_API FHSRActionDistanceResult
 	float NewBase = 0.0f;
 	float OldRemaining = 0.0f;
 	float NewRemaining = 0.0f;
+	int32 OldPendingOperationCount = 0;
+	int32 NewPendingOperationCount = 0;
 	int32 PendingOperationCount = 0;
 	FName CurrentParticipantId;
 	FName NextParticipantId;

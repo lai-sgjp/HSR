@@ -2,6 +2,14 @@
 
 Status: `IMPLEMENTED / REVIEW REQUIRED`
 
+## REVISE follow-up (2026-07-27)
+
+- Fixed the reviewer-blocking unknown-enum path: only Advance/Delay are accepted before OperationId consumption.
+- Result snapshots now retain pre-mutation base/remaining/pending values and expose post-mutation pending count.
+- Removed the public deferred-defeat bypass. Only `UHSRBattleCoordinator` can invoke the private admitted-alive Break forwarding path during its existing synchronous transaction.
+- Added controlled Automation assertions for invalid-kind non-consumption/reuse and current-pending old/new count evidence.
+- Re-ran Development Editor Build — PASS; `Automation RunTests HSR.Battle.Patch` — PASS, exit code 0.
+
 ## Implemented
 
 - Replaced static speed queue/Break skip-once storage with battle-local action-distance state: effective speed, base distance, remaining distance, deterministic epsilon candidate selection, current-turn lock and ordered post-action adjustments.
