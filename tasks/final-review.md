@@ -1,33 +1,27 @@
-# TASK-P17-PATCH-02 — Behavior Tree AI Migration Planning Gate Review
+# TASK-P17-PATCH-02 — Two-Stage Asset Gate Review
 
 ## Review metadata
 
 - Reviewer: Independent Task-Gate / Prompt-Safety Reviewer
 - Date: 2026-07-27
 - Result: `PASS`
+- Reviewed revision: Coordinator commit `6236efa`
 
-## Evidence inspected
+## Findings
 
-- `tasks/active-task.md` revision `4b36dfa`
-- `docs/phase-roadmap-0-20.md` improvement direction 4
-- `docs/phase-17-patch-01-execution-plan.md` Patch 02 boundary
-- Existing `HSREnemyAIController`, `HSREnemyCharacter`, `HSREnemyTypes`, and encounter DTOs
-- `tasks/execution-result.md` (`NOT STARTED / TASK GATE REQUIRED`)
+The two-stage order is safe and does not expand the frozen outcome. Stage A is limited to the existing allowlist: C++ adapter/reference/epoch-key/lifecycle seams and Automation coverage. It does not require a populated Behavior Tree graph, does not create new production BT node classes or source files, and keeps Encounter admission/resolution authoritative in C++.
 
-## Gate result
+The user-confirmed Blackboard/Behavior Tree paths, six-key schema, BT-to-Blackboard assignment, controller/Auto Possess binding, and perception values satisfy the prerequisite Asset Gate. The card correctly preserves user-only ownership of `.uasset` edits and requires exact Editor construction evidence before Stage B is considered complete.
 
-The revised card now freezes a single outcome and an implementation-safe boundary. AIController owns Behavior Tree/Blackboard startup and shutdown; Character owns perception and movement callbacks; C++ remains authoritative for Encounter admission, duplicate/resolved rejection, and epoch. Blackboard actor references are transient and cleared on all lifecycle/target-loss paths. The state mapping is one-to-one and explicitly requires LostTarget and MoveFailed recovery to `SpawnOrigin`, removing the previous random-patrol ambiguity.
+The sequencing guard is adequate: Stage B cannot begin until the Stage-A adapter builds; the user then assembles only stock Decorator, Move To, and Wait nodes. The graph remains event-driven: no interval/tick service is permitted, `EncounterPending` observes the authoritative result/key transition without calling the battle subsystem, and recovery branches explicitly move to `SpawnOrigin`. Missing assets, a required custom production node, a new source file, or any dependency/Encounter-contract expansion remains a hard stop.
 
-Encounter semantics are frozen around one submitter and transaction key, with explicit same-frame duplicate, pending/traveling, resolved, invalid, and travel-failure outcomes plus exactly-once consumption. The card also requires event-driven perception/movement callbacks and prohibits Tick/polling services, including lifecycle teardown and stale-callback handling.
+## Required handoff constraints
 
-The user Asset Gate is explicit: exact Behavior Tree, Blackboard, Service/Task, perception, and Controller/Character Blueprint/DataAsset paths and fields must be provided or confirmed by the user. Missing assets halt implementation; no Content, Blueprint, Config, Build.cs, or new production file is inferred. The acceptance matrix now covers acquisition/loss, destruction, movement outcomes, SpawnOrigin recovery, duplicate/resolved Encounter paths, stale callbacks, and no-Tick proof with before/after IDs and epochs.
-
-## Remaining boundaries
-
-- No implementation, asset creation, or production-code modification is authorized by this review.
-- After this `PASS`, Implementation may only provide the required read-only contract restatement.
-- Actual implementation requires the user’s separate confirmation of `TASK-P17-PATCH-02`; if the Asset Gate is not satisfied, stop and request the smallest authorization.
+- Implementation may now provide its read-only contract restatement, then proceed only under the already-confirmed `TASK-P17-PATCH-02` authorization.
+- Stage-A changes must remain within the exact allowlist and must stop at the first build failure or missing asset/reference.
+- No implementation agent may edit or binary-modify the three `.uasset` files; Stage-B Editor work and evidence remain user-owned.
+- Reviewer must retain the Stage-A build evidence, user’s Stage-B graph/path evidence, and the existing no-Tick/Encounter regression matrix separately.
 
 ## Conclusion
 
-`PASS` — Task Gate scope, ownership, lifecycle, Encounter semantics, Asset Gate, no-Tick rule, and observable regression criteria are sufficiently frozen for a read-only Implementation handoff.
+`PASS` — the staged C++-adapter-before-user-BT-graph sequence is bounded, reversible at the asset gate, and consistent with ownership, no-Tick, Encounter, and stop-condition contracts.
