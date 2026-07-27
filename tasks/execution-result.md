@@ -240,6 +240,10 @@ Validation:
 - `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
 - `HSR.BattleReturn.MapContract`: `PASS`, exit `0`.
 
+### Stage-B return/chase/overlap evidence — USER PROVIDED
+
+User-provided PIE log confirms: perception enters chasing; lost sight transitions `4 -> 7 -> 8`; `ReturnComplete` reports distance `41.38` with zero request id and resumes patrol `8 -> 2`. An overlap while still returning is correctly rejected (`TryRequestEncounter` state `8`), and a subsequent normal chase reaches one successful encounter request and battle consume. This records observed PIE evidence only; user assets were not modified.
+
 ### Stage-B transition admission fixture — deterministic duplicate and resolved rejection
 
 `UHSRBattleTransitionSubsystem` now exposes `WITH_DEV_AUTOMATION_TESTS`-only fixture methods and `FHSRTransitionAutomationSnapshot`; production `RequestEncounter` signature and rejection behavior remain unchanged. The snapshot includes encounter state, full pending request, travel kind/request id, resolved-membership, and an admission-mutation counter.
