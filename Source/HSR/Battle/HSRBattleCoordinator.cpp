@@ -625,7 +625,11 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		{
 			const EHSRStatusOperationResult BreakStatusResult = RequestBreakStatus(Command.ActorParticipantId, BreakResult.TargetParticipantId, BreakResult.ActionId);
 #if WITH_EDITOR
-			++BreakStatusRequestCountForTest;
+			LastBreakStatusResultForTest = BreakStatusResult;
+			if (BreakStatusResult == EHSRStatusOperationResult::Success)
+			{
+				++BreakStatusRequestCountForTest;
+			}
 #endif
 			UE_LOG(LogTemp, Log, TEXT("P9-003 BreakStatus ActionId=%s Target=%s Result=%d"), *BreakResult.ActionId.ToString(), *BreakResult.TargetParticipantId.ToString(), static_cast<int32>(BreakStatusResult));
 			FHSRTurnDelayRequest DelayRequest;
@@ -634,7 +638,11 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 			LastBreakDelayActionId = DelayRequest.ActionId;
 			bLastBreakDelayRegistered = TurnManager->ConsumeBreakDelay(DelayRequest);
 #if WITH_EDITOR
-			++BreakDelayRegistrationCountForTest;
+			bLastBreakDelayAcceptedForTest = bLastBreakDelayRegistered;
+			if (bLastBreakDelayRegistered)
+			{
+				++BreakDelayRegistrationCountForTest;
+			}
 #endif
 		}
 		Finalize(Resolution);
@@ -1232,6 +1240,8 @@ void UHSRBattleCoordinator::Reset()
 #if WITH_EDITOR
 	BreakStatusRequestCountForTest = 0;
 	BreakDelayRegistrationCountForTest = 0;
+	LastBreakStatusResultForTest = EHSRStatusOperationResult::UnknownStatus;
+	bLastBreakDelayAcceptedForTest = false;
 #endif
 	if (TurnManager)
 	{

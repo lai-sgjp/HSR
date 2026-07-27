@@ -88,6 +88,8 @@ public:
 	/** Controlled-runtime counters for repeatable Break transaction audits. */
 	int32 GetBreakStatusRequestCountForDevelopmentTest() const { return BreakStatusRequestCountForTest; }
 	int32 GetBreakDelayRegistrationCountForDevelopmentTest() const { return BreakDelayRegistrationCountForTest; }
+	EHSRStatusOperationResult GetLastBreakStatusResultForDevelopmentTest() const { return LastBreakStatusResultForTest; }
+	bool WasLastBreakDelayAcceptedForDevelopmentTest() const { return bLastBreakDelayAcceptedForTest; }
 #endif
 	/** Event-driven, pure-value UI snapshot. Consumers never receive runtime Actors or ASCs. */
 	FHSRBattleCommandStateReadyDelegate& OnCommandStateReady() { return CommandStateReady; }
@@ -219,6 +221,8 @@ private:
 #if WITH_EDITOR
 	int32 BreakStatusRequestCountForTest = 0;
 	int32 BreakDelayRegistrationCountForTest = 0;
+	EHSRStatusOperationResult LastBreakStatusResultForTest = EHSRStatusOperationResult::UnknownStatus;
+	bool bLastBreakDelayAcceptedForTest = false;
 #endif
 	TMap<FGuid, FHSRSkillPointReservation> SkillPointReservations;
 	UPROPERTY()

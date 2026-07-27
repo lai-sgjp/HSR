@@ -1255,6 +1255,8 @@ namespace HSRBattleDevelopmentTest
 				const int32 StatusBefore = Coordinator->GetBreakStatusRequestCountForDevelopmentTest();
 				const int32 DelayBefore = Coordinator->GetBreakDelayRegistrationCountForDevelopmentTest();
 				FirstBreakActionId = FGuid::NewGuid(); const FHSRAbilityResolution First = Coordinator->RequestAction(MakeRepeatCommand(FirstBreakActionId));
+				const EHSRStatusOperationResult FirstStatusResult = Coordinator->GetLastBreakStatusResultForDevelopmentTest();
+				const bool bFirstDelayAccepted = Coordinator->WasLastBreakDelayAcceptedForDevelopmentTest();
 				const FHSRAbilityResolution Replay = Coordinator->RequestAction(MakeRepeatCommand(FirstBreakActionId));
 				const int32 StatusAfterReplay = Coordinator->GetBreakStatusRequestCountForDevelopmentTest();
 				const int32 DelayAfterReplay = Coordinator->GetBreakDelayRegistrationCountForDevelopmentTest();
@@ -1264,8 +1266,12 @@ namespace HSRBattleDevelopmentTest
 				const int32 DelayAfterRecovery = Coordinator->GetBreakDelayRegistrationCountForDevelopmentTest();
 				RepeatManager->Initialize(Coordinator->GetParticipants());
 				SecondBreakActionId = FGuid::NewGuid(); const FHSRAbilityResolution Second = Coordinator->RequestAction(MakeRepeatCommand(SecondBreakActionId));
+				const EHSRStatusOperationResult SecondStatusResult = Coordinator->GetLastBreakStatusResultForDevelopmentTest();
+				const bool bSecondDelayAccepted = Coordinator->WasLastBreakDelayAcceptedForDevelopmentTest();
 				bRepeatableBreakPass = First.bHasBreakResult && First.BreakResult.bTriggered && Replay.BreakResult.bTriggered
 					&& Second.bHasBreakResult && Second.BreakResult.bTriggered && FirstBreakActionId != SecondBreakActionId
+					&& FirstStatusResult == EHSRStatusOperationResult::Success && SecondStatusResult == EHSRStatusOperationResult::Success
+					&& bFirstDelayAccepted && bSecondDelayAccepted
 					&& StatusAfterReplay == StatusBefore + 1 && DelayAfterReplay == DelayBefore + 1
 					&& StatusAfterRecovery == StatusAfterReplay && DelayAfterRecovery == DelayAfterReplay
 					&& Coordinator->GetBreakStatusRequestCountForDevelopmentTest() == StatusBefore + 2

@@ -22,3 +22,9 @@ Status: `REVISE / IMPLEMENTED, RUNTIME VALIDATION PENDING`
 
 - Run Development Editor build, `HSR.Battle.Patch.RepeatableBreak` automation coverage, and PIE with `bRunP9DotBreakHarness` enabled.
 - Confirm no `FAIL`, `INCOMPLETE`, or `SKIPPED`; capture first/replay/recovery/second, initial/continued zero, Finished, stale BattleId, Reset, reused ActionId, and same-frame lethal evidence.
+
+## Follow-up revision evidence
+
+- Independent review correctly found that the original editor counters recorded attempts rather than accepted outcomes. They now retain the latest `EHSRStatusOperationResult` and Delay acceptance, increment Status only for `Success`, and increment Delay only when `ConsumeBreakDelay` returns true.
+- Follow-up Development Editor build: PASS — `HSREditor Win64 Development` (2026-07-27); the same external-engine `AISystem.h` C4996 warning remains the only reported warning.
+- Stop condition reached for the requested Automation matrix: `HSRCombatPatchTests.cpp` has no accessible Coordinator construction/initialization seam, while the only existing complete runtime fixture is the internal `RunP9DotBreakHarness` function in `HSRBattleGameMode.cpp`. Calling it from Automation, or configuring a GameMode instance for it, requires an interface declaration in `HSRBattleGameMode.h`, which is outside this task's allowlist. Adding a definition-only Automation test would violate the task contract. Therefore the full `HSR.Battle.Patch.RepeatableBreak` Automation and PIE execution remain `INCOMPLETE`; Task Gate remains `REVISE`.
