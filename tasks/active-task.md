@@ -4,7 +4,7 @@ Status: `PLANNED / IMPLEMENTATION RESTATEMENT REQUIRED`
 
 ## Single outcome
 
-同一存活目标每次 Toughness 从大于零降到零都恰好发布一个独立 Break；恢复到正数后再次归零可再次 Break，而同一 ActionId replay、零到零、恢复本身、死亡、Finished、Reset 与跨地图重建不会伪造或重复 Break/Status/Delay。
+同一存活目标每次 Toughness 从大于零降到零都恰好发布一个独立 Break；恢复到正数后再次归零可再次 Break，而同一 ActionId replay、零到零、恢复本身、请求准入前死亡、Finished、Reset 与跨地图重建不会伪造或重复 Break/Status/Delay。
 
 ## Frozen ownership and data flow
 
@@ -13,6 +13,7 @@ Status: `PLANNED / IMPLEMENTATION RESTATEMENT REQUIRED`
 - 移除 `FHSRBattleParticipant::bBreakResultPublished` 角色终身闩锁；不得用另一个布尔字段改名替代。
 - 每个成功边沿分别 exactly-once 请求 Break Status 与 Turn Delay；PATCH-01B 不改变 Delay 的现有 skip-once 语义，完整行动值迁移属于 PATCH-01C。
 - Toughness 恢复由既有 authority 或 Automation fixture 提供；本卡不新增自动恢复 Gameplay 规则。
+- 同一合法伤害事务若让入场时存活目标同时 `HP > 0 -> 0` 且 `Toughness > 0 -> 0`，保持现有管线优先级：先发布该事务唯一 Break/Status/Delay，再由 `ResolveDefeat` 收尾；不得因稍后的死亡清理抹掉已发布结果。请求准入前已经死亡的目标仍拒绝且不产生 Break。
 
 ## Exact allowlist
 
@@ -28,12 +29,15 @@ Implementation Agent 不得修改本活动卡、计划、PROJECT_STATE、worklog
 
 ## Required validation
 
-- `>0 -> 0` 首次触发一次；相同 ActionId replay 零新增。
-- 恢复到 `>0` 后用新 ActionId 再归零，再触发一次 Break、Status、Delay。
-- 初始/持续为零、只恢复、未归零、无弱点、死亡、Finished、Reset/rebuild 不触发。
-- 两次 Break 的 ActionId/Event 彼此独立；旧 Battle/旧 target 回调零副作用。
+- 首次 `>0 -> 0` 必须记录：BreakResult triggered/event 增量 `+1`、Break Status request/result 增量 `+1`、Delay registration `+1`、Toughness 归零，当前行动只按既有流程 resolve 一次。
+- 同 BattleId + 同 ActionId replay 返回缓存 Resolution；Break/Status/Delay/Toughness/Turn 增量全部为 `+0`。
+- 恢复到 `>0` 本身所有副作用增量为 `+0`；第二个新 ActionId 再归零时 Break/Status/Delay 分别再 `+1`，且两次 Break ActionId 不同。
+- 初始/持续 `0 -> 0`、未归零、无弱点、Finished、请求准入前死亡均要求所有副作用计数 `+0`。
+- Reset 后旧 BattleId 请求结构化拒绝且计数 `+0`；新 BattleId 下复用旧 ActionId 视为新 Battle-local 事务，可在新的正数到零边沿触发一次。不得测试不存在的“旧 target callback”抽象。
+- 同帧致死+击破按冻结优先级各发布一次 Break/Status/Delay，随后完成 Defeat；不得重复行动或结果。
 - Development Editor Build、`HSR.Battle.Patch.RepeatableBreak`、适用 P8/P9/Battle 回归、`git diff --check`。
-- 若真实两次 Break 需要 Editor harness，用户 PIE 必须提供事件计数与零 FAIL/INCOMPLETE/SKIPPED。
+- Automation 负责真实/受控 runtime 的 first/replay/recovery/second/0->0/Finished/Reset/stale BattleId/reused ActionId 与精确计数；不得以 Definition-only 测试代替 runtime。
+- PIE 复用现有 `bRunP9DotBreakHarness` 与 `P9-003 DotBreak Harness`，只在现有开关中增加 repeatable-Break 案例和日志；不得新增 `HSRBattleGameMode.h` 属性。用户 PIE 必须提供两次独立 Break ActionId、各副作用计数与零 FAIL/INCOMPLETE/SKIPPED。
 
 ## Explicit non-goals and stop conditions
 
