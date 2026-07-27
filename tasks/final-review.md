@@ -305,3 +305,58 @@ After capture, restore `Run P9 Dot Break Harness` to `false` and Save All. Provi
 ## Verdict
 
 `PASS WITH FOLLOW-UP` — Code, scope, build claim and deterministic runtime Automation satisfy the implementation gate. The task is not yet archival-complete because its required production DataAsset/GE PIE gate remains user-owned and pending. Route to the user PIE gate now; return the full log to an independent Reviewer before Coordinator archival.
+
+---
+
+# TASK-P17-PATCH-01B Post-PIE Evidence Review
+
+Status: `REVISE`
+
+Role: `Independent Reviewer`
+Date: `2026-07-27`
+Evidence level: `USER PIE LOG + STATIC RUNTIME/HARNESS TRACE`
+
+## User evidence
+
+- First Break Status: `Result=0` (`Success`).
+- Second Break Status: `Result=17` (`InvalidRuntimeInstance`).
+- Repeatable counters: `Status=0->1->1`, `Delay=0->1->2`.
+- `RepeatableBreak_FirstReplayRecoverySecond_ExactCounts Result=FAIL`.
+- `P9-003 DotBreak Harness=INCOMPLETE FailedCases=1`.
+- Other reported P9-003 cases passed. This new runtime evidence supersedes the pending-PIE follow-up state in `16d4b44`; the task cannot archive.
+
+## Root cause
+
+`EHSRStatusOperationResult` ordinal `17` maps to `InvalidRuntimeInstance`. The production Status guard returns it when an existing instance's GE handle is invalid/inactive, stack count differs, or its saved BattleEpoch differs from the bound TurnManager epoch.
+
+The PIE harness performs this invalid sequence:
+
+1. First Break successfully creates a one-turn Break Status with the current BattleEpoch.
+2. Fixture restores Toughness directly but does not advance the target's turn or expire the Break Status.
+3. Fixture calls `RepeatManager->Initialize(...)` again. This creates a new TurnManager epoch while the existing Status instance still records the old epoch.
+4. Second Break finds the existing Status and correctly rejects its epoch mismatch as `InvalidRuntimeInstance`.
+
+The accepted Delay count still reaches two because Delay registration has no Status-instance epoch dependency. This explains the exact `Status=0->1->1 / Delay=0->1->2` evidence and rules out repeatable edge detection as the failure.
+
+The deterministic Automation already uses the correct recovery sequence: advance the real turn lifecycle until the one-turn Break Status expires, then prepare the second action. The PIE harness omitted that corresponding fixture progression. Production Status/Break/Delay logic should not be weakened to accept a stale-epoch Status instance.
+
+## Minimal in-allowlist fix
+
+Modify only the existing P9 harness block in `Source/HSR/Battle/HSRBattleGameMode.cpp`:
+
+- After Toughness recovery and before the second `RepeatManager->Initialize`, obtain the target `UHSRStatusComponent`.
+- Resolve the current real turn lifecycle with a small deterministic bound (matching Automation's maximum four steps) until `Status.Debuff.Break` has `InstanceCount == 0`.
+- Assert/log that the Break Status expired and that Status/Delay Break counters remained unchanged during recovery/lifecycle progression.
+- Only then reinitialize ordering to make the source deterministic and submit the second ActionId.
+- Do not clear the Status directly, mutate its BattleEpoch/GE handle, relax `InvalidRuntimeInstance`, or change production TurnManager/Status behavior.
+
+Required regression after the harness-only fix:
+
+1. Development Editor Build.
+2. Isolated `HSR.Battle.Patch.RepeatableBreak`.
+3. Shared `HSR.Battle.Patch` 2/2.
+4. User reruns the existing `bRunP9DotBreakHarness` PIE gate. Required repeatable evidence remains two distinct ActionIds, `Status=0->1->2`, `Delay=0->1->2`, case `Result=PASS`, `Harness=COMPLETE`, and zero related `FAIL/INCOMPLETE/SKIPPED`.
+
+## Verdict
+
+`REVISE` — Production repeatable-Break behavior and Automation remain credible, but the required PIE gate failed because its fixture illegally changed the TurnManager epoch while retaining a live old-epoch Break Status. The minimal correction is entirely within the already-authorized `HSRBattleGameMode.cpp` P9 harness; route automatically to Implementation without further user authorization, then rebuild/retest and return to independent review before asking the user for one final PIE rerun.
