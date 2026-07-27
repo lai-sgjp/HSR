@@ -1,31 +1,34 @@
-# TASK-P17-PATCH-02 Stage A Independent Review
+# TASK-P17-PATCH-02 Stage A Revision Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed implementation: `62c593d`
-- Result: `PASS WITH FOLLOW-UP`
+- Reviewed revision: `38d868e`
+- Result: `REVISE`
 - Date: 2026-07-27
 
-## Evidence reviewed
+## Verified evidence
 
-- The implementation diff and allowlist provenance.
-- `tasks/execution-result.md`, including the preserved first compile error `C4458` and the successful retry.
-- Confirmed paired assets `/Game/AI/Enemy/BT_HSREnemy_Exploration` and `/Game/AI/Enemy/BB_HSREnemy_Exploration` and the six-key schema recorded in the execution report.
-- Existing Enemy controller, character, definition, and Encounter entry point.
+- Revision provenance is limited to the allowlisted controller `.h/.cpp` and `tasks/execution-result.md`; no user `.uasset` is part of `38d868e`.
+- `Saved/Logs/HSR.log` independently confirms one discovered `HSR.Exploration.Patch.BehaviorTreeAdapter` test, `Test Completed. Result={Success}`, `TEST COMPLETE. EXIT CODE: 0`, and normal engine exit.
+- The execution report records the post-fix editor build as six actions with exit `0`. Stage B assets and PIE behavior remain unverified and must not be marked complete.
+- The revision correctly removes the BeginPlay patrol timer, perception `MoveToActor`, and SpawnOrigin `MoveToLocation` call added by the first Stage-A implementation.
 
-## Findings
+## Blocking finding
 
-Stage A stays within the frozen allowlist. `UHSREnemyDefinition` adds only the requested paired soft references. The controller validates that both references load and that the Behavior Tree points to the same Blackboard before starting runtime; invalid references do not submit an Encounter. Runtime Blackboard values are written for the confirmed keys, `TargetActor` is transient and cleared on perception loss and lifecycle teardown, and the epoch is incremented across teardown/re-possess to invalidate stale state. LostTarget and MoveFailed both use an explicit bounded SpawnOrigin recovery intent. Encounter admission remains solely in `TryRequestEncounterFromCharacter`, with an admitted request ID guarding duplicate submission. No Actor Tick or polling service was introduced.
+`Source/HSR/Enemy/HSREnemyAIController.cpp` still contains the legacy `StartPatrol()` implementation. It calls `MoveToLocation` directly and schedules itself through `PatrolWaitTimerHandle`. The `OnMoveCompleted` override also still interprets movement completion by exploration state and, for `MovingToPatrol`, schedules `StartPatrol` again. Consequently a Stage-B stock Behavior Tree `Move To` completion can enter this legacy timer path and later issue a second C++ movement request. The claim that stock `Move To`/`Wait` is the sole movement driver is therefore not yet true.
 
-The compile evidence is credible: the initial C4458 shadowing failure is retained, the local was renamed, and the subsequent editor build completed successfully. The new automation test is useful as a seam/default contract check, but it was compiled only and was not run; it does not prove perception, movement, stale-callback, duplicate Encounter, or runtime key behavior.
+## Minimum required correction
 
-## Required follow-up (not a Stage A failure)
+- Remove the `StartPatrol` declaration and implementation, including all timer callbacks to it and its direct `MoveToLocation` call.
+- Make `OnMoveCompleted` incapable of scheduling or issuing movement. If it is retained as the event adapter, it may only publish state/Blackboard recovery intent; Stage-B stock nodes must remain the only owner of Move To and Wait execution.
+- Remove any now-dead legacy timer/handler storage only where it is no longer used, staying inside the existing controller allowlist.
+- Rebuild and rerun `HSR.Exploration.Patch.BehaviorTreeAdapter`. Add a static/automation assertion that the Stage-A controller cannot reintroduce legacy movement ownership if feasible within the existing test allowlist.
 
-- Stage B remains user-owned and incomplete. The Behavior Tree graph currently has no verified Patrol, Chasing, LostTarget, MoveFailed, or EncounterPending branches. Do not claim those branches, recovery behavior, or end-to-end Encounter behavior as complete until the user saves/reopens the graph and supplies Editor evidence.
-- Run the new `HSR.Exploration.Patch.BehaviorTreeAdapter` automation test separately; retain its actual result.
-- After Stage B, collect PIE/runtime evidence for target acquire/loss/destruction, move success/failure/abort, SpawnOrigin recovery, duplicate overlap+perception, already-resolved rejection, stale epoch after re-possess/EndPlay, and zero Tick/polling proof.
+## Scope guard
+
+Do not edit or submit `Content/AI/**`, the Enemy Blueprint, or any other user asset during this correction. Stage B has not begun and PATCH-02 as a whole is not complete.
 
 ## Conclusion
 
-`PASS WITH FOLLOW-UP`: Stage A C++ adapter/build and ownership boundaries are acceptable. This result does not waive the Stage B Editor asset gate or the unrun automation/runtime evidence.
+`REVISE`: the explicit Stage-A single-movement-owner contract is still violated by reachable legacy patrol code. The correction is confined to the existing allowlist and needs no new user authorization.
