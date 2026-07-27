@@ -56,7 +56,10 @@ public:
 #if WITH_DEV_AUTOMATION_TESTS
 	void SetSpeedDelegateBindFailureAfterForAutomation(int32 InBindCount) { SpeedDelegateBindFailureAfter = InBindCount; }
 	int32 GetSpeedDelegateBindingCountForAutomation() const { return SpeedDelegateBindings.Num(); }
+	float GetLastPostRechargeDistanceForAutomation() const { return LastPostRechargeDistanceForAutomation; }
 	bool GetActionDistanceForAutomation(FName ParticipantId, float& OutSpeed, float& OutBase, float& OutRemaining, int32& OutPending) const;
+	bool SetActionDistanceForAutomation(FName ParticipantId, float InSpeed, float InBase, float InRemaining);
+	void InvokeSpeedChangedForAutomation(FName ParticipantId, UAbilitySystemComponent* SourceASC, uint64 BoundEpoch, float NewSpeed) { HandleSpeedChanged(ParticipantId, SourceASC, BoundEpoch, NewSpeed); }
 #endif
 
 private:
@@ -96,5 +99,6 @@ private:
 	FHSRActionResolvedDelegate ActionResolved;
 #if WITH_DEV_AUTOMATION_TESTS
 	int32 SpeedDelegateBindFailureAfter = INDEX_NONE;
+	float LastPostRechargeDistanceForAutomation = 0.0f;
 #endif
 };

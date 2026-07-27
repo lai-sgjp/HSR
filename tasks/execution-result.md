@@ -43,3 +43,26 @@ Status: `IMPLEMENTED / REVIEW REQUIRED`
 ## Known boundary
 
 This is Implementation evidence only. Independent code review and the coordinator's archive/state updates remain required before the task can be closed.
+
+## Required matrix closure (replacement Implementation Agent, 2026-07-27)
+
+Status: `IMPLEMENTED / REVIEW REQUIRED`
+
+1. `HSR.Battle.Patch.ActionDistance.CurrentPending` — real runtime requests prove accepted-distance freezing across a later Speed callback (`Base 100 -> 50`, pre-selection recharge `55`), plus ordered per-step clamp (`Delay -> Advance = 0`, `Advance -> Delay = 30.000002`).
+2. `HSR.Battle.Patch.ActionDistance.LifecycleOrdering` — a synchronous `TurnEnded` listener changes Speed; assertions prove complete End callback before latest-Base recharge (`50`), deterministic next selection, exactly one End/one successor Start, and sequence changes only with Start.
+3. `HSR.Battle.Patch.ActionDistance.ThreeParticipant` — A/B/C `Base=100/50/200`, deterministic initial Remaining, lexical epsilon tie (`TieA`), and 18-resolve frequency `A/B/C=5/11/2`.
+4. The same `ThreeParticipant` case applies actual B SpeedUp and C Slow delegates while A is locked; Base and Remaining retain the same progress ratio and B becomes the next actor.
+5. `HSR.Battle.Patch.ActionDistance.RequestMatrix` plus `CurrentPending` cover Advance `0/0.25/1`, Delay `0/0.3/1`, combinations, accepted replay, rejected/reused or consumed OperationId semantics, old epoch, invalid/unknown/dead/Finished, and controlled finite overflow with atomic `ArithmeticFailure`.
+6. `HSR.Battle.Patch.ActionDistance.NumericAndBinding` covers initialization Speed `0`, negative, NaN and `+Inf`; actual bound delegate broadcasts cover runtime `0`, negative, NaN and `+Inf`. Non-finite callbacks emit `SpeedRejected` and preserve the complete manager snapshot.
+7. The same `NumericAndBinding` case injects nth-bind failure after one binding and proves rollback to zero handles/no first Start/Waiting; Reset, reinitialize, old ASC broadcast, old epoch callback and Finish unbinding are asserted.
+8. `HSR.Battle.Patch.RepeatableBreak` now reads action-distance snapshots around normal Break, cached replay, Reset/reused ActionId, already-dead admission and same-frame deferred defeat. Accepted Break is exactly `+1.0 Base`; replay/dead paths are zero mutation.
+9. Every `RequestActionDistanceAdjustmentInternal` result now emits one structured record with numeric result plus named `Reason`, OperationId, target, kind, ratio, old/new Speed/Base/Remaining/pending, current/next, epoch and sequence. `RequestMatrix` executes all result types: Accepted, DuplicateOperation, InvalidRequest, InvalidEpoch, InvalidTarget, DefeatedTarget, Finished and ArithmeticFailure.
+
+## Final verification
+
+- Development Editor Build: `HSREditor Win64 Development` — PASS, UHT/Compile/Link/WriteMetadata, exit code `0` (final run 2026-07-27 21:16 Asia/Shanghai).
+- `Automation RunTests HSR.Battle` — PASS, exit code `0` (final log 2026-07-27 13:17:26 UTC in `Saved/Logs/HSR.log`).
+  - ActionDistance Baseline, CurrentPending, LifecycleOrdering, NumericAndBinding, RequestMatrix and ThreeParticipant — all Success.
+  - `HSR.Battle.Patch.RepeatableBreak`, `HSR.Battle.Patch.StatusGeneric`, and `HSR.BattleReturn.MapContract` — all Success.
+- `git diff --check` — PASS.
+- Dedicated legacy P8/P9/Turn Automation names do not exist in `Source/HSR/Tests`; their applicable Break/Status/Turn runtime contracts are exercised by the Patch cases above. PIE harness was not run and is not claimed as evidence.
