@@ -1,4 +1,43 @@
-# TASK-P17-004 Final Review
+# TASK-P17-PATCH-01A Final Review
+
+Status: `REVISE`
+
+## Scope and provenance
+
+- Reviewed implementation commits `e93b04c` and `955d5d3` against `tasks/active-task.md` and `docs/phase-17-patch-01-execution-plan.md`.
+- The implementation commits contain only authorized files. `Config/DefaultGameplayTags.ini` adds exactly `Status.Buff.SpeedUp` and `Status.Buff.Shield`; the `HSRBattleGameMode.cpp` change is limited to the authorized P9 `OldRemoveFailure` harness assertion.
+- Coordinator/user dirty files (`tasks/active-task.md`, `docs/phase-17-patch-01-execution-plan.md`, `learn/SaveSystem.md`, `.claude/**`) remain outside the implementation commits and were not modified by this review.
+- Role commits use the Implementation Agent message format. No generated output, Content, Save, Turn, Break, Build.cs, module, or unrelated Config change is present.
+
+## Confirmed implementation properties
+
+- Definition validation no longer contains the three-ID whitelist. It validates the `Status.*` root, exact `StatusId`/GrantedTag identity, enum/configuration values, refresh/stack contract, infinite-GE presence, and DoT field contract.
+- Runtime storage is one `TMap<FName, FHSRStatusInstance>` plus one `TSet<FGuid>` OperationId path. AttackUp-specific routing, the secondary handle, and the split operation-ID sets are removed.
+- `GetPublicSnapshot` returns structured `UnknownStatus` and preserves the requested ID. Public snapshot lists remain lexically sorted.
+- Runtime Definition references are held by a reflected `TMap<FName, TObjectPtr<UHSRStatusDefinition>>`; ASC, TurnManager, and Coordinator references are weak. Delegate unbinding remains in lifecycle cleanup. No Tick or latent/Delay path was introduced.
+- Add/refresh/stack, per-ID clear/dispel/expiry, source-invalid removal, and explicit replace all use the unified map. The authorized P9 harness now checks that old-remove failure rolls back the new GE and preserves the old instance before later clear.
+
+## Blocking findings
+
+| Severity | File/evidence | Problem | Required minimal action |
+|---|---|---|---|
+| Blocking | `Source/HSR/Tests/HSRCombatPatchTests.cpp:13-50`; task Validation | `HSR.Battle.Patch.StatusGeneric` only calls `Validate()` on Attack/Speed/Shield and performs an unknown lookup on an uninitialized component. It does not prove the frozen outcome that all three Definitions traverse the same add/query/refresh/stack/expire/clear runtime path. The execution report explicitly delegates runtime mutation to P9, but P9 covers existing AttackUp/DoT/Break and is `NOT EXECUTED`; it cannot prove SpeedUp/Shield use the new runtime path. | Within the existing test allowlist, add a real initialized transient ASC/TurnManager/status-component fixture and exercise distinct Attack/Speed/Shield through the generic runtime. Cover successful add and typed query for all three, plus refresh/stack as applicable and deterministic expiry/clear. Re-run the named Automation and record actual results. |
+| Blocking | `Source/HSR/Status/HSRStatusComponent.cpp:279-300` | `ClearStatus()` records a failed GE removal but unconditionally empties `Statuses` and `RuntimeDefinitions`. A still-active GE can therefore become orphaned from the component, violating the task's handle ownership/clear compensation requirement and making retry impossible. This is especially relevant to EndPlay/reset and multi-status cleanup. | Preserve every entry whose active GE removal fails (and its RuntimeDefinition), remove only successfully cleared or already-inactive entries, return `RemoveFailed`, and add a controlled failure assertion proving ownership/snapshot survives and a later clear succeeds. Do not reintroduce a secondary handle. |
+
+## Evidence assessment
+
+- The reported Development Editor builds and two `StatusGeneric` runs are documented with exit code 0, but the current test's coverage is insufficient for the task's runtime acceptance contract.
+- Existing P9 runtime regression is accurately marked `NOT EXECUTED`; therefore add/refresh/stack/dispel/expiry/source-invalid/replace compensation regression is not independently established for this revision.
+- Independent `git diff --check` exits 0 (only line-ending warnings on unrelated dirty files).
+- No user PIE evidence is required to diagnose the two engineering blockers. After fixes and automated runtime coverage, the existing P9 PIE harness remains an explicit user gate if no standalone equivalent is added.
+
+## Verdict
+
+`REVISE`. The unified architecture and authorized atomic-replace direction are acceptable, but runtime acceptance coverage is materially weaker than the frozen task card, and bulk clear can lose ownership of a live GameplayEffect after removal failure. Return automatically to the same Implementation Agent for the two minimal allowlist fixes, new Build/Automation evidence, and an updated role commit; then route back to this independent Reviewer.
+
+---
+
+# Prior Review — TASK-P17-004
 
 Status: `PASS`
 
