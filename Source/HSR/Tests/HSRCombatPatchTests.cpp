@@ -59,6 +59,14 @@ namespace HSRActionDistanceAutomation
 		return Out;
 	}
 
+	static bool SameSnapshot(const FSnapshot& A, const FSnapshot& B)
+	{
+		return FMath::IsNearlyEqual(A.Speed, B.Speed, 1.e-4f)
+			&& FMath::IsNearlyEqual(A.Base, B.Base, 1.e-4f)
+			&& FMath::IsNearlyEqual(A.Remaining, B.Remaining, 1.e-4f)
+			&& A.Pending == B.Pending;
+	}
+
 	static FHSRActionDistanceResult Request(UHSRTurnManager* Manager, FName Target, EHSRActionDistanceAdjustmentKind Kind, float Ratio, FGuid OperationId = FGuid())
 	{
 		FHSRActionDistanceRequest Value;
@@ -308,15 +316,41 @@ bool FHSRActionDistanceRequestMatrixPatchTest::RunTest(const FString& Parameters
 	FHSRBattleParticipant C = MakeParticipant(World, TEXT("ReqC"), 50.0f, EHSRBattleParticipantTeam::Enemy);
 	UHSRTurnManager* Manager = NewObject<UHSRTurnManager>();
 	TestTrue(TEXT("RequestMatrix initializes"), Manager->Initialize({ A, B, C }));
+	int32 RequestStarted = 0;
+	int32 RequestEnded = 0;
+	Manager->OnTurnStarted().AddLambda([&](const FHSRTurnLifecycleEvent&) { ++RequestStarted; });
+	Manager->OnTurnEnded().AddLambda([&](const FHSRTurnLifecycleEvent&) { ++RequestEnded; });
 	const FName Current = Manager->GetCurrentParticipantId();
 	const FSnapshot BeforeB = Read(Manager, TEXT("ReqB"));
 	const FGuid DuplicateId = FGuid::NewGuid();
 	const FHSRActionDistanceResult Accepted = Request(Manager, TEXT("ReqB"), EHSRActionDistanceAdjustmentKind::Advance, 0.25f, DuplicateId);
 	TestEqual(TEXT("RequestMatrix Advance 0.25 accepted"), Accepted.Result, EHSRActionDistanceAdjustmentResult::Accepted);
 	TestTrue(TEXT("RequestMatrix accepted snapshot contains old/new values"), Accepted.OldPendingOperationCount == 0 && Accepted.NewPendingOperationCount == 0 && Accepted.OldRemaining > Accepted.NewRemaining);
-	const FSnapshot AfterAdvance = Read(Manager, TEXT("ReqB"));
-	TestEqual(TEXT("RequestMatrix duplicate is replay"), Manager->RequestActionDistanceAdjustment(FHSRActionDistanceRequest{ Manager->GetBattleEpoch(), DuplicateId, TEXT("ReqB"), 0.25f, EHSRActionDistanceAdjustmentKind::Advance }).Result, EHSRActionDistanceAdjustmentResult::DuplicateOperation);
-	TestTrue(TEXT("RequestMatrix duplicate has zero mutation"), FMath::IsNearlyEqual(Read(Manager, TEXT("ReqB")).Remaining, AfterAdvance.Remaining));
+	const FSnapshot AcceptedTargetBeforeReplay = Read(Manager, TEXT("ReqB"));
+	const FSnapshot CrossTargetBeforeReplay = Read(Manager, TEXT("ReqC"));
+	const EHSRTurnManagerState StateBeforeCrossReplay = Manager->GetState();
+	const FName CurrentBeforeCrossReplay = Manager->GetCurrentParticipantId();
+	const uint64 EpochBeforeCrossReplay = Manager->GetBattleEpoch();
+	const uint64 SequenceBeforeCrossReplay = Manager->GetTurnSequence();
+	const int32 BindingsBeforeCrossReplay = Manager->GetSpeedDelegateBindingCountForAutomation();
+	const int32 StartsBeforeCrossReplay = RequestStarted;
+	const int32 EndsBeforeCrossReplay = RequestEnded;
+	const FHSRActionDistanceResult CrossReplay = Manager->RequestActionDistanceAdjustment(FHSRActionDistanceRequest{ Manager->GetBattleEpoch(), DuplicateId, TEXT("ReqC"), 1.0f, EHSRActionDistanceAdjustmentKind::Delay });
+	TestEqual(TEXT("RequestMatrix accepted OperationId is global across target and kind"), CrossReplay.Result, EHSRActionDistanceAdjustmentResult::DuplicateOperation);
+	const FSnapshot AcceptedTargetAfterReplay = Read(Manager, TEXT("ReqB"));
+	const FSnapshot CrossTargetAfterReplay = Read(Manager, TEXT("ReqC"));
+	const bool bCrossReplayAtomic = SameSnapshot(AcceptedTargetBeforeReplay, AcceptedTargetAfterReplay)
+		&& SameSnapshot(CrossTargetBeforeReplay, CrossTargetAfterReplay)
+		&& Manager->GetState() == StateBeforeCrossReplay
+		&& Manager->GetCurrentParticipantId() == CurrentBeforeCrossReplay
+		&& Manager->GetBattleEpoch() == EpochBeforeCrossReplay
+		&& Manager->GetTurnSequence() == SequenceBeforeCrossReplay
+		&& Manager->GetSpeedDelegateBindingCountForAutomation() == BindingsBeforeCrossReplay
+		&& RequestStarted == StartsBeforeCrossReplay && RequestEnded == EndsBeforeCrossReplay
+		&& CrossReplay.CurrentParticipantId == CurrentBeforeCrossReplay && CrossReplay.NextParticipantId == CurrentBeforeCrossReplay
+		&& CrossReplay.BattleEpoch == EpochBeforeCrossReplay && CrossReplay.TurnSequence == SequenceBeforeCrossReplay;
+	TestTrue(TEXT("RequestMatrix cross-target cross-kind replay has complete zero mutation"), bCrossReplayAtomic);
+	UE_LOG(LogTemp, Log, TEXT("ActionDistanceCase Case=CrossTargetKindReplay Result=%s OperationId=%s FirstTarget=ReqB FirstKind=Advance ReplayTarget=ReqC ReplayKind=Delay Current=%s Epoch=%llu Sequence=%llu Bindings=%d Starts=%d Ends=%d"), bCrossReplayAtomic ? TEXT("PASS") : TEXT("FAIL"), *DuplicateId.ToString(), *CurrentBeforeCrossReplay.ToString(), EpochBeforeCrossReplay, SequenceBeforeCrossReplay, BindingsBeforeCrossReplay, RequestStarted, RequestEnded);
 
 	const float Ratios[] = { 0.0f, 0.3f, 1.0f };
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Ratios); ++Index)
@@ -421,7 +455,9 @@ bool FHSRActionDistanceNumericLifecyclePatchTest::RunTest(const FString& Paramet
 	UHSRTurnManager* BindManager = NewObject<UHSRTurnManager>();
 	BindManager->SetSpeedDelegateBindFailureAfterForAutomation(1);
 	int32 BindStarted = 0;
+	int32 BindEnded = 0;
 	BindManager->OnTurnStarted().AddLambda([&](const FHSRTurnLifecycleEvent&) { ++BindStarted; });
+	BindManager->OnTurnEnded().AddLambda([&](const FHSRTurnLifecycleEvent&) { ++BindEnded; });
 	TestFalse(TEXT("NumericAndBinding nth bind failure rejects initialization"), BindManager->Initialize({ BindA, BindB }));
 	TestEqual(TEXT("NumericAndBinding nth bind failure removes every handle"), BindManager->GetSpeedDelegateBindingCountForAutomation(), 0);
 	TestEqual(TEXT("NumericAndBinding nth bind failure emits no TurnStarted"), BindStarted, 0);
@@ -437,11 +473,51 @@ bool FHSRActionDistanceNumericLifecyclePatchTest::RunTest(const FString& Paramet
 	FHSRBattleParticipant FreshA = MakeParticipant(World, TEXT("FreshA"), 100.0f);
 	FHSRBattleParticipant FreshB = MakeParticipant(World, TEXT("FreshB"), 50.0f, EHSRBattleParticipantTeam::Enemy);
 	TestTrue(TEXT("NumericAndBinding reinitialize binds fresh epoch"), BindManager->Initialize({ FreshA, FreshB }));
+	const FSnapshot FreshABeforeOldASCBroadcast = Read(BindManager, TEXT("FreshA"));
+	const FSnapshot FreshBBeforeOldASCBroadcast = Read(BindManager, TEXT("FreshB"));
+	const EHSRTurnManagerState FreshStateBeforeOldASCBroadcast = BindManager->GetState();
+	const FName FreshCurrentBeforeOldASCBroadcast = BindManager->GetCurrentParticipantId();
+	const uint64 FreshEpochBeforeOldASCBroadcast = BindManager->GetBattleEpoch();
+	const uint64 FreshSequenceBeforeOldASCBroadcast = BindManager->GetTurnSequence();
+	const int32 FreshBindingsBeforeOldASCBroadcast = BindManager->GetSpeedDelegateBindingCountForAutomation();
+	const int32 FreshStartsBeforeOldASCBroadcast = BindStarted;
+	const int32 FreshEndsBeforeOldASCBroadcast = BindEnded;
+	BroadcastSpeed(BindB.AbilitySystemComponent.Get(), BeforeReset.Speed, 300.0f);
+	const bool bOldASCPostReinitializeAtomic = SameSnapshot(FreshABeforeOldASCBroadcast, Read(BindManager, TEXT("FreshA")))
+		&& SameSnapshot(FreshBBeforeOldASCBroadcast, Read(BindManager, TEXT("FreshB")))
+		&& BindManager->GetState() == FreshStateBeforeOldASCBroadcast
+		&& BindManager->GetCurrentParticipantId() == FreshCurrentBeforeOldASCBroadcast
+		&& BindManager->GetBattleEpoch() == FreshEpochBeforeOldASCBroadcast
+		&& BindManager->GetTurnSequence() == FreshSequenceBeforeOldASCBroadcast
+		&& BindManager->GetSpeedDelegateBindingCountForAutomation() == FreshBindingsBeforeOldASCBroadcast
+		&& BindStarted == FreshStartsBeforeOldASCBroadcast && BindEnded == FreshEndsBeforeOldASCBroadcast;
+	TestTrue(TEXT("NumericAndBinding old ASC broadcast after reinitialize has complete zero mutation"), bOldASCPostReinitializeAtomic);
+	UE_LOG(LogTemp, Log, TEXT("ActionDistanceCase Case=OldASCPostReinitialize Result=%s OldParticipant=BindB FreshCurrent=%s FreshEpoch=%llu Sequence=%llu Bindings=%d Starts=%d Ends=%d"), bOldASCPostReinitializeAtomic ? TEXT("PASS") : TEXT("FAIL"), *FreshCurrentBeforeOldASCBroadcast.ToString(), FreshEpochBeforeOldASCBroadcast, FreshSequenceBeforeOldASCBroadcast, FreshBindingsBeforeOldASCBroadcast, BindStarted, BindEnded);
 	const FSnapshot FreshBefore = Read(BindManager, TEXT("FreshB"));
 	BindManager->InvokeSpeedChangedForAutomation(TEXT("FreshB"), FreshB.AbilitySystemComponent.Get(), OldEpoch, 300.0f);
 	TestTrue(TEXT("NumericAndBinding stale epoch callback has zero effect"), FMath::IsNearlyEqual(Read(BindManager, TEXT("FreshB")).Base, FreshBefore.Base) && FMath::IsNearlyEqual(Read(BindManager, TEXT("FreshB")).Remaining, FreshBefore.Remaining));
 	BindManager->FinishBattle();
 	TestEqual(TEXT("NumericAndBinding FinishBattle unbinds all speed delegates"), BindManager->GetSpeedDelegateBindingCountForAutomation(), 0);
+	const FSnapshot FinishedABeforeBroadcast = Read(BindManager, TEXT("FreshA"));
+	const FSnapshot FinishedBBeforeBroadcast = Read(BindManager, TEXT("FreshB"));
+	const EHSRTurnManagerState FinishedStateBeforeBroadcast = BindManager->GetState();
+	const FName FinishedCurrentBeforeBroadcast = BindManager->GetCurrentParticipantId();
+	const uint64 FinishedEpochBeforeBroadcast = BindManager->GetBattleEpoch();
+	const uint64 FinishedSequenceBeforeBroadcast = BindManager->GetTurnSequence();
+	const int32 FinishedBindingsBeforeBroadcast = BindManager->GetSpeedDelegateBindingCountForAutomation();
+	const int32 FinishedStartsBeforeBroadcast = BindStarted;
+	const int32 FinishedEndsBeforeBroadcast = BindEnded;
+	BroadcastSpeed(FreshB.AbilitySystemComponent.Get(), FreshBefore.Speed, 400.0f);
+	const bool bOldASCAfterFinishAtomic = SameSnapshot(FinishedABeforeBroadcast, Read(BindManager, TEXT("FreshA")))
+		&& SameSnapshot(FinishedBBeforeBroadcast, Read(BindManager, TEXT("FreshB")))
+		&& BindManager->GetState() == FinishedStateBeforeBroadcast && BindManager->GetState() == EHSRTurnManagerState::Finished
+		&& BindManager->GetCurrentParticipantId() == FinishedCurrentBeforeBroadcast && FinishedCurrentBeforeBroadcast.IsNone()
+		&& BindManager->GetBattleEpoch() == FinishedEpochBeforeBroadcast
+		&& BindManager->GetTurnSequence() == FinishedSequenceBeforeBroadcast
+		&& BindManager->GetSpeedDelegateBindingCountForAutomation() == FinishedBindingsBeforeBroadcast && FinishedBindingsBeforeBroadcast == 0
+		&& BindStarted == FinishedStartsBeforeBroadcast && BindEnded == FinishedEndsBeforeBroadcast;
+	TestTrue(TEXT("NumericAndBinding old ASC broadcast after Finish has complete zero mutation"), bOldASCAfterFinishAtomic);
+	UE_LOG(LogTemp, Log, TEXT("ActionDistanceCase Case=OldASCAfterFinish Result=%s State=%d Current=%s Epoch=%llu Sequence=%llu Bindings=%d Starts=%d Ends=%d"), bOldASCAfterFinishAtomic ? TEXT("PASS") : TEXT("FAIL"), static_cast<int32>(BindManager->GetState()), *BindManager->GetCurrentParticipantId().ToString(), BindManager->GetBattleEpoch(), BindManager->GetTurnSequence(), BindManager->GetSpeedDelegateBindingCountForAutomation(), BindStarted, BindEnded);
 	UE_LOG(LogTemp, Log, TEXT("ActionDistanceCase Case=NumericAndBinding Result=PASS InitNaN=Rollback InitInf=Rollback RuntimeNaN=ZeroMutation RuntimeInf=ZeroMutation BindFailure=Atomic ResetStale=ZeroEpochStale=Zero"));
 	return true;
 }

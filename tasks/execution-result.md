@@ -66,3 +66,12 @@ Status: `IMPLEMENTED / REVIEW REQUIRED`
   - `HSR.Battle.Patch.RepeatableBreak`, `HSR.Battle.Patch.StatusGeneric`, and `HSR.BattleReturn.MapContract` — all Success.
 - `git diff --check` — PASS.
 - Dedicated legacy P8/P9/Turn Automation names do not exist in `Source/HSR/Tests`; their applicable Break/Status/Turn runtime contracts are exercised by the Patch cases above. PIE harness was not run and is not claimed as evidence.
+
+## Final re-review 4 closure (2026-07-27)
+
+- `RequestMatrix` now replays an accepted OperationId across both target and kind (`ReqB/Advance -> ReqC/Delay`). `CrossTargetKindReplay` asserts `DuplicateOperation` and complete zero mutation for both participants' Speed/Base/Remaining/pending plus manager state, current/next, epoch, sequence, binding count and lifecycle counts. Runtime log: `Result=PASS ... Bindings=3 Starts=0 Ends=0`.
+- `NumericAndBinding` now performs a real Speed attribute delegate broadcast from the old `BindB` ASC after fresh participants are initialized. `OldASCPostReinitialize` compares both fresh participants plus manager state/current/epoch/sequence/bindings/lifecycle and logs `Result=PASS ... FreshEpoch=3 Sequence=1 Bindings=2 Starts=2 Ends=0`.
+- After `FinishBattle`, the test performs another real broadcast from the formerly bound fresh ASC. `OldASCAfterFinish` compares both retained snapshots and the complete Finished manager state, logging `Result=PASS State=3 Current=None Epoch=3 Sequence=1 Bindings=0 Starts=2 Ends=0`.
+- Development Editor Build — PASS, exit code `0`.
+- `Automation RunTests HSR.Battle` — PASS, all nine discovered Battle tests Success, final exit code `0` (`Saved/Logs/HSR.log`, 2026-07-27 13:28:05 UTC).
+- `git diff --check` — PASS.
