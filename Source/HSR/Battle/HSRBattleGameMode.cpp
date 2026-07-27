@@ -1165,7 +1165,7 @@ namespace HSRBattleDevelopmentTest
 		UHSRStatusDefinition* InvalidGE = DuplicateObject<UHSRStatusDefinition>(DotDefinition, Coordinator); InvalidGE->InfiniteGameplayEffectClass.Reset();
 		UHSRStatusDefinition* InvalidRule = DuplicateObject<UHSRStatusDefinition>(DotDefinition, Coordinator); InvalidRule->DamageRule.Reset();
 		UHSRStatusDefinition* InvalidDamageType = DuplicateObject<UHSRStatusDefinition>(DotDefinition, Coordinator); InvalidDamageType->DamageType = FGameplayTag();
-		LogCase(TEXT("InvalidDefinition_GE_Rule_DamageType"), InvalidId->Validate() == EHSRStatusOperationResult::InvalidStatusId
+		LogCase(TEXT("InvalidDefinition_GE_Rule_DamageType"), InvalidId->Validate() == EHSRStatusOperationResult::InvalidDefinition
 			&& InvalidGE->Validate() == EHSRStatusOperationResult::MissingGameplayEffect && InvalidRule->Validate() == EHSRStatusOperationResult::InvalidDefinition
 			&& InvalidDamageType->Validate() == EHSRStatusOperationResult::InvalidDefinition);
 		LogCase(TEXT("InvalidTarget"), Coordinator->AddDamageOverTimeForDevelopmentTest(Source.ParticipantId, NAME_None, FGuid::NewGuid()) == EHSRStatusOperationResult::InvalidTarget);
