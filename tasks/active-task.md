@@ -23,10 +23,10 @@ TurnManager 使用统一行动距离决定下一行动者：运行中 Speed/Slow
 
 ### Current actor adjustments
 
-- 当前 actor 已锁定且 `RemainingActionDistance == 0` 时，Advance/Delay 不得丢失，也不得改变当前 actor。TurnManager 为其维护按接收顺序累计的纯值 `PendingPostActionOffset`。
-- 接受请求时使用当时有效的 Base 将 Ratio 固化为绝对有符号距离：Advance 为 `-Base*Ratio`，Delay 为 `+Base*Ratio`；之后的 Speed 变化不得重新解释已接受 offset。
+- 当前 actor 已锁定且 `RemainingActionDistance == 0` 时，Advance/Delay 不得丢失，也不得改变当前 actor。TurnManager 为其维护纯值、有序的 `PendingPostActionOperations`；每项记录 Kind 与接受时固化的绝对距离，禁止折叠成单个累计 offset。
+- 接受请求时使用当时有效的 Base 将 Ratio 固化为绝对距离：Advance 项为 `Base*Ratio`，Delay 项为 `Base*Ratio`；之后的 Speed 变化不得重新解释已接受项。
 - Resolve 顺序固定为：完整广播 `TurnEnded`（同步 Speed 回调可更新 Base）→ 使用最新 Base recharge → 按请求顺序应用 pending offset，每次 Advance clamp 到 0 → 清空 pending → 选择下一 actor。
-- 精确示例：当前 actor Base=100 时 Advance 0.25，接受后 pending=-25；即使行动结束前 Speed 令 Base=80，recharge 后 Remaining=`max(0,80-25)=55`。Base=100 时 Delay 0.3 后再变为 Base=80，则 Remaining=`80+30=110`。连续请求严格按接受顺序逐步应用。
+- 精确示例：当前 actor Base=100 时 Advance 0.25，接受后 pending Advance=25；即使行动结束前 Speed 令 Base=80，recharge 后 Remaining=`max(0,80-25)=55`。Base=100 时 Delay 0.3 后再变为 Base=80，则 Remaining=`80+30=110`。连续请求严格按接受顺序逐步应用；低 recharge 下 `Delay 30 → Advance 100` 与 `Advance 100 → Delay 30` 必须分别得到 0 与 30，证明逐项 clamp 和顺序不可折叠。
 
 ### Generic request, result, and dedupe
 
@@ -36,7 +36,7 @@ TurnManager 使用统一行动距离决定下一行动者：运行中 Speed/Slow
 
 ### Numeric and delegate lifecycle
 
-- 初始化 Speed 非 finite 时整个 Initialize 原子失败并解除本轮已建立的全部绑定；有限 `Speed <= 1` 统一 clamp 为 1。所有 Base/Remaining/pending 中间值先验证 finite，溢出返回 `ArithmeticFailure` 且事务零变更。
+- 初始化 Speed 非 finite 时整个 Initialize 原子失败并解除本轮已建立的全部绑定；有限 `Speed <= 1` 统一 clamp 为 1。所有 Base/Remaining/pending 中间值先验证 finite，溢出返回 `ArithmeticFailure` 且事务零变更。当前 actor 每次接受 pending 前，必须以最大可能 recharge Base（clamp 规则下为 10000）按完整有序 pending 列表预演；若任一步非 finite 则拒绝且不写入，使任何已接受请求在后续 Resolve 都不会因算术溢出才失败。
 - 运行中 NaN/Inf Speed 回调必须结构化记录，并保持旧 Speed/Base/Remaining/pending 完全不变；Speed=0 或负有限值按 clamp=1 处理。
 - 每个绑定身份固定为 `(ParticipantId, weak ASC identity, delegate handle, bound BattleEpoch)`。Initialize 必须先完成全量验证，再在首次 TurnStarted 前建立全部绑定；任一失败均原子 Reset。回调同时核对 manager state、epoch、ParticipantId 与 ASC identity。
 - `FinishBattle`、`Reset` 与重新 Initialize 必须幂等解除全部绑定并清空 handle；旧 ASC/旧 epoch callback 零副作用。Speed callback 只更新纯值，不广播 lifecycle、不调用 Resolve/Advance/Delay；选择/resolve 期间使用重入保护或延迟纯值处理。
@@ -44,7 +44,7 @@ TurnManager 使用统一行动距离决定下一行动者：运行中 Speed/Slow
 
 ### Candidate selection and lifecycle budget
 
-- 固定 `DistanceEpsilon=1e-4`。从 eligible participant 求严格 finite 最小 Remaining，统一减去该最小值并在 `abs(value)<=epsilon` 时 snap 为 0；候选集合使用 `abs(Remaining-Min)<=epsilon`，仅在集合内按 ParticipantId 字典序选择。禁止使用 `IsNearlyEqual` 作为排序比较器。
+- 固定 `DistanceEpsilon=1e-4`。先从 eligible participant 的原始严格 finite Remaining 求 Min，并在任何值改变前建立候选集合 `abs(OriginalRemaining-Min)<=epsilon`；随后所有 eligible Remaining 统一减 Min，并在 `abs(value)<=epsilon` 时 snap 为 0；最终仅在预先建立的候选集合内按 ParticipantId 字典序选择。禁止拿归一化后的值再与旧 Min 比较，也禁止使用 `IsNearlyEqual` 作为排序比较器。
 - 每次成功 `TurnStarted` 恰好令 `TurnSequence +1`。每次合法 Resolve 恰好一个 `TurnEnded`；仍有候选时恰好再有一个 TurnStarted，无候选才 Finished；唯一存活 participant 可连续再次行动。调整请求和 Speed callback 均不得改变 TurnSequence 或 lifecycle 次数。
 - `GetOrderedParticipants()` 仅表示稳定 participant registry/诊断视图，不承诺未来行动顺序，也不得改变现有 UI DTO。若测试需要距离快照，只能添加非 UI 的纯值 `WITH_DEV_AUTOMATION_TESTS` seam；正式行动条快照不在本任务范围，需停下扩权。
 
@@ -70,7 +70,8 @@ Implementation 不得修改 active-task、计划、PROJECT_STATE、worklog/todo/
 
 ## Required matrix
 
-- 专项补齐四类 Task Gate 场景：当前 actor 的 Advance/Delay（含随后 Speed 改变）；`TurnEnded` 同步回调导致 Speed 改变；请求被拒后以同一 OperationId 重放并验证已消费语义；Initialize 部分绑定失败的原子回滚。
+- 专项补齐四类 Task Gate 场景：当前 actor 的 Advance/Delay（含随后 Speed 改变及低 recharge 下反向请求顺序）；`TurnEnded` 同步回调导致 Speed 改变；请求被拒后以同一 OperationId 重放并验证已消费语义；Initialize 部分绑定失败的原子回滚。
+- 为稳定制造最后一类失败，允许仅在现有 `HSRTurnManager.h/.cpp` 内增加非反射、`WITH_DEV_AUTOMATION_TESTS` 包裹的 nth-bind failure injection seam；默认关闭，不得进入 Shipping 状态、正式 API、Blueprint 或资产。测试设置第 N 次绑定失败并断言此前 handle 全部解除、manager Reset、首次 TurnStarted 未发出。
 - 上述四类分别断言 Base/Remaining/pending、current/next、epoch、sequence、delegate count 与旧 callback 零副作用；不得把不存在或未运行的 Automation 记为通过。
 
 - A/B/C 初始速度产生可解释的行动距离与稳定顺序；高速角色在足够多次 resolve 中可比低速角色多行动。
