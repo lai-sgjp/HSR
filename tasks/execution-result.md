@@ -130,3 +130,20 @@ Validation after the final seam correction:
 - `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, `Success`, exit `0`.
 
 No Stage-B `.uasset` was modified. User PIE must now verify that the stock patrol branch consumes this published intent before a target is sensed.
+
+### Stage-B PIE revision — observable patrol candidates
+
+The first initial-intent repair used `SpawnOrigin` itself as `PatrolLocation`. That is safe but a stock `Move To` is already at that point, so it does not preserve observable patrol behavior. The Controller now uses `UNavigationSystemV1::GetRandomReachablePointInRadius(SpawnOrigin, PatrolRadius)` only to generate data:
+
+- On a reachable result, it publishes that candidate to `PatrolLocation` and `MovingToPatrol`.
+- On stock BT move completion, it publishes the next candidate intent; C++ still makes no movement request and schedules no timer.
+- If navigation is unavailable or no point is reachable, it logs a structured fallback, publishes `PatrolLocation=SpawnOrigin`, and enters `PatrolWaiting`; no C++ retry loop is formed.
+
+`HSR.Exploration.Patch.BehaviorTreeAdapter` now uses a controllable candidate seam to verify candidate/state publication and the no-candidate waiting fallback. Static scan again found no `MoveToLocation`, `MoveToActor`, `SetTimer`, or `TimerHandle` in the Controller adapter.
+
+Validation:
+
+- `HSREditor Win64 Development`: `PASS`, 7 actions, exit `0` (only engine AISystem C4996 warning).
+- `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
+
+No user `.uasset` was modified. Stage-B PIE must verify that patrol moves to the generated candidate and that a completed stock Move To consumes a newly published candidate after the user graph's Wait branch.

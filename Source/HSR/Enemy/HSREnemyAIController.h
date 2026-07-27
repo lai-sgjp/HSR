@@ -34,7 +34,7 @@ public:
 
 #if WITH_DEV_AUTOMATION_TESTS
 	bool GetPatrolLocationForAutomation(FVector& OutPatrolLocation) const;
-	void PublishInitialPatrolIntentForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin);
+	void PublishPatrolIntentForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin, const FVector& InCandidate, bool bHasReachableCandidate);
 #endif
 
 protected:
@@ -47,7 +47,8 @@ protected:
 	bool StartBehaviorTreeRuntime();
 	void StopBehaviorTreeRuntime();
 	void WriteBlackboardRuntimeState();
-	void PublishInitialPatrolIntent(const FVector& InSpawnOrigin);
+	void PublishNextPatrolIntent(const FVector& InSpawnOrigin, float PatrolRadius);
+	void PublishPatrolIntent(const FVector& InSpawnOrigin, const FVector& InCandidate, bool bHasReachableCandidate);
 	void ClearBlackboardRuntimeState();
 	void SetBlackboardTarget(AActor* Target);
 	void BeginSpawnOriginRecovery(EHSREnemyExplorationState RecoveryState);

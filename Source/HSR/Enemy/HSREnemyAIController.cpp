@@ -6,6 +6,7 @@
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "NavigationSystem.h"
 #include "GameFramework/Character.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
@@ -141,6 +142,15 @@ void AHSREnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathF
 	if (!Result.IsSuccess())
 	{
 		HandleMoveFailedOrAborted();
+	}
+	else if (CurrentState == EHSREnemyExplorationState::MovingToPatrol)
+	{
+		AHSREnemyCharacter* Enemy = Cast<AHSREnemyCharacter>(GetPawn());
+		UHSREnemyDefinition* Definition = Enemy ? Enemy->EnemyDefinition : nullptr;
+		if (Enemy && Definition)
+		{
+			PublishNextPatrolIntent(Enemy->GetSpawnOrigin(), Definition->PatrolRadius);
+		}
 	}
 	else if (CurrentState == EHSREnemyExplorationState::Chasing)
 	{
@@ -315,7 +325,7 @@ bool AHSREnemyAIController::StartBehaviorTreeRuntime()
 	RuntimeBlackboard = BlackboardComponent;
 	++BehaviorTreeEpoch;
 	ActiveEncounterRequestId.Invalidate();
-	PublishInitialPatrolIntent(Enemy->GetSpawnOrigin());
+	PublishNextPatrolIntent(Enemy->GetSpawnOrigin(), Definition->PatrolRadius);
 	if (!RunBehaviorTree(Tree))
 	{
 		ClearBlackboardRuntimeState();
@@ -351,11 +361,25 @@ void AHSREnemyAIController::WriteBlackboardRuntimeState()
 	SetBlackboardTarget(CurrentTarget.Get());
 }
 
-void AHSREnemyAIController::PublishInitialPatrolIntent(const FVector& InSpawnOrigin)
+void AHSREnemyAIController::PublishNextPatrolIntent(const FVector& InSpawnOrigin, float PatrolRadius)
 {
+	UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	FNavLocation Candidate;
+	const bool bHasReachableCandidate = NavSystem
+		&& NavSystem->GetRandomReachablePointInRadius(InSpawnOrigin, FMath::Max(0.0f, PatrolRadius), Candidate);
+	if (!bHasReachableCandidate)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("P17-PATCH-02 patrol intent fallback: %s has no reachable patrol point"), *GetName());
+	}
+	PublishPatrolIntent(InSpawnOrigin, Candidate.Location, bHasReachableCandidate);
+}
+
+void AHSREnemyAIController::PublishPatrolIntent(const FVector& InSpawnOrigin, const FVector& InCandidate, bool bHasReachableCandidate)
+{
+	const FVector PublishedLocation = bHasReachableCandidate ? InCandidate : InSpawnOrigin;
 	bHasPublishedPatrolLocation = true;
-	PublishedPatrolLocation = InSpawnOrigin;
-	SetState(EHSREnemyExplorationState::MovingToPatrol);
+	PublishedPatrolLocation = PublishedLocation;
+	SetState(bHasReachableCandidate ? EHSREnemyExplorationState::MovingToPatrol : EHSREnemyExplorationState::PatrolWaiting);
 
 	if (!RuntimeBlackboard)
 	{
@@ -363,7 +387,7 @@ void AHSREnemyAIController::PublishInitialPatrolIntent(const FVector& InSpawnOri
 	}
 
 	RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::SpawnOrigin, InSpawnOrigin);
-	RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::PatrolLocation, InSpawnOrigin);
+	RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::PatrolLocation, PublishedLocation);
 }
 
 void AHSREnemyAIController::ClearBlackboardRuntimeState()
@@ -400,9 +424,9 @@ bool AHSREnemyAIController::GetPatrolLocationForAutomation(FVector& OutPatrolLoc
 	return true;
 }
 
-void AHSREnemyAIController::PublishInitialPatrolIntentForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin)
+void AHSREnemyAIController::PublishPatrolIntentForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin, const FVector& InCandidate, bool bHasReachableCandidate)
 {
 	RuntimeBlackboard = InBlackboard;
-	PublishInitialPatrolIntent(InSpawnOrigin);
+	PublishPatrolIntent(InSpawnOrigin, InCandidate, bHasReachableCandidate);
 }
 #endif

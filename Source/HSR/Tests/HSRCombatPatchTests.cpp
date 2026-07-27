@@ -110,11 +110,16 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Behavior Tree adapter does not enable Actor Tick"), Controller->PrimaryActorTick.bCanEverTick);
 	TestEqual(TEXT("Fresh controller begins at epoch zero before Possess"), Controller->GetBehaviorTreeEpoch(), 0);
 	const FVector ExpectedSpawnOrigin(137.0f, -29.0f, 11.0f);
-	Controller->PublishInitialPatrolIntentForAutomation(nullptr, ExpectedSpawnOrigin);
+	const FVector CandidatePatrolLocation(291.0f, -83.0f, 11.0f);
+	Controller->PublishPatrolIntentForAutomation(nullptr, ExpectedSpawnOrigin, CandidatePatrolLocation, true);
 	TestEqual(TEXT("BT initialization publishes a patrol state instead of Idle"), Controller->GetCurrentState(), EHSREnemyExplorationState::MovingToPatrol);
 	FVector PatrolLocation = FVector::ZeroVector;
 	TestTrue(TEXT("BT initialization writes PatrolLocation"), Controller->GetPatrolLocationForAutomation(PatrolLocation));
-	TestEqual(TEXT("Initial PatrolLocation is SpawnOrigin intent"), PatrolLocation, ExpectedSpawnOrigin);
+	TestEqual(TEXT("Reachable patrol candidate is published without a movement request"), PatrolLocation, CandidatePatrolLocation);
+	Controller->PublishPatrolIntentForAutomation(nullptr, ExpectedSpawnOrigin, FVector::ZeroVector, false);
+	TestEqual(TEXT("Unreachable patrol fallback waits instead of issuing a movement loop"), Controller->GetCurrentState(), EHSREnemyExplorationState::PatrolWaiting);
+	TestTrue(TEXT("Unreachable patrol fallback publishes SpawnOrigin"), Controller->GetPatrolLocationForAutomation(PatrolLocation));
+	TestEqual(TEXT("Unreachable patrol fallback location is SpawnOrigin"), PatrolLocation, ExpectedSpawnOrigin);
 	return true;
 }
 
