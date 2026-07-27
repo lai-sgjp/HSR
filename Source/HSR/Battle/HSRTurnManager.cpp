@@ -77,7 +77,7 @@ bool UHSRTurnManager::ResolveAction(FName ResolvingParticipantId)
 	return true;
 }
 
-bool UHSRTurnManager::ConsumeBreakDelay(const FHSRTurnDelayRequest& Request)
+bool UHSRTurnManager::ConsumeBreakDelay(const FHSRTurnDelayRequest& Request, bool bAllowPendingDeferredDefeat)
 {
 	if (!Request.ActionId.IsValid() || Request.TargetParticipantId.IsNone())
 	{
@@ -99,7 +99,8 @@ bool UHSRTurnManager::ConsumeBreakDelay(const FHSRTurnDelayRequest& Request)
 	{
 		return Participant.ParticipantId == Request.TargetParticipantId;
 	});
-	if (!OrderedParticipants.IsValidIndex(TargetIndex) || !IsParticipantTurnEligible(OrderedParticipants[TargetIndex]))
+	if (!OrderedParticipants.IsValidIndex(TargetIndex)
+		|| (!bAllowPendingDeferredDefeat && !IsParticipantTurnEligible(OrderedParticipants[TargetIndex])))
 	{
 		UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Applied=0 Reason=InvalidTarget"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString());
 		return false;

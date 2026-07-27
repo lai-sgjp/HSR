@@ -27,7 +27,7 @@ public:
 	bool BindTurnManager(UHSRTurnManager* InTurnManager);
 	void BindBattleCoordinator(UHSRBattleCoordinator* InCoordinator);
 	void UnbindTurnManager();
-	EHSRStatusOperationResult AddOrRefreshStatus(const UHSRStatusDefinition* Definition, FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId = FGuid());
+	EHSRStatusOperationResult AddOrRefreshStatus(const UHSRStatusDefinition* Definition, FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId = FGuid(), bool bAllowPendingDeferredDefeat = false);
 	EHSRStatusOperationResult ReplaceStatus(const UHSRStatusDefinition* Definition, FName SourceParticipantId, FName TargetParticipantId);
 	EHSRStatusOperationResult ClearStatus();
 	EHSRStatusOperationResult DispelOneStatus();
@@ -53,7 +53,7 @@ public:
 private:
 	void HandleTurnEnded(const FHSRTurnLifecycleEvent& Event);
 	EHSRStatusOperationResult ClearStatusById(FName StatusId, EHSRStatusPublicOperation Operation = EHSRStatusPublicOperation::Clear);
-	EHSRStatusOperationResult ValidateAdd(const UHSRStatusDefinition* Definition, FName SourceParticipantId, FName TargetParticipantId, TSubclassOf<UGameplayEffect>& OutEffectClass) const;
+	EHSRStatusOperationResult ValidateAdd(const UHSRStatusDefinition* Definition, FName SourceParticipantId, FName TargetParticipantId, TSubclassOf<UGameplayEffect>& OutEffectClass, bool bAllowPendingDeferredDefeat) const;
 	void NotifyStatusChanged() { StatusChanged.Broadcast(); }
 	void RecordPublicOperation(EHSRStatusPublicOperation Operation, EHSRStatusOperationResult Result, FName StatusId, FName TargetId);
 

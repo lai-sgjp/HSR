@@ -42,3 +42,15 @@ Status: `REVISE / IMPLEMENTED, RUNTIME VALIDATION PENDING`
 - Serial shared regression `HSR.Battle.Patch`: `PASS` (2/2): `RepeatableBreak` and `StatusGeneric` both completed with `Result={Success}`.
 - Covered runtime matrix: first edge, cached replay, recovery-only, natural Break-status expiry, second independent edge, initial/continued zero, non-zero, weakness failure, Reset/rebuild, stale BattleId, battle-local ActionId reuse, same-frame lethal Break/Status/Delay before Defeat, and Finished rejection. Assertions cover exact Status/accepted-Delay deltas, Toughness, cached Break ActionId, and turn deltas.
 - PIE remains pending user execution through the existing `bRunP9DotBreakHarness` / `P9-003` gate. Until independent review and PIE evidence complete, task status remains `REVISE` rather than final PASS.
+
+## Deferred-defeat admission revision
+
+- Independent review `da23b94` blocked the temporary `Health 0 -> epsilon -> 0` workaround because synchronous Status publication and ASC listeners could observe an artificial revival. User authorized the exact four-file Status/Turn consumer expansion; Coordinator recorded it in `6d5ea79`.
+- Removed both temporary Health writes. `AddOrRefreshStatus` and `ConsumeBreakDelay` now accept one non-reflected, non-persisted, default-`false` pending-deferred-defeat parameter. Ordinary callers retain dead-target rejection. Coordinator passes `true` only when the target was alive at command admission and the same open action produced `PendingDefeatedParticipantId` for that target.
+- Turn ordering, pending skip-once storage/consumption, status refresh policy, and all non-Break call sites remain unchanged.
+- Tightened Automation evidence: replay compares every reflected `FHSRAbilityResolution` field; first/second/reused/lethal paths assert exact turn deltas; already-dead admission is independently rejected with zero effects; Reset reuses an ActionId processed in the old battle and asserts exact Status `+1`, accepted Delay `+1`, Toughness zero, and turn `+1`.
+- First build after the authorized API revision: `FAIL` because the ordinary `ReplaceStatus` path still called the internal validator with four arguments. It was corrected to pass the explicit default-deny value `false`; no behavior expansion was made.
+- Development Editor rebuild: `PASS` (`HSREditor Win64 Development`, 2026-07-27); only the existing external `AISystem.h` C4996 warning remains.
+- Isolated `HSR.Battle.Patch.RepeatableBreak`: `PASS`, including standalone World cleanup.
+- Serial `HSR.Battle.Patch`: `PASS` (2/2): `RepeatableBreak` and `StatusGeneric` both completed with `Result={Success}`.
+- PIE remains pending the existing user-run `P9-003` gate after independent review. Task status remains `REVISE` until that evidence is accepted.

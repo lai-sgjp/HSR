@@ -411,6 +411,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 	{
 		return Reject(EHSRAbilityFailureReason::InvalidTarget);
 	}
+	const bool bTargetAliveAtAdmission = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) > 0.0f;
 	if (ResolvedSkillDefinition->Category == EHSRSkillCategory::Heal && Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) >= Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxHealthAttribute())) return Reject(EHSRAbilityFailureReason::AlreadyAtFullHealth);
 
 	// This is the synchronous preflight for the only mutating P6-001 ability.
@@ -623,19 +624,10 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 			BreakResult.ToughnessAfter, BreakResult.bTriggered ? 1 : 0, static_cast<int32>(BreakResult.FailureReason));
 		if (BreakResult.bTriggered)
 		{
-			// A target admitted alive may reach zero Health in the same formal
-			// transaction. ResolveDefeat is intentionally deferred until after
-			// Break publication, so keep that admission eligibility visible to the
-			// existing Status and Delay consumers during this synchronous window.
-			// No presentation snapshot is published until Health is restored to the
-			// committed terminal value below.
-			const bool bLethalBreakTransaction = PendingDefeatedParticipantId == Target->ParticipantId
-				&& Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) <= 0.0f;
-			if (bLethalBreakTransaction)
-			{
-				Target->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), UE_KINDA_SMALL_NUMBER);
-			}
-			const EHSRStatusOperationResult BreakStatusResult = RequestBreakStatus(Command.ActorParticipantId, BreakResult.TargetParticipantId, BreakResult.ActionId);
+			const bool bAllowPendingDeferredDefeat = bTargetAliveAtAdmission
+				&& PendingDefeatedParticipantId == Target->ParticipantId;
+			const EHSRStatusOperationResult BreakStatusResult = RequestBreakStatus(
+				Command.ActorParticipantId, BreakResult.TargetParticipantId, BreakResult.ActionId, bAllowPendingDeferredDefeat);
 #if WITH_EDITOR
 			LastBreakStatusResultForTest = BreakStatusResult;
 			if (BreakStatusResult == EHSRStatusOperationResult::Success)
@@ -648,7 +640,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 			DelayRequest.ActionId = BreakResult.ActionId;
 			DelayRequest.TargetParticipantId = BreakResult.TargetParticipantId;
 			LastBreakDelayActionId = DelayRequest.ActionId;
-			bLastBreakDelayRegistered = TurnManager->ConsumeBreakDelay(DelayRequest);
+			bLastBreakDelayRegistered = TurnManager->ConsumeBreakDelay(DelayRequest, bAllowPendingDeferredDefeat);
 #if WITH_EDITOR
 			bLastBreakDelayAcceptedForTest = bLastBreakDelayRegistered;
 			if (bLastBreakDelayRegistered)
@@ -656,10 +648,6 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 				++BreakDelayRegistrationCountForTest;
 			}
 #endif
-			if (bLethalBreakTransaction)
-			{
-				Target->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 0.0f);
-			}
 		}
 		Finalize(Resolution);
 		if (!PendingDefeatedParticipantId.IsNone()) { const FName Defeated = PendingDefeatedParticipantId; PendingDefeatedParticipantId = NAME_None; ResolveDefeat(Defeated); }
@@ -1641,11 +1629,11 @@ UHSRStatusComponent* UHSRBattleCoordinator::GetStatusComponent(FName Participant
 	return Found ? Found->Get() : nullptr;
 }
 
-EHSRStatusOperationResult UHSRBattleCoordinator::RequestBreakStatus(FName SourceParticipantId, FName TargetParticipantId, const FGuid& OperationId)
+EHSRStatusOperationResult UHSRBattleCoordinator::RequestBreakStatus(FName SourceParticipantId, FName TargetParticipantId, const FGuid& OperationId, bool bAllowPendingDeferredDefeat)
 {
 	if (!BreakStatusDefinition) return EHSRStatusOperationResult::InvalidDefinition;
 	UHSRStatusComponent* Component = GetStatusComponent(TargetParticipantId);
-	return Component ? Component->AddOrRefreshStatus(BreakStatusDefinition, SourceParticipantId, TargetParticipantId, OperationId)
+	return Component ? Component->AddOrRefreshStatus(BreakStatusDefinition, SourceParticipantId, TargetParticipantId, OperationId, bAllowPendingDeferredDefeat)
 		: EHSRStatusOperationResult::InvalidTarget;
 }
 

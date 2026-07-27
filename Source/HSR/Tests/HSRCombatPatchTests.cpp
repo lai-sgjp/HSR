@@ -101,11 +101,11 @@ bool FHSRRepeatableBreakPatchTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("First edge adds one accepted Delay"), Counts().Y, BeforeFirst.Y + 1);
 	TestEqual(TEXT("First Status result succeeds"), Coordinator->GetLastBreakStatusResultForDevelopmentTest(), EHSRStatusOperationResult::Success);
 	TestTrue(TEXT("First Delay is accepted"), Coordinator->WasLastBreakDelayAcceptedForDevelopmentTest());
-	TestTrue(TEXT("First action advances the turn"), Coordinator->GetTurnManager()->GetTurnSequence() > TurnBeforeFirst);
+	TestEqual(TEXT("First action advances the turn exactly once"), Coordinator->GetTurnManager()->GetTurnSequence(), TurnBeforeFirst + 1);
 	const FIntPoint BeforeReplay = Counts();
 	const uint64 TurnBeforeReplay = Coordinator->GetTurnManager()->GetTurnSequence();
 	const FHSRAbilityResolution Replay = Coordinator->RequestAction(CommandFor(FirstId));
-	TestEqual(TEXT("Replay returns cached Break ActionId"), Replay.BreakResult.ActionId, First.BreakResult.ActionId);
+	TestTrue(TEXT("Replay returns every cached Resolution field"), FHSRAbilityResolution::StaticStruct()->CompareScriptStruct(&Replay, &First, 0));
 	TestEqual(TEXT("Replay has zero Status delta"), Counts().X, BeforeReplay.X);
 	TestEqual(TEXT("Replay has zero Delay delta"), Counts().Y, BeforeReplay.Y);
 	TestEqual(TEXT("Replay has zero turn delta"), Coordinator->GetTurnManager()->GetTurnSequence(), TurnBeforeReplay);
@@ -123,10 +123,12 @@ bool FHSRRepeatableBreakPatchTest::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("Second action runtime prepares"), Prepare(BreakDamage, true));
 	const FGuid SecondId = FGuid::NewGuid();
+	const uint64 TurnBeforeSecond = Coordinator->GetTurnManager()->GetTurnSequence();
 	const FHSRAbilityResolution Second = Coordinator->RequestAction(CommandFor(SecondId));
 	TestTrue(TEXT("Second independent edge triggers Break"), Second.bHasBreakResult && Second.BreakResult.bTriggered && SecondId != FirstId);
 	TestEqual(TEXT("Two edges produce two Status successes"), Counts().X, BeforeFirst.X + 2);
 	TestEqual(TEXT("Two edges produce two accepted Delays"), Counts().Y, BeforeFirst.Y + 2);
+	TestEqual(TEXT("Second edge advances the turn exactly once"), Coordinator->GetTurnManager()->GetTurnSequence(), TurnBeforeSecond + 1);
 
 	TestTrue(TEXT("Zero-to-zero runtime prepares"), Prepare(0.0f, true));
 	const FIntPoint BeforeZero = Counts();
@@ -159,18 +161,36 @@ bool FHSRRepeatableBreakPatchTest::RunTest(const FString& Parameters)
 	const FHSRAbilityResolution Stale = Coordinator->RequestAction(CommandFor(FGuid::NewGuid(), OldBattleId));
 	TestFalse(TEXT("Old BattleId is rejected"), Stale.Succeeded());
 	TestEqual(TEXT("Old BattleId has zero side effects"), Counts(), BeforeStale);
+	const uint64 TurnBeforeReused = Coordinator->GetTurnManager()->GetTurnSequence();
 	const FHSRAbilityResolution FreshReused = Coordinator->RequestAction(CommandFor(ReusedId));
 	TestTrue(TEXT("ActionId is battle-local after Reset"), FreshReused.bHasBreakResult && FreshReused.BreakResult.bTriggered);
+	TestEqual(TEXT("Reused ActionId adds one Status success"), Counts().X, BeforeStale.X + 1);
+	TestEqual(TEXT("Reused ActionId adds one accepted Delay"), Counts().Y, BeforeStale.Y + 1);
+	TestEqual(TEXT("Reused ActionId reaches exact zero Toughness"), FreshReused.ToughnessResult.After, 0.0f);
+	TestEqual(TEXT("Reused ActionId advances the turn exactly once"), Coordinator->GetTurnManager()->GetTurnSequence(), TurnBeforeReused + 1);
+
+	const FHSRBattleInitResult DeadAdmissionRebuild = Coordinator->ResetAndRebuildForDevelopmentTest(BattleWorld);
+	TestTrue(TEXT("Already-dead admission rebuild succeeds"), DeadAdmissionRebuild.IsSuccess());
+	TestTrue(TEXT("Already-dead admission runtime prepares"), Prepare(BreakDamage, true));
+	const FIntPoint BeforeDeadAdmission = Counts();
+	const uint64 TurnBeforeDeadAdmission = Coordinator->GetTurnManager()->GetTurnSequence();
+	Coordinator->GetParticipants()[1].AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 0.0f);
+	const FHSRAbilityResolution DeadAdmission = Coordinator->RequestAction(CommandFor(FGuid::NewGuid()));
+	TestFalse(TEXT("Target dead before command admission is rejected"), DeadAdmission.Succeeded());
+	TestEqual(TEXT("Already-dead admission has zero Break side effects"), Counts(), BeforeDeadAdmission);
+	TestEqual(TEXT("Already-dead admission has zero turn delta"), Coordinator->GetTurnManager()->GetTurnSequence(), TurnBeforeDeadAdmission);
 
 	const FHSRBattleInitResult LethalRebuild = Coordinator->ResetAndRebuildForDevelopmentTest(BattleWorld);
 	TestTrue(TEXT("Lethal matrix rebuild succeeds"), LethalRebuild.IsSuccess());
 	TestTrue(TEXT("Lethal runtime prepares"), Prepare(BreakDamage, true, 1.0f));
 	const FIntPoint BeforeLethal = Counts();
 	const int32 DefeatBefore = Coordinator->GetDefeatCountForDevelopmentTest();
+	const uint64 TurnBeforeLethal = Coordinator->GetTurnManager()->GetTurnSequence();
 	const FHSRAbilityResolution Lethal = Coordinator->RequestAction(CommandFor(FGuid::NewGuid()));
 	TestTrue(TEXT("Same-frame lethal publishes Break before terminal defeat"), Lethal.bHasBreakResult && Lethal.BreakResult.bTriggered
 		&& Counts() == BeforeLethal + FIntPoint(1, 1) && Coordinator->GetDefeatCountForDevelopmentTest() == DefeatBefore + 1
 		&& Coordinator->GetCurrentState() == EHSRBattleCoordinatorState::Finished);
+	TestEqual(TEXT("Same-frame lethal has exact zero turn-advance delta"), Coordinator->GetTurnManager()->GetTurnSequence(), TurnBeforeLethal);
 	const FIntPoint BeforeFinished = Counts();
 	const FHSRAbilityResolution Finished = Coordinator->RequestAction(CommandFor(FGuid::NewGuid()));
 	TestFalse(TEXT("Finished battle rejects new action"), Finished.Succeeded());

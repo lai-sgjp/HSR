@@ -46,7 +46,7 @@ public:
 	bool Initialize(const TArray<FHSRBattleParticipant>& InParticipants);
 	bool ResolveAction(FName ResolvingParticipantId);
 	/** Registers one pure break-delay request. The next candidate turn for its living target is skipped once. */
-	bool ConsumeBreakDelay(const FHSRTurnDelayRequest& Request);
+	bool ConsumeBreakDelay(const FHSRTurnDelayRequest& Request, bool bAllowPendingDeferredDefeat = false);
 	/** Stops turn progression after a terminal battle result. */
 	void FinishBattle();
 	void Reset();

@@ -317,7 +317,7 @@ private:
 	void ClearRuntimeDelegates();
 	bool InitializeStatusComponents();
 	void ClearStatusComponents();
-	EHSRStatusOperationResult RequestBreakStatus(FName SourceParticipantId, FName TargetParticipantId, const FGuid& OperationId);
+	EHSRStatusOperationResult RequestBreakStatus(FName SourceParticipantId, FName TargetParticipantId, const FGuid& OperationId, bool bAllowPendingDeferredDefeat = false);
 	int32 RouteSourceInvalid(FName SourceParticipantId);
 	void HandleStatusChanged(FName ParticipantId);
 	FHSRStatusPublicOperationEvent LastStatusOperation;

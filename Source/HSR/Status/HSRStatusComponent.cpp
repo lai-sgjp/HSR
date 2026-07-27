@@ -63,7 +63,7 @@ void UHSRStatusComponent::UnbindTurnManager()
 	BoundTurnManager.Reset();
 }
 
-EHSRStatusOperationResult UHSRStatusComponent::ValidateAdd(const UHSRStatusDefinition* Definition, FName SourceParticipantId, FName TargetParticipantId, TSubclassOf<UGameplayEffect>& OutEffectClass) const
+EHSRStatusOperationResult UHSRStatusComponent::ValidateAdd(const UHSRStatusDefinition* Definition, FName SourceParticipantId, FName TargetParticipantId, TSubclassOf<UGameplayEffect>& OutEffectClass, bool bAllowPendingDeferredDefeat) const
 {
 	if (!Definition) return EHSRStatusOperationResult::InvalidDefinition;
 	if (const EHSRStatusOperationResult Result = Definition->Validate(); Result != EHSRStatusOperationResult::Success) return Result;
@@ -71,7 +71,7 @@ EHSRStatusOperationResult UHSRStatusComponent::ValidateAdd(const UHSRStatusDefin
 	if (TargetParticipantId.IsNone() || TargetParticipantId != ParticipantId) return EHSRStatusOperationResult::InvalidTarget;
 	if (!BoundTurnManager.IsValid() || BoundTurnManager->GetBattleEpoch() == 0) return EHSRStatusOperationResult::InvalidEpoch;
 	if (!AbilitySystem.IsValid()) return EHSRStatusOperationResult::MissingAbilitySystem;
-	if (AbilitySystem->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) <= 0.0f) return EHSRStatusOperationResult::DefeatedTarget;
+	if (!bAllowPendingDeferredDefeat && AbilitySystem->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) <= 0.0f) return EHSRStatusOperationResult::DefeatedTarget;
 	if (Definition->Classification == EHSRStatusClassification::Debuff && Definition->ImmunityTag.IsValid() && AbilitySystem->HasMatchingGameplayTag(Definition->ImmunityTag)) return EHSRStatusOperationResult::Immune;
 	OutEffectClass = Definition->InfiniteGameplayEffectClass.LoadSynchronous();
 	if (!OutEffectClass) return EHSRStatusOperationResult::MissingGameplayEffect;
@@ -79,11 +79,11 @@ EHSRStatusOperationResult UHSRStatusComponent::ValidateAdd(const UHSRStatusDefin
 		? EHSRStatusOperationResult::Success : EHSRStatusOperationResult::GameplayEffectNotInfinite;
 }
 
-EHSRStatusOperationResult UHSRStatusComponent::AddOrRefreshStatus(const UHSRStatusDefinition* Definition, FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId)
+EHSRStatusOperationResult UHSRStatusComponent::AddOrRefreshStatus(const UHSRStatusDefinition* Definition, FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId, bool bAllowPendingDeferredDefeat)
 {
 	if (OperationId.IsValid() && ProcessedOperationIds.Contains(OperationId)) return LastResult = EHSRStatusOperationResult::IgnoredEvent;
 	TSubclassOf<UGameplayEffect> EffectClass;
-	if ((LastResult = ValidateAdd(Definition, SourceParticipantId, TargetParticipantId, EffectClass)) != EHSRStatusOperationResult::Success) return LastResult;
+	if ((LastResult = ValidateAdd(Definition, SourceParticipantId, TargetParticipantId, EffectClass, bAllowPendingDeferredDefeat)) != EHSRStatusOperationResult::Success) return LastResult;
 
 	FHSRStatusInstance* Existing = Statuses.Find(Definition->StatusId);
 	if (Existing)
@@ -158,7 +158,7 @@ EHSRStatusOperationResult UHSRStatusComponent::ReplaceStatus(const UHSRStatusDef
 	if (Statuses.Num() != 1) return LastResult = EHSRStatusOperationResult::InvalidRuntimeInstance;
 	const FName OldStatusId = Statuses.CreateConstIterator().Key();
 	TSubclassOf<UGameplayEffect> EffectClass;
-	if ((LastResult = ValidateAdd(Definition, SourceParticipantId, TargetParticipantId, EffectClass)) != EHSRStatusOperationResult::Success) return LastResult;
+	if ((LastResult = ValidateAdd(Definition, SourceParticipantId, TargetParticipantId, EffectClass, false)) != EHSRStatusOperationResult::Success) return LastResult;
 	FHSRStatusInstance& OldInstance = Statuses.FindChecked(OldStatusId);
 	if (!AbilitySystem->GetActiveGameplayEffect(OldInstance.ActiveGameplayEffectHandle)) return LastResult = EHSRStatusOperationResult::InvalidRuntimeInstance;
 #if WITH_EDITOR
