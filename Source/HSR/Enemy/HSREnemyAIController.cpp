@@ -5,7 +5,6 @@
 #include "../Character/HSRExplorationCharacter.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
-#include "NavigationSystem.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "GameFramework/Character.h"
 #include "BehaviorTree/BehaviorTree.h"
@@ -114,14 +113,6 @@ void AHSREnemyAIController::SetState(EHSREnemyExplorationState NewState)
 
 void AHSREnemyAIController::ClearState()
 {
-	// Clear all timers (with world safety for teardown edge)
-	UWorld* World = GetWorld();
-	if (World)
-	{
-		World->GetTimerManager().ClearTimer(PatrolWaitTimerHandle);
-		World->GetTimerManager().ClearTimer(InitTimerHandle);
-	}
-
 	// Stop movement
 	if (GetPathFollowingComponent())
 	{
@@ -132,62 +123,6 @@ void AHSREnemyAIController::ClearState()
 	SetBlackboardTarget(nullptr);
 	CurrentState = EHSREnemyExplorationState::Idle;
 	WriteBlackboardRuntimeState();
-}
-
-void AHSREnemyAIController::StartPatrol()
-{
-	AHSREnemyCharacter* EnemyChar = Cast<AHSREnemyCharacter>(GetPawn());
-	if (!EnemyChar)
-	{
-		ClearState();
-		return;
-	}
-
-	UHSREnemyDefinition* Def = EnemyChar->EnemyDefinition;
-	if (!Def)
-	{
-		SetState(EHSREnemyExplorationState::Idle);
-		UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::StartPatrol - %s: no Definition, idle"), *GetName());
-		return;
-	}
-
-	SetState(EHSREnemyExplorationState::MovingToPatrol);
-
-	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
-	if (!NavSys)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("AHSREnemyAIController::StartPatrol - %s: no NavSystem"), *GetName());
-		HandleMoveFailedOrAborted();
-		return;
-	}
-
-	FNavLocation NavLoc;
-	if (NavSys->GetRandomReachablePointInRadius(EnemyChar->GetSpawnOrigin(), Def->PatrolRadius, NavLoc))
-	{
-		if (RuntimeBlackboard)
-		{
-			RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::PatrolLocation, NavLoc.Location);
-		}
-		EPathFollowingRequestResult::Type MoveResult = MoveToLocation(NavLoc.Location, -1.f, false);
-		if (MoveResult == EPathFollowingRequestResult::AlreadyAtGoal)
-		{
-			UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::StartPatrol - %s: already at patrol goal"), *GetName());
-			SetState(EHSREnemyExplorationState::PatrolWaiting);
-			GetWorld()->GetTimerManager().SetTimer(PatrolWaitTimerHandle, this, &AHSREnemyAIController::StartPatrol, Def->PatrolWaitTime, false);
-		}
-		else if (MoveResult == EPathFollowingRequestResult::Failed)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("AHSREnemyAIController::StartPatrol - %s: MoveTo Failed"), *GetName());
-			// P4-002: MoveTo failed/aborted -> bounded recovery via HandleMoveFailedOrAborted (timer + retry)
-			HandleMoveFailedOrAborted();
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("AHSREnemyAIController::StartPatrol - %s: no reachable point"), *GetName());
-		SetState(EHSREnemyExplorationState::PatrolWaiting);
-		GetWorld()->GetTimerManager().SetTimer(PatrolWaitTimerHandle, this, &AHSREnemyAIController::StartPatrol, Def->PatrolWaitTime, false);
-	}
 }
 
 void AHSREnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
@@ -201,33 +136,12 @@ void AHSREnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathF
 		return;
 	}
 
-	if (CurrentState == EHSREnemyExplorationState::MovingToPatrol)
+	if (!Result.IsSuccess())
 	{
-		// Patrol move completed
-		if (Result.IsSuccess())
-		{
-			AHSREnemyCharacter* EnemyChar = Cast<AHSREnemyCharacter>(GetPawn());
-			if (!EnemyChar) return;
-
-			UHSREnemyDefinition* Def = EnemyChar->EnemyDefinition;
-			float WaitTime = Def ? Def->PatrolWaitTime : 3.0f;
-
-			SetState(EHSREnemyExplorationState::PatrolWaiting);
-			GetWorld()->GetTimerManager().SetTimer(PatrolWaitTimerHandle, this, &AHSREnemyAIController::StartPatrol, WaitTime, false);
-		}
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("AHSREnemyAIController::OnMoveCompleted - %s: patrol move %s"),
-				*GetName(), *Result.ToString());
-			HandleMoveFailedOrAborted();
-		}
+		HandleMoveFailedOrAborted();
 	}
 	else if (CurrentState == EHSREnemyExplorationState::Chasing)
 	{
-		// DONT call MoveToActor here - would cause infinite recursion
-		// when MoveTo completes synchronously. The EncounterCollision
-		// overlap (triggered when player enters EncounterCollision range)
-		// or a new Perception stimulus will handle re-engagement.
 		AActor* Target = CurrentTarget.Get();
 		if (!Target || !IsValid(Target))
 		{
@@ -264,7 +178,6 @@ void AHSREnemyAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus
 		CurrentTarget = Actor;
 		SetBlackboardTarget(Actor);
 
-		GetWorld()->GetTimerManager().ClearTimer(PatrolWaitTimerHandle);
 		StopMovement();
 
 	// Stage B's stock Move To node consumes TargetActor. C++ owns the state and
@@ -316,8 +229,7 @@ void AHSREnemyAIController::BeginSpawnOriginRecovery(EHSREnemyExplorationState R
 		RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::PatrolLocation, Enemy->GetSpawnOrigin());
 	}
 	SetState(EHSREnemyExplorationState::ReturningToSpawnOrigin);
-	// Stage B's stock Move To consumes PatrolLocation=SpawnOrigin. Do not call
-	// MoveToLocation here: that would race the Behavior Tree movement request.
+	// Stage B's stock Move To consumes PatrolLocation=SpawnOrigin.
 }
 
 void AHSREnemyAIController::TryRequestEncounterFromCharacter()
@@ -373,7 +285,6 @@ void AHSREnemyAIController::TryRequestEncounterFromCharacter()
 		ActiveEncounterRequestId = EncResult.RequestId;
 		SetState(EHSREnemyExplorationState::EncounterPending);
 		StopMovement();
-		GetWorld()->GetTimerManager().ClearTimer(PatrolWaitTimerHandle);
 
 		UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::TryRequestEncounter - %s SUCCESS (RequestId=%s, EnemyId=%s)"),
 			*GetName(), *EncResult.RequestId.ToString(), *Def->EnemyDefinitionId.ToString());

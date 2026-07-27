@@ -96,3 +96,18 @@ The automation review exposed a future Stage-B ownership conflict: the legacy `B
 - LostTarget/MoveFailed only publish `PatrolLocation=SpawnOrigin` and recovery state; they no longer call `MoveToLocation`.
 
 Therefore the Stage-B stock `Move To`/`Wait` graph will be the sole movement request owner, while C++ retains state, epoch, Blackboard-key and Encounter-admission authority. The post-fix `HSREditor Win64 Development` build passed (6 actions, exit `0`) and the Automation passed again. Stage B remains pending user-owned Editor work.
+
+### Reviewer revision — legacy movement owner fully removed
+
+Independent review found that the dormant `StartPatrol` implementation could still issue `MoveToLocation` and schedule a timer if reached from a later stock-BT completion. The Controller adapter was narrowed again within the same allowlist:
+
+- Removed `StartPatrol`, both legacy timer handles, all timer callbacks, and the legacy navigation-system dependency.
+- `OnMoveCompleted` now only forwards a failed result into the existing Blackboard recovery-state publisher or observes a lost weak target; it never schedules or issues movement.
+- A source-level allowlist check found zero remaining matches for `StartPatrol`, `MoveToLocation`, `MoveToActor`, `SetTimer`, or `TimerHandle` in the Controller header/implementation.
+
+Post-revision validation:
+
+- `HSREditor Win64 Development`: `PASS`, 6 actions, exit `0` (only the existing engine AISystem C4996 warning).
+- `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, `Success`, exit `0`.
+
+This closes Stage-A C++ movement ownership: only Stage-B user-owned stock BT nodes may request movement. Stage B and PIE remain pending.

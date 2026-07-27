@@ -3,7 +3,6 @@
 #include "CoreMinimal.h"
 #include "AIController.h"
 #include "Perception/AIPerceptionTypes.h"
-#include "Engine/TimerHandle.h"
 #include "HSREnemyTypes.h"
 #include "HSREnemyAIController.generated.h"
 
@@ -36,7 +35,6 @@ public:
 protected:
 	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 
-	void StartPatrol();
 	UFUNCTION()
 	void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 	void HandleChaseTargetLost();
@@ -56,9 +54,6 @@ protected:
 	EHSREnemyExplorationState CurrentState;
 	int32 BehaviorTreeEpoch = 0;
 	FGuid ActiveEncounterRequestId;
-
-	FTimerHandle PatrolWaitTimerHandle;
-	FTimerHandle InitTimerHandle;
 
 	UPROPERTY()
 	TObjectPtr<UAISenseConfig_Sight> SightConfig;
