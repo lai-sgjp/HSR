@@ -170,3 +170,36 @@ This is a genuine allowlist stop condition. Revising the Automation requirement 
 ## Verdict
 
 `BLOCKED` — Status/Delay counter corrections remain accepted, but runtime Automation cannot safely proceed under the current allowlist. Coordinator must request user authorization for the single file `Source/HSR/Battle/HSRBattleGameMode.h`, limited to the exact `WITH_DEV_AUTOMATION_TESTS` factory contract above. After authorization, route to the original Implementation Agent, then rebuild/run Automation and return to independent review before the user PIE gate.
+
+---
+
+# TASK-P17-PATCH-01B GameInstance Lifecycle Reassessment
+
+Status: `REVISE`
+
+Role: `Independent Reviewer`
+Date: `2026-07-27`
+Evidence level: `UE5.6 ENGINE SOURCE + STATIC UNCOMMITTED-DIFF REVIEW`
+
+## Concrete lifecycle route
+
+The reported null `BattleWorld->GetGameInstance()` is caused by creating a standalone `UGameInstance` and an unrelated `UWorld::CreateWorld`. UE5.6 already provides the correct public lifecycle:
+
+1. Require `GEngine != nullptr`.
+2. Create and strongly retain `UGameInstance* GameInstance = NewObject<UGameInstance>(GEngine)`.
+3. Call `GameInstance->InitializeStandalone(UniqueWorldPackageName)`. Do **not** call `CreateNewWorldContext` or `UWorld::CreateWorld` separately.
+4. UE5.6 `InitializeStandalone` itself calls `GEngine->CreateNewWorldContext(EWorldType::Game)`, sets `WorldContext.OwningGameInstance`, creates the World, calls `World->SetGameInstance(GameInstance)`, installs it as the current context World, and finally calls `GameInstance->Init()`. Therefore `GetSubsystem<UHSRCharacterProfileSubsystem>()` is obtained through the real `UGameInstanceSubsystem` lifecycle rather than `NewObject` fabrication.
+5. Obtain `UWorld* BattleWorld = GameInstance->GetWorld()` and assert `BattleWorld`, `BattleWorld->GetGameInstance() == GameInstance`, and the profile subsystem are non-null before invoking the fixture factory.
+6. Preserve the World pointer before shutdown. On every exit path, first destroy/reset Coordinator-owned runtime while the subsystem collection is alive, then call `GameInstance->Shutdown()` to deinitialize subsystems, then `BattleWorld->DestroyWorld(false)`, then `GEngine->DestroyWorldContext(BattleWorld)`. Use scope-exit/RAII so assertion failures cannot leak a global WorldContext. Never call `Shutdown` twice.
+
+Required test-file includes are `Engine/Engine.h`, `Engine/GameInstance.h`, and `Misc/ScopeExit.h`; all changes remain within `Source/HSR/Tests/HSRCombatPatchTests.cpp`. Risks are global WorldContext leakage and subsystem delegates surviving a failed test; the mandatory cleanup ordering and scope guard address them. The test must run serially on the game thread, as existing Editor Automation does.
+
+## Factory ownership correction
+
+- The current uncommitted diff places `CreateRepeatableBreakAutomationFixture` on `UHSRBattleCoordinator` and adds unrestricted `friend class UHSRBattleCoordinator` to `AHSRBattleGameMode`. That is broader than the previously approved exact surface and gives the whole Coordinator class access to every protected GameMode member.
+- Keep the factory as the one `AHSRBattleGameMode` static method authorized in the prior review, implemented in `HSRBattleGameMode.cpp` under `#if WITH_DEV_AUTOMATION_TESTS`. A class member already has access to its own CDO configuration, so no friend declaration is required.
+- The factory may create a transient Coordinator with the supplied Outer, copy configuration through existing public Coordinator setters, register the configured catalog using the properly initialized GameInstance subsystem, submit the deterministic request, and call real `BuildParticipants`. It must not manually construct the subsystem or write Coordinator private state.
+
+## Verdict
+
+`REVISE` — A safe executable route exists with the currently authorized files; no additional allowlist expansion is needed. Route to Implementation with the exact `InitializeStandalone`/cleanup sequence above and remove the broad GameMode friend plus Coordinator-owned factory surface. After Build, run the Automation in isolation first to detect leaked WorldContexts or subsystem delegates, then run it with applicable regressions before independent review.
