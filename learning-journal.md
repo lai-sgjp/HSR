@@ -1,5 +1,13 @@
 ﻿# HSR Learning Journal
 
+## 2026-07-27｜行动距离、事务去重与 delegate 生命周期
+
+- 回合频率应由 battle-local `RemainingActionDistance` 推进，而不是初始化时固定速度排序；当前行动锁与未来排序必须分离。
+- 当前 actor 的 Advance/Delay 必须保存为按接受顺序的绝对距离操作，不能合并为一个 offset，否则逐步 clamp 会丢失顺序语义。
+- `OperationId` 的去重域要明确到 battle、跨 Kind/Target；合法 ID 首次观察即消费，replay 对目标双方与 manager 生命周期都必须零变化。
+- GAS Attribute delegate 的安全性不仅是解绑数量：Reset、reinitialize、Finish 后要真实广播旧 ASC，并比较完整 fresh/Finished 快照，才能证明 stale callback 零副作用。
+- Automation 的测试名和总 PASS 不能替代矩阵证据；每个冻结契约都应有真实触发路径、精确数值和生命周期计数。
+
 ## 2026-07-24｜Phase 10 closeout learning boundary
 
 - A static review, a Development harness, User-provided PIE, and `USER ACCEPTED` are distinct evidence labels. User acceptance can close a planning gate without becoming a fabricated dynamic test or Independent Reviewer PASS.

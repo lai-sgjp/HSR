@@ -7,6 +7,8 @@
 > 当前进度：PATCH-01A 已归档并由 Independent Reviewer 最终判定 `PASS`；PATCH-01B 活动卡已创建，等待 Implementation 只读复述与用户单独确认。
 
 > 进度更新：PATCH-01B 已归档并由 Independent Reviewer 最终判定 `PASS`；PATCH-01C 完整行动距离模型活动卡已创建，等待 Task Gate 审查。
+>
+> 进度更新：PATCH-01C 已归档并由 Independent Reviewer 最终判定 `PASS`（`28d3213`）；PATCH-01D 最终回归与归档活动卡已创建，等待 Task Gate 审查。
 
 ## 1. 当前事实与 Gate
 

@@ -7,8 +7,9 @@
 - Phase 17 P17-001～004 已完成；在 P17-005 前执行独立 Patch 01。
 - `TASK-P17-PATCH-01A` ActiveStatus 通用化最终 Reviewer=`PASS`（`8cc09ed`）：Build、`HSR.Battle.Patch.StatusGeneric` 与用户 P9-001/002/003 PIE 全部通过。
 - `TASK-P17-PATCH-01B` 可重复 Break 最终 Reviewer=`PASS`（`4a074c5`）：Build、RepeatableBreak Automation、Patch 2/2 与用户 P9-003 19-case PIE 全部通过。
+- `TASK-P17-PATCH-01C` 完整行动距离模型最终 Reviewer=`PASS`（`28d3213`）：最终 Development Editor Build、`Automation RunTests HSR.Battle` 9 项与 `git diff --check` 均由 Reviewer 独立复跑通过；CurrentPending、同步 Speed recharge、A/B/C 频率、全局 OperationId、delegate rollback/stale callback 与 Break `+Base` 均有 runtime 证据。
 - PATCH-01A Implementation commits：`e93b04c`、`955d5d3`、`d1f8eb0`、`06f84db`；REVISE/BLOCKED 与首错历史保存在三件套归档。
-- 当前唯一活动任务为 `TASK-P17-PATCH-01C`，规划完整行动距离模型；状态=`PLANNED / TASK GATE REVIEW REQUIRED`，尚未获得该任务的用户实现确认。
+- `TASK-P17-PATCH-01C` 三件套已归档；当前唯一活动任务为 `TASK-P17-PATCH-01D`，只做 Patch 01 最终回归、证据汇总与归档，不新增 Gameplay，等待 Task Gate 审查。
 - `learn/SaveSystem.md` 与 `.claude/**` 的未提交变化不属于 PATCH-01A Coordinator 产物，保持不触碰。
 
 ## 历史 Phase 15 状态

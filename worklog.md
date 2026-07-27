@@ -1,5 +1,13 @@
 ﻿# HSR Worklog
 
+## 2026-07-27｜TASK-P17-PATCH-01C complete action-distance model archived
+
+- Implementation chain culminated in `adb11d2`; Independent Reviewer final conclusion is `PASS` in `28d3213` after preserving all intermediate `REVISE` history.
+- Reviewer independently reran `HSREditor Win64 Development` and `Automation RunTests HSR.Battle`: Build exited 0 and all 9 Battle tests succeeded, including six ActionDistance matrices, RepeatableBreak, StatusGeneric and MapContract.
+- Runtime evidence closes accepted-distance freezing (`55`), ordered pending clamp (`0/30`), synchronous TurnEnded Speed recharge, A/B/C frequency (`5/11/2` over 18 resolves), lexical tie, cross-target/kind OperationId dedupe, numeric rejection, bind rollback, Reset/reinitialize/Finish stale ASC broadcasts and Break `+Base` exactly-once.
+- PIE was not run and is not claimed. The task used controlled runtime Automation because no authorized production Speed/Advance/Delay asset entry exists.
+- The three task files are archived as `TASK-P17-PATCH-01C-*`; user-local `learn/SaveSystem.md` and `.claude/**` remain outside all role commits.
+
 ## 2026-07-24｜P10-005 closeout archived
 
 - P10-004 latest USER PROVIDED log closes the base-PlayerController integration across three result/return rounds; Reviewer conclusion is `PASS WITH FOLLOW-UP`.
