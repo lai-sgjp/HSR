@@ -254,3 +254,17 @@ User-provided PIE attachment verifies the following observed main path only:
 - `OnUnPossess` performs clean teardown, with no duplicate or stale-callback log observed in this run.
 
 This is user-provided runtime evidence. It does not claim unobserved full-return completion, move-failure handling, target-destruction handling, or duplicate-overlap coverage. User-owned map, enemy DataAsset, and `Content/AI/**` assets remain isolated and unchanged.
+
+### Stage-B reviewer revision — teardown Blackboard ownership and stale runtime isolation
+
+`StopBehaviorTreeRuntime` now stops Brain logic, clears the six runtime Blackboard keys, detaches `RuntimeBlackboard`, invalidates the active request, and advances the runtime epoch only when it owned active runtime state. The detach happens before callers continue into `ClearState`, `OnUnPossess`, or `EndPlay`, so those cleanup paths cannot repopulate the cleared Blackboard. Repeated Stop is epoch-idempotent after teardown.
+
+`HSR.Exploration.Patch.BehaviorTreeAdapter` uses an AI World-backed Blackboard fixture and deterministically verifies: all six runtime keys clear on Stop; Stop then ClearState cannot write them back; a second Stop preserves both clear state and epoch; a fresh runtime bind receives a new epoch; and an old retry callback cannot consume or write into that fresh runtime. The test also exercises the same Stop then ClearState ordering used by EndPlay.
+
+Validation:
+
+- `HSREditor Win64 Development`: `PASS`, 7 actions, exit `0` (only engine AISystem C4996 warning).
+- `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
+- `HSR.BattleReturn.MapContract`: `PASS`, exit `0`.
+
+This revision does not claim new live-PIE coverage for same-frame duplicate overlap response payload/reason preservation, post-resolved rejection, stock MoveTo return completion, move failure/abort, or target destruction. Those require a fully wired encounter/BT PIE fixture and remain explicitly unobserved here. No Encounter DTO or user-owned map, DataAsset, or `Content/AI/**` asset changed.

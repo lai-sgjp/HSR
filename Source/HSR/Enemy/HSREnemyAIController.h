@@ -41,6 +41,11 @@ public:
 	void ApplySuccessfulPerceptionForAutomation(AActor* Target);
 	bool HasActiveEncounterRequestForAutomation() const { return ActiveEncounterRequestId.IsValid(); }
 	int32 GetEncounterSubmissionAttemptsForAutomation() const { return EncounterSubmissionAttemptsForAutomation; }
+	void BindRuntimeBlackboardForAutomation(UBlackboardComponent* InBlackboard);
+	void StopBehaviorTreeRuntimeForAutomation();
+	void ClearStateForAutomation();
+	bool HasRuntimeBlackboardForAutomation() const { return RuntimeBlackboard != nullptr; }
+	bool AreBlackboardRuntimeKeysClearForAutomation(const UBlackboardComponent* InBlackboard) const;
 #endif
 
 protected:
@@ -78,6 +83,7 @@ protected:
 
 #if WITH_DEV_AUTOMATION_TESTS
 	int32 EncounterSubmissionAttemptsForAutomation = 0;
+	uint8 BlackboardRuntimeKeyWriteMaskForAutomation = 0;
 #endif
 
 	UPROPERTY()

@@ -339,19 +339,26 @@ bool AHSREnemyAIController::StartBehaviorTreeRuntime()
 
 void AHSREnemyAIController::StopBehaviorTreeRuntime()
 {
+	const bool bHadRuntimeOwnership = RuntimeBlackboard != nullptr || bNavReadyRetryScheduled || ActiveEncounterRequestId.IsValid();
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(NavReadyRetryTimerHandle);
 	}
 	bNavReadyRetryScheduled = false;
 	NavReadyRetryEpoch = INDEX_NONE;
-	ClearBlackboardRuntimeState();
 	if (BrainComponent)
 	{
 		BrainComponent->StopLogic(TEXT("P17-PATCH-02 lifecycle teardown"));
 	}
+	ClearBlackboardRuntimeState();
+	// ClearState/UnPossess/EndPlay follow this call. Detach before returning so
+	// none of their cleanup writes can repopulate the just-cleared Blackboard.
+	RuntimeBlackboard = nullptr;
 	ActiveEncounterRequestId.Invalidate();
-	++BehaviorTreeEpoch;
+	if (bHadRuntimeOwnership)
+	{
+		++BehaviorTreeEpoch;
+	}
 }
 
 void AHSREnemyAIController::WriteBlackboardRuntimeState()
@@ -365,6 +372,9 @@ void AHSREnemyAIController::WriteBlackboardRuntimeState()
 	RuntimeBlackboard->SetValueAsInt(HSREnemyBlackboardKeys::TreeEpoch, BehaviorTreeEpoch);
 	RuntimeBlackboard->SetValueAsName(HSREnemyBlackboardKeys::EncounterRequestId, ActiveEncounterRequestId.IsValid() ? FName(*ActiveEncounterRequestId.ToString()) : NAME_None);
 	SetBlackboardTarget(CurrentTarget.Get());
+#if WITH_DEV_AUTOMATION_TESTS
+	BlackboardRuntimeKeyWriteMaskForAutomation = 0x3f;
+#endif
 }
 
 void AHSREnemyAIController::PublishNextPatrolIntent(const FVector& InSpawnOrigin, float PatrolRadius)
@@ -468,6 +478,9 @@ void AHSREnemyAIController::ClearBlackboardRuntimeState()
 	RuntimeBlackboard->ClearValue(HSREnemyBlackboardKeys::TreeEpoch);
 	RuntimeBlackboard->ClearValue(HSREnemyBlackboardKeys::AIState);
 	RuntimeBlackboard->ClearValue(HSREnemyBlackboardKeys::SpawnOrigin);
+#if WITH_DEV_AUTOMATION_TESTS
+	BlackboardRuntimeKeyWriteMaskForAutomation = 0;
+#endif
 }
 
 void AHSREnemyAIController::SetBlackboardTarget(AActor* Target)
@@ -522,5 +535,26 @@ bool AHSREnemyAIController::ConsumeNavReadyRetryForAutomation(int32 InEpoch)
 void AHSREnemyAIController::ApplySuccessfulPerceptionForAutomation(AActor* Target)
 {
 	BeginChasingTarget(Target);
+}
+
+void AHSREnemyAIController::BindRuntimeBlackboardForAutomation(UBlackboardComponent* InBlackboard)
+{
+	RuntimeBlackboard = InBlackboard;
+	++BehaviorTreeEpoch;
+}
+
+void AHSREnemyAIController::StopBehaviorTreeRuntimeForAutomation()
+{
+	StopBehaviorTreeRuntime();
+}
+
+void AHSREnemyAIController::ClearStateForAutomation()
+{
+	ClearState();
+}
+
+bool AHSREnemyAIController::AreBlackboardRuntimeKeysClearForAutomation(const UBlackboardComponent* InBlackboard) const
+{
+	return InBlackboard && BlackboardRuntimeKeyWriteMaskForAutomation == 0;
 }
 #endif

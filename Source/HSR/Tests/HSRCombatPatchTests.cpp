@@ -9,6 +9,13 @@
 #include "Engine/GameInstance.h"
 #include "GameFramework/Actor.h"
 #include "Misc/ScopeExit.h"
+#include "BehaviorTree/BlackboardComponent.h"
+#include "BehaviorTree/BlackboardData.h"
+#include "BehaviorTree/Blackboard/BlackboardKeyType_Object.h"
+#include "BehaviorTree/Blackboard/BlackboardKeyType_Vector.h"
+#include "BehaviorTree/Blackboard/BlackboardKeyType_Name.h"
+#include "BehaviorTree/Blackboard/BlackboardKeyType_Int.h"
+#include "BehaviorTree/Blackboard/BlackboardKeyType_Enum.h"
 #include "../Battle/HSRBattleCoordinator.h"
 #include "../Battle/HSRBattleGameMode.h"
 #include "../Battle/HSRBattleParticipant.h"
@@ -134,6 +141,10 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Nav-ready retry cannot repeat after consumption"), Controller->ConsumeNavReadyRetryForAutomation(7));
 	UWorld* OriginWorld = UWorld::CreateWorld(EWorldType::GamePreview, false);
 	ON_SCOPE_EXIT { if (OriginWorld) OriginWorld->DestroyWorld(false); };
+	if (OriginWorld)
+	{
+		OriginWorld->CreateAISystem();
+	}
 	AActor* PerceivedTarget = OriginWorld ? OriginWorld->SpawnActor<AActor>() : nullptr;
 	if (!TestNotNull(TEXT("Perception fixture spawns target"), PerceivedTarget))
 	{
@@ -145,6 +156,49 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Perception does not submit an encounter request"), Controller->GetEncounterSubmissionAttemptsForAutomation(), 0);
 	Controller->TryRequestEncounterFromCharacter();
 	TestEqual(TEXT("Explicit Character-overlap transaction entry performs one submission attempt"), Controller->GetEncounterSubmissionAttemptsForAutomation(), 1);
+	UBlackboardData* BlackboardData = NewObject<UBlackboardData>(Controller);
+	const auto AddBlackboardKey = [BlackboardData](FName Name, UBlackboardKeyType* KeyType)
+	{
+		FBlackboardEntry& Entry = BlackboardData->Keys.AddDefaulted_GetRef();
+		Entry.EntryName = Name;
+		Entry.KeyType = KeyType;
+	};
+	AddBlackboardKey(TEXT("TargetActor"), NewObject<UBlackboardKeyType_Object>(BlackboardData));
+	AddBlackboardKey(TEXT("SpawnOrigin"), NewObject<UBlackboardKeyType_Vector>(BlackboardData));
+	AddBlackboardKey(TEXT("PatrolLocation"), NewObject<UBlackboardKeyType_Vector>(BlackboardData));
+	AddBlackboardKey(TEXT("AIState"), NewObject<UBlackboardKeyType_Enum>(BlackboardData));
+	AddBlackboardKey(TEXT("TreeEpoch"), NewObject<UBlackboardKeyType_Int>(BlackboardData));
+	AddBlackboardKey(TEXT("EncounterRequestId"), NewObject<UBlackboardKeyType_Name>(BlackboardData));
+	UBlackboardComponent* TeardownBlackboard = NewObject<UBlackboardComponent>(OriginWorld);
+	if (!TestNotNull(TEXT("Teardown fixture creates Blackboard data"), BlackboardData)
+		|| !TestNotNull(TEXT("Teardown fixture creates Blackboard component"), TeardownBlackboard)
+		|| !TestTrue(TEXT("Teardown fixture initializes Blackboard"), TeardownBlackboard->InitializeBlackboard(*BlackboardData)))
+	{
+		return false;
+	}
+	Controller->BindRuntimeBlackboardForAutomation(TeardownBlackboard);
+	const int32 OldRuntimeEpoch = Controller->GetBehaviorTreeEpoch();
+	Controller->PublishPatrolIntentForAutomation(TeardownBlackboard, ExpectedSpawnOrigin, CandidatePatrolLocation, EHSRPatrolIntentResult::Reachable);
+	TestFalse(TEXT("Runtime fixture has writes before Stop"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
+	Controller->StopBehaviorTreeRuntimeForAutomation();
+	const int32 StoppedEpoch = Controller->GetBehaviorTreeEpoch();
+	TestTrue(TEXT("Stop clears all six runtime Blackboard keys"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
+	TestFalse(TEXT("Stop detaches RuntimeBlackboard before caller cleanup"), Controller->HasRuntimeBlackboardForAutomation());
+	TestEqual(TEXT("Stop invalidates the active runtime epoch once"), StoppedEpoch, OldRuntimeEpoch + 1);
+	Controller->ClearStateForAutomation();
+	TestTrue(TEXT("Stop then ClearState cannot repopulate cleared Blackboard keys"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
+	Controller->StopBehaviorTreeRuntimeForAutomation();
+	TestEqual(TEXT("Repeated Stop is epoch-idempotent after teardown"), Controller->GetBehaviorTreeEpoch(), StoppedEpoch);
+	TestTrue(TEXT("Repeated Stop preserves six cleared Blackboard keys"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
+	Controller->BindRuntimeBlackboardForAutomation(TeardownBlackboard);
+	const int32 RepossessEpoch = Controller->GetBehaviorTreeEpoch();
+	TestTrue(TEXT("Fresh runtime bind receives a new epoch"), RepossessEpoch > StoppedEpoch);
+	TestTrue(TEXT("Fresh runtime Blackboard begins clear"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
+	TestFalse(TEXT("Old retry callback cannot consume after Stop and rebind"), Controller->ConsumeNavReadyRetryForAutomation(OldRuntimeEpoch));
+	TestTrue(TEXT("Old retry callback leaves fresh runtime Blackboard clear"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
+	Controller->StopBehaviorTreeRuntimeForAutomation();
+	Controller->ClearStateForAutomation();
+	TestTrue(TEXT("EndPlay ordering Stop then ClearState remains idempotently clear"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
 	AHSREnemyCharacter* OriginEnemy = OriginWorld ? OriginWorld->SpawnActor<AHSREnemyCharacter>() : nullptr;
 	if (!TestNotNull(TEXT("Origin fallback fixture spawns Enemy"), OriginEnemy))
 	{
