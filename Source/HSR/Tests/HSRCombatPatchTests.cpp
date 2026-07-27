@@ -21,12 +21,14 @@
 #include "../Battle/HSRBattleGameMode.h"
 #include "../Battle/HSRBattleParticipant.h"
 #include "../Battle/HSRTurnManager.h"
+#include "../Battle/HSRBattleTransitionSubsystem.h"
 #include "../Data/HSRSkillDefinition.h"
 #include "../Data/Definitions/HSRStatusDefinition.h"
 #include "../GAS/HSRAbilitySystemComponent.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "../Status/HSRStatusComponent.h"
 #include "../Data/Definitions/HSREnemyDefinition.h"
+#include "../Data/Definitions/HSREncounterDefinition.h"
 #include "../Enemy/HSREnemyAIController.h"
 #include "../Enemy/HSREnemyCharacter.h"
 #include <limits>
@@ -117,6 +119,28 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Recovery state is distinct from LostTarget and MoveFailed"), EHSREnemyExplorationState::ReturningToSpawnOrigin != EHSREnemyExplorationState::LostTarget && EHSREnemyExplorationState::ReturningToSpawnOrigin != EHSREnemyExplorationState::MoveFailed);
 	AHSREnemyAIController* Controller = NewObject<AHSREnemyAIController>();
 	TestFalse(TEXT("Behavior Tree adapter does not enable Actor Tick"), Controller->PrimaryActorTick.bCanEverTick);
+	UGameInstance* TransitionOwner = NewObject<UGameInstance>(GEngine);
+	UHSRBattleTransitionSubsystem* Transition = NewObject<UHSRBattleTransitionSubsystem>(TransitionOwner);
+	UHSREncounterDefinition* EncounterDefinition = NewObject<UHSREncounterDefinition>();
+	EncounterDefinition->EncounterId = TEXT("Encounter.Automation");
+	EncounterDefinition->EnemyDefinitionId = TEXT("Enemy.Automation");
+	EncounterDefinition->BattleMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Maps/Map_Battle")));
+	FHSREncounterRequest SeedRequest;
+	SeedRequest.RequestId = FGuid(11, 22, 33, 44);
+	SeedRequest.EncounterId = EncounterDefinition->EncounterId;
+	SeedRequest.EnemyDefinitionId = EncounterDefinition->EnemyDefinitionId;
+	Transition->SeedPendingEncounterForAutomation(SeedRequest);
+	const FHSRTransitionAutomationSnapshot PendingBefore = Transition->GetAutomationSnapshot(EncounterDefinition->EncounterId);
+	const FHSREncounterResult PendingDuplicate = Transition->RequestEncounter(EncounterDefinition, EHSREncounterInitiative::Enemy);
+	const FHSRTransitionAutomationSnapshot PendingAfter = Transition->GetAutomationSnapshot(EncounterDefinition->EncounterId);
+	TestEqual(TEXT("Same-frame duplicate encounter returns AlreadyPending"), PendingDuplicate.ResultType, EHSREncounterResultType::AlreadyPending);
+	TestTrue(TEXT("Same-frame duplicate encounter has zero snapshot mutation"), PendingBefore.State == PendingAfter.State && PendingBefore.PendingRequest.RequestId == PendingAfter.PendingRequest.RequestId && PendingBefore.TravelKind == PendingAfter.TravelKind && PendingBefore.TravelRequestId == PendingAfter.TravelRequestId && PendingBefore.bResolvedMembership == PendingAfter.bResolvedMembership && PendingBefore.AdmissionMutationCount == PendingAfter.AdmissionMutationCount);
+	Transition->SeedResolvedEncounterForAutomation(EncounterDefinition->EncounterId);
+	const FHSRTransitionAutomationSnapshot ResolvedBefore = Transition->GetAutomationSnapshot(EncounterDefinition->EncounterId);
+	const FHSREncounterResult ResolvedReplay = Transition->RequestEncounter(EncounterDefinition, EHSREncounterInitiative::Enemy);
+	const FHSRTransitionAutomationSnapshot ResolvedAfter = Transition->GetAutomationSnapshot(EncounterDefinition->EncounterId);
+	TestEqual(TEXT("Resolved encounter replay returns AlreadyConsumed"), ResolvedReplay.ResultType, EHSREncounterResultType::AlreadyConsumed);
+	TestTrue(TEXT("Resolved encounter replay has zero snapshot mutation"), ResolvedBefore.State == ResolvedAfter.State && ResolvedBefore.PendingRequest.RequestId == ResolvedAfter.PendingRequest.RequestId && ResolvedBefore.TravelKind == ResolvedAfter.TravelKind && ResolvedBefore.TravelRequestId == ResolvedAfter.TravelRequestId && ResolvedBefore.bResolvedMembership == ResolvedAfter.bResolvedMembership && ResolvedBefore.AdmissionMutationCount == ResolvedAfter.AdmissionMutationCount);
 	TestEqual(TEXT("Fresh controller begins at epoch zero before Possess"), Controller->GetBehaviorTreeEpoch(), 0);
 	const FVector ExpectedSpawnOrigin(137.0f, -29.0f, 11.0f);
 	const FVector CandidatePatrolLocation(291.0f, -83.0f, 11.0f);

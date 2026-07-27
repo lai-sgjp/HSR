@@ -240,6 +240,14 @@ Validation:
 - `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
 - `HSR.BattleReturn.MapContract`: `PASS`, exit `0`.
 
+### Stage-B transition admission fixture — deterministic duplicate and resolved rejection
+
+`UHSRBattleTransitionSubsystem` now exposes `WITH_DEV_AUTOMATION_TESTS`-only fixture methods and `FHSRTransitionAutomationSnapshot`; production `RequestEncounter` signature and rejection behavior remain unchanged. The snapshot includes encounter state, full pending request, travel kind/request id, resolved-membership, and an admission-mutation counter.
+
+Adapter automation seeds a pending request and calls production `RequestEncounter`, asserting `AlreadyPending` and full snapshot zero mutation. It separately seeds a resolved encounter and asserts production `AlreadyConsumed` with the same zero-mutation guarantee. The fixture owner is a valid `UGameInstance`, avoiding the prior invalid-outer ensure.
+
+Validation: Development Build `PASS`; `HSR.Exploration.Patch.BehaviorTreeAdapter` `PASS`; `HSR.BattleReturn.MapContract` `PASS` (all exit `0`). User-owned assets remain untouched.
+
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
 
 ### Stage-B main-path PIE evidence — USER PROVIDED

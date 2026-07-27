@@ -159,6 +159,9 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 
 	PendingRequest = NewRequest;
 	CurrentState = EHSREncounterState::Pending;
+#if WITH_DEV_AUTOMATION_TESTS
+	++AdmissionMutationCountForAutomation;
+#endif
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - RequestId=%s EncounterId=%s EnemyDefId=%s ExplorationMap=%s"),
 		*NewRequestId.ToString(), *Definition->EncounterId.ToString(), *Definition->EnemyDefinitionId.ToString(),
@@ -196,6 +199,49 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 
 	return FHSREncounterResult::MakeSuccess(NewRequestId);
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+FHSRTransitionAutomationSnapshot UHSRBattleTransitionSubsystem::GetAutomationSnapshot(FName EncounterId) const
+{
+	FHSRTransitionAutomationSnapshot Snapshot;
+	Snapshot.State = CurrentState;
+	Snapshot.PendingRequest = PendingRequest;
+	Snapshot.TravelKind = TravelKind;
+	Snapshot.TravelRequestId = TravelRequestId;
+	Snapshot.bResolvedMembership = ResolvedEncounterIds.Contains(EncounterId);
+	Snapshot.AdmissionMutationCount = AdmissionMutationCountForAutomation;
+	return Snapshot;
+}
+
+void UHSRBattleTransitionSubsystem::SeedPendingEncounterForAutomation(const FHSREncounterRequest& InRequest)
+{
+	ResetEncounterAutomationFixture();
+	PendingRequest = InRequest;
+	CurrentState = EHSREncounterState::Pending;
+	TravelKind = EHSRTravelKind::Encounter;
+	TravelRequestId = InRequest.RequestId;
+}
+
+void UHSRBattleTransitionSubsystem::SeedResolvedEncounterForAutomation(FName EncounterId)
+{
+	ResetEncounterAutomationFixture();
+	ResolvedEncounterIds.Add(EncounterId);
+}
+
+void UHSRBattleTransitionSubsystem::ResetEncounterAutomationFixture()
+{
+	ClearTravelTimeout();
+	CurrentState = EHSREncounterState::Empty;
+	PendingRequest = FHSREncounterRequest();
+	TravelKind = EHSRTravelKind::None;
+	TravelRequestId.Invalidate();
+	TravelTargetMap = NAME_None;
+	TravelSourceMap = NAME_None;
+	TravelCompletedEncounterId = NAME_None;
+	ResolvedEncounterIds.Reset();
+	AdmissionMutationCountForAutomation = 0;
+}
+#endif
 
 FHSREncounterResult UHSRBattleTransitionSubsystem::ConsumePendingEncounter()
 {

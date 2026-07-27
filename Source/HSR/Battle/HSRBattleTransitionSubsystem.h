@@ -19,6 +19,18 @@ enum class EHSRTravelKind : uint8
 	Return
 };
 
+#if WITH_DEV_AUTOMATION_TESTS
+struct FHSRTransitionAutomationSnapshot
+{
+	EHSREncounterState State = EHSREncounterState::Empty;
+	FHSREncounterRequest PendingRequest;
+	EHSRTravelKind TravelKind = EHSRTravelKind::None;
+	FGuid TravelRequestId;
+	bool bResolvedMembership = false;
+	int32 AdmissionMutationCount = 0;
+};
+#endif
+
 UCLASS()
 class HSR_API UHSRBattleTransitionSubsystem : public UGameInstanceSubsystem
 {
@@ -63,6 +75,13 @@ public:
 	bool HasReturnPending() const { return bReturnPending; }
 
 	void HandleTravelFailure(UWorld* InWorld, ETravelFailure::Type FailureType, const FString& ErrorString);
+
+#if WITH_DEV_AUTOMATION_TESTS
+	FHSRTransitionAutomationSnapshot GetAutomationSnapshot(FName EncounterId) const;
+	void SeedPendingEncounterForAutomation(const FHSREncounterRequest& InRequest);
+	void SeedResolvedEncounterForAutomation(FName EncounterId);
+	void ResetEncounterAutomationFixture();
+#endif
 	static bool DoesTravelFailureMatch(const FString& FailureWorldPackage, const FString& SourcePackage, const FString& TargetPackage);
 
 private:
@@ -81,4 +100,7 @@ private:
 	FName TravelCompletedEncounterId;
 	FTSTicker::FDelegateHandle TravelTimeoutHandle;
 	TSet<FName> ResolvedEncounterIds;
+#if WITH_DEV_AUTOMATION_TESTS
+	int32 AdmissionMutationCountForAutomation = 0;
+#endif
 };
