@@ -19,7 +19,14 @@ The requested `HSR.Battle.Patch.StatusGeneric` test requires distinct legal tran
 - Initial build attempt through `msbuild` failed because it was not on PATH (`CommandNotFoundException`); this remains the first failed command, not a source failure.
 - UE 5.6 Build.bat: `E:\programs\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat HSREditor Win64 Development E:\work\unreal_projects\HSR\HSR.uproject -NoHotReload -WaitMutex` succeeded. UHT generated 6 files; compile/link/metadata all completed; exit code 0. The only warning was the installed VS 2022 compiler not being UE's preferred version.
 - `HSR.Battle.Patch.StatusGeneric`: passed through `UnrealEditor-Cmd -nullrhi`; log reports one matching test, `Result={Success}`, and exit code 0.
+- After the P9 harness-only update, the same UE Build.bat command succeeded again (6 actions, including `HSRBattleGameMode.cpp`); `StatusGeneric` was rerun and again reported `Result={Success}` with automation exit code 0.
 - Existing P9 status regression: `NOT EXECUTED`. Its status stack/explicit-replace/old-remove-failure coverage is embedded in the Battle GameMode development/PIE harness, not a standalone Automation test. It remains a user Editor/PIE gate; no claim of P9 runtime pass is made.
+
+## P9 OldRemoveFailure contract resolution
+
+- The former P9 harness expected a dual-handle recovery state after old-handle removal failed. That state conflicts with PATCH-01A's single-map/no-secondary-handle contract.
+- With explicit authorization limited to the harness, the assertion now verifies atomic compensation instead: replacement returns `RemoveFailed`, the newly applied GE is rolled back, the old instance/handle/stack/attribute/tag and apply/remove counts remain unchanged, and a later `ClearStatus` removes the retained old handle normally.
+- This changes no Battle/GameMode production path. The P9 harness still requires the user Editor/PIE gate and is not claimed as automated evidence.
 
 ## Scope audit
 

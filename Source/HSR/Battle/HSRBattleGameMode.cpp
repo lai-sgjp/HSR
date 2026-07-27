@@ -1040,23 +1040,23 @@ namespace HSRBattleDevelopmentTest
 		const int32 RemoveBeforeOldFail = AfterFail.RemoveCount;
 		Component->SetForceOldRemoveFailureForDevelopmentTest(true);
 		const EHSRStatusOperationResult RemoveFail = Component->ReplaceStatus(RefreshDefinition, Target.ParticipantId, Target.ParticipantId);
-		const FHSRStatusRuntimeSnapshot Dual = Component->GetSnapshot();
+		const FHSRStatusRuntimeSnapshot RolledBack = Component->GetSnapshot();
 		Component->SetForceOldRemoveFailureForDevelopmentTest(false);
-		const FActiveGameplayEffectHandle DualPrimary = Component->GetPrimaryHandleForDevelopmentTest();
-		const FActiveGameplayEffectHandle DualSecondary = Component->GetSecondaryHandleForDevelopmentTest();
-		const float DualAttack = ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetAttackAttribute());
-		const bool bDualOwned = RemoveFail == EHSRStatusOperationResult::RemoveFailed && Dual.bHandleValid && Dual.bSecondaryHandleValid
-			&& Dual.ActiveHandleIdentity != Dual.SecondaryHandleIdentity && ASC->GetActiveGameplayEffect(DualPrimary) && ASC->GetActiveGameplayEffect(DualSecondary)
-			&& Dual.Stacks == 1 && Dual.GameplayEffectStackCount == 1 && Dual.ApplyCount == ApplyBeforeOldFail + 1
-			&& Dual.RemoveCount == RemoveBeforeOldFail && FMath::IsNearlyEqual(DualAttack, Baseline + 20.0f) && HasTag();
-		const EHSRStatusOperationResult DualClearResult = Component->ClearStatus();
-		const FHSRStatusRuntimeSnapshot DualCleared = Component->GetSnapshot();
-		const bool bDualCleared = DualClearResult == EHSRStatusOperationResult::Success && !ASC->GetActiveGameplayEffect(DualPrimary)
-			&& !ASC->GetActiveGameplayEffect(DualSecondary) && DualCleared.InstanceCount == 0 && !DualCleared.bHandleValid && !DualCleared.bSecondaryHandleValid
-			&& DualCleared.RemoveCount == RemoveBeforeOldFail + 2
+		const FActiveGameplayEffectHandle RolledBackHandle = Component->GetPrimaryHandleForDevelopmentTest();
+		const float RolledBackAttack = ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetAttackAttribute());
+		const bool bAtomicRollback = RemoveFail == EHSRStatusOperationResult::RemoveFailed && RolledBack.bHandleValid && !RolledBack.bSecondaryHandleValid
+			&& RolledBack.ActiveHandleIdentity == AfterFail.ActiveHandleIdentity && ASC->GetActiveGameplayEffect(RolledBackHandle)
+			&& RolledBack.Stacks == AfterFail.Stacks && RolledBack.GameplayEffectStackCount == AfterFail.GameplayEffectStackCount
+			&& RolledBack.ApplyCount == ApplyBeforeOldFail && RolledBack.RemoveCount == RemoveBeforeOldFail
+			&& FMath::IsNearlyEqual(RolledBackAttack, AttackBeforeFail) && HasTag() == bTagBeforeFail;
+		const EHSRStatusOperationResult RollbackClearResult = Component->ClearStatus();
+		const FHSRStatusRuntimeSnapshot RollbackCleared = Component->GetSnapshot();
+		const bool bRollbackCleared = RollbackClearResult == EHSRStatusOperationResult::Success && !ASC->GetActiveGameplayEffect(RolledBackHandle)
+			&& RollbackCleared.InstanceCount == 0 && !RollbackCleared.bHandleValid && !RollbackCleared.bSecondaryHandleValid
+			&& RollbackCleared.RemoveCount == RemoveBeforeOldFail + 1
 			&& FMath::IsNearlyEqual(ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetAttackAttribute()), Baseline) && !HasTag();
-		const bool bOldFail = bDualOwned && bDualCleared;
-		LogStackCase(TEXT("OldRemoveFailure"), bOldFail, FString::Printf(TEXT("Old=%s New=%s DualAttack=%.2f ClearResult=%d RemoveCount=%d"), *Dual.ActiveHandleIdentity, *Dual.SecondaryHandleIdentity, DualAttack, static_cast<int32>(DualClearResult), DualCleared.RemoveCount));
+		const bool bOldFail = bAtomicRollback && bRollbackCleared;
+		LogStackCase(TEXT("OldRemoveFailure"), bOldFail, FString::Printf(TEXT("Old=%s RollbackAttack=%.2f ClearResult=%d RemoveCount=%d"), *RolledBack.ActiveHandleIdentity, RolledBackAttack, static_cast<int32>(RollbackClearResult), RollbackCleared.RemoveCount));
 
 		const FGuid AddId = FGuid::NewGuid();
 		const EHSRStatusOperationResult FirstId = Component->AddOrRefreshStatus(StackDefinition, Target.ParticipantId, Target.ParticipantId, AddId);
