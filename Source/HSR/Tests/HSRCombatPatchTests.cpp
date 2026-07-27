@@ -5,15 +5,178 @@
 #include "GameplayEffect.h"
 #include "GameplayTagContainer.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
 #include "GameFramework/Actor.h"
+#include "Misc/ScopeExit.h"
+#include "../Battle/HSRBattleCoordinator.h"
+#include "../Battle/HSRBattleGameMode.h"
 #include "../Battle/HSRBattleParticipant.h"
 #include "../Battle/HSRTurnManager.h"
+#include "../Data/HSRSkillDefinition.h"
 #include "../Data/Definitions/HSRStatusDefinition.h"
 #include "../GAS/HSRAbilitySystemComponent.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "../Status/HSRStatusComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRStatusGenericPatchTest, "HSR.Battle.Patch.StatusGeneric", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRRepeatableBreakPatchTest, "HSR.Battle.Patch.RepeatableBreak", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSRRepeatableBreakPatchTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Engine is available"), GEngine)) return false;
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GEngine);
+	if (!TestNotNull(TEXT("Standalone GameInstance is created"), GameInstance)) return false;
+	GameInstance->AddToRoot();
+	UWorld* BattleWorld = nullptr;
+	UHSRBattleCoordinator* Coordinator = nullptr;
+	ON_SCOPE_EXIT
+	{
+		if (Coordinator) Coordinator->Reset();
+		if (GameInstance)
+		{
+			GameInstance->Shutdown();
+			if (BattleWorld)
+			{
+				BattleWorld->DestroyWorld(false);
+				GEngine->DestroyWorldContext(BattleWorld);
+			}
+			GameInstance->RemoveFromRoot();
+		}
+	};
+	GameInstance->InitializeStandalone(FName(*FString::Printf(TEXT("HSRRepeatableBreak_%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits))));
+	BattleWorld = GameInstance->GetWorld();
+	if (!TestNotNull(TEXT("InitializeStandalone creates a World"), BattleWorld)
+		|| !TestEqual(TEXT("World owns the standalone GameInstance"), BattleWorld->GetGameInstance(), GameInstance)) return false;
+
+	TSubclassOf<AHSRBattleGameMode> GameModeClass = LoadClass<AHSRBattleGameMode>(nullptr, TEXT("/Game/Blueprints/Framework/BP_HSRBattleGameMode.BP_HSRBattleGameMode_C"));
+	if (!TestNotNull(TEXT("Configured battle GameMode loads"), GameModeClass.Get())) return false;
+	FText Failure;
+	Coordinator = AHSRBattleGameMode::CreateRepeatableBreakAutomationFixture(GameInstance, BattleWorld, GameModeClass, Failure);
+	if (!TestNotNull(*FString::Printf(TEXT("Production fixture builds: %s"), *Failure.ToString()), Coordinator)) return false;
+
+	const auto Prepare = [this, Coordinator](float Toughness, bool bWeakness, float Health = 1000.0f)
+	{
+		if (Coordinator->GetParticipants().Num() != 2 || !Coordinator->GetBasicAttackDefinition()) return false;
+		const FHSRBattleParticipant& Source = Coordinator->GetParticipants()[0];
+		const FHSRBattleParticipant& Target = Coordinator->GetParticipants()[1];
+		if (!Source.AbilitySystemComponent.IsValid() || !Target.AbilitySystemComponent.IsValid() || !Coordinator->GetTurnManager()) return false;
+		const UHSRSkillDefinition* Skill = Coordinator->GetBasicAttackDefinition();
+		const FString Element = Skill->ElementTag.ToString();
+		const FGameplayTag Weakness = Element.StartsWith(TEXT("Element."))
+			? FGameplayTag::RequestGameplayTag(FName(*FString::Printf(TEXT("Weakness.%s"), *Element.RightChop(8))), false) : FGameplayTag();
+		FHSRBattleParticipant& MutableTarget = const_cast<FHSRBattleParticipant&>(Target);
+		MutableTarget.WeaknessTags.Reset();
+		if (bWeakness && Weakness.IsValid()) MutableTarget.WeaknessTags.AddTag(Weakness);
+		Source.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), 120.0f);
+		Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), 80.0f);
+		Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(), 1000.0f);
+		Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), Health);
+		Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxToughnessAttribute(), FMath::Max(Toughness, Skill->ToughnessDamage));
+		Target.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetToughnessAttribute(), Toughness);
+		Coordinator->SetTeamSkillPointsForDevelopmentTest(1, 3);
+		return Coordinator->GetTurnManager()->Initialize(Coordinator->GetParticipants());
+	};
+	const auto CommandFor = [Coordinator](const FGuid& ActionId, const FGuid& BattleId = FGuid())
+	{
+		FHSRBattleActionCommand Command;
+		Command.ActionId = ActionId;
+		Command.BattleId = BattleId.IsValid() ? BattleId : Coordinator->GetCurrentRequestId();
+		Command.ActorParticipantId = Coordinator->GetParticipants()[0].ParticipantId;
+		Command.SkillId = Coordinator->GetBasicAttackDefinition()->SkillId;
+		Command.TargetParticipantIds.Add(Coordinator->GetParticipants()[1].ParticipantId);
+		return Command;
+	};
+	const auto Counts = [Coordinator]() { return FIntPoint(Coordinator->GetBreakStatusRequestCountForDevelopmentTest(), Coordinator->GetBreakDelayRegistrationCountForDevelopmentTest()); };
+	const float BreakDamage = Coordinator->GetBasicAttackDefinition()->ToughnessDamage;
+	if (!TestTrue(TEXT("Configured attack has Toughness damage"), BreakDamage > 0.0f) || !Prepare(BreakDamage, true)) return false;
+
+	const FGuid FirstId = FGuid::NewGuid();
+	const FIntPoint BeforeFirst = Counts();
+	const uint64 TurnBeforeFirst = Coordinator->GetTurnManager()->GetTurnSequence();
+	const FHSRAbilityResolution First = Coordinator->RequestAction(CommandFor(FirstId));
+	TestTrue(TEXT("First positive-to-zero edge triggers Break"), First.Succeeded() && First.bHasBreakResult && First.BreakResult.bTriggered);
+	TestEqual(TEXT("First edge reaches zero Toughness"), First.BreakResult.ToughnessAfter, 0.0f);
+	TestEqual(TEXT("First edge adds one successful Status"), Counts().X, BeforeFirst.X + 1);
+	TestEqual(TEXT("First edge adds one accepted Delay"), Counts().Y, BeforeFirst.Y + 1);
+	TestEqual(TEXT("First Status result succeeds"), Coordinator->GetLastBreakStatusResultForDevelopmentTest(), EHSRStatusOperationResult::Success);
+	TestTrue(TEXT("First Delay is accepted"), Coordinator->WasLastBreakDelayAcceptedForDevelopmentTest());
+	TestTrue(TEXT("First action advances the turn"), Coordinator->GetTurnManager()->GetTurnSequence() > TurnBeforeFirst);
+	const FIntPoint BeforeReplay = Counts();
+	const uint64 TurnBeforeReplay = Coordinator->GetTurnManager()->GetTurnSequence();
+	const FHSRAbilityResolution Replay = Coordinator->RequestAction(CommandFor(FirstId));
+	TestEqual(TEXT("Replay returns cached Break ActionId"), Replay.BreakResult.ActionId, First.BreakResult.ActionId);
+	TestEqual(TEXT("Replay has zero Status delta"), Counts().X, BeforeReplay.X);
+	TestEqual(TEXT("Replay has zero Delay delta"), Counts().Y, BeforeReplay.Y);
+	TestEqual(TEXT("Replay has zero turn delta"), Coordinator->GetTurnManager()->GetTurnSequence(), TurnBeforeReplay);
+
+	Coordinator->GetParticipants()[1].AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetToughnessAttribute(), BreakDamage);
+	TestEqual(TEXT("Recovery has zero Status delta"), Counts().X, BeforeReplay.X);
+	TestEqual(TEXT("Recovery has zero Delay delta"), Counts().Y, BeforeReplay.Y);
+	// Advance the existing turn lifecycle until the one-turn Break status has
+	// naturally expired. This is fixture progression, not a recovery rule.
+	UHSRStatusComponent* BreakComponent = Coordinator->GetStatusComponent(Coordinator->GetParticipants()[1].ParticipantId);
+	for (int32 Step = 0; BreakComponent && Step < 4
+		&& BreakComponent->GetSnapshot(TEXT("Status.Debuff.Break")).InstanceCount > 0; ++Step)
+	{
+		Coordinator->GetTurnManager()->ResolveAction(Coordinator->GetTurnManager()->GetCurrentParticipantId());
+	}
+	TestTrue(TEXT("Second action runtime prepares"), Prepare(BreakDamage, true));
+	const FGuid SecondId = FGuid::NewGuid();
+	const FHSRAbilityResolution Second = Coordinator->RequestAction(CommandFor(SecondId));
+	TestTrue(TEXT("Second independent edge triggers Break"), Second.bHasBreakResult && Second.BreakResult.bTriggered && SecondId != FirstId);
+	TestEqual(TEXT("Two edges produce two Status successes"), Counts().X, BeforeFirst.X + 2);
+	TestEqual(TEXT("Two edges produce two accepted Delays"), Counts().Y, BeforeFirst.Y + 2);
+
+	TestTrue(TEXT("Zero-to-zero runtime prepares"), Prepare(0.0f, true));
+	const FIntPoint BeforeZero = Counts();
+	const FHSRAbilityResolution Zero = Coordinator->RequestAction(CommandFor(FGuid::NewGuid()));
+	TestTrue(TEXT("Initial zero does not trigger Break"), Zero.bHasBreakResult && !Zero.BreakResult.bTriggered);
+	TestEqual(TEXT("Initial zero has zero Break side effects"), Counts(), BeforeZero);
+	TestTrue(TEXT("Continued zero runtime prepares"), Prepare(0.0f, true));
+	Coordinator->RequestAction(CommandFor(FGuid::NewGuid()));
+	TestEqual(TEXT("Continued zero has zero Break side effects"), Counts(), BeforeZero);
+
+	TestTrue(TEXT("Non-zero runtime prepares"), Prepare(BreakDamage * 2.0f, true));
+	const FIntPoint BeforeNonZero = Counts();
+	const FHSRAbilityResolution NonZero = Coordinator->RequestAction(CommandFor(FGuid::NewGuid()));
+	TestTrue(TEXT("Non-zero result does not trigger Break"), NonZero.bHasBreakResult && !NonZero.BreakResult.bTriggered && NonZero.ToughnessResult.After > 0.0f);
+	TestEqual(TEXT("Non-zero result has zero Break side effects"), Counts(), BeforeNonZero);
+	TestTrue(TEXT("No-weakness runtime prepares"), Prepare(BreakDamage, false));
+	const FIntPoint BeforeNoWeakness = Counts();
+	Coordinator->RequestAction(CommandFor(FGuid::NewGuid()));
+	TestEqual(TEXT("No weakness has zero Break side effects"), Counts(), BeforeNoWeakness);
+
+	const FGuid OldBattleId = Coordinator->GetCurrentRequestId();
+	// FirstId was processed in the old battle and must become valid again in
+	// the fresh battle-local resolution cache.
+	const FGuid ReusedId = FirstId;
+	const FHSRBattleInitResult Rebuild = Coordinator->ResetAndRebuildForDevelopmentTest(BattleWorld);
+	TestTrue(TEXT("Reset rebuild succeeds"), Rebuild.IsSuccess());
+	TestTrue(TEXT("New battle has a new BattleId"), Coordinator->GetCurrentRequestId() != OldBattleId);
+	TestTrue(TEXT("New battle runtime prepares"), Prepare(BreakDamage, true));
+	const FIntPoint BeforeStale = Counts();
+	const FHSRAbilityResolution Stale = Coordinator->RequestAction(CommandFor(FGuid::NewGuid(), OldBattleId));
+	TestFalse(TEXT("Old BattleId is rejected"), Stale.Succeeded());
+	TestEqual(TEXT("Old BattleId has zero side effects"), Counts(), BeforeStale);
+	const FHSRAbilityResolution FreshReused = Coordinator->RequestAction(CommandFor(ReusedId));
+	TestTrue(TEXT("ActionId is battle-local after Reset"), FreshReused.bHasBreakResult && FreshReused.BreakResult.bTriggered);
+
+	const FHSRBattleInitResult LethalRebuild = Coordinator->ResetAndRebuildForDevelopmentTest(BattleWorld);
+	TestTrue(TEXT("Lethal matrix rebuild succeeds"), LethalRebuild.IsSuccess());
+	TestTrue(TEXT("Lethal runtime prepares"), Prepare(BreakDamage, true, 1.0f));
+	const FIntPoint BeforeLethal = Counts();
+	const int32 DefeatBefore = Coordinator->GetDefeatCountForDevelopmentTest();
+	const FHSRAbilityResolution Lethal = Coordinator->RequestAction(CommandFor(FGuid::NewGuid()));
+	TestTrue(TEXT("Same-frame lethal publishes Break before terminal defeat"), Lethal.bHasBreakResult && Lethal.BreakResult.bTriggered
+		&& Counts() == BeforeLethal + FIntPoint(1, 1) && Coordinator->GetDefeatCountForDevelopmentTest() == DefeatBefore + 1
+		&& Coordinator->GetCurrentState() == EHSRBattleCoordinatorState::Finished);
+	const FIntPoint BeforeFinished = Counts();
+	const FHSRAbilityResolution Finished = Coordinator->RequestAction(CommandFor(FGuid::NewGuid()));
+	TestFalse(TEXT("Finished battle rejects new action"), Finished.Succeeded());
+	TestEqual(TEXT("Finished battle has zero Break side effects"), Counts(), BeforeFinished);
+	return true;
+}
 
 bool FHSRStatusGenericPatchTest::RunTest(const FString& Parameters)
 {

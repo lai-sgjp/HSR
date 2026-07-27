@@ -1427,6 +1427,80 @@ AHSRBattleGameMode::AHSRBattleGameMode()
 	PrimaryActorTick.bCanEverTick = false;
 }
 
+#if WITH_DEV_AUTOMATION_TESTS
+UHSRBattleCoordinator* AHSRBattleGameMode::CreateRepeatableBreakAutomationFixture(UObject* Outer, UWorld* BattleWorld, TSubclassOf<AHSRBattleGameMode> ConfiguredGameModeClass, FText& OutFailure)
+{
+	OutFailure = FText::GetEmpty();
+	const AHSRBattleGameMode* Config = ConfiguredGameModeClass
+		? ConfiguredGameModeClass->GetDefaultObject<AHSRBattleGameMode>() : nullptr;
+	if (!Outer || !BattleWorld || !Config || !Config->BasicAttackSkillDefinition || !Config->EnemyDefinition
+		|| !Config->BreakStatusDefinition || !Config->ParticipantInitializationGameplayEffect)
+	{
+		OutFailure = FText::FromString(TEXT("Missing configured production battle fixture."));
+		return nullptr;
+	}
+	UHSRCharacterProfileSubsystem* Profiles = BattleWorld->GetGameInstance()
+		? BattleWorld->GetGameInstance()->GetSubsystem<UHSRCharacterProfileSubsystem>() : nullptr;
+	if (!Profiles || !Config->CharacterCatalog || Config->PlayerCharacterId.IsNone())
+	{
+		OutFailure = FText::FromString(TEXT("Missing profile subsystem, catalog, or player id."));
+		return nullptr;
+	}
+	const EHSRCharacterProfileResult CatalogResult = Profiles->RegisterLoadedCatalog(Config->CharacterCatalog);
+	if (CatalogResult != EHSRCharacterProfileResult::Success && CatalogResult != EHSRCharacterProfileResult::DefinitionAlreadyRegistered)
+	{
+		OutFailure = FText::FromString(TEXT("Catalog registration failed."));
+		return nullptr;
+	}
+	FHSRCharacterProgressionContext Context;
+	const UHSRCharacterDefinition* PlayerDefinition = nullptr;
+	if (!Profiles->GetProgressionContext(Config->PlayerCharacterId, Context)
+		|| !Profiles->GetDefinition(Config->PlayerCharacterId, PlayerDefinition) || !PlayerDefinition
+		|| PlayerDefinition->CharacterClass.IsNull())
+	{
+		OutFailure = FText::FromString(TEXT("Configured player profile is unavailable."));
+		return nullptr;
+	}
+	UClass* PlayerClass = PlayerDefinition->CharacterClass.LoadSynchronous();
+	if (!PlayerClass || !PlayerClass->IsChildOf<APawn>())
+	{
+		OutFailure = FText::FromString(TEXT("Configured player class is invalid."));
+		return nullptr;
+	}
+	UHSRBattleCoordinator* Result = NewObject<UHSRBattleCoordinator>(Outer);
+	Result->SetBasicAttackDefinition(Config->BasicAttackSkillDefinition);
+	Result->SetUltimateDefinition(Config->UltimateSkillDefinition);
+	Result->SetSkillDefinition(Config->SkillSkillDefinition);
+	Result->SetHealDefinition(Config->HealSkillDefinition);
+	Result->SetEnemyDefinition(Config->EnemyDefinition);
+	Result->SetStatusDefinition(Config->AttackUpStatusDefinition);
+	Result->SetDamageOverTimeStatusDefinition(Config->DamageOverTimeStatusDefinition);
+	Result->SetBreakStatusDefinition(Config->BreakStatusDefinition);
+	Result->SetParticipantInitializationGameplayEffect(Config->ParticipantInitializationGameplayEffect);
+	Result->SetCharacterProgressionGameplayEffect(Config->CharacterProgressionGameplayEffect);
+	Result->SetPlayerCharacterDefinition(Config->PlayerCharacterId, PlayerClass);
+	Result->SetCharacterProgressionContext(TEXT("Player"), Context);
+	FHSREncounterRequest Request;
+	Request.RequestId = FGuid::NewGuid();
+	Request.EncounterId = TEXT("Automation.RepeatableBreak");
+	Request.EnemyDefinitionId = Config->EnemyDefinition->EnemyDefinitionId;
+	Request.BattleMapPath = TEXT("/Game/Maps/Battle");
+	Request.ExplorationMapPath = TEXT("/Game/Maps/Exploration");
+	if (!Result->SubmitBattleRequest(Request))
+	{
+		OutFailure = FText::FromString(TEXT("Automation encounter submission failed."));
+		return nullptr;
+	}
+	const FHSRBattleInitResult Build = Result->BuildParticipants(BattleWorld);
+	if (!Build.IsSuccess() || Result->GetCurrentState() != EHSRBattleCoordinatorState::Spawned)
+	{
+		OutFailure = Build.Message;
+		return nullptr;
+	}
+	return Result;
+}
+#endif
+
 void AHSRBattleGameMode::BeginPlay()
 {
 	Super::BeginPlay();

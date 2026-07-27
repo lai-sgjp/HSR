@@ -44,6 +44,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Battle")
 	UHSRBattleCoordinator* GetCoordinator() const { return Coordinator; }
+#if WITH_DEV_AUTOMATION_TESTS
+	static UHSRBattleCoordinator* CreateRepeatableBreakAutomationFixture(UObject* Outer, UWorld* BattleWorld, TSubclassOf<AHSRBattleGameMode> ConfiguredGameModeClass, FText& OutFailure);
+#endif
 	UFUNCTION(BlueprintPure, Category = "Battle") UHSRBattleCommandViewModel* GetCommandViewModel() const { return CommandViewModel; }
 	UFUNCTION(BlueprintCallable, Category = "Battle|UI") void ShowCharacterDetail();
 	UFUNCTION(BlueprintCallable, Category = "Battle|UI") void ShowBattleCommands();

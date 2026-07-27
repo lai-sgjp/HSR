@@ -623,6 +623,18 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 			BreakResult.ToughnessAfter, BreakResult.bTriggered ? 1 : 0, static_cast<int32>(BreakResult.FailureReason));
 		if (BreakResult.bTriggered)
 		{
+			// A target admitted alive may reach zero Health in the same formal
+			// transaction. ResolveDefeat is intentionally deferred until after
+			// Break publication, so keep that admission eligibility visible to the
+			// existing Status and Delay consumers during this synchronous window.
+			// No presentation snapshot is published until Health is restored to the
+			// committed terminal value below.
+			const bool bLethalBreakTransaction = PendingDefeatedParticipantId == Target->ParticipantId
+				&& Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) <= 0.0f;
+			if (bLethalBreakTransaction)
+			{
+				Target->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), UE_KINDA_SMALL_NUMBER);
+			}
 			const EHSRStatusOperationResult BreakStatusResult = RequestBreakStatus(Command.ActorParticipantId, BreakResult.TargetParticipantId, BreakResult.ActionId);
 #if WITH_EDITOR
 			LastBreakStatusResultForTest = BreakStatusResult;
@@ -644,6 +656,10 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 				++BreakDelayRegistrationCountForTest;
 			}
 #endif
+			if (bLethalBreakTransaction)
+			{
+				Target->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 0.0f);
+			}
 		}
 		Finalize(Resolution);
 		if (!PendingDefeatedParticipantId.IsNone()) { const FName Defeated = PendingDefeatedParticipantId; PendingDefeatedParticipantId = NAME_None; ResolveDefeat(Defeated); }
@@ -1323,7 +1339,6 @@ FHSRBattleInitResult UHSRBattleCoordinator::ResetAndRebuildForDevelopmentTest(UW
 	}
 	return BuildParticipants(BattleWorld);
 }
-
 void UHSRBattleCoordinator::InitializeDevelopmentDamageRng(int32 InSeed)
 {
 	DevelopmentDamageSeed = InSeed;
