@@ -2112,3 +2112,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 当前只完成任务规划；等待 Independent Reviewer 任务 Gate 审查，未修改 Source/Content、未 Build/Automation/Editor/PIE。
 - Task Gate 首轮 Reviewer/Implementation 均=`REVISE`；已冻结现有 ExplorationWidget 为唯一 root、Pause-only 新 WBP、UIOnly Back 入口、Open/Close 新 token 补偿、非 Slate UE5.6 API 路线、外部暂停拒绝和 Automation seam，等待最终复核。
 - Independent Reviewer 与 Implementation 最终 Task Gate 均=`PASS`；目标、allowlist、事务补偿、API 路线和证据边界可实施。当前仍等待用户对 TASK-P17-002 的单独确认，未修改 Source/Content。
+
+# 2026-07-27｜TASK-P17-PATCH-01A ActiveStatus 通用化
+
+- 用户授权在 P17-005 前提前处理路线图跨阶段改进 1～3；Patch 01 与 Behavior Tree Patch 02 分离。
+- PATCH-01A 将 AttackUp 专用 `ActiveStatus`/额外容器与双幂等路径合并为通用 Status map；Definition 改为字段/Tag 驱动，新增 SpeedUp/Shield Tag 与结构化 `UnknownStatus`。
+- Clear 的 Remove failure 保留实例、Definition 与 Handle，允许安全重试；Replace 的旧移除失败改为回滚新 GE、保留旧快照的原子语义。
+- 历史首错保留：msbuild PATH 不可用；transient ASC Health=0 导致 Automation exit -1；Reviewer `REVISE` 指出测试仅 Definition 与 Clear 丢失所有权；首次用户 PIE 因旧 `Status.Unsupported` 预期产生 P9-003 FAIL/INCOMPLETE，Reviewer=`BLOCKED`。
+- 最终 Development Editor Build、`HSR.Battle.Patch.StatusGeneric` exit 0；用户重跑 P9：P9-001/002/003 COMPLETE，OldRemoveFailure 与 InvalidDefinition PASS，相关 FAIL/INCOMPLETE/SKIPPED 均为 0。
+- Independent Reviewer 最终=`PASS`，commit `8cc09ed`；三件套已归档。当前活动切换到 PATCH-01B，只规划可重复 Break，尚未授权实现。
