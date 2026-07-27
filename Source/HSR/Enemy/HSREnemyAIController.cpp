@@ -231,11 +231,19 @@ void AHSREnemyAIController::BeginSpawnOriginRecovery(EHSREnemyExplorationState R
 	AHSREnemyCharacter* Enemy = Cast<AHSREnemyCharacter>(GetPawn());
 	if (!Enemy)
 		return;
+	PublishSpawnOriginRecoveryIntent(Enemy->GetSpawnOrigin(), RecoveryState);
+}
 
+
+void AHSREnemyAIController::PublishSpawnOriginRecoveryIntent(const FVector& InSpawnOrigin, EHSREnemyExplorationState RecoveryState)
+{
+#if WITH_DEV_AUTOMATION_TESTS
+	LastRecoveryStateForAutomation = RecoveryState;
+#endif
 	SetState(RecoveryState);
 	if (RuntimeBlackboard)
 	{
-		RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::PatrolLocation, Enemy->GetSpawnOrigin());
+		RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::PatrolLocation, InSpawnOrigin);
 	}
 	SetState(EHSREnemyExplorationState::ReturningToSpawnOrigin);
 	// Stage B's stock Move To consumes PatrolLocation=SpawnOrigin.
@@ -550,5 +558,19 @@ void AHSREnemyAIController::ClearStateForAutomation()
 void AHSREnemyAIController::SetActiveEncounterRequestForAutomation(const FGuid& InRequestId)
 {
 	ActiveEncounterRequestId = InRequestId;
+}
+
+void AHSREnemyAIController::PublishMoveFailureRecoveryForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin)
+{
+	RuntimeBlackboard = InBlackboard;
+	PublishSpawnOriginRecoveryIntent(InSpawnOrigin, EHSREnemyExplorationState::MoveFailed);
+}
+
+void AHSREnemyAIController::PublishLostTargetRecoveryForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin)
+{
+	RuntimeBlackboard = InBlackboard;
+	CurrentTarget.Reset();
+	SetBlackboardTarget(nullptr);
+	PublishSpawnOriginRecoveryIntent(InSpawnOrigin, EHSREnemyExplorationState::LostTarget);
 }
 #endif

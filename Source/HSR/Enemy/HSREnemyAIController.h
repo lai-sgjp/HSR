@@ -46,6 +46,10 @@ public:
 	void ClearStateForAutomation();
 	bool HasRuntimeBlackboardForAutomation() const { return RuntimeBlackboard != nullptr; }
 	void SetActiveEncounterRequestForAutomation(const FGuid& InRequestId);
+	void PublishMoveFailureRecoveryForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin);
+	void PublishLostTargetRecoveryForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin);
+	EHSREnemyExplorationState GetLastRecoveryStateForAutomation() const { return LastRecoveryStateForAutomation; }
+	bool IsNavReadyRetryScheduledForAutomation() const { return bNavReadyRetryScheduled; }
 #endif
 
 protected:
@@ -66,6 +70,7 @@ protected:
 	void ClearBlackboardRuntimeState();
 	void SetBlackboardTarget(AActor* Target);
 	void BeginSpawnOriginRecovery(EHSREnemyExplorationState RecoveryState);
+	void PublishSpawnOriginRecoveryIntent(const FVector& InSpawnOrigin, EHSREnemyExplorationState RecoveryState);
 	void ClearState();
 	void SetState(EHSREnemyExplorationState NewState);
 
@@ -83,6 +88,7 @@ protected:
 
 #if WITH_DEV_AUTOMATION_TESTS
 	int32 EncounterSubmissionAttemptsForAutomation = 0;
+	EHSREnemyExplorationState LastRecoveryStateForAutomation = EHSREnemyExplorationState::Idle;
 #endif
 
 	UPROPERTY()

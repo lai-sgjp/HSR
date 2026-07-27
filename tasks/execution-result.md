@@ -282,3 +282,15 @@ Validation:
 - `HSR.BattleReturn.MapContract`: `PASS`, exit `0`.
 
 No production behavior, Encounter DTO, or user-owned map, DataAsset, or `Content/AI/**` asset changed in this revision.
+
+### Stage-B reviewer follow-up — recovery intent coverage
+
+`BehaviorTreeAdapter` now drives the production spawn-origin recovery intent through deterministic seams. A move-failure path records `MoveFailed`, publishes `ReturningToSpawnOrigin`, writes `PatrolLocation=SpawnOrigin`, and does not arm a C++ retry loop. A controlled destroyed chase target clears `TargetActor`, records `LostTarget`, publishes the same return intent/location, and creates no encounter request.
+
+The existing transition API exposes `AlreadyPending` and `AlreadyConsumed`, but a deterministic controller-level first-admission fixture with structured request-attempt/side-effect counters would require a new TransitionSubsystem contract seam or a travel-capable encounter fixture. That seam is not present in the allowed surface, so same-frame duplicate admission and post-resolved zero-mutation are explicitly retained as a contract blocker rather than simulated or claimed. Full return remains USER PIE pending.
+
+Validation:
+
+- `HSREditor Win64 Development`: `PASS`, 7 actions, exit `0`.
+- `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
+- `HSR.BattleReturn.MapContract`: `PASS`, exit `0`.
