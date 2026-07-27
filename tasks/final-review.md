@@ -1,53 +1,48 @@
-# TASK-P17-PATCH-01C Task Gate Final Re-review
+# TASK-P17-PATCH-01C Final Review
 
 ## 审查对象
 
 - 任务编号：`TASK-P17-PATCH-01C`
 - 任务名称：Complete Action-Distance Turn Model
-- 审查角色：Prompt Reviewer + Safety Reviewer（仅实施前 Task Gate）
+- 审查角色：Independent Prompt Reviewer + Safety Reviewer
 - 审查日期：2026-07-27
-- Coordinator 修订提交：`5244868`
-- 结论：`PASS`
 
-## 审查输入与证据等级
+## 审查输入与独立证据
 
-- 一级：`.agents/agents.md` 第 38～44 节、修订后的 `tasks/active-task.md`、`tasks/review-template.md`、Patch 计划、roadmap 改进方向 3。
-- 一级：当前 BreakTypes、BattleParticipant、TurnManager、Coordinator、Status consumer 与 CombatPatchTests 代码事实。
-- 一级：PATCH-01B 已归档的 repeatable Break、same-frame deferred defeat、Status/Delay exactly-once 边界。
-- 本结论只证明实施合同可执行；尚无 PATCH-01C Implementation、Build、Automation 或 PIE 完成证据。
+- 已阅读 `.agents/agents.md` 的 Automatic Role Handoff 规则、`tasks/active-task.md`、`tasks/review-template.md`、`tasks/execution-result.md` 及 commit `ee6e70b` 的完整 diff 和相关 Coordinator/Status/Turn 调用链。
+- `git show --stat ee6e70b` 显示仅修改 `HSRBattleParticipant.h`、`HSRTurnManager.h/.cpp`、`HSRBreakTypes.h`、`HSRCombatPatchTests.cpp`、`tasks/execution-result.md`；均处于 allowlist，未触及既存用户改动 `learn/SaveSystem.md` 或 `.claude/**`。
+- 独立执行 `git diff --check ee6e70b^ ee6e70b`，通过。
+- `Saved/Logs/HSR.log` 记录 2026-07-27 的受控运行：`Automation RunTests HSR.Battle.Patch` 发现并运行 3 项测试，`ActionDistance`、`RepeatableBreak`、`StatusGeneric` 均为 Success，最终 exit code 0。该日志证明自动化实际运行过，但不能弥补下列缺失断言。
+- Implementation 报告声称 Development Editor Build 成功；本审查未重新运行 Build。PIE 未运行，且本任务不需要新的用户可见入口。
 
-## 契约复审
+## 范围与实现审查
 
-- 单一结果清楚：只建立 battle-local 行动距离模型，不提前实现正式行动条 UI、资产、Save、网络、AI、Behavior Tree 或 P17-005。
-- 行动数学已冻结：`10000/max(Speed,1)`、初始化 Remaining=Base、最小距离推进、ParticipantId 稳定 Tie-break、Resolve 使用最新 Base recharge。
-- 当前行动锁完整：当前 actor 的 Advance/Delay 固化为有序 `PendingPostActionOperations`，不取消当前行动；Resolve 在完整 TurnEnded 同步链后 recharge，并逐项按 Kind 应用和 clamp。
-- 顺序语义唯一：低 recharge 的 `Delay→Advance` 与 `Advance→Delay` 已给出不同预期，禁止折叠为单标量。
-- Speed 生命周期完整：ASC identity、delegate handle、bound epoch、全量验证、初始化失败回滚、Finish/Reset/reinitialize 幂等解绑、旧 callback 零副作用均已冻结；callback 不广播 lifecycle、不调用 Resolve/Advance/Delay。
-- DTO 与 exactly-once 完整：字段、Kind、结构化结果、非法请求不消费、其他有效 ID 首次观察即按 battle-local 全局域消费、重复零变化、Break ActionId 映射均明确。
-- Break Delay 只有单一路径：旧 pending/consumed skip 容器必须删除；兼容入口不得保存第二份状态；deferred-defeat 资格只由 Coordinator 当前同步事务传入且不进入 DTO/TurnManager 状态。
-- 数值安全完整：初始化非 finite 原子失败；运行中非法 Speed 零变化；有限 `Speed<=1` clamp；所有运算 finite 检查；当前 pending 接受前以最大 Base=10000 预演完整有序列表，确保 Resolve 不会因已接受操作才溢出。
-- 候选算法无歧义：以原始 Remaining 求 Min 并先冻结 epsilon 候选集，之后统一归一化，最终只从已冻结集合按 ParticipantId 选择；不使用近似排序比较器。
-- lifecycle 预算可验收：合法 Resolve 恰好一个 TurnEnded，有候选时恰好一个后续 TurnStarted；只有 TurnStarted 增加 TurnSequence；调整与 Speed callback 不改变 lifecycle 计数。
-- `GetOrderedParticipants()` 已限定为稳定 registry/诊断视图，不承诺未来顺序，不迫使修改现有 UI DTO。
-- nth-bind failure 使用现有 TurnManager h/cpp 内、非反射、`WITH_DEV_AUTOMATION_TESTS`、默认关闭的 seam；可真实验证部分绑定回滚，不扩展 Shipping/API/资产范围。
+- 单一目标、allowlist 和无 Tick 的边界符合任务卡；旧 Break skip-once 容器已从 TurnManager 删除，Break 入口目前转发至统一 Delay 请求。
+- 公式、ParticipantId tie-break、当前行动锁、delegate 的 weak ASC/epoch 基本骨架及 Initialize 绑定失败回滚 seam 均已出现于实现中。
+- 但冻结契约要求的请求验证、结构化结果、deferred-defeat 权限收口、运行时可观测性以及完整 Automation 矩阵尚未满足，不能归档。
 
-## 范围与安全审查
+## 问题清单
 
-- Exact candidate allowlist 足够；无需新增生产文件、Build.cs、Config、Content、GameplayTag、GE、DataAsset、Widget、反射接口或正式 Turn UI snapshot。
-- GameMode 仅允许复用/最小扩展测试 fixture 与既有 harness；不得创建 Blueprint 开关或资产规则。
-- required matrix 覆盖 A/B/C 频率、current lock、Speed Up/Slow、Advance/Delay 顺序与边界、重复/拒绝 OperationId、Break 单次 `+Base`、tie、唯一/无合法候选、Reset/stale callback、same-frame defeat 和 PATCH-01B 回归。
-- Automation 负责受控数值证据；PIE 只验证现有 Battle 行动不中断与 Break 回归。没有合法资产入口时不得伪造 Speed/Advance/Delay 的用户视觉验证。
-- `learn/SaveSystem.md` 与 `.claude/**` 是既存用户/本地变更，Implementation、Reviewer 与后续提交均不得包含。
+| 严重度 | 文件/符号 | 问题 | 必须采取的动作 |
+|---|---|---|---|
+| Blocking | `Source/HSR/Battle/HSRTurnManager.cpp` — `RequestActionDistanceAdjustment` | 未验证 `Request.Kind`。经 `static_cast<EHSRActionDistanceAdjustmentKind>` 传入未知枚举值会走 Delay 分支、消费 OperationId 并修改状态，而任务卡要求非法 Kind 返回 `InvalidRequest` 且不消费 ID。 | 在任何 `ConsumedOperationIds.Add` 前显式只接受 Advance/Delay；添加非法 Kind 首次请求及同 ID 重放的零变更断言。 |
+| Blocking | `Source/HSR/Battle/HSRTurnManager.cpp` — `MakeAdjustmentResult` | 结果对象在 mutation 后才读取 Participant，并把 `OldBase == NewBase`、`OldRemaining == NewRemaining`；accepted Advance/Delay 无法报告冻结契约要求的真实 old/new 快照。`NextParticipantId` 也始终复制 current，无法成为有意义的结构化快照。 | 在验证后、写入前捕获 old snapshot，在成功写入后捕获 new snapshot；明确 pending 的前后计数与 current/next 语义，并用测试验证实际差异与 duplicate/reject 零变化。 |
+| Blocking | `Source/HSR/Battle/HSRTurnManager.h/.cpp` — public `bAllowPendingDeferredDefeat` 参数 | 通用公开入口和 `ConsumeBreakDelay` 均可由任意调用方传 `true` 绕过死亡目标拒绝，未实现“仅 Coordinator 当前同步事务可保留 admitted-alive 资格”的边界。 | 将该资格收口为 Coordinator 的窄转发路径（不得进入 DTO 或普通请求）；普通调用者即使传入等价输入也必须拒绝死亡目标，并补 same-frame lethal/已死亡/重放回归。 |
+| Blocking | `Source/HSR/Tests/HSRCombatPatchTests.cpp` — `FHSRActionDistancePatchTest` | 新测试仅覆盖 current Delay、一次 duplicate、Resolve 和旧 epoch，未覆盖 Required matrix：A/B/C 行动频率、Speed Up/Slow 比例换算、当前 Advance/Delay 的有序 pending 与 Speed 变化、ratio 0/边界/NaN/Inf、epsilon tie、唯一/无合法参与者、Reset/旧 callback、部分绑定失败回滚、delegate count，以及 Break `+1.0 Base` 的数值证据。现有 RepeatableBreak 只验证“Delay accepted”，未验证距离增量。 | 以受控 runtime Automation 扩充矩阵；必要时只添加任务卡允许的 `WITH_DEV_AUTOMATION_TESTS` 纯值 seam（距离/pending/delegate count/nth bind failure）。每类断言 Base、Remaining、pending、current/next、epoch、sequence、lifecycle 次数与旧 callback 零副作用。 |
+| Risk | `Source/HSR/Battle/HSRTurnManager.cpp` — `HandleSpeedChanged`、调整入口 | 非有限 Speed callback 直接静默返回，调整请求也没有记录 OperationId、old/new Base/Remaining、current/next、sequence 和接受/拒绝结果；不满足任务卡的结构化记录与运行时证据要求。 | 对非法 Speed 及每次调整生成可审计的结构化日志/测试记录，不得改变 state 或 lifecycle；将其纳入 Automation 断言。 |
 
 ## 审查结论
 
-`PASS`
+`REVISE`
 
-活动卡已形成单一、可实现、可测试且可回滚的行动距离合同；此前关于 current pending、OperationId、非法 Speed、delegate 生命周期、浮点候选、Break 双延后、顺序表示、归一化时点、绑定失败测试入口与 Resolve 算术风险的阻断均已关闭。Implementation 必须严格停在 allowlist 和 stop conditions 内；发现需要新文件、正式 UI/反射接口或资产时立即停止申请最小授权。
+实现的基础方向正确，且现有三项 Automation 有真实 PASS 日志；但存在一个可触发的非法枚举状态写入、错误的 old/new 结果快照、deferred-defeat 权限未收口，以及绝大多数强制测试矩阵缺失。修复必须限定在现有 allowlist 内，不得改动 `learn/SaveSystem.md` 或 `.claude/**`。修订后需要重新执行 Development Editor Build、`Automation RunTests HSR.Battle.Patch`、`git diff --check`，再进行独立复审。
 
-**现在只允许 Implementation Agent 进入只读契约复述。** 复述后必须停止，等待用户对 `TASK-P17-PATCH-01C` 的单独确认；本次 Task Gate `PASS` 不授权任何代码写入、Build、测试执行或 Editor 操作。
+## Git 交付审查
 
-## Git 交付
+- 本次审查提交仅包含本文件。
+- 未暂存或提交任何既存用户/本地改动。
 
-- Reviewer 仅提交 `tasks/final-review.md`。
-- 不提交生产代码、活动卡、计划、状态文档、用户文件或 `.claude/**`。
+## 归档与下一步
+
+- 活动卡不可归档。
+- 唯一下一步：由原 Implementation Agent 在同一 allowlist 内按上述最小修订修复并重新提交证据；随后重新触发独立 Review。
