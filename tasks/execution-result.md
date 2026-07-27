@@ -38,3 +38,27 @@ After saving, close and reopen the Editor, load `BP_HSREnemy_Phase4Test` and `BT
 ## Minimum authorization request
 
 Authorize creation/editing of only the listed `Content/AI/Enemy` assets and the specified existing Enemy Blueprint/DataAsset binding fields. Once the saved asset paths, Blackboard schema, perception values, and binding evidence are supplied, Implementation may resume within the frozen PATCH-02 C++ allowlist. No production source or Config file was modified in this Asset Gate pass.
+
+## Asset Gate follow-up — user-provided `/Game/AI` paths
+
+Status remains: `BLOCKED ASSET GATE`.
+
+Read-only package inspection now confirms both supplied assets exist and are internally paired:
+
+- `/Game/AI/Enemy/BB_HSREnemy_Exploration` is a `BlackboardData` asset. Its serialized keys include `TargetActor` (`Object`, base `Actor`), `SpawnOrigin` (`Vector`), `PatrolLocation` (`Vector`), `AIState` (`Enum`, `EHSREnemyExplorationState`), `TreeEpoch` (`Int`), and `EncounterRequestId` (`Name`).
+- `/Game/AI/Enemy/BT_HSREnemy_Exploration` is a `BehaviorTree` asset and serializes `BlackboardAsset=/Game/AI/Enemy/BB_HSREnemy_Exploration`.
+- `BP_HSREnemy_Phase4Test` serializes `AIControllerClass` and `HSREnemyAIController`; the current C++ perception values are SightRadius `1000`, LoseSightRadius `1500`, PeripheralVision `90`, all affiliations enabled, and MaxAge `5`. The intended encounter entry point remains `AHSREnemyAIController::TryRequestEncounterFromCharacter`.
+
+The Behavior Tree is not yet executable for the frozen migration contract. Its serialized graph contains only `BehaviorTreeGraphNode_Root` and `SingleComposite`; it contains no movement, Blackboard, Task, Decorator, Service, Patrol, Chasing, LostTarget, MoveFailed, or EncounterPending branch node. There is consequently no evidence of the required SpawnOrigin recovery paths, authoritative Encounter wait/result handling, stale-epoch cleanup, or no-polling implementation.
+
+### Exact remaining Editor work
+
+In `/Game/AI/Enemy/BT_HSREnemy_Exploration`, add and save explicit branches that consume the confirmed keys:
+
+1. Patrol: choose/write `PatrolLocation`, move there, then wait without a polling Service.
+2. Chasing: require valid `TargetActor`, move toward it, and let the existing C++ controller remain the sole Encounter submitter.
+3. LostTarget: clear `TargetActor`, then execute `Move To SpawnOrigin`; it must not select a random patrol location as its recovery action.
+4. MoveFailed: abort the failed action and execute bounded recovery via `Move To SpawnOrigin`.
+5. EncounterPending: block/complete only from the authoritative C++ request/result transition; it must not call the battle subsystem directly or issue a second request.
+
+For every non-stock node, provide its exact asset path, parent class, exposed Blackboard key selectors, and whether it reacts only to C++-emitted events. Confirm there is no interval/tick Service. Save the BT, close and reopen the Editor, then provide either an Editor screenshot or a node/path listing showing the five branches and assigned Blackboard. Only after that evidence is supplied can C++ BT/BB reference fields and lifecycle binding be implemented.
