@@ -51,3 +51,42 @@ Scope: Coordinator revision following gate commit `0ff5be7`; the historical `REV
 ### Verdict
 
 `PASS` — The revised task is self-contained and safe to hand to Implementation. Implementation read-only restatement may begin; production work still requires the task-specific user confirmation mandated by Automatic Role Handoff.
+
+---
+
+# TASK-P17-PATCH-01B Independent Implementation Review
+
+Status: `REVISE`
+
+Role: `Independent Reviewer`
+Date: `2026-07-27`
+Evidence level: `STATIC CODE/COMMIT REVIEW + RECORDED BUILD CLAIM; AUTOMATION/PIE NOT RUN`
+Reviewed commits: Task Gate `0ff5be7`, Task Gate re-review `4e23bf0`, Coordinator `08cec4d`, Implementation `60ee700`
+
+## Scope and implementation findings
+
+- `PASS` — Implementation commit `60ee700` changes only the active-task allowlist: Coordinator, participant, existing P9 harness, and execution report. No TurnManager, action-value, Config, Content, Save, UI, network, or Tick change is present.
+- `PASS` — The participant-lifetime `bBreakResultPublished` latch was removed without introducing a renamed lifetime latch. Break publication remains on the authoritative `Before > 0 && After == 0` Toughness edge, and the existing completed ActionId resolution cache remains the replay boundary.
+- `PASS` — The existing same-transaction ordering remains Break/Status/Delay followed by deferred `ResolveDefeat`; no production ownership was moved into Status, Widget, GameplayCue, or TurnManager.
+- `PASS` — Added counter state is scalar, editor-only, reset synchronously in `Reset`, and introduces no UObject/GC, reflection, delegate, asynchronous, replication, or Tick hazard. Existing weak ASC/Actor participant references are unchanged.
+- `RISK` — `BreakStatusRequestCountForTest` records only attempted requests and does not retain/assert `EHSRStatusOperationResult`; `BreakDelayRegistrationCountForTest` increments even when `ConsumeBreakDelay` returns false. These names and the PIE assertions therefore cannot establish the frozen Status request/result and accepted Delay counts.
+
+## Evidence findings
+
+- `PASS` — `git diff --check 08cec4d..60ee700` succeeds. The worktree's unrelated `learn/SaveSystem.md` and `.claude/**` changes are not in the Implementation commit.
+- `PASS (reported, not independently rerun)` — `tasks/execution-result.md` records a successful `HSREditor Win64 Development` build after one preserved sandbox write failure. No build artifact/log was committed as independent evidence, but the implementation report clearly separates the claim from unrun runtime checks.
+- `BLOCKING` — The required `HSR.Battle.Patch.RepeatableBreak` Automation test does not exist. `Source/HSR/Tests/HSRCombatPatchTests.cpp` still contains only `HSR.Battle.Patch.StatusGeneric` and was not changed by `60ee700`.
+- `BLOCKING` — No Automation or PIE runtime evidence was run. The task explicitly forbids inferring runtime correctness from harness source.
+- `BLOCKING` — The added P9 case exercises only first edge, cached replay, fixture recovery, and second edge. It does not cover or log initial/continued `0 -> 0`, non-zero/no-break, weakness failure, already-dead admission, Finished, Reset plus stale BattleId, reused ActionId under the new BattleId, or same-frame lethal Break-before-Defeat behavior.
+- `BLOCKING` — The P9 case does not assert cached Resolution equality, exact Toughness values, Status operation results, accepted Delay results, or exact turn advancement. It also reinitializes TurnManager before the second edge, which avoids demonstrating recovery/second-edge behavior across the same uninterrupted turn runtime.
+
+## Minimal required revision (within the existing allowlist)
+
+1. Add `HSR.Battle.Patch.RepeatableBreak` to `Source/HSR/Tests/HSRCombatPatchTests.cpp`. It must use a real or controlled Coordinator runtime and deterministically cover first/replay/recovery/second, initial and continued zero, non-zero/no-break, weakness failure, already-dead admission, Finished, Reset, stale BattleId, reused ActionId in the new battle epoch, and same-frame lethal priority. Assert exact Break, Status request/result, accepted Delay, Toughness, and turn deltas; replay must return the cached Resolution with all new deltas zero.
+2. Make the editor-only observability truthful: retain enough Status result and Delay acceptance evidence to distinguish a request attempt from a successful result/accepted registration. Increment any accepted-Delay counter only when `ConsumeBreakDelay` returns true. Do not change TurnManager behavior.
+3. Tighten the existing P9 repeatable-Break case to verify both independent ActionIds, both successful Status results, both accepted Delay registrations, replay zero-delta/cached result, recovery zero-delta, second edge, Toughness, and turn effects. Add the missing runtime cases to Automation; PIE may remain the narrower production DataAsset/GE gate required by the task.
+4. Rebuild, run `HSR.Battle.Patch.RepeatableBreak` plus applicable P8/P9/Battle Automation, and run the existing `bRunP9DotBreakHarness` PIE gate. Preserve the first real failure and attach exact logs. PIE must show `P9-003 DotBreak Harness=COMPLETE`, the repeatable case `Result=PASS`, two distinct ActionIds, exact successful Status/accepted Delay evidence, and zero related `FAIL`, `INCOMPLETE`, or `SKIPPED`.
+
+## Verdict
+
+`REVISE` — The production latch removal and edge/replay direction are plausible and stay in scope, but the task's mandatory runtime matrix and exact side-effect evidence are absent. Route automatically back to the original Implementation Agent; all required fixes fit the existing allowlist and authorization, so no user scope expansion is required. After Implementation commits the revision, return to an independent Reviewer before requesting the user PIE gate.
