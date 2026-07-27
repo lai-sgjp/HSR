@@ -1,43 +1,41 @@
-# TASK-P17-PATCH-02 Teardown Revision Review
+# TASK-P17-PATCH-02 Real-Blackboard Teardown Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `52250a8`
-- Result: `REVISE`
+- Reviewed revision: `4620704`
+- Result: `REVISE` (teardown revision passes; overall acceptance matrix remains incomplete)
 - Date: 2026-07-28
 
-## Production fix verified
+## Teardown revision accepted
 
-- Teardown now stops Brain logic, clears Blackboard state, nulls `RuntimeBlackboard`, invalidates the active request, and advances the epoch only when runtime ownership existed.
-- Because the pointer is detached before caller cleanup, subsequent `ClearState` from UnPossess/EndPlay cannot repopulate Blackboard keys. A repeated Stop after teardown is epoch-idempotent.
-- The one-shot retry remains cleared/invalidated before stale work. A fresh bind obtains a later epoch.
-- Revision provenance stays inside the Controller/test/result allowlist. User Map, Enemy DataAsset, `Content/AI/**`, learning, and `.claude/**` changes remain isolated.
-- Raw logs show the final `BehaviorTreeAdapter` and `MapContract` runs succeeded with exit `0`; the report records Build as 7 actions, exit `0`. Earlier failed adapter runs remain preserved.
+- The synthetic write mask and its pass oracle were removed.
+- The Automation fixture creates an AI World-backed initialized Blackboard with the six real key types, seeds each key with a non-default value, and directly reads every key.
+- It verifies real defaults after Stop, Stop then ClearState, repeated Stop, fresh rebind plus stale retry, and EndPlay-equivalent Stop then ClearState. Cleared vectors are correctly compared with `FAISystem::InvalidLocation`.
+- The preserved first failed run (`HSR-backup-2026.07.27-17.52.24.log`) shows the vector-clear assertions failing before the InvalidLocation correction; the final adapter log records Success/exit `0`. Final `MapContract` also records Success/exit `0`, and the report records Build as 4 actions, exit `0`.
+- Revision provenance is confined to the Controller/test/result allowlist. User Map, Enemy DataAsset, `Content/AI/**`, learning, and `.claude/**` changes remain isolated.
 
-## Blocking Automation finding
+## Remaining blocking acceptance groups
 
-The test does not truly verify the six Blackboard keys. `AreBlackboardRuntimeKeysClearForAutomation` ignores `InBlackboard` values and returns only whether an internal synthetic bitmask is zero. `WriteBlackboardRuntimeState` sets that mask wholesale to `0x3f`, and `ClearBlackboardRuntimeState` resets it wholesale to zero independently of whether each `ClearValue` call remains correct. Thus removing or breaking any one of the six real key clears would still pass every “six keys clear” assertion.
+The code revision closes the Blackboard teardown defect, but four required runtime groups remain unverified, so PATCH-02 cannot yet pass its complete gate:
 
-Minimum correction: seed all six actual keys in the world-backed Blackboard with non-default values, call Stop, and query the Blackboard component itself to prove each key is cleared. Repeat the real-value assertions after `ClearState`, repeated Stop, fresh bind/stale callback, and the EndPlay-equivalent ordering. Remove the synthetic mask or retain it only as non-authoritative diagnostics. Rebuild and rerun both tests.
+1. Full return completion:
+   - Enter chase, leave sight, do not reacquire.
+   - Record state/epoch/target validity and distance to SpawnOrigin at `Chasing -> LostTarget -> ReturningToSpawnOrigin`.
+   - Wait for stock Move To completion and record final location/state, proving arrival rather than only transition intent.
+2. Move failure/abort:
+   - During patrol or return, temporarily select an unreachable destination or interrupt the active stock Move To.
+   - Capture the result as failure/abort, `MoveFailed -> ReturningToSpawnOrigin`, Blackboard target/location, and proof that no C++ movement/timer retry loop starts.
+3. Target destruction:
+   - While Chasing and before overlap, destroy the target Actor.
+   - Capture target validity before/after, cleared `TargetActor`, state/epoch, and recovery toward SpawnOrigin.
+4. Encounter duplicate/resolved matrix:
+   - Trigger two overlap entry calls for the same transaction in one frame; capture both structured result reasons, identical/new request IDs as applicable, state/epoch, and subsystem counts before/after.
+   - After the admitted request is consumed/resolved, repeat the same transaction and capture `AlreadyResolved` (or the frozen equivalent) with zero mutation.
+   - If physical PIE cannot reliably generate same-frame duplicates, add a deterministic allowlisted transaction fixture; do not infer duplicate handling from one successful overlap.
 
-## Remaining completion-gate evidence
-
-Even after the teardown test is corrected, the active acceptance matrix still lacks:
-
-- same-frame duplicate overlap with preserved request ID, structured result/reason, and before/after state;
-- post-resolved/already-resolved rejection;
-- full stock `Move To SpawnOrigin` completion;
-- move failure and abort recovery;
-- target destruction cleanup.
-
-These remain blocking for PATCH-02 archive because the active card explicitly requires them. Minimal user PIE steps:
-
-1. Lose sight without reacquiring; wait until the enemy reaches SpawnOrigin and capture state/location before and after completion.
-2. Temporarily make the recovery/patrol destination unreachable or interrupt the active stock Move To; capture failure/abort, `MoveFailed -> ReturningToSpawnOrigin`, and absence of a C++ retry loop.
-3. Destroy the perceived target during Chasing; capture target validity, cleared `TargetActor`, state transition, and recovery.
-4. Trigger two overlap notifications in the same frame, then repeat after the first transaction resolves; capture request IDs, result reasons, state, epoch, and subsystem counts before/after. If the Editor cannot reliably force same-frame overlap, implement a deterministic allowlisted transaction seam instead of inferring it from a single successful overlap.
+Each run must retain before/after state, tree epoch, target validity, Encounter request/result IDs, and the first failure/SKIPPED reason. These are explicit active-task acceptance requirements rather than optional follow-up.
 
 ## Conclusion
 
-`REVISE`: the production teardown ordering fixes the identified rewrite defect, but the purported six-key test is synthetic rather than Blackboard-backed, and the explicitly required transaction/movement/destruction matrix is still incomplete. Do not archive PATCH-02.
+`REVISE`: `4620704` correctly supplies real six-key teardown evidence and needs no further teardown correction. The task remains blocked only on the four runtime acceptance groups above; do not archive PATCH-02 yet.
