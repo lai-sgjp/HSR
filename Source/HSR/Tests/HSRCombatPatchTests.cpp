@@ -117,7 +117,14 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Enemy perception defaults preserve existing radii"), FMath::IsNearlyEqual(Definition->SightRadius, 1000.0f) && FMath::IsNearlyEqual(Definition->LoseSightRadius, 1500.0f) && FMath::IsNearlyEqual(Definition->EncounterRadius, 200.0f));
 	Definition->SightRadius = 1200.0f;
 	Definition->LoseSightRadius = 1000.0f;
-	TestTrue(TEXT("LoseSight normalization is bounded by SightRadius"), FMath::Max(FMath::Max(0.0f, Definition->SightRadius), Definition->LoseSightRadius) == 1200.0f);
+	AHSREnemyAIController* RadiusController = NewObject<AHSREnemyAIController>();
+	RadiusController->ApplyDefinitionPerceptionConfigForAutomation(nullptr);
+	TestTrue(TEXT("No-Definition perception fallback preserves prior defaults"), FMath::IsNearlyEqual(RadiusController->GetSightRadiusForAutomation(), 1000.0f) && FMath::IsNearlyEqual(RadiusController->GetLoseSightRadiusForAutomation(), 1500.0f));
+	RadiusController->ApplyDefinitionPerceptionConfigForAutomation(Definition);
+	TestTrue(TEXT("Definition perception applies normalized radii"), FMath::IsNearlyEqual(RadiusController->GetSightRadiusForAutomation(), 1200.0f) && FMath::IsNearlyEqual(RadiusController->GetLoseSightRadiusForAutomation(), 1200.0f));
+	Definition->SightRadius = -1.0f; Definition->LoseSightRadius = -2.0f;
+	RadiusController->ApplyDefinitionPerceptionConfigForAutomation(Definition);
+	TestTrue(TEXT("Negative perception radii clamp in production helper"), FMath::IsNearlyZero(RadiusController->GetSightRadiusForAutomation()) && FMath::IsNearlyZero(RadiusController->GetLoseSightRadiusForAutomation()));
 	TestEqual(TEXT("Behavior Tree default reference is the Stage-A user asset"), Definition->BehaviorTreeAsset.ToSoftObjectPath().ToString(), FString(TEXT("/Game/AI/Enemy/BT_HSREnemy_Exploration.BT_HSREnemy_Exploration")));
 	TestEqual(TEXT("Blackboard default reference is the Stage-A user asset"), Definition->BlackboardAsset.ToSoftObjectPath().ToString(), FString(TEXT("/Game/AI/Enemy/BB_HSREnemy_Exploration.BB_HSREnemy_Exploration")));
 	TestTrue(TEXT("Recovery state is distinct from LostTarget and MoveFailed"), EHSREnemyExplorationState::ReturningToSpawnOrigin != EHSREnemyExplorationState::LostTarget && EHSREnemyExplorationState::ReturningToSpawnOrigin != EHSREnemyExplorationState::MoveFailed);
@@ -315,6 +322,14 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
+	UHSREnemyDefinition* RadiusDefinition = NewObject<UHSREnemyDefinition>();
+	RadiusDefinition->EncounterRadius = 333.0f;
+	OriginEnemy->EnemyDefinition = RadiusDefinition;
+	OriginEnemy->ApplyDefinitionEncounterConfigForAutomation();
+	TestTrue(TEXT("Definition encounter radius applies through production helper"), FMath::IsNearlyEqual(OriginEnemy->GetEncounterRadiusForAutomation(), 333.0f));
+	RadiusDefinition->EncounterRadius = -10.0f;
+	OriginEnemy->ApplyDefinitionEncounterConfigForAutomation();
+	TestTrue(TEXT("Negative encounter radius clamps in production helper"), FMath::IsNearlyZero(OriginEnemy->GetEncounterRadiusForAutomation()));
 	const FVector PreBeginPlayLocation(701.0f, -113.0f, 42.0f);
 	OriginEnemy->SetActorLocation(PreBeginPlayLocation);
 	TestEqual(TEXT("Pre-BeginPlay origin falls back to ActorLocation"), OriginEnemy->GetSpawnOrigin(), PreBeginPlayLocation);

@@ -10,6 +10,7 @@
 class UAIPerceptionComponent;
 class UAISenseConfig_Sight;
 class UBlackboardComponent;
+class UHSREnemyDefinition;
 
 UCLASS()
 class HSR_API AHSREnemyAIController : public AAIController
@@ -82,6 +83,14 @@ protected:
 	void ClearState();
 	void SetState(EHSREnemyExplorationState NewState);
 	void ApplyDefinitionPerceptionConfig();
+	void ApplyPerceptionConfig(const UHSREnemyDefinition* InDefinition);
+
+#if WITH_DEV_AUTOMATION_TESTS
+public:
+	void ApplyDefinitionPerceptionConfigForAutomation(const UHSREnemyDefinition* InDefinition);
+	float GetSightRadiusForAutomation() const;
+	float GetLoseSightRadiusForAutomation() const;
+#endif
 
 	UPROPERTY()
 	TWeakObjectPtr<AActor> CurrentTarget;

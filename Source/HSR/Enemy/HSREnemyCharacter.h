@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Components/SphereComponent.h"
 #include "HSREnemyCharacter.generated.h"
 
 class UHSREnemyDefinition;
@@ -40,4 +41,11 @@ protected:
 
 	bool bSpawnOriginCaptured = false;
 	void CaptureSpawnOrigin();
+	void ApplyDefinitionEncounterConfig();
+
+#if WITH_DEV_AUTOMATION_TESTS
+public:
+	void ApplyDefinitionEncounterConfigForAutomation() { ApplyDefinitionEncounterConfig(); }
+	float GetEncounterRadiusForAutomation() const { return EncounterCollision ? EncounterCollision->GetScaledSphereRadius() : -1.0f; }
+#endif
 };

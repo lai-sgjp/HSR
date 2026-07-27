@@ -280,6 +280,8 @@ Handled-fixture isolation revision: Moving and Returning failures independently 
 
 Validation: `HSREditor Win64 Development` `PASS` (13 actions, exit `0`); `HSR.Exploration.Patch.BehaviorTreeAdapter` `PASS` (exit `0`). User assets were not changed.
 
+Reviewer test-realism revision: Adapter now invokes the same production perception/encounter apply helpers used by possession/BeginPlay and reads actual `SightConfig`/`EncounterCollision` values. It verifies no-Definition `1000/1500/200`, Definition `1200/1000/333` normalization to `1200/1200/333`, and negative-radius clamp behavior. Build and Adapter pass.
+
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
 
 ### Stage-B main-path PIE evidence — USER PROVIDED

@@ -218,17 +218,39 @@ void AHSREnemyAIController::ApplyDefinitionPerceptionConfig()
 {
 	const AHSREnemyCharacter* Enemy = Cast<AHSREnemyCharacter>(GetPawn());
 	const UHSREnemyDefinition* Definition = Enemy ? Enemy->EnemyDefinition : nullptr;
-	if (!Definition || !SightConfig)
+	ApplyPerceptionConfig(Definition);
+}
+
+void AHSREnemyAIController::ApplyPerceptionConfig(const UHSREnemyDefinition* Definition)
+{
+	if (!SightConfig)
 	{
 		return;
 	}
-	SightConfig->SightRadius = FMath::Max(0.0f, Definition->SightRadius);
-	SightConfig->LoseSightRadius = FMath::Max(SightConfig->SightRadius, Definition->LoseSightRadius);
+	SightConfig->SightRadius = FMath::Max(0.0f, Definition ? Definition->SightRadius : 1000.0f);
+	SightConfig->LoseSightRadius = FMath::Max(SightConfig->SightRadius, Definition ? Definition->LoseSightRadius : 1500.0f);
 	if (PerceptionComponent)
 	{
 		PerceptionComponent->RequestStimuliListenerUpdate();
 	}
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+void AHSREnemyAIController::ApplyDefinitionPerceptionConfigForAutomation(const UHSREnemyDefinition* InDefinition)
+{
+	ApplyPerceptionConfig(InDefinition);
+}
+
+float AHSREnemyAIController::GetSightRadiusForAutomation() const
+{
+	return SightConfig ? SightConfig->SightRadius : -1.0f;
+}
+
+float AHSREnemyAIController::GetLoseSightRadiusForAutomation() const
+{
+	return SightConfig ? SightConfig->LoseSightRadius : -1.0f;
+}
+#endif
 
 void AHSREnemyAIController::BeginChasingTarget(AActor* Actor)
 {
