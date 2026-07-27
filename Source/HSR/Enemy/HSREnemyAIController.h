@@ -55,7 +55,6 @@ protected:
 
 	EHSREnemyExplorationState CurrentState;
 	int32 BehaviorTreeEpoch = 0;
-	bool bRecoveryMoveActive = false;
 	FGuid ActiveEncounterRequestId;
 
 	FTimerHandle PatrolWaitTimerHandle;

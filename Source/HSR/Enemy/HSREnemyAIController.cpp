@@ -49,8 +49,8 @@ void AHSREnemyAIController::BeginPlay()
 
 	UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::BeginPlay - %s"), *GetName());
 
-	// Start patrol after a short frame delay to allow NavMesh to initialize
-	GetWorld()->GetTimerManager().SetTimer(InitTimerHandle, this, &AHSREnemyAIController::StartPatrol, 0.2f, false);
+	// Stage A deliberately does not start the legacy patrol timer. Stage B stock
+	// Move To/Wait nodes are the sole movement driver after the BT is populated.
 }
 
 void AHSREnemyAIController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -200,15 +200,6 @@ void AHSREnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathF
 	{
 		return;
 	}
-	if (bRecoveryMoveActive)
-	{
-		bRecoveryMoveActive = false;
-		if (Result.IsSuccess())
-		{
-			StartPatrol();
-		}
-		return;
-	}
 
 	if (CurrentState == EHSREnemyExplorationState::MovingToPatrol)
 	{
@@ -276,12 +267,9 @@ void AHSREnemyAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus
 		GetWorld()->GetTimerManager().ClearTimer(PatrolWaitTimerHandle);
 		StopMovement();
 
-	// Start chase with configured acceptance radius
+	// Stage B's stock Move To node consumes TargetActor. C++ owns the state and
+	// encounter admission, but never issues a competing movement request.
 	SetState(EHSREnemyExplorationState::Chasing);
-	AHSREnemyCharacter* EnemyChar = Cast<AHSREnemyCharacter>(GetPawn());
-	UHSREnemyDefinition* EDef = EnemyChar ? EnemyChar->EnemyDefinition : nullptr;
-	float Acceptance = EDef ? EDef->ChaseAcceptanceRadius : 50.0f;
-	MoveToActor(Actor, Acceptance);
 
 	// A4c: Try request encounter now that we're in Chasing state.
 	// The physical overlap (NotifyActorBeginOverlap) may have already fired while the AI
@@ -319,22 +307,17 @@ void AHSREnemyAIController::HandleMoveFailedOrAborted()
 void AHSREnemyAIController::BeginSpawnOriginRecovery(EHSREnemyExplorationState RecoveryState)
 {
 	AHSREnemyCharacter* Enemy = Cast<AHSREnemyCharacter>(GetPawn());
-	if (!Enemy || bRecoveryMoveActive)
+	if (!Enemy)
 		return;
 
-	StopMovement();
 	SetState(RecoveryState);
 	if (RuntimeBlackboard)
 	{
 		RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::PatrolLocation, Enemy->GetSpawnOrigin());
 	}
 	SetState(EHSREnemyExplorationState::ReturningToSpawnOrigin);
-	bRecoveryMoveActive = true;
-	if (MoveToLocation(Enemy->GetSpawnOrigin(), 25.0f, true) == EPathFollowingRequestResult::Failed)
-	{
-		bRecoveryMoveActive = false;
-		SetState(EHSREnemyExplorationState::MoveFailed);
-	}
+	// Stage B's stock Move To consumes PatrolLocation=SpawnOrigin. Do not call
+	// MoveToLocation here: that would race the Behavior Tree movement request.
 }
 
 void AHSREnemyAIController::TryRequestEncounterFromCharacter()
@@ -431,7 +414,6 @@ void AHSREnemyAIController::StopBehaviorTreeRuntime()
 		BrainComponent->StopLogic(TEXT("P17-PATCH-02 lifecycle teardown"));
 	}
 	ActiveEncounterRequestId.Invalidate();
-	bRecoveryMoveActive = false;
 	++BehaviorTreeEpoch;
 }
 

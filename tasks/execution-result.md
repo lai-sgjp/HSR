@@ -84,3 +84,15 @@ Status: `IMPLEMENTED / STAGE-A BUILD PASS / STAGE-B USER EDITOR GATE PENDING`.
 
 - The new automation test was compiled but not run.
 - PIE/runtime evidence and the five Stage-B stock-node branches remain user-owned and pending. Do not treat the Stage-A build as proof of target acquisition/loss, travel failure, or end-to-end Encounter behavior.
+
+### Stage-A Automation and movement-ownership follow-up
+
+`HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS` in `UnrealEditor-Cmd` (test completed `Success`, process exit `0`).
+
+The automation review exposed a future Stage-B ownership conflict: the legacy `BeginPlay` patrol timer and perception `MoveToActor` request could run alongside the user-built stock BT `Move To` nodes. The Controller was corrected within the existing allowlist:
+
+- `BeginPlay` no longer starts the legacy `StartPatrol` timer.
+- Perception only publishes `TargetActor` and `Chasing`; it no longer calls `MoveToActor`.
+- LostTarget/MoveFailed only publish `PatrolLocation=SpawnOrigin` and recovery state; they no longer call `MoveToLocation`.
+
+Therefore the Stage-B stock `Move To`/`Wait` graph will be the sole movement request owner, while C++ retains state, epoch, Blackboard-key and Encounter-admission authority. The post-fix `HSREditor Win64 Development` build passed (6 actions, exit `0`) and the Automation passed again. Stage B remains pending user-owned Editor work.
