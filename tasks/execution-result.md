@@ -10,6 +10,13 @@ Status: `IMPLEMENTED / REVIEW REQUIRED`
 - Added controlled Automation assertions for invalid-kind non-consumption/reuse and current-pending old/new count evidence.
 - Re-ran Development Editor Build — PASS; `Automation RunTests HSR.Battle.Patch` — PASS, exit code 0.
 
+## REVISE follow-up 2 (2026-07-27)
+
+- Consolidated admitted-alive Break Delay onto the same internal request admission, atomic arithmetic preview, snapshot and OperationId path as ordinary Delay; the privileged route remains private to Coordinator.
+- Added executable rejection/replay coverage for NaN Ratio, invalid target and same-OperationId replay after a structured rejection.
+- Added structured `ActionDistance` rejection logs for invalid requests and non-finite Speed callbacks; each rejects with zero state/lifecycle mutation.
+- First Build attempt failed only because this engine's `TNumericLimits<float>` lacks `QuietNaN`; the test was corrected to use `FMath::Sqrt(-1.0f)`. The subsequent Development Editor Build passed, and the full `HSR.Battle.Patch` Automation run passed with exit code 0.
+
 ## Implemented
 
 - Replaced static speed queue/Break skip-once storage with battle-local action-distance state: effective speed, base distance, remaining distance, deterministic epsilon candidate selection, current-turn lock and ordered post-action adjustments.

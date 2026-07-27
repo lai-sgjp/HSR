@@ -61,6 +61,7 @@ private:
 	friend class UHSRBattleCoordinator;
 	/** The only defeated-target exception: Coordinator's same synchronous admitted-alive transaction. */
 	bool ConsumeAdmittedBreakDelay(const FHSRTurnDelayRequest& Request);
+	FHSRActionDistanceResult RequestActionDistanceAdjustmentInternal(const FHSRActionDistanceRequest& Request, bool bAllowAdmittedDeferredDefeat);
 	struct FPendingPostActionOperation { EHSRActionDistanceAdjustmentKind Kind = EHSRActionDistanceAdjustmentKind::Advance; float Distance = 0.0f; };
 	struct FSpeedDelegateBinding { FName ParticipantId; TWeakObjectPtr<UAbilitySystemComponent> AbilitySystemComponent; FDelegateHandle Handle; uint64 Epoch = 0; };
 

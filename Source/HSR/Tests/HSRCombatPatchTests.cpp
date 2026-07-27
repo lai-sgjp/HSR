@@ -46,6 +46,13 @@ bool FHSRActionDistancePatchTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Unknown adjustment kind is rejected before consuming id"), Manager->RequestActionDistanceAdjustment(InvalidKind).Result, EHSRActionDistanceAdjustmentResult::InvalidRequest);
 	InvalidKind.Kind = EHSRActionDistanceAdjustmentKind::Advance;
 	TestEqual(TEXT("Unknown-kind operation id remains usable"), Manager->RequestActionDistanceAdjustment(InvalidKind).Result, EHSRActionDistanceAdjustmentResult::Accepted);
+	FHSRActionDistanceRequest InvalidRatio = Delay; InvalidRatio.OperationId = FGuid::NewGuid(); InvalidRatio.Ratio = FMath::Sqrt(-1.0f);
+	TestEqual(TEXT("Non-finite ratio rejects without consuming id"), Manager->RequestActionDistanceAdjustment(InvalidRatio).Result, EHSRActionDistanceAdjustmentResult::InvalidRequest);
+	InvalidRatio.Ratio = 0.0f;
+	TestEqual(TEXT("Rejected ratio id can subsequently be accepted"), Manager->RequestActionDistanceAdjustment(InvalidRatio).Result, EHSRActionDistanceAdjustmentResult::Accepted);
+	FHSRActionDistanceRequest BadTarget = Delay; BadTarget.OperationId = FGuid::NewGuid(); BadTarget.TargetParticipantId = TEXT("Unknown");
+	TestEqual(TEXT("Unknown target is structured rejection"), Manager->RequestActionDistanceAdjustment(BadTarget).Result, EHSRActionDistanceAdjustmentResult::InvalidTarget);
+	TestEqual(TEXT("Rejected valid-id target replay is duplicate"), Manager->RequestActionDistanceAdjustment(BadTarget).Result, EHSRActionDistanceAdjustmentResult::DuplicateOperation);
 	TestEqual(TEXT("Adjustment does not advance lifecycle"), Manager->GetTurnSequence(), Sequence);
 	TestTrue(TEXT("Current action resolves after pending delay"), Manager->ResolveAction(Current));
 	TestEqual(TEXT("Resolve emits exactly one successor turn"), Manager->GetTurnSequence(), Sequence + 1);
