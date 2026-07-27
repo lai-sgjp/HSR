@@ -162,3 +162,25 @@ Validation:
 - `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
 
 User-owned `Content/Data/Enemies/DA_Enemy_Phase5Test1.uasset`, `Content/Maps/Map_Phase1_Exploration.umap`, and `Content/AI/**` were observed as dirty and were not touched or staged.
+
+### Stage-B PIE revision — one-shot navigation readiness retry
+
+After the SpawnOrigin repair, PIE still showed the initial patrol query occurring in `OnPossess` before the Recast NavData was ready. A saved NavMesh does not guarantee NavData is available at that earlier lifecycle point.
+
+The Controller now keeps BT/Blackboard startup immediate, then schedules exactly one 0.2-second Nav-ready intent retry after BeginPlay/runtime availability. The retry:
+
+- captures `BehaviorTreeEpoch`, is armed only once, and consumes itself before work;
+- is cancelled and invalidated during Stop/UnPossess/EndPlay;
+- rejects stale epochs without mutation;
+- only calls `PublishNextPatrolIntent`, which queries navigation and writes Blackboard state/location. It never issues movement, starts a repeating timer, or polls.
+
+Patrol logs now include controller, center, radius, NavSystem, NavData, candidate/result, plus retry schedule and stale-epoch details. Static scan found no `MoveToLocation` or `MoveToActor` in the Controller.
+
+`HSR.Exploration.Patch.BehaviorTreeAdapter` verifies one pending arm, duplicate-arm rejection, stale epoch rejection, one matching consumption, and no second consumption.
+
+Validation:
+
+- `HSREditor Win64 Development`: `PASS`, 7 actions, exit `0` (only engine AISystem C4996 warning).
+- `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
+
+User map, enemy DataAsset, and AI assets remain untouched. PIE must now verify a `NavReadyRetry` log followed by a Reachable patrol candidate and stock BT movement.

@@ -7,6 +7,7 @@
 #include "Perception/AISenseConfig_Sight.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationSystem.h"
+#include "NavigationData.h"
 #include "GameFramework/Character.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
@@ -51,6 +52,7 @@ void AHSREnemyAIController::BeginPlay()
 
 	// Stage A deliberately does not start the legacy patrol timer. Stage B stock
 	// Move To/Wait nodes are the sole movement driver after the BT is populated.
+	ScheduleNavReadyPatrolIntent();
 }
 
 void AHSREnemyAIController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -82,6 +84,7 @@ void AHSREnemyAIController::OnPossess(APawn* InPawn)
 	}
 
 	StartBehaviorTreeRuntime();
+	ScheduleNavReadyPatrolIntent();
 }
 
 void AHSREnemyAIController::OnUnPossess()
@@ -339,6 +342,12 @@ bool AHSREnemyAIController::StartBehaviorTreeRuntime()
 
 void AHSREnemyAIController::StopBehaviorTreeRuntime()
 {
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(NavReadyRetryTimerHandle);
+	}
+	bNavReadyRetryScheduled = false;
+	NavReadyRetryEpoch = INDEX_NONE;
 	ClearBlackboardRuntimeState();
 	if (BrainComponent)
 	{
@@ -364,14 +373,64 @@ void AHSREnemyAIController::WriteBlackboardRuntimeState()
 void AHSREnemyAIController::PublishNextPatrolIntent(const FVector& InSpawnOrigin, float PatrolRadius)
 {
 	UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	const ANavigationData* NavData = NavSystem ? NavSystem->GetDefaultNavDataInstance(FNavigationSystem::DontCreate) : nullptr;
 	FNavLocation Candidate;
-	const bool bHasReachableCandidate = NavSystem
+	const bool bHasReachableCandidate = NavData
 		&& NavSystem->GetRandomReachablePointInRadius(InSpawnOrigin, FMath::Max(0.0f, PatrolRadius), Candidate);
+	UE_LOG(LogTemp, Log, TEXT("P17-PATCH-02 PatrolIntent Controller=%s Center=%s Radius=%.2f NavSystem=%s NavData=%s Result=%s Candidate=%s"),
+		*GetName(), *InSpawnOrigin.ToString(), PatrolRadius, *GetNameSafe(NavSystem), *GetNameSafe(NavData),
+		bHasReachableCandidate ? TEXT("Reachable") : TEXT("Fallback"), *Candidate.Location.ToString());
 	if (!bHasReachableCandidate)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("P17-PATCH-02 patrol intent fallback: %s has no reachable patrol point"), *GetName());
 	}
 	PublishPatrolIntent(InSpawnOrigin, Candidate.Location, bHasReachableCandidate);
+}
+
+void AHSREnemyAIController::ScheduleNavReadyPatrolIntent()
+{
+	if (bNavReadyRetryScheduled || !RuntimeBlackboard || !GetWorld())
+	{
+		return;
+	}
+
+	AHSREnemyCharacter* Enemy = Cast<AHSREnemyCharacter>(GetPawn());
+	UHSREnemyDefinition* Definition = Enemy ? Enemy->EnemyDefinition : nullptr;
+	if (!Enemy || !Definition)
+	{
+		return;
+	}
+
+	const int32 ScheduledEpoch = BehaviorTreeEpoch;
+	bNavReadyRetryScheduled = true;
+	NavReadyRetryEpoch = ScheduledEpoch;
+	UE_LOG(LogTemp, Log, TEXT("P17-PATCH-02 NavReadyRetry Scheduled Controller=%s Epoch=%d Center=%s Radius=%.2f"),
+		*GetName(), ScheduledEpoch, *Enemy->GetSpawnOrigin().ToString(), Definition->PatrolRadius);
+	GetWorld()->GetTimerManager().SetTimer(NavReadyRetryTimerHandle,
+		FTimerDelegate::CreateWeakLambda(this, [this, ScheduledEpoch]() { RunNavReadyPatrolIntent(ScheduledEpoch); }), 0.2f, false);
+}
+
+void AHSREnemyAIController::RunNavReadyPatrolIntent(int32 ScheduledEpoch)
+{
+	if (!bNavReadyRetryScheduled || NavReadyRetryEpoch != ScheduledEpoch)
+	{
+		return;
+	}
+
+	bNavReadyRetryScheduled = false;
+	NavReadyRetryEpoch = INDEX_NONE;
+	if (BehaviorTreeEpoch != ScheduledEpoch)
+	{
+		UE_LOG(LogTemp, Log, TEXT("P17-PATCH-02 NavReadyRetry Stale Controller=%s ScheduledEpoch=%d CurrentEpoch=%d"), *GetName(), ScheduledEpoch, BehaviorTreeEpoch);
+		return;
+	}
+
+	AHSREnemyCharacter* Enemy = Cast<AHSREnemyCharacter>(GetPawn());
+	UHSREnemyDefinition* Definition = Enemy ? Enemy->EnemyDefinition : nullptr;
+	if (Enemy && Definition)
+	{
+		PublishNextPatrolIntent(Enemy->GetSpawnOrigin(), Definition->PatrolRadius);
+	}
 }
 
 void AHSREnemyAIController::PublishPatrolIntent(const FVector& InSpawnOrigin, const FVector& InCandidate, bool bHasReachableCandidate)
@@ -428,5 +487,27 @@ void AHSREnemyAIController::PublishPatrolIntentForAutomation(UBlackboardComponen
 {
 	RuntimeBlackboard = InBlackboard;
 	PublishPatrolIntent(InSpawnOrigin, InCandidate, bHasReachableCandidate);
+}
+
+bool AHSREnemyAIController::ArmNavReadyRetryForAutomation(int32 InEpoch)
+{
+	if (bNavReadyRetryScheduled)
+	{
+		return false;
+	}
+	bNavReadyRetryScheduled = true;
+	NavReadyRetryEpoch = InEpoch;
+	return true;
+}
+
+bool AHSREnemyAIController::ConsumeNavReadyRetryForAutomation(int32 InEpoch)
+{
+	if (!bNavReadyRetryScheduled || NavReadyRetryEpoch != InEpoch)
+	{
+		return false;
+	}
+	bNavReadyRetryScheduled = false;
+	NavReadyRetryEpoch = INDEX_NONE;
+	return true;
 }
 #endif

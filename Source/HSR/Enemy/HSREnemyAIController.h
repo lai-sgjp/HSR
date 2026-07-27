@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "AIController.h"
 #include "Perception/AIPerceptionTypes.h"
+#include "Engine/TimerHandle.h"
 #include "HSREnemyTypes.h"
 #include "HSREnemyAIController.generated.h"
 
@@ -35,6 +36,8 @@ public:
 #if WITH_DEV_AUTOMATION_TESTS
 	bool GetPatrolLocationForAutomation(FVector& OutPatrolLocation) const;
 	void PublishPatrolIntentForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin, const FVector& InCandidate, bool bHasReachableCandidate);
+	bool ArmNavReadyRetryForAutomation(int32 InEpoch);
+	bool ConsumeNavReadyRetryForAutomation(int32 InEpoch);
 #endif
 
 protected:
@@ -49,6 +52,8 @@ protected:
 	void WriteBlackboardRuntimeState();
 	void PublishNextPatrolIntent(const FVector& InSpawnOrigin, float PatrolRadius);
 	void PublishPatrolIntent(const FVector& InSpawnOrigin, const FVector& InCandidate, bool bHasReachableCandidate);
+	void ScheduleNavReadyPatrolIntent();
+	void RunNavReadyPatrolIntent(int32 ScheduledEpoch);
 	void ClearBlackboardRuntimeState();
 	void SetBlackboardTarget(AActor* Target);
 	void BeginSpawnOriginRecovery(EHSREnemyExplorationState RecoveryState);
@@ -63,6 +68,9 @@ protected:
 	FGuid ActiveEncounterRequestId;
 	FVector PublishedPatrolLocation = FVector::ZeroVector;
 	bool bHasPublishedPatrolLocation = false;
+	FTimerHandle NavReadyRetryTimerHandle;
+	int32 NavReadyRetryEpoch = INDEX_NONE;
+	bool bNavReadyRetryScheduled = false;
 
 	UPROPERTY()
 	TObjectPtr<UAISenseConfig_Sight> SightConfig;

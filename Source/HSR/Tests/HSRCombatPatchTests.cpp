@@ -121,6 +121,11 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Unreachable patrol fallback waits instead of issuing a movement loop"), Controller->GetCurrentState(), EHSREnemyExplorationState::PatrolWaiting);
 	TestTrue(TEXT("Unreachable patrol fallback publishes SpawnOrigin"), Controller->GetPatrolLocationForAutomation(PatrolLocation));
 	TestEqual(TEXT("Unreachable patrol fallback location is SpawnOrigin"), PatrolLocation, ExpectedSpawnOrigin);
+	TestTrue(TEXT("Nav-ready retry arms once"), Controller->ArmNavReadyRetryForAutomation(7));
+	TestFalse(TEXT("Nav-ready retry refuses a second pending arm"), Controller->ArmNavReadyRetryForAutomation(7));
+	TestFalse(TEXT("Nav-ready retry rejects stale epoch consumption"), Controller->ConsumeNavReadyRetryForAutomation(8));
+	TestTrue(TEXT("Nav-ready retry consumes matching epoch exactly once"), Controller->ConsumeNavReadyRetryForAutomation(7));
+	TestFalse(TEXT("Nav-ready retry cannot repeat after consumption"), Controller->ConsumeNavReadyRetryForAutomation(7));
 	UWorld* OriginWorld = UWorld::CreateWorld(EWorldType::GamePreview, false);
 	ON_SCOPE_EXIT { if (OriginWorld) OriginWorld->DestroyWorld(false); };
 	AHSREnemyCharacter* OriginEnemy = OriginWorld ? OriginWorld->SpawnActor<AHSREnemyCharacter>() : nullptr;
