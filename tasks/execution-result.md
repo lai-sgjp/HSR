@@ -214,3 +214,14 @@ Validation:
 - `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
 
 No user-owned map, enemy DataAsset, or `Content/AI/**` asset was changed.
+
+### Stage-B PIE acceptance evidence — USER PROVIDED
+
+User-provided PIE log and screenshot confirm the runtime handoff after the one-shot navigation-readiness retry:
+
+- `NavData` is valid as `RecastNavMesh-Default` after the retry; patrol-center projection succeeds and publishes reachable candidate `(1718.833, -1064.412, 0)`.
+- Blackboard patrol state transitions `1 -> 2` (`PatrolWaiting` to `MovingToPatrol`).
+- A later reachable candidate `(1656.780, -942.160, 0)` is published after the stock Behavior Tree `MoveTo` completes, confirming that `OnMoveCompleted` advances patrol intent rather than any legacy Controller movement loop.
+- The accompanying PIE screenshot shows the full green NavMesh coverage required by this traversal.
+
+The observed Crowd warning occurs only during teardown and does not supersede the successful patrol evidence above. This entry records user-provided verification only; no map, DataAsset, or `Content/AI/**` asset was modified.
