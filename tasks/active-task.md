@@ -17,6 +17,9 @@ Status: `PLANNED / TASK GATE REVIEW REQUIRED`
 - `Source/HSR/Data/Definitions/HSREnemyDefinition.h`
 - `Source/HSR/Data/Definitions/HSREnemyDefinition.cpp`
 - `Source/HSR/Tests/HSRCombatPatchTests.cpp`
+- `Content/AI/Enemy/BB_HSREnemy_Exploration.uasset`（用户资产；仅用户在 Editor 修改/提交）
+- `Content/AI/Enemy/BT_HSREnemy_Exploration.uasset`（用户资产；仅用户在 Editor 修改/提交）
+- `Content/Blueprints/Character/Enemy/BP_HSREnemy_Phase4Test.uasset`（用户资产；仅 Controller/Auto Possess/Definition 绑定）
 - `tasks/execution-result.md`
 
 Implementation 不得在 Task Gate/复述阶段修改文件；正式 Behavior Tree、Blackboard、服务/任务节点、Blueprint/DataAsset 和感知资产需要用户 Asset Gate 与最小授权，不能从本卡推断授权。
@@ -40,7 +43,10 @@ Implementation 不得在 Task Gate/复述阶段修改文件；正式 Behavior Tr
 - First admitted request creates one pending transaction. Same-frame duplicate overlap+perception returns `DuplicateRequest` with no new request ID, movement, or tree task. Already pending/traveling returns `AlreadyPending`; already consumed/resolved returns `AlreadyResolved`; invalid definition/target returns structured rejection. Travel failure completes and clears the task/pending record without restarting chase or enqueuing another request.
 - Encounter result consumption is exactly once by the authoritative controller; resolved rejection is terminal for that transaction key. A new BattleEpoch or explicit new encounter identity is required for a later request. Automation must cover same-frame duplicate and post-resolved rejection with before/after state, request ID and result reason.
 
-## User Asset Gate and acceptance matrix
+## Two-stage Asset Gate and acceptance matrix
 
-- Before implementation, user must provide or confirm exact paths and editable fields for one Behavior Tree, one Blackboard, any Service/Task nodes, perception configuration, and enemy Controller/Character Blueprint/DataAsset bindings; if these assets do not exist, implementation stops and requests the smallest asset authorization. No Content/Blueprint/Config is inferred from this card.
+- Stage A is satisfied by the user-confirmed assets `/Game/AI/Enemy/BB_HSREnemy_Exploration` and `/Game/AI/Enemy/BT_HSREnemy_Exploration`, the verified six-key Blackboard schema, confirmed BT→BB assignment, `BP_HSREnemy_Phase4Test` Controller/Auto Possess binding, and explicit authorization for minimal `UHSREnemyDefinition` BT/BB references. The BT graph may still be empty at Stage A.
+- After Stage A, Implementation may add only the allowlisted C++ event adapter, BT/BB asset references, epoch/key writes, lifecycle start/stop and Automation seams. It must use stock Blackboard Decorator, Move To and Wait where sufficient; any required new production BT Task/Service/Decorator class or new source file is a hard stop for allowlist expansion.
+- Stage B occurs only after the Stage-A C++ adapter builds. Coordinator then gives the user exact Editor node construction using the compiled state/key contract. The user alone edits the three allowlisted `.uasset` files, saves/reopens, and supplies the five-branch screenshot/path evidence. Implementation must not binary-edit or submit those assets.
+- Stage B still forbids interval/tick Services. EncounterPending must observe the authoritative C++ result/key transition and must not call the battle subsystem; LostTarget/MoveFailed must use `Move To SpawnOrigin`.
 - Required runtime evidence after Asset Gate: acquire/loss, target destruction, move success/failure/abort, return-to-SpawnOrigin, duplicate overlap+perception, already-resolved rejection, stale callback after re-possess/EndPlay, and zero Tick/polling proof. Each case logs before/after state, tree epoch, target validity and Encounter request/result IDs.
