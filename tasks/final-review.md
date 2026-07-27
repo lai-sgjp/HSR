@@ -1,38 +1,42 @@
-# TASK-P17-PATCH-02 Intentional-Abort Review
+# TASK-P17-PATCH-02 Move-Ownership Matrix Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `2ed4786`
+- Reviewed revision: `21996d1`
 - Result: `REVISE`
 - Date: 2026-07-28
 
-## Production behavior verified
+## Verified
 
-- Failed/aborted movement is converted to recovery only while the current state owns patrol/recovery movement: `MovingToPatrol` or `ReturningToSpawnOrigin`.
-- Abort callbacks arriving after a branch switch to Alert, Chasing, EncounterPending, or Idle are ignored with structured `MoveAbortIgnored ... Reason=BranchSwitch` logging; the ignored branch contains no state or Blackboard write.
-- True handled failure still uses the existing `MoveFailed -> ReturningToSpawnOrigin` publisher and does not introduce direct movement or a retry loop.
-- Build, `BehaviorTreeAdapter`, and `MapContract` are reported/logged as Success with exit `0`. Revision provenance remains in the Controller/test/result allowlist; dirty user Blueprints, Map, DataAsset, and AI assets remain isolated.
+- The test now reaches the production decision seam for both handled states, `MovingToPatrol` and `ReturningToSpawnOrigin`, rather than relying only on the direct recovery publisher.
+- Alert, Chasing, EncounterPending, and Idle are each passed through the same seam and return `false`.
+- Production classification remains correct, and no production `.cpp` behavior changed in this assertion revision.
+- Build, `BehaviorTreeAdapter`, and `MapContract` remain reported/logged as successful. Revision provenance is restricted to the allowlisted header/test/result files; user Blueprints, Map, DataAsset, and AI assets remain isolated.
 
-## Blocking Automation gaps
+## Blocking assertion gaps
 
-The report claims both paths are verified, but the new predicate is exercised only for the ignored Chasing path:
+The new ignored-state assertion is still not the “full relevant snapshot” required by the preceding review. It checks only CurrentState, PatrolLocation, controller epoch, Encounter attempt count, and retry flag. It does not check:
 
-- The earlier “true patrol failure” assertions call `PublishMoveFailureRecoveryForAutomation` directly, bypassing `ShouldHandleMoveFailureOrAbort` and the new `HandleMoveFailureForAutomation` decision path. A regression that rejects `MovingToPatrol` would still pass.
-- The ignored path asserts only that `CurrentState` remains Chasing. It does not snapshot Blackboard values, active Encounter request, Nav-ready retry state, target identity, or recovery marker, so the claimed state/Blackboard zero mutation is incomplete.
-- ReturningToSpawnOrigin, Alert, EncounterPending, and Idle predicate classifications are not asserted despite being explicitly named by the contract.
+- Blackboard `AIState`, `TargetActor`, `SpawnOrigin`, `TreeEpoch`, or `EncounterRequestId`;
+- controller active Encounter request identity;
+- the last recovery marker;
+- target identity/validity.
 
-Minimum correction inside the existing allowlist:
+Consequently, mutations to most Blackboard runtime state or the active request would remain undetected. The handled-state checks are also incomplete: the new Moving/Returning decision calls do not each assert final `PatrolLocation=SpawnOrigin`, no retry, no Encounter creation/identity change, and bounded final `ReturningToSpawnOrigin` state.
 
-1. Publish a reachable patrol intent to establish `MovingToPatrol`, call `HandleMoveFailureForAutomation`, require `true`, and assert `MoveFailed` was recorded before final `ReturningToSpawnOrigin` with `PatrolLocation=SpawnOrigin` and no retry/Encounter.
-2. Establish `ReturningToSpawnOrigin` and assert the same handled result.
-3. For Alert, Chasing, EncounterPending, and Idle, capture a full relevant snapshot before/after (AIState, TargetActor, PatrolLocation, SpawnOrigin, TreeEpoch, EncounterRequestId/active request, retry flag, and last recovery marker), call the decision seam, require `false`, and assert exact zero mutation.
-4. Rebuild and rerun both Automation tests.
+Minimum correction inside the current allowlist:
 
-## Remaining user gate
+1. Add a test-local snapshot containing CurrentState, all six Blackboard values, tree epoch, active Encounter request validity/identity, Encounter attempt count, retry flag, last recovery marker, and target object/validity.
+2. Seed non-default TargetActor, SpawnOrigin, PatrolLocation, TreeEpoch, EncounterRequestId/active request, and recovery marker where necessary.
+3. For each of Alert, Chasing, EncounterPending, and Idle, capture before/after snapshots around `HandleMoveFailureForAutomation`, require `false`, and compare every snapshot field exactly.
+4. For MovingToPatrol and ReturningToSpawnOrigin, require `true` and independently assert recorded `MoveFailed`, final `ReturningToSpawnOrigin`, `PatrolLocation=SpawnOrigin`, unchanged/no Encounter admission, no retry arm, and unchanged epoch.
+5. Rebuild and rerun `BehaviorTreeAdapter`; `MapContract` only needs a fresh rerun if production/Transition code changes.
 
-After those deterministic assertions pass, the only remaining task-level evidence is still the real full-return PIE: `Chasing -> LostTarget -> ReturningToSpawnOrigin`, one `ReturnComplete` within acceptance radius, cleared target/no Encounter, followed by the next patrol candidate or bounded fallback, with no duplicate completion or C++ Move/retry.
+## Remaining task gate
+
+After this exact snapshot matrix passes, the code Gate should have no known remaining issue. The sole task-level requirement will be full-return user PIE: one real `ReturnComplete` within acceptance radius, cleared target/no Encounter, then a new patrol candidate or bounded fallback, with no duplicate completion or Controller Move/retry.
 
 ## Conclusion
 
-`REVISE`: production filtering is appropriately scoped, but Automation does not yet prove the handled predicate path or the claimed zero-mutation matrix. Full-return user PIE remains pending afterward.
+`REVISE`: the decision seam is now invoked for all six states, but the required handled invariants and full ignored-state zero-mutation snapshot are not yet proven.
