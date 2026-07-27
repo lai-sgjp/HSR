@@ -175,37 +175,7 @@ void AHSREnemyAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus
 
 	if (Stimulus.WasSuccessfullySensed())
 	{
-		// Target sensed - start chasing if not already EncounterPending
-		if (CurrentState == EHSREnemyExplorationState::EncounterPending)
-		{
-			return;
-		}
-
-		// If already chasing the same target, don't restart
-		if (CurrentState == EHSREnemyExplorationState::Chasing && CurrentTarget.Get() == Actor)
-		{
-			UE_LOG(LogTemp, Log, TEXT("P4-002: repeat perception of same target, blocked (no storm)"));
-			return;
-		}
-
-		// Stop patrol timer and set new target
-		SetState(EHSREnemyExplorationState::Alert);
-		CurrentTarget = Actor;
-		SetBlackboardTarget(Actor);
-
-		StopMovement();
-
-	// Stage B's stock Move To node consumes TargetActor. C++ owns the state and
-	// encounter admission, but never issues a competing movement request.
-	SetState(EHSREnemyExplorationState::Chasing);
-
-	// A4c: Try request encounter now that we're in Chasing state.
-	// The physical overlap (NotifyActorBeginOverlap) may have already fired while the AI
-	// was in PatrolWaiting/MovingToPatrol and was rejected by the Chasing guard.
-	// Retrying here ensures the encounter proceeds once the AI is properly chasing.
-	TryRequestEncounterFromCharacter();
-
-	UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::OnTargetPerceptionUpdated - %s sensed %s, chasing"), *GetName(), *Actor->GetName());
+		BeginChasingTarget(Actor);
 	}
 	else
 	{
@@ -225,6 +195,30 @@ void AHSREnemyAIController::HandleChaseTargetLost()
 	CurrentTarget.Reset();
 	SetBlackboardTarget(nullptr);
 	BeginSpawnOriginRecovery(EHSREnemyExplorationState::LostTarget);
+}
+
+void AHSREnemyAIController::BeginChasingTarget(AActor* Actor)
+{
+	// Perception only publishes Alert/Chasing intent for the stock BT Move To.
+	// Encounter admission remains exclusively owned by Character overlap contact.
+	if (CurrentState == EHSREnemyExplorationState::EncounterPending)
+	{
+		return;
+	}
+
+	if (CurrentState == EHSREnemyExplorationState::Chasing && CurrentTarget.Get() == Actor)
+	{
+		UE_LOG(LogTemp, Log, TEXT("P4-002: repeat perception of same target, blocked (no storm)"));
+		return;
+	}
+
+	SetState(EHSREnemyExplorationState::Alert);
+	CurrentTarget = Actor;
+	SetBlackboardTarget(Actor);
+	StopMovement();
+	SetState(EHSREnemyExplorationState::Chasing);
+
+	UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::BeginChasingTarget - %s sensed %s, chasing without encounter submission"), *GetName(), *GetNameSafe(Actor));
 }
 
 void AHSREnemyAIController::HandleMoveFailedOrAborted()
@@ -249,6 +243,9 @@ void AHSREnemyAIController::BeginSpawnOriginRecovery(EHSREnemyExplorationState R
 
 void AHSREnemyAIController::TryRequestEncounterFromCharacter()
 {
+#if WITH_DEV_AUTOMATION_TESTS
+	++EncounterSubmissionAttemptsForAutomation;
+#endif
 	// Only process Encounter requests while in Chasing state
 	if (CurrentState != EHSREnemyExplorationState::Chasing)
 	{
@@ -520,5 +517,10 @@ bool AHSREnemyAIController::ConsumeNavReadyRetryForAutomation(int32 InEpoch)
 	bNavReadyRetryScheduled = false;
 	NavReadyRetryEpoch = INDEX_NONE;
 	return true;
+}
+
+void AHSREnemyAIController::ApplySuccessfulPerceptionForAutomation(AActor* Target)
+{
+	BeginChasingTarget(Target);
 }
 #endif

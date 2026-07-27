@@ -225,3 +225,19 @@ User-provided PIE log and screenshot confirm the runtime handoff after the one-s
 - The accompanying PIE screenshot shows the full green NavMesh coverage required by this traversal.
 
 The observed Crowd warning occurs only during teardown and does not supersede the successful patrol evidence above. This entry records user-provided verification only; no map, DataAsset, or `Content/AI/**` asset was modified.
+
+### Stage-B follow-up — perception publishes chase; overlap commits encounter
+
+Latest user PIE evidence showed that patrol completes repeatedly, but a successful perception event had immediately submitted an encounter request. That changed the Blackboard flow from Alert/Chasing directly to `EncounterPending`, so the stock Behavior Tree chase `MoveTo` had no opportunity to run or receive a lost-target event.
+
+The successful-perception path now writes only `TargetActor` and the `Alert -> Chasing` state transition. It does not call `TryRequestEncounterFromCharacter`, does not create an active request, and does not enter `EncounterPending`. Encounter submission remains exclusively at `AHSREnemyCharacter::NotifyActorBeginOverlap -> TryRequestEncounter -> AHSREnemyAIController::TryRequestEncounterFromCharacter`; the existing active-request duplicate guard remains unchanged.
+
+`HSR.Exploration.Patch.BehaviorTreeAdapter` now asserts that a perception transition remains `Chasing`, has no active encounter request, and makes zero submission attempts; an explicit Character-overlap transaction entry then makes one submission attempt. No Encounter DTO or user asset changed.
+
+Validation:
+
+- `HSREditor Win64 Development`: `PASS`, 7 actions, exit `0` (only engine AISystem C4996 warning).
+- `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
+- `HSR.BattleReturn.MapContract`: `PASS`, exit `0`.
+
+User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.

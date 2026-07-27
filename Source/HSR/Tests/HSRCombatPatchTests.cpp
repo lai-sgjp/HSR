@@ -134,6 +134,17 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Nav-ready retry cannot repeat after consumption"), Controller->ConsumeNavReadyRetryForAutomation(7));
 	UWorld* OriginWorld = UWorld::CreateWorld(EWorldType::GamePreview, false);
 	ON_SCOPE_EXIT { if (OriginWorld) OriginWorld->DestroyWorld(false); };
+	AActor* PerceivedTarget = OriginWorld ? OriginWorld->SpawnActor<AActor>() : nullptr;
+	if (!TestNotNull(TEXT("Perception fixture spawns target"), PerceivedTarget))
+	{
+		return false;
+	}
+	Controller->ApplySuccessfulPerceptionForAutomation(PerceivedTarget);
+	TestEqual(TEXT("Perception publishes Chasing instead of EncounterPending"), Controller->GetCurrentState(), EHSREnemyExplorationState::Chasing);
+	TestFalse(TEXT("Perception does not create an active encounter request"), Controller->HasActiveEncounterRequestForAutomation());
+	TestEqual(TEXT("Perception does not submit an encounter request"), Controller->GetEncounterSubmissionAttemptsForAutomation(), 0);
+	Controller->TryRequestEncounterFromCharacter();
+	TestEqual(TEXT("Explicit Character-overlap transaction entry performs one submission attempt"), Controller->GetEncounterSubmissionAttemptsForAutomation(), 1);
 	AHSREnemyCharacter* OriginEnemy = OriginWorld ? OriginWorld->SpawnActor<AHSREnemyCharacter>() : nullptr;
 	if (!TestNotNull(TEXT("Origin fallback fixture spawns Enemy"), OriginEnemy))
 	{

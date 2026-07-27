@@ -38,6 +38,9 @@ public:
 	void PublishPatrolIntentForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin, const FVector& InCandidate, EHSRPatrolIntentResult Result);
 	bool ArmNavReadyRetryForAutomation(int32 InEpoch);
 	bool ConsumeNavReadyRetryForAutomation(int32 InEpoch);
+	void ApplySuccessfulPerceptionForAutomation(AActor* Target);
+	bool HasActiveEncounterRequestForAutomation() const { return ActiveEncounterRequestId.IsValid(); }
+	int32 GetEncounterSubmissionAttemptsForAutomation() const { return EncounterSubmissionAttemptsForAutomation; }
 #endif
 
 protected:
@@ -45,6 +48,7 @@ protected:
 
 	UFUNCTION()
 	void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
+	void BeginChasingTarget(AActor* Actor);
 	void HandleChaseTargetLost();
 	void HandleMoveFailedOrAborted();
 	bool StartBehaviorTreeRuntime();
@@ -71,6 +75,10 @@ protected:
 	FTimerHandle NavReadyRetryTimerHandle;
 	int32 NavReadyRetryEpoch = INDEX_NONE;
 	bool bNavReadyRetryScheduled = false;
+
+#if WITH_DEV_AUTOMATION_TESTS
+	int32 EncounterSubmissionAttemptsForAutomation = 0;
+#endif
 
 	UPROPERTY()
 	TObjectPtr<UAISenseConfig_Sight> SightConfig;
