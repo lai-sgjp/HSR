@@ -90,3 +90,37 @@ Reviewed commits: Task Gate `0ff5be7`, Task Gate re-review `4e23bf0`, Coordinato
 ## Verdict
 
 `REVISE` — The production latch removal and edge/replay direction are plausible and stay in scope, but the task's mandatory runtime matrix and exact side-effect evidence are absent. Route automatically back to the original Implementation Agent; all required fixes fit the existing allowlist and authorization, so no user scope expansion is required. After Implementation commits the revision, return to an independent Reviewer before requesting the user PIE gate.
+
+---
+
+# TASK-P17-PATCH-01B Independent Follow-up Review
+
+Status: `REVISE`
+
+Role: `Independent Reviewer`
+Date: `2026-07-27`
+Evidence level: `STATIC FOLLOW-UP REVIEW + RECORDED BUILD CLAIM; AUTOMATION/PIE STILL NOT RUN`
+Reviewed follow-up: Implementation `418b8a1` after Reviewer `968d4d8`
+
+## Closed findings
+
+- `PASS` — Status observability now retains the latest `EHSRStatusOperationResult` and increments its count only for `Success`.
+- `PASS` — Delay observability now retains the actual `ConsumeBreakDelay` return and increments its count only for an accepted registration.
+- `PASS` — The P9 repeatable case captures and asserts both first and second Status success plus both accepted Delay results. The changes remain editor-only, reset synchronously, and do not alter TurnManager or action-value semantics.
+- `PASS (reported, not independently rerun)` — The follow-up execution report records another successful Development Editor build and preserves the existing external `AISystem.h` warning.
+
+## Blocker assessment
+
+- `REJECTED` — Expanding `HSRBattleGameMode.h` is not proven necessary. The internal `RunP9DotBreakHarness` is a PIE/log harness and exposing it to Automation would couple deterministic tests to GameMode asset/configuration and logging ownership.
+- `AVAILABLE WITHIN CURRENT ALLOWLIST` — `UHSRBattleCoordinator` already owns the private battle state, actual `RequestAction` path, participant/TurnManager/status runtime, completed-resolution cache, and Reset/rebuild contract. Add one narrowly named `#if WITH_DEV_AUTOMATION_TESTS` fixture initializer in the already-allowlisted `HSRBattleCoordinator.h/.cpp`. It may create a transient two-participant world/runtime and a valid saved battle request solely for `HSR.Battle.Patch.RepeatableBreak`; the Automation then drives the existing public `RequestAction`, ASC attributes, Reset/rebuild, and read-only counters. The seam must not be `UFUNCTION`, Blueprint-visible, compiled in shipping/non-test builds, or become an alternate Break resolver.
+- This Coordinator-owned seam is safer than a GameMode header API because it initializes test state adjacent to the private invariants it must satisfy, while the test still traverses the production RequestAction/GE/Status/Delay path. Do not expose the internal P9 namespace function, P9 switches, configured DataAssets, or a generic mutable-state API.
+
+## Remaining required work
+
+1. Add the narrowly guarded Coordinator fixture initializer described above and implement `HSR.Battle.Patch.RepeatableBreak` in the already-allowlisted test file.
+2. Cover and assert the full frozen matrix from the previous review, including cached Resolution equality, exact Toughness and turn deltas, Reset/stale BattleId/new-epoch ActionId reuse, and same-frame lethal ordering/counts.
+3. Run the new Automation and applicable regressions. Only after Automation passes should the existing P9 PIE gate be handed to the user.
+
+## Verdict
+
+`REVISE` — The accepted Status/Delay counter defect is fixed, but required Automation remains absent. No allowlist expansion or new user authorization is required: route back to the original Implementation Agent with the Coordinator-owned, `WITH_DEV_AUTOMATION_TESTS`-only fixture direction. Return to independent review after its role commit.
