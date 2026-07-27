@@ -274,6 +274,12 @@ Recovery Blackboard revision: bounded handled recovery now explicitly writes bot
 
 Handled-fixture isolation revision: Moving and Returning failures independently reset the recovery marker and capture controller/Blackboard epochs plus encounter attempts before invoking the production decision seam. Each verifies unchanged epochs/counts, empty request/targets, no retry, and an independently observed `MoveFailed` source marker.
 
+### Stage-B data-driven enemy perception and encounter radii
+
+`UHSREnemyDefinition` now exposes editable `SightRadius`, `LoseSightRadius`, and `EncounterRadius`, preserving the prior defaults `1000`, `1500`, and `200`. On possession the Controller applies Definition sight values and normalizes `LoseSightRadius` to at least `SightRadius`; with no Definition it retains constructor defaults. The Character applies the Definition encounter sphere radius at BeginPlay, with a nonnegative clamp. No BT ordering, state transition, MoveTo, delay, or encounter admission behavior changed.
+
+Validation: `HSREditor Win64 Development` `PASS` (13 actions, exit `0`); `HSR.Exploration.Patch.BehaviorTreeAdapter` `PASS` (exit `0`). User assets were not changed.
+
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
 
 ### Stage-B main-path PIE evidence — USER PROVIDED

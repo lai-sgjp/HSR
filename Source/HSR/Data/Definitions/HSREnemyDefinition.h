@@ -47,4 +47,13 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy|Chase", meta = (ClampMin = "0.0", UIMin = "10.0"))
 	float ChaseAcceptanceRadius = 50.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy|Perception", meta = (ClampMin = "0.0", UIMin = "100.0"))
+	float SightRadius = 1000.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy|Perception", meta = (ClampMin = "0.0", UIMin = "100.0"))
+	float LoseSightRadius = 1500.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy|Encounter", meta = (ClampMin = "0.0", UIMin = "10.0"))
+	float EncounterRadius = 200.0f;
 };

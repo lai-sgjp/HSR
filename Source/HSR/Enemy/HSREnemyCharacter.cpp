@@ -23,6 +23,10 @@ void AHSREnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	CaptureSpawnOrigin();
+	if (EnemyDefinition && EncounterCollision)
+	{
+		EncounterCollision->SetSphereRadius(FMath::Max(0.0f, EnemyDefinition->EncounterRadius));
+	}
 	UE_LOG(LogTemp, Log, TEXT("AHSREnemyCharacter::BeginPlay - %s SpawnOrigin=%s"), *GetName(), *SpawnOrigin.ToString());
 }
 

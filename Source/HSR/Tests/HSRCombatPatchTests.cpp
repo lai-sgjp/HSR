@@ -114,6 +114,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRBehaviorTreeAdapterPatchTest, "HSR.Explorat
 bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 {
 	UHSREnemyDefinition* Definition = NewObject<UHSREnemyDefinition>();
+	TestTrue(TEXT("Enemy perception defaults preserve existing radii"), FMath::IsNearlyEqual(Definition->SightRadius, 1000.0f) && FMath::IsNearlyEqual(Definition->LoseSightRadius, 1500.0f) && FMath::IsNearlyEqual(Definition->EncounterRadius, 200.0f));
+	Definition->SightRadius = 1200.0f;
+	Definition->LoseSightRadius = 1000.0f;
+	TestTrue(TEXT("LoseSight normalization is bounded by SightRadius"), FMath::Max(FMath::Max(0.0f, Definition->SightRadius), Definition->LoseSightRadius) == 1200.0f);
 	TestEqual(TEXT("Behavior Tree default reference is the Stage-A user asset"), Definition->BehaviorTreeAsset.ToSoftObjectPath().ToString(), FString(TEXT("/Game/AI/Enemy/BT_HSREnemy_Exploration.BT_HSREnemy_Exploration")));
 	TestEqual(TEXT("Blackboard default reference is the Stage-A user asset"), Definition->BlackboardAsset.ToSoftObjectPath().ToString(), FString(TEXT("/Game/AI/Enemy/BB_HSREnemy_Exploration.BB_HSREnemy_Exploration")));
 	TestTrue(TEXT("Recovery state is distinct from LostTarget and MoveFailed"), EHSREnemyExplorationState::ReturningToSpawnOrigin != EHSREnemyExplorationState::LostTarget && EHSREnemyExplorationState::ReturningToSpawnOrigin != EHSREnemyExplorationState::MoveFailed);

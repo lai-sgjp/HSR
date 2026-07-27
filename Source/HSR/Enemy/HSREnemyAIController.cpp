@@ -82,6 +82,7 @@ void AHSREnemyAIController::OnPossess(APawn* InPawn)
 		PerceptionComponent->OnTargetPerceptionUpdated.RemoveAll(this);
 		PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AHSREnemyAIController::OnTargetPerceptionUpdated);
 	}
+	ApplyDefinitionPerceptionConfig();
 
 	StartBehaviorTreeRuntime();
 	ScheduleNavReadyPatrolIntent();
@@ -211,6 +212,22 @@ void AHSREnemyAIController::HandleChaseTargetLost()
 	CurrentTarget.Reset();
 	SetBlackboardTarget(nullptr);
 	BeginSpawnOriginRecovery(EHSREnemyExplorationState::LostTarget);
+}
+
+void AHSREnemyAIController::ApplyDefinitionPerceptionConfig()
+{
+	const AHSREnemyCharacter* Enemy = Cast<AHSREnemyCharacter>(GetPawn());
+	const UHSREnemyDefinition* Definition = Enemy ? Enemy->EnemyDefinition : nullptr;
+	if (!Definition || !SightConfig)
+	{
+		return;
+	}
+	SightConfig->SightRadius = FMath::Max(0.0f, Definition->SightRadius);
+	SightConfig->LoseSightRadius = FMath::Max(SightConfig->SightRadius, Definition->LoseSightRadius);
+	if (PerceptionComponent)
+	{
+		PerceptionComponent->RequestStimuliListenerUpdate();
+	}
 }
 
 void AHSREnemyAIController::BeginChasingTarget(AActor* Actor)

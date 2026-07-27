@@ -81,6 +81,7 @@ protected:
 	void ResumePatrolAfterReturn(const FVector& InSpawnOrigin, float PatrolRadius);
 	void ClearState();
 	void SetState(EHSREnemyExplorationState NewState);
+	void ApplyDefinitionPerceptionConfig();
 
 	UPROPERTY()
 	TWeakObjectPtr<AActor> CurrentTarget;
