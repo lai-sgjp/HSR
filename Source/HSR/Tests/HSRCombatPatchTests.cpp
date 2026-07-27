@@ -20,6 +20,7 @@
 #include "../Status/HSRStatusComponent.h"
 #include "../Data/Definitions/HSREnemyDefinition.h"
 #include "../Enemy/HSREnemyAIController.h"
+#include "../Enemy/HSREnemyCharacter.h"
 #include <limits>
 
 namespace HSRActionDistanceAutomation
@@ -120,6 +121,19 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Unreachable patrol fallback waits instead of issuing a movement loop"), Controller->GetCurrentState(), EHSREnemyExplorationState::PatrolWaiting);
 	TestTrue(TEXT("Unreachable patrol fallback publishes SpawnOrigin"), Controller->GetPatrolLocationForAutomation(PatrolLocation));
 	TestEqual(TEXT("Unreachable patrol fallback location is SpawnOrigin"), PatrolLocation, ExpectedSpawnOrigin);
+	UWorld* OriginWorld = UWorld::CreateWorld(EWorldType::GamePreview, false);
+	ON_SCOPE_EXIT { if (OriginWorld) OriginWorld->DestroyWorld(false); };
+	AHSREnemyCharacter* OriginEnemy = OriginWorld ? OriginWorld->SpawnActor<AHSREnemyCharacter>() : nullptr;
+	if (!TestNotNull(TEXT("Origin fallback fixture spawns Enemy"), OriginEnemy))
+	{
+		return false;
+	}
+	const FVector PreBeginPlayLocation(701.0f, -113.0f, 42.0f);
+	OriginEnemy->SetActorLocation(PreBeginPlayLocation);
+	TestEqual(TEXT("Pre-BeginPlay origin falls back to ActorLocation"), OriginEnemy->GetSpawnOrigin(), PreBeginPlayLocation);
+	OriginEnemy->CaptureSpawnOriginForAutomation();
+	OriginEnemy->SetActorLocation(FVector(999.0f, 999.0f, 999.0f));
+	TestEqual(TEXT("Post-BeginPlay captured origin remains stable"), OriginEnemy->GetSpawnOrigin(), PreBeginPlayLocation);
 	return true;
 }
 

@@ -22,7 +22,11 @@ public:
 	TObjectPtr<UHSREnemyDefinition> EnemyDefinition;
 
 	UFUNCTION(BlueprintPure, Category = "Enemy")
-	FVector GetSpawnOrigin() const { return SpawnOrigin; }
+	FVector GetSpawnOrigin() const { return bSpawnOriginCaptured ? SpawnOrigin : GetActorLocation(); }
+
+#if WITH_DEV_AUTOMATION_TESTS
+	void CaptureSpawnOriginForAutomation();
+#endif
 
 protected:
 	virtual void BeginPlay() override;
@@ -33,4 +37,7 @@ protected:
 
 	UPROPERTY()
 	FVector SpawnOrigin;
+
+	bool bSpawnOriginCaptured = false;
+	void CaptureSpawnOrigin();
 };

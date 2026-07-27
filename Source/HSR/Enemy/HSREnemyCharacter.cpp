@@ -22,9 +22,22 @@ AHSREnemyCharacter::AHSREnemyCharacter()
 void AHSREnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	SpawnOrigin = GetActorLocation();
+	CaptureSpawnOrigin();
 	UE_LOG(LogTemp, Log, TEXT("AHSREnemyCharacter::BeginPlay - %s SpawnOrigin=%s"), *GetName(), *SpawnOrigin.ToString());
 }
+
+void AHSREnemyCharacter::CaptureSpawnOrigin()
+{
+	SpawnOrigin = GetActorLocation();
+	bSpawnOriginCaptured = true;
+}
+
+#if WITH_DEV_AUTOMATION_TESTS
+void AHSREnemyCharacter::CaptureSpawnOriginForAutomation()
+{
+	CaptureSpawnOrigin();
+}
+#endif
 
 void AHSREnemyCharacter::NotifyActorBeginOverlap(AActor* OtherActor)
 {

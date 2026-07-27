@@ -147,3 +147,18 @@ Validation:
 - `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
 
 No user `.uasset` was modified. Stage-B PIE must verify that patrol moves to the generated candidate and that a completed stock Move To consumes a newly published candidate after the user graph's Wait branch.
+
+### Stage-B PIE revision — safe SpawnOrigin before Enemy BeginPlay
+
+PIE lifecycle evidence showed `AHSREnemyAIController::OnPossess` can start BT initialization before `AHSREnemyCharacter::BeginPlay`. The former stored `SpawnOrigin` was then still the default zero vector, so the initial Blackboard origin/location and navigation query could target the wrong place.
+
+`AHSREnemyCharacter::GetSpawnOrigin` now returns `GetActorLocation()` until BeginPlay captures the formal origin, and returns that captured value thereafter. Controller initialization, Blackboard `SpawnOrigin`, patrol candidate query, and recovery all already use this one getter, so they now share the same valid location in both lifecycle orders. No BT asset, NavMesh, direct movement, or timer changed.
+
+`HSR.Exploration.Patch.BehaviorTreeAdapter` covers a non-zero pre-BeginPlay ActorLocation fallback and verifies that the captured post-BeginPlay origin remains stable after the Actor moves.
+
+Validation:
+
+- `HSREditor Win64 Development`: `PASS`, 7 actions, exit `0` (only engine AISystem C4996 warning).
+- `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
+
+User-owned `Content/Data/Enemies/DA_Enemy_Phase5Test1.uasset`, `Content/Maps/Map_Phase1_Exploration.umap`, and `Content/AI/**` were observed as dirty and were not touched or staged.
