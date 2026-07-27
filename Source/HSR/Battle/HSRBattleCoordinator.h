@@ -84,6 +84,11 @@ public:
 	const FHSRTeamResourceState& GetTeamResourceState() const { return TeamResourceState; }
 	bool WasLastBreakDelayRegistered() const { return bLastBreakDelayRegistered; }
 	FGuid GetLastBreakDelayActionId() const { return LastBreakDelayActionId; }
+#if WITH_EDITOR
+	/** Controlled-runtime counters for repeatable Break transaction audits. */
+	int32 GetBreakStatusRequestCountForDevelopmentTest() const { return BreakStatusRequestCountForTest; }
+	int32 GetBreakDelayRegistrationCountForDevelopmentTest() const { return BreakDelayRegistrationCountForTest; }
+#endif
 	/** Event-driven, pure-value UI snapshot. Consumers never receive runtime Actors or ASCs. */
 	FHSRBattleCommandStateReadyDelegate& OnCommandStateReady() { return CommandStateReady; }
 	FHSRBattleCommandViewState GetCommandViewState() const;
@@ -211,6 +216,10 @@ private:
 	FHSRTeamResourceState TeamResourceState;
 	bool bLastBreakDelayRegistered = false;
 	FGuid LastBreakDelayActionId;
+#if WITH_EDITOR
+	int32 BreakStatusRequestCountForTest = 0;
+	int32 BreakDelayRegistrationCountForTest = 0;
+#endif
 	TMap<FGuid, FHSRSkillPointReservation> SkillPointReservations;
 	UPROPERTY()
 	TObjectPtr<UHSRSkillDefinition> BasicAttackDefinition;

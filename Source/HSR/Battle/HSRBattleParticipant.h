@@ -17,9 +17,6 @@ struct FHSRBattleParticipant
 	/** Snapshot when the turn order is built. TurnManager never polls this every frame. */
 	float InitiativeSpeed = 0.0f;
 	bool bDefeated = false;
-	/** Coordinator-owned lifecycle latch for the pure P8 BreakResult publication. */
-	bool bBreakResultPublished = false;
-
 	TWeakObjectPtr<AActor> Actor;
 	TWeakObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 

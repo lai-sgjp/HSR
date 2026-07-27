@@ -593,8 +593,9 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 			*ExpectedWeakness,
 			ToughnessResult.bMatched ? 1 : 0, ToughnessResult.Before, ToughnessResult.Damage, ToughnessResult.After,
 			ToughnessResult.bReachedZero ? 1 : 0, static_cast<int32>(ToughnessResult.FailureReason));
-		// P8-003 only publishes a pure result.  The participant latch scopes
-		// exactly-once publication to this spawned battle lifecycle.
+		// A Break is owned by this ActionId transaction: only the observed
+		// positive-to-zero Toughness edge may publish it.  RequestAction caches
+		// the completed Resolution, so an ActionId replay never reaches here.
 		Resolution.bHasBreakResult = true;
 		FHSRBreakResult& BreakResult = Resolution.BreakResult;
 		BreakResult.ActionId = Command.ActionId;
@@ -613,13 +614,8 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		{
 			BreakResult.FailureReason = EHSRBreakFailureReason::ToughnessNotDepleted;
 		}
-		else if (Target->bBreakResultPublished)
-		{
-			BreakResult.FailureReason = EHSRBreakFailureReason::AlreadyPublished;
-		}
 		else
 		{
-			Target->bBreakResultPublished = true;
 			BreakResult.bTriggered = true;
 		}
 		UE_LOG(LogTemp, Log, TEXT("P8-003 Break ActionId=%s Target=%s Before=%.2f After=%.2f Triggered=%d Replay=0 FailureReason=%d"),
@@ -628,12 +624,18 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		if (BreakResult.bTriggered)
 		{
 			const EHSRStatusOperationResult BreakStatusResult = RequestBreakStatus(Command.ActorParticipantId, BreakResult.TargetParticipantId, BreakResult.ActionId);
+#if WITH_EDITOR
+			++BreakStatusRequestCountForTest;
+#endif
 			UE_LOG(LogTemp, Log, TEXT("P9-003 BreakStatus ActionId=%s Target=%s Result=%d"), *BreakResult.ActionId.ToString(), *BreakResult.TargetParticipantId.ToString(), static_cast<int32>(BreakStatusResult));
 			FHSRTurnDelayRequest DelayRequest;
 			DelayRequest.ActionId = BreakResult.ActionId;
 			DelayRequest.TargetParticipantId = BreakResult.TargetParticipantId;
 			LastBreakDelayActionId = DelayRequest.ActionId;
 			bLastBreakDelayRegistered = TurnManager->ConsumeBreakDelay(DelayRequest);
+#if WITH_EDITOR
+			++BreakDelayRegistrationCountForTest;
+#endif
 		}
 		Finalize(Resolution);
 		if (!PendingDefeatedParticipantId.IsNone()) { const FName Defeated = PendingDefeatedParticipantId; PendingDefeatedParticipantId = NAME_None; ResolveDefeat(Defeated); }
@@ -1227,6 +1229,10 @@ void UHSRBattleCoordinator::Reset()
 	TeamResourceState = FHSRTeamResourceState();
 	bLastBreakDelayRegistered = false;
 	LastBreakDelayActionId.Invalidate();
+#if WITH_EDITOR
+	BreakStatusRequestCountForTest = 0;
+	BreakDelayRegistrationCountForTest = 0;
+#endif
 	if (TurnManager)
 	{
 		TurnManager->Reset();

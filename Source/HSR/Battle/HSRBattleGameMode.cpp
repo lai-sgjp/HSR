@@ -1218,6 +1218,62 @@ namespace HSRBattleDevelopmentTest
 		}
 		const FHSRBattleInitResult RebuildResult = Coordinator->ResetAndRebuildForDevelopmentTest(BattleWorld);
 		LogCase(TEXT("DeathReset_RebuildsCleanRuntime"), RebuildResult.IsSuccess() && Coordinator->GetParticipants().Num() == 2 && Coordinator->GetStatusSnapshotForDevelopmentTest(Coordinator->GetParticipants()[0].ParticipantId, DotDefinition->StatusId).InstanceCount == 0);
+		// PATCH-01B: exercise the real RequestAction -> GE -> Status -> Delay path.
+		// Toughness recovery is deliberately fixture-controlled; this is not a new
+		// gameplay recovery rule.
+		bool bRepeatableBreakPass = false;
+		FGuid FirstBreakActionId;
+		FGuid SecondBreakActionId;
+		if (RebuildResult.IsSuccess() && Coordinator->GetParticipants().Num() == 2 && Coordinator->GetBasicAttackDefinition())
+		{
+			const FHSRBattleParticipant& RepeatSource = Coordinator->GetParticipants()[0];
+			const FHSRBattleParticipant& RepeatTarget = Coordinator->GetParticipants()[1];
+			UHSRTurnManager* RepeatManager = Coordinator->GetTurnManager();
+			UHSRSkillDefinition* RepeatSkill = const_cast<UHSRSkillDefinition*>(Coordinator->GetBasicAttackDefinition());
+			const float BreakDamage = RepeatSkill->ToughnessDamage;
+			const FGameplayTag RepeatWeakness = RepeatSkill->ElementTag.IsValid()
+				? FGameplayTag::RequestGameplayTag(FName(*FString::Printf(TEXT("Weakness.%s"), *RepeatSkill->ElementTag.ToString().RightChop(FCString::Strlen(TEXT("Element."))))), false)
+				: FGameplayTag();
+			if (RepeatSource.AbilitySystemComponent.IsValid() && RepeatTarget.AbilitySystemComponent.IsValid() && RepeatManager
+				&& BreakDamage > 0.0f && RepeatWeakness.IsValid())
+			{
+				const_cast<FHSRBattleParticipant&>(RepeatTarget).WeaknessTags.Reset();
+				const_cast<FHSRBattleParticipant&>(RepeatTarget).WeaknessTags.AddTag(RepeatWeakness);
+				RepeatSource.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), 120.0f);
+				RepeatTarget.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), 80.0f);
+				RepeatTarget.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(), 1000.0f);
+				RepeatTarget.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 1000.0f);
+				RepeatTarget.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxToughnessAttribute(), BreakDamage);
+				RepeatTarget.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetToughnessAttribute(), BreakDamage);
+				Coordinator->SetTeamSkillPointsForDevelopmentTest(1, 3);
+				RepeatManager->Initialize(Coordinator->GetParticipants());
+				const auto MakeRepeatCommand = [Coordinator, &RepeatSource, &RepeatTarget](const FGuid& ActionId)
+				{
+					FHSRBattleActionCommand Command; Command.ActionId = ActionId; Command.BattleId = Coordinator->GetCurrentRequestId();
+					Command.ActorParticipantId = RepeatSource.ParticipantId; Command.SkillId = FName(TEXT("BasicAttack")); Command.TargetParticipantIds.Add(RepeatTarget.ParticipantId); return Command;
+				};
+				const int32 StatusBefore = Coordinator->GetBreakStatusRequestCountForDevelopmentTest();
+				const int32 DelayBefore = Coordinator->GetBreakDelayRegistrationCountForDevelopmentTest();
+				FirstBreakActionId = FGuid::NewGuid(); const FHSRAbilityResolution First = Coordinator->RequestAction(MakeRepeatCommand(FirstBreakActionId));
+				const FHSRAbilityResolution Replay = Coordinator->RequestAction(MakeRepeatCommand(FirstBreakActionId));
+				const int32 StatusAfterReplay = Coordinator->GetBreakStatusRequestCountForDevelopmentTest();
+				const int32 DelayAfterReplay = Coordinator->GetBreakDelayRegistrationCountForDevelopmentTest();
+				// Controlled recovery itself must not emit any Break-side effect.
+				RepeatTarget.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetToughnessAttribute(), BreakDamage);
+				const int32 StatusAfterRecovery = Coordinator->GetBreakStatusRequestCountForDevelopmentTest();
+				const int32 DelayAfterRecovery = Coordinator->GetBreakDelayRegistrationCountForDevelopmentTest();
+				RepeatManager->Initialize(Coordinator->GetParticipants());
+				SecondBreakActionId = FGuid::NewGuid(); const FHSRAbilityResolution Second = Coordinator->RequestAction(MakeRepeatCommand(SecondBreakActionId));
+				bRepeatableBreakPass = First.bHasBreakResult && First.BreakResult.bTriggered && Replay.BreakResult.bTriggered
+					&& Second.bHasBreakResult && Second.BreakResult.bTriggered && FirstBreakActionId != SecondBreakActionId
+					&& StatusAfterReplay == StatusBefore + 1 && DelayAfterReplay == DelayBefore + 1
+					&& StatusAfterRecovery == StatusAfterReplay && DelayAfterRecovery == DelayAfterReplay
+					&& Coordinator->GetBreakStatusRequestCountForDevelopmentTest() == StatusBefore + 2
+					&& Coordinator->GetBreakDelayRegistrationCountForDevelopmentTest() == DelayBefore + 2;
+				UE_LOG(LogTemp, Log, TEXT("P9-003 RepeatableBreak FirstActionId=%s SecondActionId=%s Status=%d->%d->%d Delay=%d->%d->%d"), *FirstBreakActionId.ToString(), *SecondBreakActionId.ToString(), StatusBefore, StatusAfterReplay, Coordinator->GetBreakStatusRequestCountForDevelopmentTest(), DelayBefore, DelayAfterReplay, Coordinator->GetBreakDelayRegistrationCountForDevelopmentTest());
+			}
+		}
+		LogCase(TEXT("RepeatableBreak_FirstReplayRecoverySecond_ExactCounts"), bRepeatableBreakPass);
 		if (FailedCases == 0)
 		{
 			UE_LOG(LogTemp, Log, TEXT("P9-003 DotBreak Harness=COMPLETE"));
