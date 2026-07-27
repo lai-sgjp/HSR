@@ -80,7 +80,8 @@ enum class EHSRStatusOperationResult : uint8
 	Immune,
 	Dispelled,
 	NoDispelCandidate,
-	Triggered
+	Triggered,
+	UnknownStatus
 };
 
 USTRUCT()

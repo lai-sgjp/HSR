@@ -34,6 +34,7 @@ public:
 	int32 HandleSourceInvalid(FName SourceParticipantId);
 	FHSRStatusRuntimeSnapshot GetSnapshot(FName StatusId = NAME_None) const;
 	TArray<FHSRStatusPublicSnapshot> GetPublicSnapshots() const;
+	EHSRStatusOperationResult GetPublicSnapshot(FName StatusId, FHSRStatusPublicSnapshot& OutSnapshot) const;
 	const FHSRStatusPublicOperationEvent& GetLastPublicOperation() const { return LastPublicOperation; }
 	FHSRStatusChangedDelegate& OnStatusChanged() { return StatusChanged; }
 
@@ -43,9 +44,9 @@ public:
 	void SetForceDispelRemoveFailureForDevelopmentTest(bool bInForce) { bForceDispelRemoveFailure = bInForce; }
 	void ConsumeLifecycleEventForDevelopmentTest(const FHSRTurnLifecycleEvent& Event) { HandleTurnEnded(Event); }
 	void InvalidateAbilitySystemForDevelopmentTest() { AbilitySystem.Reset(); }
-	FActiveGameplayEffectHandle GetPrimaryHandleForDevelopmentTest() const { return ActiveStatus.IsSet() ? ActiveStatus->ActiveGameplayEffectHandle : FActiveGameplayEffectHandle(); }
-	FActiveGameplayEffectHandle GetHandleForDevelopmentTest(FName StatusId) const { const FHSRStatusInstance* Instance = AdditionalStatuses.Find(StatusId); return Instance ? Instance->ActiveGameplayEffectHandle : GetPrimaryHandleForDevelopmentTest(); }
-	FActiveGameplayEffectHandle GetSecondaryHandleForDevelopmentTest() const { return SecondaryOwnedHandle; }
+	FActiveGameplayEffectHandle GetPrimaryHandleForDevelopmentTest() const { return Statuses.IsEmpty() ? FActiveGameplayEffectHandle() : Statuses.CreateConstIterator().Value().ActiveGameplayEffectHandle; }
+	FActiveGameplayEffectHandle GetHandleForDevelopmentTest(FName StatusId) const { const FHSRStatusInstance* Instance = Statuses.Find(StatusId); return Instance ? Instance->ActiveGameplayEffectHandle : FActiveGameplayEffectHandle(); }
+	FActiveGameplayEffectHandle GetSecondaryHandleForDevelopmentTest() const { return FActiveGameplayEffectHandle(); }
 #endif
 
 private:
@@ -60,14 +61,11 @@ private:
 	TWeakObjectPtr<UHSRTurnManager> BoundTurnManager;
 	TWeakObjectPtr<UHSRBattleCoordinator> BoundCoordinator;
 	FDelegateHandle TurnEndedHandle;
-	TOptional<FHSRStatusInstance> ActiveStatus;
-	TMap<FName, FHSRStatusInstance> AdditionalStatuses;
+	TMap<FName, FHSRStatusInstance> Statuses;
 	UPROPERTY()
 	TMap<FName, TObjectPtr<UHSRStatusDefinition>> RuntimeDefinitions;
-	TSet<FString> ProcessedStatusOperations;
 	TSet<FString> ProcessedInvalidSources;
-	TSet<FGuid> ProcessedAddOperations;
-	FActiveGameplayEffectHandle SecondaryOwnedHandle;
+	TSet<FGuid> ProcessedOperationIds;
 	EHSRStatusOperationResult LastResult = EHSRStatusOperationResult::Success;
 	int32 ApplyCount = 0;
 	int32 RemoveCount = 0;

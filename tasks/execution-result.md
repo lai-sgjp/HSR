@@ -1,3 +1,37 @@
+# TASK-P17-PATCH-01A Execution Result
+
+Status: `IMPLEMENTED / ENGINEERING VALIDATION PARTIAL`
+
+## Implemented before the gate
+
+- Audited the existing allowed-file drafts rather than assuming them correct. `ActiveStatus`/`AdditionalStatuses`, AttackUp-specific routing, dual OperationId sets, and the secondary owned-handle path were replaced in the working tree with one `TMap<FName, FHSRStatusInstance>` and one `TSet<FGuid>` dedupe path.
+- Definition validation is field/tag driven: `Status.*` root, exact Tag/Id identity, enum/configuration validity, policy/stack consistency, infinite GE requirement, and DoT-only damage configuration. `GetPublicSnapshot` returns structured `UnknownStatus` for empty or absent keys.
+- Generic add, refresh, stack, dispel, expiry, source-invalid cleanup, clear, public snapshots, and replace compensation now operate on the single map. No AttackUp `StatusId` branch remains in the runtime code.
+
+## Resolved allowlist gate
+
+The requested `HSR.Battle.Patch.StatusGeneric` test requires distinct legal transient Attack/Speed/Shield definitions. The Config allowlist was subsequently expanded with exact authority for `Status.Buff.SpeedUp` and `Status.Buff.Shield`; those two tags were added and no other Config entry changed.
+
+`Source/HSR/Tests/HSRCombatPatchTests.cpp` now registers `HSR.Battle.Patch.StatusGeneric`. It verifies Attack/Speed/Shield field-valid transient Definitions, Tag/Id mismatch, invalid root, invalid policy, and structured unknown public lookup. Its three Definitions use the same generic Definition validation route. Runtime GE mutation remains covered by the existing P9 GameMode harness rather than duplicated with a test-only GE class.
+
+## Verification attempted
+
+- Initial build attempt through `msbuild` failed because it was not on PATH (`CommandNotFoundException`); this remains the first failed command, not a source failure.
+- UE 5.6 Build.bat: `E:\programs\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat HSREditor Win64 Development E:\work\unreal_projects\HSR\HSR.uproject -NoHotReload -WaitMutex` succeeded. UHT generated 6 files; compile/link/metadata all completed; exit code 0. The only warning was the installed VS 2022 compiler not being UE's preferred version.
+- `HSR.Battle.Patch.StatusGeneric`: passed through `UnrealEditor-Cmd -nullrhi`; log reports one matching test, `Result={Success}`, and exit code 0.
+- Existing P9 status regression: `NOT EXECUTED`. Its status stack/explicit-replace/old-remove-failure coverage is embedded in the Battle GameMode development/PIE harness, not a standalone Automation test. It remains a user Editor/PIE gate; no claim of P9 runtime pass is made.
+
+## Scope audit
+
+- Modified implementation files were already uncommitted at task resumption and were treated as audit inputs: `HSRStatusDefinition.cpp`, `HSRStatusComponent.cpp`, `HSRStatusComponent.h`, and `HSRStatusTypes.h`. This implementation replaces their special-container/dual-dedupe drafts with the generic path; they are submitted as this role's implementation output.
+- This role created `Config/DefaultGameplayTags.ini`'s two authorized tag entries and `Source/HSR/Tests/HSRCombatPatchTests.cpp`, and updated this execution record.
+- Excluded as Coordinator/user-owned or unrelated: `tasks/active-task.md`, `docs/phase-17-patch-01-execution-plan.md`, `learn/SaveSystem.md`, and `.claude/**`.
+- No Save, Turn, Break, Content, or unapproved Config behavior was changed.
+
+---
+
+# Prior Task Record
+
 # TASK-P17-004 Execution Result
 
 Status: `PASS / ENGINEERING AND USER PIE GATES COMPLETE`
