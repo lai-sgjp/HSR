@@ -14,6 +14,7 @@ Status: `PLANNED / IMPLEMENTATION RESTATEMENT REQUIRED`
 - 每个成功边沿分别 exactly-once 请求 Break Status 与 Turn Delay；PATCH-01B 不改变 Delay 的现有 skip-once 语义，完整行动值迁移属于 PATCH-01C。
 - Toughness 恢复由既有 authority 或 Automation fixture 提供；本卡不新增自动恢复 Gameplay 规则。
 - 同一合法伤害事务若让入场时存活目标同时 `HP > 0 -> 0` 且 `Toughness > 0 -> 0`，保持现有管线优先级：先发布该事务唯一 Break/Status/Delay，再由 `ResolveDefeat` 收尾；不得因稍后的死亡清理抹掉已发布结果。请求准入前已经死亡的目标仍拒绝且不产生 Break。
+- 同帧致死例外只能由 Coordinator 在同一开放 `RequestAction` 事务内、`PendingDefeatedParticipantId == TargetParticipantId` 且目标在请求准入时存活时传入 Status/Delay；禁止写入临时正 Health、禁止持久化或缓存该资格，其他调用默认参数 `false` 并继续拒绝死亡目标。
 
 ## Exact allowlist
 
@@ -21,6 +22,10 @@ Status: `PLANNED / IMPLEMENTATION RESTATEMENT REQUIRED`
 - `Source/HSR/Battle/HSRBattleParticipant.h`
 - `Source/HSR/Battle/HSRBattleCoordinator.h`
 - `Source/HSR/Battle/HSRBattleCoordinator.cpp`
+- `Source/HSR/Status/HSRStatusComponent.h`（仅增加非反射的 admitted-alive/pending-deferred-defeat 参数；默认 `false`，普通死亡拒绝不变）
+- `Source/HSR/Status/HSRStatusComponent.cpp`（仅实现上述当前同步事务例外；禁止临时改写 Health）
+- `Source/HSR/Battle/HSRTurnManager.h`（仅为 Delay 接受路径增加非反射 pending-deferred-defeat 参数；默认 `false`）
+- `Source/HSR/Battle/HSRTurnManager.cpp`（仅实现上述例外；禁止修改排序、skip-once 或 Delay 算法）
 - `Source/HSR/Battle/HSRBattleGameMode.cpp`（仅 P8/P9 repeatable-Break development harness）
 - `Source/HSR/Battle/HSRBattleGameMode.h`（用户精确扩权：仅在 `#if WITH_DEV_AUTOMATION_TESTS` 下添加非 UFUNCTION/非 Blueprint/非 Shipping 的 `CreateRepeatableBreakAutomationFixture` 静态入口；禁止新增属性、BeginPlay 开关或通用状态 mutator）
 - `Source/HSR/Tests/HSRCombatPatchTests.cpp`
@@ -42,4 +47,4 @@ Implementation Agent 不得修改本活动卡、计划、PROJECT_STATE、worklog
 
 ## Explicit non-goals and stop conditions
 
-不实现行动值、Speed/Advance/Delay/Slow 重排；不修改 TurnManager；不新增 Toughness 自动恢复、Status Definition、GE、Tag、Content、Config、Save、UI、网络或 Tick。需要白名单外生产文件、资产或契约扩张时立即停止请求最小授权。
+不实现行动值、Speed/Advance/Delay/Slow 重排；除已授权的 pending-deferred-defeat Delay 准入参数外不修改 TurnManager；不新增 Toughness 自动恢复、Status Definition、GE、Tag、Content、Config、Save、UI、网络或 Tick。需要白名单外生产文件、资产或契约扩张时立即停止请求最小授权。
