@@ -1,43 +1,35 @@
-# TASK-P17-PATCH-02 Radius Integration Revision Review
+# TASK-P17-PATCH-02 Radius Zero-Mutation Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `0522ee4`
-- Prior finding: `9c3debd`
+- Reviewed revision: `cc700ca`
+- Prior finding: `f81b80f`
 - Result: `REVISE`
 - Date: 2026-07-28
 
-## Test-realism improvements accepted
+## Closed findings
 
-- Controller Automation now invokes the same `ApplyPerceptionConfig` helper used by `OnPossess` and reads the real `UAISenseConfig_Sight` values.
-- Character Automation invokes the same `ApplyDefinitionEncounterConfig` helper used by BeginPlay and reads the real EncounterCollision sphere radius.
-- Actual component/config assertions cover perception fallback `1000/1500`, Definition normalization `1200/1000 -> 1200/1200`, negative perception clamps, EncounterRadius `333`, and negative EncounterRadius clamp.
-- Production changes remain limited to helper extraction and dev-only seams/getters. BT ordering, state transitions, movement ownership, Encounter admission, and user assets are unchanged.
+- A fresh Character now calls the real encounter-config helper with `EnemyDefinition=nullptr` and reads the actual sphere radius as `200`.
+- That null-Definition Character call verifies Tick remains disabled and ActorLocation/SpawnOrigin remain unchanged.
+- The null-Definition Controller call verifies defaults `1000/1500` and checks controller state, epoch, target, active request, retry, attempt count, and Tick remain unchanged.
+- Revision is test/result-only; there is no production, BT, state, Encounter-admission, or user-asset scope creep. Existing Build/Adapter evidence remains applicable.
 
-## Remaining blocking assertions
+## Remaining blocking coverage
 
-Two requirements from `9c3debd` are still not actually covered:
+The requested complete zero-mutation matrix is still incomplete:
 
-1. Encounter no-Definition fallback `200`:
-   - The test verifies the Definition object's default is `200`, but it never reads a fresh Character's actual EncounterCollision radius before assigning a Definition.
-   - Therefore a broken constructor fallback sphere could pass.
-2. Radius application zero mutation:
-   - The Controller test does not snapshot state, epoch, target, active/Blackboard Encounter request, retry state, or Tick before/after applying null, normalized, and negative Definitions.
-   - The Character test does not assert applying EncounterRadius leaves origin/lifecycle and Tick behavior unchanged.
+- Controller runtime-state comparison occurs only after the null-Definition apply. The normalized `1200/1000` apply and negative-value apply are not followed by the same snapshot comparison.
+- Blackboard/runtime binding state is not asserted. The requirement explicitly includes BB state; the existing `HasRuntimeBlackboardForAutomation()` can prove the fresh Controller remains unbound before and after every apply.
+- Character Tick/SpawnOrigin/ActorLocation comparison occurs only after the null-Definition apply. The `333` and negative-radius production-helper calls are not followed by the same zero-mutation assertions.
 
-Minimum test-only correction within the current allowlist:
+Minimum test-only correction:
 
-- Immediately after spawning the Character and before assigning `EnemyDefinition`, assert the real sphere radius is `200` and that applying the helper with no Definition preserves `200`.
-- Around each Controller apply call, capture/compare CurrentState, BehaviorTreeEpoch, current target, active Encounter RequestId, retry flag, submission-attempt count, and `PrimaryActorTick.bCanEverTick`; all must remain unchanged.
-- Where no runtime Blackboard is bound, explicitly record that fact; where a Blackboard is used, compare all six keys before/after.
-- Around Character apply calls, assert `PrimaryActorTick.bCanEverTick` remains false and SpawnOrigin/Actor location are unchanged.
-- Rebuild and rerun `BehaviorTreeAdapter`. `MapContract` does not need rerun unless Encounter/Transition production changes.
-
-## Scope and provenance
-
-The revision remains inside the existing Controller/Character/test/result allowlist. Dirty user Blueprints, Map, Enemy DataAsset, `Content/AI/**`, learning, and `.claude/**` files remain isolated.
+1. Create one test-local Controller invariant predicate/snapshot containing state, epoch, target, active request, retry, attempts, Tick, and `HasRuntimeBlackboardForAutomation`; compare it after all three calls: null, normalized Definition, and negative Definition.
+2. Create one Character invariant snapshot containing Tick, ActorLocation, and SpawnOrigin; compare it after null, `333`, and negative EncounterRadius calls.
+3. Keep the existing actual radius assertions alongside each invariant comparison.
+4. Rebuild and rerun `BehaviorTreeAdapter`; no fresh `MapContract` is required because no Transition/Encounter production code changed.
 
 ## Conclusion
 
-`REVISE`: the tests now exercise real production helpers and real components, but actual Character fallback `200` and the required zero-mutation invariants are not yet proven.
+`REVISE`: actual fallback `200` is now proven, but zero-mutation is checked only for the first apply in each object. The normalized and negative production-helper calls plus Blackboard binding state still need the same assertions.
