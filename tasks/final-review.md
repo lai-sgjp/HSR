@@ -1,47 +1,43 @@
-# TASK-P17-PATCH-02 Data-Driven Radius Addendum Review
+# TASK-P17-PATCH-02 Radius Integration Revision Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `f6ec65e`
-- Baseline Code Gate: `eb67ede`
-- User PIE evidence baseline: `4f07f0d`
+- Reviewed revision: `0522ee4`
+- Prior finding: `9c3debd`
 - Result: `REVISE`
 - Date: 2026-07-28
 
-## Production review
+## Test-realism improvements accepted
 
-- Scope is authorized and allowlisted: the user explicitly requested moving SightRadius, LoseSightRadius, and EncounterRadius into `UHSREnemyDefinition`; no new file, BT behavior, state transition, Move To ownership, or Encounter admission path was added.
-- Defaults preserve existing behavior: Definition values are `1000/1500/200`, matching Controller sight defaults and Character sphere-constructor default.
-- Controller data flow is correctly located after possession, when the possessed Character and its Definition are available. Sight is clamped nonnegative and LoseSight is normalized to at least Sight. Missing Definition/SightConfig leaves constructor defaults unchanged.
-- Character applies EncounterRadius during BeginPlay, after Blueprint/DataAsset properties are available, with a nonnegative clamp. Missing Definition leaves the constructor radius `200` unchanged.
-- Dirty user Blueprint, Map, DataAsset, and `Content/AI/**` assets remain outside `f6ec65e`; provenance separation is intact.
+- Controller Automation now invokes the same `ApplyPerceptionConfig` helper used by `OnPossess` and reads the real `UAISenseConfig_Sight` values.
+- Character Automation invokes the same `ApplyDefinitionEncounterConfig` helper used by BeginPlay and reads the real EncounterCollision sphere radius.
+- Actual component/config assertions cover perception fallback `1000/1500`, Definition normalization `1200/1000 -> 1200/1200`, negative perception clamps, EncounterRadius `333`, and negative EncounterRadius clamp.
+- Production changes remain limited to helper extraction and dev-only seams/getters. BT ordering, state transitions, movement ownership, Encounter admission, and user assets are unchanged.
 
-## Blocking test finding
+## Remaining blocking assertions
 
-Automation does not test the production data flow. It only:
+Two requirements from `9c3debd` are still not actually covered:
 
-- reads the three Definition defaults; and
-- repeats the normalization expression directly in the test with `FMath::Max`.
+1. Encounter no-Definition fallback `200`:
+   - The test verifies the Definition object's default is `200`, but it never reads a fresh Character's actual EncounterCollision radius before assigning a Definition.
+   - Therefore a broken constructor fallback sphere could pass.
+2. Radius application zero mutation:
+   - The Controller test does not snapshot state, epoch, target, active/Blackboard Encounter request, retry state, or Tick before/after applying null, normalized, and negative Definitions.
+   - The Character test does not assert applying EncounterRadius leaves origin/lifecycle and Tick behavior unchanged.
 
-It never invokes `ApplyDefinitionPerceptionConfig`, never inspects the actual `SightConfig`, never verifies the no-Definition fallback, never applies EncounterRadius to `EncounterCollision`, and never verifies the Character lifecycle/helper result. Therefore the test would pass if the production calls were removed, reversed, or wired to the wrong fields.
+Minimum test-only correction within the current allowlist:
 
-## Minimum correction within the existing allowlist
+- Immediately after spawning the Character and before assigning `EnemyDefinition`, assert the real sphere radius is `200` and that applying the helper with no Definition preserves `200`.
+- Around each Controller apply call, capture/compare CurrentState, BehaviorTreeEpoch, current target, active Encounter RequestId, retry flag, submission-attempt count, and `PrimaryActorTick.bCanEverTick`; all must remain unchanged.
+- Where no runtime Blackboard is bound, explicitly record that fact; where a Blackboard is used, compare all six keys before/after.
+- Around Character apply calls, assert `PrimaryActorTick.bCanEverTick` remains false and SpawnOrigin/Actor location are unchanged.
+- Rebuild and rerun `BehaviorTreeAdapter`. `MapContract` does not need rerun unless Encounter/Transition production changes.
 
-- Extract/reuse a single production helper for applying Controller perception values, called by `OnPossess`, and expose only a `WITH_DEV_AUTOMATION_TESTS` seam/getters for the actual SightConfig radii.
-- Extract/reuse a Character helper for applying Definition EncounterRadius, called by BeginPlay, with a dev-only seam/getter for the actual sphere radius.
-- Automation must assert actual component/config state for:
-  1. fresh no-Definition fallback remains `1000/1500/200`;
-  2. Definition `1200/1000/333` produces sight `1200`, lose sight `1200`, encounter `333`;
-  3. negative Definition values clamp safely to zero while LoseSight remains at least Sight;
-  4. applying these values does not change AI state, epoch, target, active Encounter request, retry state, or enable Tick.
-- Ensure the perception listener refresh uses the same configured SightConfig object; retain `RequestStimuliListenerUpdate` (and call `ConfigureSense` again only if required by the actual UE5.6 component contract).
-- Rebuild and rerun `BehaviorTreeAdapter`; rerun `MapContract` only if Encounter/Transition production code changes.
+## Scope and provenance
 
-## Existing Gate status
-
-The earlier BT/Behavior code Gate and user PIE evidence are not invalidated by this addendum. This `REVISE` applies only to the new radius parameterization evidence. Do not mark the addendum accepted until its production seams are actually exercised.
+The revision remains inside the existing Controller/Character/test/result allowlist. Dirty user Blueprints, Map, Enemy DataAsset, `Content/AI/**`, learning, and `.claude/**` files remain isolated.
 
 ## Conclusion
 
-`REVISE`: production wiring is plausible and backward-compatible, but current Automation is tautological and cannot detect broken Controller/Character Definition integration. No production code should be changed by Reviewer; return the precise test repair above to Implementation.
+`REVISE`: the tests now exercise real production helpers and real components, but actual Character fallback `200` and the required zero-mutation invariants are not yet proven.
