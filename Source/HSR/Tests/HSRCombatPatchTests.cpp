@@ -118,8 +118,12 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	Definition->SightRadius = 1200.0f;
 	Definition->LoseSightRadius = 1000.0f;
 	AHSREnemyAIController* RadiusController = NewObject<AHSREnemyAIController>();
+	const EHSREnemyExplorationState RadiusStateBefore = RadiusController->GetCurrentState();
+	const int32 RadiusEpochBefore = RadiusController->GetBehaviorTreeEpoch();
+	const int32 RadiusAttemptsBefore = RadiusController->GetEncounterSubmissionAttemptsForAutomation();
 	RadiusController->ApplyDefinitionPerceptionConfigForAutomation(nullptr);
 	TestTrue(TEXT("No-Definition perception fallback preserves prior defaults"), FMath::IsNearlyEqual(RadiusController->GetSightRadiusForAutomation(), 1000.0f) && FMath::IsNearlyEqual(RadiusController->GetLoseSightRadiusForAutomation(), 1500.0f));
+	TestTrue(TEXT("Controller perception apply has zero runtime-state mutation"), RadiusController->GetCurrentState() == RadiusStateBefore && RadiusController->GetBehaviorTreeEpoch() == RadiusEpochBefore && RadiusController->GetCurrentTargetForAutomation() == nullptr && !RadiusController->HasActiveEncounterRequestForAutomation() && !RadiusController->IsNavReadyRetryScheduledForAutomation() && RadiusController->GetEncounterSubmissionAttemptsForAutomation() == RadiusAttemptsBefore && !RadiusController->PrimaryActorTick.bCanEverTick);
 	RadiusController->ApplyDefinitionPerceptionConfigForAutomation(Definition);
 	TestTrue(TEXT("Definition perception applies normalized radii"), FMath::IsNearlyEqual(RadiusController->GetSightRadiusForAutomation(), 1200.0f) && FMath::IsNearlyEqual(RadiusController->GetLoseSightRadiusForAutomation(), 1200.0f));
 	Definition->SightRadius = -1.0f; Definition->LoseSightRadius = -2.0f;
@@ -322,6 +326,11 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
+	const FVector CharacterLocationBeforeConfig = OriginEnemy->GetActorLocation();
+	const FVector CharacterSpawnBeforeConfig = OriginEnemy->GetSpawnOrigin();
+	OriginEnemy->EnemyDefinition = nullptr;
+	OriginEnemy->ApplyDefinitionEncounterConfigForAutomation();
+	TestTrue(TEXT("No-Definition Character apply preserves encounter fallback and runtime state"), FMath::IsNearlyEqual(OriginEnemy->GetEncounterRadiusForAutomation(), 200.0f) && !OriginEnemy->PrimaryActorTick.bCanEverTick && OriginEnemy->GetActorLocation() == CharacterLocationBeforeConfig && OriginEnemy->GetSpawnOrigin() == CharacterSpawnBeforeConfig);
 	UHSREnemyDefinition* RadiusDefinition = NewObject<UHSREnemyDefinition>();
 	RadiusDefinition->EncounterRadius = 333.0f;
 	OriginEnemy->EnemyDefinition = RadiusDefinition;

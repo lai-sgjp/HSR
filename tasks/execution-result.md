@@ -282,6 +282,8 @@ Validation: `HSREditor Win64 Development` `PASS` (13 actions, exit `0`); `HSR.Ex
 
 Reviewer test-realism revision: Adapter now invokes the same production perception/encounter apply helpers used by possession/BeginPlay and reads actual `SightConfig`/`EncounterCollision` values. It verifies no-Definition `1000/1500/200`, Definition `1200/1000/333` normalization to `1200/1200/333`, and negative-radius clamp behavior. Build and Adapter pass.
 
+Apply zero-mutation evidence: actual Character no-Definition apply reads the default `EncounterCollision` radius `200` and preserves Tick, SpawnOrigin, and ActorLocation. Controller apply preserves state, epoch, target, active request, retry, attempts, and Tick while changing only perception configuration.
+
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
 
 ### Stage-B main-path PIE evidence — USER PROVIDED
