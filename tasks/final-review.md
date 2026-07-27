@@ -1,24 +1,25 @@
-# TASK-P17-PATCH-02 Stage A Revision Review
+# TASK-P17-PATCH-02 Stage B Initial-Patrol Revision Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `69c1b83`
+- Reviewed revision: `dd56861`
 - Result: `PASS WITH FOLLOW-UP`
-- Date: 2026-07-27
+- Date: 2026-07-28
 
 ## Verified
 
-- `StartPatrol`, `MoveToLocation`, `MoveToActor`, `SetTimer`, and `TimerHandle` have zero matches in the Controller header/implementation. The old patrol function, timer handles/callbacks, and navigation dependency were removed.
-- `OnMoveCompleted` no longer schedules patrol or issues movement. It only routes failed movement to the existing recovery-state/Blackboard publisher and checks weak-target validity; no movement owner remains in C++.
-- Revision provenance is confined to the allowlisted Controller files and `tasks/execution-result.md`. No `Content/AI/**` user asset was modified or submitted.
-- `Saved/Logs/HSR.log` records `HSR.Exploration.Patch.BehaviorTreeAdapter` as `Test Completed. Result={Success}` and `**** TEST COMPLETE. EXIT CODE: 0 ****`.
-- The execution report records the post-revision editor Build as 6 actions, exit `0`, with only the pre-existing engine deprecation warning.
+- Root cause and fix align: after `UseBlackboard` succeeds and before `RunBehaviorTree`, the shared publisher sets `MovingToPatrol`, `SpawnOrigin`, and `PatrolLocation=SpawnOrigin`, so the initial selector no longer evaluates an Idle/empty patrol intent.
+- The production path and automation seam share `PublishInitialPatrolIntent`; the test checks the non-Idle state and exact location value.
+- Static inspection finds zero `StartPatrol`, `MoveToLocation`, `MoveToActor`, `SetTimer`, `TimerHandle`, or `NavigationSystem` matches in the Controller header/implementation. `OnMoveCompleted` still only publishes failure/recovery state or checks weak-target validity and does not regain movement ownership.
+- Revision provenance is limited to the allowlisted Controller, test, and execution-result files. No user `.uasset` is included.
+- The failed bare-`UWorld` fixture evidence remains preserved in `Saved/Logs/HSR-backup-2026.07.27-16.20.49.log`: invalid BT/BB initialization is the first relevant failure, followed by the expected state/location assertion failures and test exit `-1`. The final seam avoids claiming that such a world can initialize `UseBlackboard`/`RunBehaviorTree`.
+- Final `Saved/Logs/HSR.log` independently records one `BehaviorTreeAdapter` test as `Success` and `TEST COMPLETE. EXIT CODE: 0`. The execution report records the final editor Build as 4 actions, exit `0`.
 
 ## Follow-up boundary
 
-Stage A C++ movement ownership is now closed, but PATCH-02 as a whole is not complete. Stage B remains user-owned and pending: the five stock-node branches (Patrol, Chasing, LostTarget, MoveFailed, EncounterPending), saved/reopened asset evidence, and PIE/runtime behavior matrix have not been verified. The successful adapter automation is a contract test, not proof of those runtime behaviors.
+This accepts only the C++ initial-intent revision. User PIE is still required to prove that the saved Stage-B stock graph consumes the patrol intent before target perception. The five branches and the broader acquire/loss, movement failure/recovery, Encounter, stale-epoch, and no-polling runtime matrix remain pending; PATCH-02 is not complete.
 
 ## Conclusion
 
-`PASS WITH FOLLOW-UP`: the requested Stage-A correction is accepted. Proceed only to the user-owned Stage-B Editor gate; do not mark the overall Behavior Tree migration complete until its asset and PIE evidence is supplied.
+`PASS WITH FOLLOW-UP`: the initial patrol intent is published at the correct startup boundary without reintroducing a C++ movement owner or modifying user assets. Continue at the user PIE gate.
