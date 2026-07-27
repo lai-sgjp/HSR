@@ -374,15 +374,23 @@ void AHSREnemyAIController::PublishNextPatrolIntent(const FVector& InSpawnOrigin
 {
 	UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	const ANavigationData* NavData = NavSystem ? NavSystem->GetDefaultNavDataInstance(FNavigationSystem::DontCreate) : nullptr;
+	FNavLocation ProjectedCenter;
+	const FVector ProjectionExtent(100.0f, 100.0f, 300.0f);
+	const bool bProjected = NavData
+		&& NavSystem->ProjectPointToNavigation(InSpawnOrigin, ProjectedCenter, ProjectionExtent, NavData);
 	FNavLocation Candidate;
-	const bool bHasReachableCandidate = NavData
-		&& NavSystem->GetRandomReachablePointInRadius(InSpawnOrigin, FMath::Max(0.0f, PatrolRadius), Candidate);
+	const bool bHasReachableCandidate = bProjected
+		&& NavSystem->GetRandomReachablePointInRadius(ProjectedCenter.Location, FMath::Max(0.0f, PatrolRadius), Candidate);
 	UE_LOG(LogTemp, Log, TEXT("P17-PATCH-02 PatrolIntent Controller=%s Center=%s Radius=%.2f NavSystem=%s NavData=%s Result=%s Candidate=%s"),
 		*GetName(), *InSpawnOrigin.ToString(), PatrolRadius, *GetNameSafe(NavSystem), *GetNameSafe(NavData),
 		bHasReachableCandidate ? TEXT("Reachable") : TEXT("Fallback"), *Candidate.Location.ToString());
+	UE_LOG(LogTemp, Log, TEXT("P17-PATCH-02 PatrolProjection Controller=%s Input=%s Extent=%s Projected=%s Result=%s Random=%s"),
+		*GetName(), *InSpawnOrigin.ToString(), *ProjectionExtent.ToString(), *ProjectedCenter.Location.ToString(),
+		bProjected ? TEXT("Success") : TEXT("Failed"), bHasReachableCandidate ? TEXT("Success") : TEXT("SkippedOrFailed"));
 	if (!bHasReachableCandidate)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("P17-PATCH-02 patrol intent fallback: %s has no reachable patrol point"), *GetName());
+		UE_LOG(LogTemp, Warning, TEXT("P17-PATCH-02 patrol intent fallback: %s Reason=%s"), *GetName(),
+			bProjected ? TEXT("RandomReachableFailed") : TEXT("ProjectPointFailed"));
 	}
 	PublishPatrolIntent(InSpawnOrigin, Candidate.Location, bHasReachableCandidate);
 }

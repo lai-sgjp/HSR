@@ -184,3 +184,20 @@ Validation:
 - `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
 
 User map, enemy DataAsset, and AI assets remain untouched. PIE must now verify a `NavReadyRetry` log followed by a Reachable patrol candidate and stock BT movement.
+
+### Stage-B PIE revision — project patrol center before random reachability
+
+Latest PIE evidence showed the delayed retry had a valid `RecastNavMesh-Default`, but its origin center was off the navigable surface. `GetRandomReachablePointInRadius` therefore fell back even with NavData available.
+
+The Controller now first calls `ProjectPointToNavigation` with extent `(100, 100, 300)`, then uses the projected center for `GetRandomReachablePointInRadius`. The branches are observable and bounded:
+
+- projection success plus random success publishes the random candidate and `MovingToPatrol`;
+- projection failure logs `ProjectPointFailed`, then publishes the existing SpawnOrigin/`PatrolWaiting` fallback;
+- random failure after successful projection logs `RandomReachableFailed`, then uses the same fallback.
+
+No direct movement, recurring timer, polling service, NavMesh/map edit, or user asset change was made. The PatrolProjection log records input center, extent, projected center, and distinct projection/random results.
+
+Validation:
+
+- `HSREditor Win64 Development`: `PASS`, 5 actions, exit `0` (only engine AISystem C4996 warning).
+- `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`; controllable candidate and bounded fallback seam assertions pass.

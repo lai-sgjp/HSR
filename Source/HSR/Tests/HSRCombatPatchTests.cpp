@@ -117,10 +117,12 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	FVector PatrolLocation = FVector::ZeroVector;
 	TestTrue(TEXT("BT initialization writes PatrolLocation"), Controller->GetPatrolLocationForAutomation(PatrolLocation));
 	TestEqual(TEXT("Reachable patrol candidate is published without a movement request"), PatrolLocation, CandidatePatrolLocation);
+	TestEqual(TEXT("Projected center plus random candidate keeps MovingToPatrol"), Controller->GetCurrentState(), EHSREnemyExplorationState::MovingToPatrol);
 	Controller->PublishPatrolIntentForAutomation(nullptr, ExpectedSpawnOrigin, FVector::ZeroVector, false);
 	TestEqual(TEXT("Unreachable patrol fallback waits instead of issuing a movement loop"), Controller->GetCurrentState(), EHSREnemyExplorationState::PatrolWaiting);
 	TestTrue(TEXT("Unreachable patrol fallback publishes SpawnOrigin"), Controller->GetPatrolLocationForAutomation(PatrolLocation));
 	TestEqual(TEXT("Unreachable patrol fallback location is SpawnOrigin"), PatrolLocation, ExpectedSpawnOrigin);
+	TestEqual(TEXT("Projection failure and random failure both retain bounded SpawnOrigin fallback"), PatrolLocation, ExpectedSpawnOrigin);
 	TestTrue(TEXT("Nav-ready retry arms once"), Controller->ArmNavReadyRetryForAutomation(7));
 	TestFalse(TEXT("Nav-ready retry refuses a second pending arm"), Controller->ArmNavReadyRetryForAutomation(7));
 	TestFalse(TEXT("Nav-ready retry rejects stale epoch consumption"), Controller->ConsumeNavReadyRetryForAutomation(8));
