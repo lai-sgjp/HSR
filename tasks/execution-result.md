@@ -241,3 +241,16 @@ Validation:
 - `HSR.BattleReturn.MapContract`: `PASS`, exit `0`.
 
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
+
+### Stage-B main-path PIE evidence — USER PROVIDED
+
+User-provided PIE attachment verifies the following observed main path only:
+
+- Multiple patrol cycles publish `Reachable` locations.
+- Successful perception transitions state `2 -> 3 -> 4` and logs `BeginChasingTarget` without encounter submission.
+- Losing sight transitions `4 -> 7` (`LostTarget`) and then `-> 8` (`ReturningToSpawnOrigin`).
+- Reacquiring the target transitions `8 -> 3 -> 4`.
+- Only after physical `NotifyActorBeginOverlap` does one `RequestEncounter` succeed, transitioning `4 -> 5` (`EncounterPending`); the travel consume then succeeds.
+- `OnUnPossess` performs clean teardown, with no duplicate or stale-callback log observed in this run.
+
+This is user-provided runtime evidence. It does not claim unobserved full-return completion, move-failure handling, target-destruction handling, or duplicate-overlap coverage. User-owned map, enemy DataAsset, and `Content/AI/**` assets remain isolated and unchanged.
