@@ -55,6 +55,8 @@ public:
 #endif
 #if WITH_DEV_AUTOMATION_TESTS
 	void SetSpeedDelegateBindFailureAfterForAutomation(int32 InBindCount) { SpeedDelegateBindFailureAfter = InBindCount; }
+	int32 GetSpeedDelegateBindingCountForAutomation() const { return SpeedDelegateBindings.Num(); }
+	bool GetActionDistanceForAutomation(FName ParticipantId, float& OutSpeed, float& OutBase, float& OutRemaining, int32& OutPending) const;
 #endif
 
 private:

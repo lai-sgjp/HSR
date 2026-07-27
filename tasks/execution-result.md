@@ -17,6 +17,12 @@ Status: `IMPLEMENTED / REVIEW REQUIRED`
 - Added structured `ActionDistance` rejection logs for invalid requests and non-finite Speed callbacks; each rejects with zero state/lifecycle mutation.
 - First Build attempt failed only because this engine's `TNumericLimits<float>` lacks `QuietNaN`; the test was corrected to use `FMath::Sqrt(-1.0f)`. The subsequent Development Editor Build passed, and the full `HSR.Battle.Patch` Automation run passed with exit code 0.
 
+## REVISE follow-up 3 (2026-07-27)
+
+- Added `WITH_DEV_AUTOMATION_TESTS`-only observation seams for action-distance values and bound Speed delegate count; no reflected or production UI API was added.
+- `ActionDistance` now executes real ASC Speed delegate changes: non-current Speed Up verifies inverse Base distance, current Speed change verifies the current actor remains locked and its Remaining distance is unchanged until Resolve, and fixture binding count is asserted.
+- Development Editor Build — PASS; `Automation RunTests HSR.Battle.Patch` — PASS, exit code 0.
+
 ## Implemented
 
 - Replaced static speed queue/Break skip-once storage with battle-local action-distance state: effective speed, base distance, remaining distance, deterministic epsilon candidate selection, current-turn lock and ordered post-action adjustments.

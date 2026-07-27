@@ -197,3 +197,10 @@ FHSRActionDistanceResult UHSRTurnManager::MakeAdjustmentResult(EHSRActionDistanc
 #if WITH_EDITOR
 bool UHSRTurnManager::InvalidateCurrentParticipantForDevelopmentTest() { if (!OrderedParticipants.IsValidIndex(CurrentTurnIndex)) return false; OrderedParticipants[CurrentTurnIndex].Actor.Reset(); return true; }
 #endif
+#if WITH_DEV_AUTOMATION_TESTS
+bool UHSRTurnManager::GetActionDistanceForAutomation(FName ParticipantId, float& OutSpeed, float& OutBase, float& OutRemaining, int32& OutPending) const
+{
+	const int32 Index = FindParticipantIndex(ParticipantId); if (!OrderedParticipants.IsValidIndex(Index)) return false;
+	const FHSRBattleParticipant& P = OrderedParticipants[Index]; OutSpeed = P.EffectiveSpeed; OutBase = P.BaseActionDistance; OutRemaining = P.RemainingActionDistance; OutPending = PendingPostActionOperations.Num(); return true;
+}
+#endif
