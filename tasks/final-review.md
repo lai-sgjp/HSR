@@ -124,3 +124,49 @@ Reviewed follow-up: Implementation `418b8a1` after Reviewer `968d4d8`
 ## Verdict
 
 `REVISE` — The accepted Status/Delay counter defect is fixed, but required Automation remains absent. No allowlist expansion or new user authorization is required: route back to the original Implementation Agent with the Coordinator-owned, `WITH_DEV_AUTOMATION_TESTS`-only fixture direction. Return to independent review after its role commit.
+
+---
+
+# TASK-P17-PATCH-01B Fixture Feasibility Reassessment
+
+Status: `BLOCKED`
+
+Role: `Independent Reviewer`
+Date: `2026-07-27`
+Evidence level: `STATIC INITIALIZATION-PATH REVIEW`
+Inputs: Implementation blocker after `7cc3a5e`; Coordinator `SubmitBattleRequest`, `BuildParticipants`, `BuildAndValidateParticipantDefinitions`, ASC/ability/status initialization; GameMode configuration injection.
+
+## Correction to the previous review
+
+- The Coordinator-only fixture direction in `7cc3a5e` was not concrete enough and is withdrawn.
+- A helper that directly writes `CurrentState`, `Participants`, `TurnManager`, granted abilities, or status components would bypass the production `SubmitBattleRequest -> BuildParticipants -> RequestAction` initialization contract and cannot satisfy the required runtime evidence.
+- A fully transient production build is theoretically possible but not a safe minimal seam here: `BuildParticipants` requires a valid BasicAttack definition/ability, formal damage and Toughness GameplayEffects, participant classes, initialization GE, enemy definition/weakness, and Break Status definition. Constructing or globally mutating these contracts inside the test would duplicate GameMode configuration and could contaminate other Automation.
+
+## Exact viable route: minimal GameMode header expansion
+
+Authorize `Source/HSR/Battle/HSRBattleGameMode.h` and add exactly one non-reflected factory under `#if WITH_DEV_AUTOMATION_TESTS`:
+
+```cpp
+static UHSRBattleCoordinator* CreateRepeatableBreakAutomationFixture(
+    UObject* Outer,
+    UWorld* BattleWorld,
+    TSubclassOf<AHSRBattleGameMode> ConfiguredGameModeClass,
+    FText& OutFailure);
+```
+
+Implementation ownership and restrictions:
+
+- Implement only in the already-allowlisted `HSRBattleGameMode.cpp`, also guarded by `#if WITH_DEV_AUTOMATION_TESTS`.
+- Resolve the supplied class CDO and read its existing BasicAttack, enemy, participant-initialization GE, Break Status, character catalog/class and related production configuration. Do not mutate the CDO or any Content asset.
+- Create a transient Coordinator owned by `Outer`, inject the CDO configuration through existing Coordinator setters, submit a deterministic fresh encounter request, and call the real `BuildParticipants(BattleWorld)`. Return only a fully `Spawned` Coordinator; otherwise return `nullptr` with structured `OutFailure`.
+- The Automation test may reference only the existing configured `BP_HSRBattleGameMode` class path, not individual GE/DataAsset paths, then drive the public `RequestAction`, ASC values, Reset/rebuild and read-only test counters.
+- The factory must not be a `UFUNCTION`, Blueprint-visible, editor property, shipping/runtime API, alternate action resolver, or generic private-state mutator. It must not add a harness switch or change normal `BeginPlay`.
+- Created Coordinator/Actors belong to the supplied transient test World/Outer and must be destroyed by the Automation fixture. No raw UObject cache or global state is permitted.
+
+## Evidence consequence
+
+This is a genuine allowlist stop condition. Revising the Automation requirement to a pure helper plus PIE would weaken the already-frozen full runtime matrix and is not justified while the exact factory above can execute the production initialization/action path.
+
+## Verdict
+
+`BLOCKED` — Status/Delay counter corrections remain accepted, but runtime Automation cannot safely proceed under the current allowlist. Coordinator must request user authorization for the single file `Source/HSR/Battle/HSRBattleGameMode.h`, limited to the exact `WITH_DEV_AUTOMATION_TESTS` factory contract above. After authorization, route to the original Implementation Agent, then rebuild/run Automation and return to independent review before the user PIE gate.
