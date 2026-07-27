@@ -1,35 +1,36 @@
-# TASK-P17-PATCH-02 Encounter-Assertion Review
+# TASK-P17-PATCH-02 Return-Completion Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `a8bf783`
-- Result: `REVISE` (code/Automation contract passes; only user full-return PIE remains)
+- Reviewed revision: `c1d33d9`
+- Result: `REVISE` (implementation passes; final user PIE evidence pending)
 - Date: 2026-07-28
 
-## Encounter contract accepted
+## Implementation accepted
 
-- The test-local `SameEncounterRequest` compares every current `FHSREncounterRequest` field: RequestId, EncounterId, EnemyDefinitionId, Initiative, BattleMapPath, ReturnTransform, ExplorationMapPath, RewardDefinitionId, and RewardSeed.
-- The snapshot comparison additionally preserves encounter state, TravelKind, TravelRequestId, resolved membership, and admission mutation count.
-- Both production rejection branches assert their exact result (`AlreadyPending` / `AlreadyConsumed`), invalid returned RequestId, nonempty failure message, and full snapshot/request zero mutation.
-- Revision `a8bf783` changes only Automation assertions and the execution report; no production or fixture behavior changed.
-- Final Build is reported as 4 actions, exit `0`, and final `BehaviorTreeAdapter` is logged as Success/exit `0`.
+- A successful `OnMoveCompleted` while `ReturningToSpawnOrigin` obtains the same Character SpawnOrigin/definition used by recovery and emits `ReturnComplete` with Controller, Actor location, SpawnOrigin, distance, and current Encounter RequestId.
+- Completion then calls `PublishNextPatrolIntent` exactly once in that handler. A reachable navigation candidate transitions to `MovingToPatrol`; projection/random failure uses the existing bounded `PatrolWaiting` plus `PatrolLocation=SpawnOrigin` fallback.
+- No direct Move request, repeating timer, polling loop, Encounter request, or new recovery retry was added. Recovery state is exited by publishing the next patrol/fallback state.
+- Adapter coverage verifies reachable next-candidate publication, bounded fallback, and no Encounter creation. It does not substitute for the physical Move To completion evidence.
+- Raw logs confirm final `BehaviorTreeAdapter` and `MapContract` Success/exit `0`; the execution report records the Development Build as passing. Revision provenance is confined to the Controller/test/result allowlist, and user assets remain isolated.
 
-## MapContract freshness decision
+## Final required USER PIE evidence
 
-A fresh `MapContract` rerun is not required for this assertion-only revision. The same production Transition fixture from `b181534` already passed `MapContract` with exit `0`, and `a8bf783` modifies neither `HSRBattleTransitionSubsystem` nor `MapContract`. The existing result remains valid provenance; rerunning would be optional redundancy rather than a gate requirement.
+PATCH-02 has no remaining known C++/Automation correction. It remains open only until the real stock-BT return completes in PIE. The expected evidence is:
 
-## Sole remaining acceptance item — USER PIE
-
-Only full stock `Move To SpawnOrigin` completion remains:
-
-1. Acquire the player, then leave sight without reacquiring or entering overlap.
-2. Capture `Chasing -> LostTarget -> ReturningToSpawnOrigin`, tree epoch, target validity/cleared `TargetActor`, start location, and SpawnOrigin.
-3. Wait for stock Move To completion; capture final Actor location and distance to SpawnOrigin within the configured acceptance radius, plus final AIState and Blackboard values.
-4. Confirm no Controller Move request, repeating timer, or retry loop occurred. Preserve the first failure/SKIPPED reason if the run cannot complete.
-
-No additional C++ or Automation correction is currently required. User Map, DataAsset, BT/BB, learning, and `.claude/**` changes remain separately owned.
+1. Before loss: one `Chasing` state record with tree epoch, valid target, Actor location, and SpawnOrigin.
+2. Loss: `Chasing -> LostTarget -> ReturningToSpawnOrigin`, `TargetActor` cleared, and no Encounter request.
+3. Completion: exactly one `P17-PATCH-02 ReturnComplete` line for that movement request, containing:
+   - Actor `Location`;
+   - `SpawnOrigin`;
+   - `Distance` within the configured Move To acceptance radius;
+   - invalid/empty Encounter `RequestId` for this no-overlap path.
+4. Immediately after completion:
+   - either `PatrolIntent ... Result=Reachable` followed by `MovingToPatrol` and a new candidate;
+   - or a projection/random failure reason followed by bounded `PatrolWaiting` and `PatrolLocation=SpawnOrigin`.
+5. No second `ReturnComplete` for the same completion, no direct Controller Move, no repeating retry, and no Encounter submission. Preserve the first failure/SKIPPED reason if the run cannot reach SpawnOrigin.
 
 ## Conclusion
 
-`REVISE`: the duplicate/post-resolved Encounter contract is now closed. PATCH-02 remains open solely for the required user-provided full-return completion evidence; do not archive until that PIE evidence is recorded and reviewed.
+`REVISE`: `c1d33d9` is accepted and closes the implementation side of return completion. The complete Gate now depends only on the final user-provided PIE log above; do not archive before it is reviewed.
