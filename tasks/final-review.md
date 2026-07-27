@@ -1,46 +1,43 @@
-# TASK-P17-PATCH-02 Complete Independent Gate Review
+# TASK-P17-PATCH-02 Teardown Revision Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed implementation chain: `62c593d` through `7aa1205`, including `9bd9200`, `eb0bd14`, `46e86e1`, and `2f96e84`
-- Reviewed user-evidence record: `52686ca`
+- Reviewed revision: `52250a8`
 - Result: `REVISE`
 - Date: 2026-07-28
 
-## Evidence accepted
+## Production fix verified
 
-- Build evidence: latest relevant editor Build reports success; the final adapter Build is 7 actions, exit `0`.
-- Automation evidence: `HSR.Exploration.Patch.BehaviorTreeAdapter` and `HSR.BattleReturn.MapContract` completed with `Success`, exit `0`.
-- Automation covers default BT/BB references, no Actor Tick, initial epoch, reachable/fallback patrol publication, distinct projection/random failure reasons, one-shot Nav-ready duplicate/stale/exact consumption, pre-BeginPlay SpawnOrigin fallback/post-capture stability, and perception-versus-explicit Encounter-entry separation.
-- User-provided PIE covers repeated reachable patrol candidates, perception `2 -> 3 -> 4` without submission, sight loss `4 -> 7 -> 8`, reacquisition `8 -> 3 -> 4`, one physical-overlap Encounter request/travel, and an observed clean UnPossess log path.
-- Read-only package tokens support the six-key Blackboard schema and a stock-node BT graph containing Blackboard decorators, selectors/sequences, `Move To`, `Wait`, Patrol/Encounter/LostTarget/MoveFailed/Returning state keys. No custom polling Service token was found.
-- Source changes stayed inside the frozen C++/test/result allowlist. Dirty user `Content/AI/**`, Map, Enemy DataAsset, learning, and `.claude/**` changes remain separated from Implementation/Reviewer commits.
+- Teardown now stops Brain logic, clears Blackboard state, nulls `RuntimeBlackboard`, invalidates the active request, and advances the epoch only when runtime ownership existed.
+- Because the pointer is detached before caller cleanup, subsequent `ClearState` from UnPossess/EndPlay cannot repopulate Blackboard keys. A repeated Stop after teardown is epoch-idempotent.
+- The one-shot retry remains cleared/invalidated before stale work. A fresh bind obtains a later epoch.
+- Revision provenance stays inside the Controller/test/result allowlist. User Map, Enemy DataAsset, `Content/AI/**`, learning, and `.claude/**` changes remain isolated.
+- Raw logs show the final `BehaviorTreeAdapter` and `MapContract` runs succeeded with exit `0`; the report records Build as 7 actions, exit `0`. Earlier failed adapter runs remain preserved.
 
-## Blocking code finding
+## Blocking Automation finding
 
-Lifecycle Blackboard cleanup is not atomic. `OnUnPossess` and `EndPlay` call `StopBehaviorTreeRuntime()` and then `ClearState()`. `StopBehaviorTreeRuntime()` clears Blackboard keys but leaves `RuntimeBlackboard` non-null. The subsequent `ClearState()` calls `SetBlackboardTarget(nullptr)` and `WriteBlackboardRuntimeState()`, repopulating `SpawnOrigin`, `AIState`, `TreeEpoch`, and `EncounterRequestId` after teardown. Therefore the frozen requirement that runtime keys are cleared across UnPossess/EndPlay is not currently satisfied, and the user log’s absence of a stale callback does not prove key cleanup.
+The test does not truly verify the six Blackboard keys. `AreBlackboardRuntimeKeysClearForAutomation` ignores `InBlackboard` values and returns only whether an internal synthetic bitmask is zero. `WriteBlackboardRuntimeState` sets that mask wholesale to `0x3f`, and `ClearBlackboardRuntimeState` resets it wholesale to zero independently of whether each `ClearValue` call remains correct. Thus removing or breaking any one of the six real key clears would still pass every “six keys clear” assertion.
 
-Minimum correction: after stopping/clearing logic, detach/null `RuntimeBlackboard` before `ClearState` can publish, or reorder teardown so final key clearing is the last Blackboard operation. Add an Automation seam/assertion for all six keys and stale callbacks after both UnPossess-equivalent and EndPlay-equivalent teardown, then rebuild and rerun the adapter test.
+Minimum correction: seed all six actual keys in the world-backed Blackboard with non-default values, call Stop, and query the Blackboard component itself to prove each key is cleared. Repeat the real-value assertions after `ClearState`, repeated Stop, fresh bind/stale callback, and the EndPlay-equivalent ordering. Remove the synthetic mask or retain it only as non-authoritative diagnostics. Rebuild and rerun both tests.
 
-## Missing required acceptance evidence
+## Remaining completion-gate evidence
 
-The active-task matrix explicitly requires, but current evidence does not verify:
+Even after the teardown test is corrected, the active acceptance matrix still lacks:
 
-- complete return-to-SpawnOrigin movement completion;
-- movement failure and abort behavior;
-- target destruction cleanup;
-- same-frame duplicate overlap submission with before/after request ID and result reason;
-- already-resolved/post-consumption rejection;
-- stale callback after actual re-possess/EndPlay (the Nav-ready seam tests epoch consumption but not the complete controller/Blackboard lifecycle);
-- exact before/after state, epoch, target validity, and request/result IDs for those cases.
+- same-frame duplicate overlap with preserved request ID, structured result/reason, and before/after state;
+- post-resolved/already-resolved rejection;
+- full stock `Move To SpawnOrigin` completion;
+- move failure and abort recovery;
+- target destruction cleanup.
 
-These are completion-gate requirements, not optional post-task polish. Add deterministic Automation for the transaction/lifecycle cases that do not require Editor navigation, and obtain focused user PIE for full return plus movement failure/abort and target destruction. Preserve failed/SKIPPED evidence separately.
+These remain blocking for PATCH-02 archive because the active card explicitly requires them. Minimal user PIE steps:
 
-## Asset/provenance boundary
-
-The user-owned BT, BB, Map, and DataAsset remain dirty/untracked and must not be absorbed into an Implementation or Reviewer commit. Before final acceptance, the Coordinator must record their user provenance and saved/reopened evidence; asset submission, if desired, remains a separate user-owned commit/decision.
+1. Lose sight without reacquiring; wait until the enemy reaches SpawnOrigin and capture state/location before and after completion.
+2. Temporarily make the recovery/patrol destination unreachable or interrupt the active stock Move To; capture failure/abort, `MoveFailed -> ReturningToSpawnOrigin`, and absence of a C++ retry loop.
+3. Destroy the perceived target during Chasing; capture target validity, cleared `TargetActor`, state transition, and recovery.
+4. Trigger two overlap notifications in the same frame, then repeat after the first transaction resolves; capture request IDs, result reasons, state, epoch, and subsystem counts before/after. If the Editor cannot reliably force same-frame overlap, implement a deterministic allowlisted transaction seam instead of inferring it from a single successful overlap.
 
 ## Conclusion
 
-`REVISE`: the main path is credible, but teardown currently rewrites cleared Blackboard state and several explicitly required lifecycle/transaction/runtime cases remain unverified. Do not archive PATCH-02 yet.
+`REVISE`: the production teardown ordering fixes the identified rewrite defect, but the purported six-key test is synthetic rather than Blackboard-backed, and the explicitly required transaction/movement/destruction matrix is still incomplete. Do not archive PATCH-02.
