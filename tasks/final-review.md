@@ -203,3 +203,52 @@ Required test-file includes are `Engine/Engine.h`, `Engine/GameInstance.h`, and 
 ## Verdict
 
 `REVISE` — A safe executable route exists with the currently authorized files; no additional allowlist expansion is needed. Route to Implementation with the exact `InitializeStandalone`/cleanup sequence above and remove the broad GameMode friend plus Coordinator-owned factory surface. After Build, run the Automation in isolation first to detect leaked WorldContexts or subsystem delegates, then run it with applicable regressions before independent review.
+
+---
+
+# TASK-P17-PATCH-01B Final Candidate Review
+
+Status: `BLOCKED`
+
+Role: `Independent Reviewer`
+Date: `2026-07-27`
+Evidence level: `STATIC CODE REVIEW + INDEPENDENT LOCAL LOG AUDIT`
+Reviewed candidate: replacement Implementation `2412d9b`
+
+## Passed findings
+
+- `PASS` — The GameMode fixture is one non-reflected static method guarded by `WITH_DEV_AUTOMATION_TESTS`; it reads but does not mutate the configured CDO/Content and executes profile registration, `SubmitBattleRequest`, and production `BuildParticipants`.
+- `PASS` — Automation uses `UGameInstance::InitializeStandalone`, verifies the World/GameInstance relationship, and scope-exit performs Coordinator Reset, GameInstance Shutdown, World destruction, WorldContext destruction, and root release. The observed logs show unique World cleanup with no double-destroy failure.
+- `PASS` — Local `Saved/Logs/HSR.log` independently confirms discovery of two `HSR.Battle.Patch` tests and `Result={Success}` for both `RepeatableBreak` and `StatusGeneric`. Historical first failures remain recorded in `tasks/execution-result.md`.
+- `PASS` — No TurnManager/action-value redesign, Tick, replication, Blueprint property, Config or Content mutation is present. Factory ownership and compile guard match the authorized surface.
+- `PASS` — The runtime test covers first edge, replay zero side effects, recovery, second edge, zero-to-zero, non-zero, weakness failure, Reset, stale BattleId, ActionId reuse, same-frame lethal, and Finished rejection through the production action path.
+
+## Blocking production defect
+
+- `BLOCKING` — Same-frame lethal handling temporarily changes authoritative Health from committed `0` to `UE_KINDA_SMALL_NUMBER`, invokes Break Status/Delay, then writes Health back to `0`. This creates observable `0 -> positive -> 0` ASC attribute changes in production.
+- The implementation comment claiming no presentation snapshot is false: successful `AddOrRefreshStatus` calls `NotifyStatusChanged`, Coordinator's bound status handler synchronously calls `PublishCommandViewState`, and the snapshot is therefore built while Health is temporarily positive. Any direct Health attribute listener can also observe both artificial writes.
+- The workaround can cause a one-frame/event-driven “revival” presentation and duplicate Health notifications solely to bypass consumer admission checks. A passing Automation assertion does not make this authority mutation safe.
+
+## Remaining evidence precision gaps
+
+- Replay checks only cached Break ActionId, not equality of the cached Resolution's status/failure/toughness/break fields.
+- First turn advancement is asserted as `>` rather than the frozen exact delta; second edge, fresh reused ActionId, and lethal paths do not assert exact turn deltas.
+- The explicit already-dead-at-admission case is not independently exercised; Finished-after-lethal is a different rejection boundary.
+- After Reset, the fresh reused ActionId is not accompanied by explicit `+1` Status/accepted-Delay and exact Toughness/turn assertions.
+
+## Required authorization and revision
+
+The Health workaround cannot be repaired safely inside Coordinator alone because the existing consumers reject by post-damage Health/turn eligibility. Request the smallest allowlist expansion for:
+
+- `Source/HSR/Status/HSRStatusComponent.h`
+- `Source/HSR/Status/HSRStatusComponent.cpp`
+- `Source/HSR/Battle/HSRTurnManager.h`
+- `Source/HSR/Battle/HSRTurnManager.cpp`
+
+Authorized purpose only: add an explicit synchronous “target was alive at authoritative command admission and is pending deferred defeat” option to the existing Break Status and Break Delay consumer calls. Default behavior must remain unchanged; ordinary dead targets still reject. Coordinator may pass the option only when its already-frozen `PendingDefeatedParticipantId` matches the admitted target in the same open action transaction. Do not expose it to Blueprint, store it beyond the call, alter skip-once semantics, or redesign TurnManager/Status. Remove both temporary Health writes.
+
+Then tighten Automation to compare cached Resolution fields and exact deltas, add an already-dead admission case, and complete exact Reset/reused/lethal assertions. Rebuild and rerun isolated plus shared `HSR.Battle.Patch` before returning to review.
+
+## Verdict
+
+`BLOCKED` — Automation infrastructure and current runtime coverage are materially improved, but the production same-frame lethal workaround publishes an artificial revival state and the exact matrix remains incomplete. Fixing it requires the four-file consumer allowlist expansion above; Coordinator must request that narrow user authorization. Do not request the user PIE gate until the revision passes independent review.
