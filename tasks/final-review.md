@@ -1,43 +1,35 @@
-# TASK-P17-PATCH-02 Transition-Fixture Review
+# TASK-P17-PATCH-02 Encounter-Assertion Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `b181534`
-- Result: `REVISE`
+- Reviewed revision: `a8bf783`
+- Result: `REVISE` (code/Automation contract passes; only user full-return PIE remains)
 - Date: 2026-07-28
 
-## Fixture design verified
+## Encounter contract accepted
 
-- `RequestEncounter` keeps its production signature and rejection flow. New snapshot/seed/reset APIs and the admission counter are guarded by `WITH_DEV_AUTOMATION_TESTS`.
-- The fixture uses a valid `UGameInstance` outer. Pending and resolved seeds only prepare private state; both rejection checks execute production `RequestEncounter`.
-- Pending rejection returns `AlreadyPending`; resolved rejection returns `AlreadyConsumed`; state/travel/request-ID membership and admission-count fields currently compared by the test remain unchanged.
-- Build, `BehaviorTreeAdapter`, and `MapContract` are reported and logged as successful with exit `0`. The earlier invalid-outer failure remains preserved. Revision provenance is limited to the approved Transition/test/result expansion, and user assets remain isolated.
+- The test-local `SameEncounterRequest` compares every current `FHSREncounterRequest` field: RequestId, EncounterId, EnemyDefinitionId, Initiative, BattleMapPath, ReturnTransform, ExplorationMapPath, RewardDefinitionId, and RewardSeed.
+- The snapshot comparison additionally preserves encounter state, TravelKind, TravelRequestId, resolved membership, and admission mutation count.
+- Both production rejection branches assert their exact result (`AlreadyPending` / `AlreadyConsumed`), invalid returned RequestId, nonempty failure message, and full snapshot/request zero mutation.
+- Revision `a8bf783` changes only Automation assertions and the execution report; no production or fixture behavior changed.
+- Final Build is reported as 4 actions, exit `0`, and final `BehaviorTreeAdapter` is logged as Success/exit `0`.
 
-## Blocking assertion gap
+## MapContract freshness decision
 
-The test text claims “full snapshot zero mutation” and “no new ID”, but it does not prove either completely:
+A fresh `MapContract` rerun is not required for this assertion-only revision. The same production Transition fixture from `b181534` already passed `MapContract` with exit `0`, and `a8bf783` modifies neither `HSRBattleTransitionSubsystem` nor `MapContract`. The existing result remains valid provenance; rerunning would be optional redundancy rather than a gate requirement.
 
-- It never asserts that `PendingDuplicate.RequestId` and `ResolvedReplay.RequestId` are invalid/no-new-ID.
-- Although the snapshot contains a full `FHSREncounterRequest`, comparison checks only `PendingRequest.RequestId`. Mutations to EncounterId, EnemyDefinitionId, Initiative, BattleMapPath, ReturnTransform, ExplorationMapPath, RewardDefinitionId, or RewardSeed would pass unnoticed.
-- It does not assert a nonempty structured failure message/reason payload.
+## Sole remaining acceptance item — USER PIE
 
-Minimum correction inside the existing allowlist:
+Only full stock `Move To SpawnOrigin` completion remains:
 
-- Add a test-local equality helper for every `FHSREncounterRequest` field listed above and use it for pending/resolved before/after snapshots.
-- Assert both returned rejection RequestIds are invalid, both result types are exact, and both failure messages are nonempty.
-- Retain the existing state, TravelKind, TravelRequestId, resolved-membership, and admission-count equality checks.
-- Rebuild and rerun `BehaviorTreeAdapter` and `MapContract`, preserving the prior invalid-outer first error.
+1. Acquire the player, then leave sight without reacquiring or entering overlap.
+2. Capture `Chasing -> LostTarget -> ReturningToSpawnOrigin`, tree epoch, target validity/cleared `TargetActor`, start location, and SpawnOrigin.
+3. Wait for stock Move To completion; capture final Actor location and distance to SpawnOrigin within the configured acceptance radius, plus final AIState and Blackboard values.
+4. Confirm no Controller Move request, repeating timer, or retry loop occurred. Preserve the first failure/SKIPPED reason if the run cannot complete.
 
-## Remaining task gate after that correction
-
-If those deterministic assertions pass, the only remaining acceptance item is user PIE proof of full stock `Move To SpawnOrigin` completion:
-
-1. Acquire the player, then leave sight without reacquiring or overlapping.
-2. Capture `Chasing -> LostTarget -> ReturningToSpawnOrigin`, epoch, cleared target, start location, and SpawnOrigin.
-3. Wait for Move To completion and capture final location/distance within acceptance radius plus final state/Blackboard values.
-4. Confirm no C++ Move or repeating retry occurred; preserve the first failure/SKIPPED reason if completion cannot be produced.
+No additional C++ or Automation correction is currently required. User Map, DataAsset, BT/BB, learning, and `.claude/**` changes remain separately owned.
 
 ## Conclusion
 
-`REVISE`: the dev-only fixture correctly reaches the production rejection branches, but its current assertions do not yet establish the claimed no-new-ID and full-request zero-mutation guarantees. After this narrow test fix, only full-return user PIE should remain.
+`REVISE`: the duplicate/post-resolved Encounter contract is now closed. PATCH-02 remains open solely for the required user-provided full-return completion evidence; do not archive until that PIE evidence is recorded and reviewed.
