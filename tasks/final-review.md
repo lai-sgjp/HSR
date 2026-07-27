@@ -1,4 +1,34 @@
-# TASK-P17-PATCH-01A Re-review — Implementation Fix `d1f8eb0`
+# TASK-P17-PATCH-01A User PIE Evidence Review — 2026-07-27
+
+Status: `BLOCKED`
+
+## Evidence inspected
+
+- Independently inspected user-supplied PIE log `C:/Users/Lai/.codex/attachments/5932ed77-67b8-4dbd-99ce-d29d33824c8a/pasted-text.txt` rather than relying on the mechanical summary.
+- `P9-001 Status Harness=COMPLETE`.
+- `P9-002 Stack Harness=COMPLETE`, including `OldRemoveFailure Result=PASS` with the retained old handle, `RollbackAttack=120.00`, successful later clear, and expected remove count.
+- P9-003 normal DoT/Break runtime cases pass, including add/no-immediate-damage, duplicate add, turn/epoch guards, failure retry, final-turn damage then expiry, duplicate Break operation, DoT/Break coexistence, invalid target, missing ASC, manager replacement, EndPlay cleanup, finished-state isolation, reset, and lethal paths.
+- The sole failed case is `P9-003 DotBreak Case=InvalidDefinition_GE_Rule_DamageType`; consequently `P9-003 DotBreak Harness=INCOMPLETE FailedCases=1`.
+
+## Root cause and contract assessment
+
+This is a stale harness expectation, not evidence that the generic production validation should restore an ID whitelist. At `HSRBattleGameMode.cpp:1164-1170`, `InvalidId` changes the copied DoT Definition's ID to `Status.Unsupported` but leaves its GrantedTag as `Status.Debuff.DamageOverTime`, then expects `InvalidStatusId`. Under PATCH-01A's frozen field-driven contract, `Status.Unsupported` has a valid `Status.*` root; the actual defect in this object is the exact Tag/Id mismatch, whose structured result is correctly `InvalidDefinition`. Returning `InvalidStatusId` here would require reintroducing unsupported-name knowledge or changing the agreed validation precedence.
+
+The sibling checks remain consistent with the new validator: missing infinite GE returns `MissingGameplayEffect`, while missing DamageRule or DamageType returns `InvalidDefinition`. The new Automation already covers a mismatched Tag/Id as `InvalidDefinition` and an actually invalid root (`Buff.Shield`) as `InvalidStatusId`.
+
+## Blocking authorization boundary
+
+The minimal correction is limited to `Source/HSR/Battle/HSRBattleGameMode.cpp:1168`: update the stale `InvalidId->Validate()` expected result from `InvalidStatusId` to `InvalidDefinition`, optionally rename the local/case wording to make “TagIdMismatch” explicit, then rebuild and rerun the same P9 PIE harness until P9-003 reports `COMPLETE`.
+
+However, the current exact allowlist authorizes changes to `HSRBattleGameMode.cpp` **only** for the P9 `OldRemoveFailure` atomic-rollback assertion. This Reviewer cannot expand that authorization or edit implementation/harness code. Do not weaken `UHSRStatusDefinition::Validate()` or add a `Status.Unsupported` special case merely to satisfy the obsolete assertion.
+
+## Verdict and automatic route
+
+`BLOCKED` pending a narrow user/Coordinator allowlist expansion for the single P9-003 validation assertion described above. After authorization, return to the same Implementation Agent for the harness-only correction, Development Editor Build, named `StatusGeneric` Automation, and P9 PIE recheck; then route back to this Reviewer. The earlier engineering `PASS WITH FOLLOW-UP` remains historically valid, but PATCH-01A cannot be archived while its required P9 gate reports `INCOMPLETE`.
+
+---
+
+# Prior Review — TASK-P17-PATCH-01A Re-review of Implementation Fix `d1f8eb0`
 
 Status: `PASS WITH FOLLOW-UP`
 
