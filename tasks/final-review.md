@@ -23,3 +23,31 @@ Coordinator must revise `tasks/active-task.md` before Implementation restatement
 ## Verdict
 
 `REVISE` — Implementation read-only restatement may not begin yet. After Coordinator updates the active task within planning ownership, this task gate must be rechecked; no user scope expansion is required unless the revision adds `HSRBattleGameMode.h` or another file outside the current allowlist.
+
+---
+
+## Pre-Implementation Task Gate Re-review
+
+Status: `PASS`
+
+Role: `Prompt Reviewer + Safety Reviewer`
+Evidence level: `STATIC REVIEW / REVISED PLANNING ONLY`
+Scope: Coordinator revision following gate commit `0ff5be7`; the historical `REVISE` above remains authoritative evidence of the first review.
+
+### Closure audit
+
+- `PASS` — Same-frame priority is now explicit and compatible with the inherited P8 pipeline: a target alive at command admission may publish exactly one Break/Status/Delay before `ResolveDefeat`; an already-dead target is rejected with zero Break side effects.
+- `PASS` — Required deltas now cover first edge, cached replay, recovery-only, second independent edge, zero-to-zero, non-zero damage, weakness failure, Finished, death, Reset, stale BattleId and ActionId reuse in a fresh battle-local epoch. Break, Status, Delay, Toughness and turn effects are auditable rather than inferred from a final snapshot alone.
+- `PASS` — The non-existent callback abstraction was removed. Reset behavior is expressed through executable old-BattleId rejection and new-BattleId ActionId reuse cases, consistent with the existing battle-local processed-resolution contract.
+- `PASS` — Automation must exercise controlled runtime transactions, while PIE reuses `bRunP9DotBreakHarness` and the existing `P9-003 DotBreak Harness` entry. No `HSRBattleGameMode.h`, Content or Config expansion is authorized or required by the revised contract.
+- `PASS` — Ownership and scope remain narrow: Coordinator detects the authoritative edge and owns replay; Status and TurnManager only consume requests; existing skip-once Delay semantics are preserved; PATCH-01C action-value, Speed, Advance, Delay/Slow redesign and TurnManager edits remain prohibited.
+
+### Safety notes for implementation
+
+- Any counters or development seams must remain editor/test-only where applicable and must not become a second production truth source.
+- “Delay +1” means one newly accepted registration/request for the Break ActionId. Actual later skip consumption remains governed by the existing TurnManager contract and applicable P9 regression; PATCH-01B must not modify that algorithm.
+- If the existing P9 harness cannot express the required runtime matrix without a new header declaration, or if a new production file becomes necessary, stop and request the smallest allowlist expansion.
+
+### Verdict
+
+`PASS` — The revised task is self-contained and safe to hand to Implementation. Implementation read-only restatement may begin; production work still requires the task-specific user confirmation mandated by Automatic Role Handoff.
