@@ -1,4 +1,33 @@
-# TASK-P17-PATCH-01A Final Review
+# TASK-P17-PATCH-01A Re-review — Implementation Fix `d1f8eb0`
+
+Status: `PASS WITH FOLLOW-UP`
+
+## Re-review scope and provenance
+
+- Re-reviewed only Implementation fix commit `d1f8eb0` against the prior `REVISE` findings and the frozen PATCH-01A card.
+- The commit changes only the existing allowlisted Status component, Status Automation test, and execution report. It contains no Save, Turn algorithm, Break publication, Content, additional Config, module, or generated-output change.
+- Coordinator/user dirty files remain separate and untouched. The prior implementation and reviewer commits are preserved; this is not an amended history.
+
+## Prior blocker closure
+
+1. **Real generic runtime coverage — closed.** `HSRCombatPatchTests.cpp` now creates a transient World and Actor, the project ASC and CoreAttributeSet, initializes ActorInfo and positive MaxHealth/Health/Speed, initializes a one-participant TurnManager, and binds a real StatusComponent. AttackUp, SpeedUp and Shield each execute the same production `AddOrRefreshStatus` and typed query path. The test additionally covers duplicate OperationId, Attack refresh and expiry, Speed stacking and expiry, Shield expiry/re-add/clear, and structured `UnknownStatus`.
+2. **Clear failure ownership — closed.** `ClearStatus()` now iterates entries in place, removes the RuntimeDefinition and map entry only after a successful removal or when no active GE exists, and retains the exact instance/Definition/active handle when removal fails. The controlled test proves `RemoveFailed`, retained typed ownership and active GAS handle, followed by a successful retry and `UnknownStatus`. The iterator implementation also preserves failed entries while independently dropping successfully removed entries; no secondary handle was reintroduced.
+
+## Safety and evidence
+
+- Runtime Definition GC ownership remains a reflected `TMap<FName, TObjectPtr<UHSRStatusDefinition>>`; ASC/TurnManager/Coordinator remain weak references. The fix adds no Tick, latent callback, re-entrant action resolution, or persistent/save state.
+- Final `Saved/Logs/HSR.log` independently shows exactly one matched `HSR.Battle.Patch.StatusGeneric`, `Result={Success}`, and `TEST COMPLETE. EXIT CODE: 0` at 2026-07-27 18:28 local time. The only recorded test warning is the pre-existing GameplayCue path fallback.
+- The execution report preserves the historical `msbuild` PATH failure, expanded-Automation exit `-1` caused by Health/MaxHealth fixture ordering, and intermediate invalid-cast compile failure instead of overwriting first-error history. It reports the final Development Editor Build and Automation exit 0.
+- Independent `git diff --check` exits 0; only line-ending warnings refer to unrelated dirty files.
+- P9 `OldRemoveFailure` remains an authorized harness-only assertion change. Existing P9 status regression is truthfully `NOT EXECUTED`; no Automation result is presented as production PIE evidence.
+
+## Verdict and follow-up
+
+`PASS WITH FOLLOW-UP`. PATCH-01A's implementation, scope, targeted Build, and new generic runtime Automation satisfy the engineering gate. Before final archival/transition to PATCH-01B, run the existing P9 Battle PIE/development harness to confirm legacy AttackUp/DoT/Break add, stack, refresh, dispel, source-invalid, expiry, replace, and the newly authorized `OldRemoveFailure` atomic-rollback assertion in the real project entry path. This is a user PIE evidence gate, not an implementation revision request.
+
+---
+
+# Prior Review — TASK-P17-PATCH-01A Initial Review
 
 Status: `REVISE`
 
