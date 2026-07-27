@@ -8,6 +8,19 @@
 #include "NavigationSystem.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "GameFramework/Character.h"
+#include "BehaviorTree/BehaviorTree.h"
+#include "BehaviorTree/BlackboardComponent.h"
+#include "BehaviorTree/BlackboardData.h"
+
+namespace HSREnemyBlackboardKeys
+{
+	static const FName TargetActor(TEXT("TargetActor"));
+	static const FName SpawnOrigin(TEXT("SpawnOrigin"));
+	static const FName PatrolLocation(TEXT("PatrolLocation"));
+	static const FName AIState(TEXT("AIState"));
+	static const FName TreeEpoch(TEXT("TreeEpoch"));
+	static const FName EncounterRequestId(TEXT("EncounterRequestId"));
+}
 
 AHSREnemyAIController::AHSREnemyAIController()
 {
@@ -42,6 +55,7 @@ void AHSREnemyAIController::BeginPlay()
 
 void AHSREnemyAIController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	StopBehaviorTreeRuntime();
 	ClearState();
 
 	if (PerceptionComponent)
@@ -63,14 +77,18 @@ void AHSREnemyAIController::OnPossess(APawn* InPawn)
 	// Bind perception delegate when possessing a pawn
 	if (PerceptionComponent)
 	{
+		PerceptionComponent->OnTargetPerceptionUpdated.RemoveAll(this);
 		PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AHSREnemyAIController::OnTargetPerceptionUpdated);
 	}
+
+	StartBehaviorTreeRuntime();
 }
 
 void AHSREnemyAIController::OnUnPossess()
 {
 	// P4-002: UnPossess -> clear timers/state, remove delegates (zero stale callbacks)
 	UE_LOG(LogTemp, Log, TEXT("P4-002: %s - OnUnPossess, clearing state and delegates"), *GetName());
+	StopBehaviorTreeRuntime();
 	ClearState();
 
 	if (PerceptionComponent)
@@ -88,6 +106,7 @@ void AHSREnemyAIController::SetState(EHSREnemyExplorationState NewState)
 
 	EHSREnemyExplorationState OldState = CurrentState;
 	CurrentState = NewState;
+	WriteBlackboardRuntimeState();
 
 	UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::SetState - %s: %d -> %d"),
 		*GetName(), static_cast<int32>(OldState), static_cast<int32>(NewState));
@@ -110,7 +129,9 @@ void AHSREnemyAIController::ClearState()
 	}
 
 	CurrentTarget.Reset();
+	SetBlackboardTarget(nullptr);
 	CurrentState = EHSREnemyExplorationState::Idle;
+	WriteBlackboardRuntimeState();
 }
 
 void AHSREnemyAIController::StartPatrol()
@@ -143,6 +164,10 @@ void AHSREnemyAIController::StartPatrol()
 	FNavLocation NavLoc;
 	if (NavSys->GetRandomReachablePointInRadius(EnemyChar->GetSpawnOrigin(), Def->PatrolRadius, NavLoc))
 	{
+		if (RuntimeBlackboard)
+		{
+			RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::PatrolLocation, NavLoc.Location);
+		}
 		EPathFollowingRequestResult::Type MoveResult = MoveToLocation(NavLoc.Location, -1.f, false);
 		if (MoveResult == EPathFollowingRequestResult::AlreadyAtGoal)
 		{
@@ -173,6 +198,15 @@ void AHSREnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathF
 	if (CurrentState == EHSREnemyExplorationState::EncounterPending ||
 		CurrentState == EHSREnemyExplorationState::Idle)
 	{
+		return;
+	}
+	if (bRecoveryMoveActive)
+	{
+		bRecoveryMoveActive = false;
+		if (Result.IsSuccess())
+		{
+			StartPatrol();
+		}
 		return;
 	}
 
@@ -237,6 +271,7 @@ void AHSREnemyAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus
 		// Stop patrol timer and set new target
 		SetState(EHSREnemyExplorationState::Alert);
 		CurrentTarget = Actor;
+		SetBlackboardTarget(Actor);
 
 		GetWorld()->GetTimerManager().ClearTimer(PatrolWaitTimerHandle);
 		StopMovement();
@@ -272,26 +307,34 @@ void AHSREnemyAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus
 void AHSREnemyAIController::HandleChaseTargetLost()
 {
 	CurrentTarget.Reset();
-	StopMovement();
-
-	SetState(EHSREnemyExplorationState::LostTarget);
-
-	// Return to patrol after a short delay
-	float WaitTime = 2.0f;
-	GetWorld()->GetTimerManager().SetTimer(PatrolWaitTimerHandle, this, &AHSREnemyAIController::StartPatrol, WaitTime, false);
+	SetBlackboardTarget(nullptr);
+	BeginSpawnOriginRecovery(EHSREnemyExplorationState::LostTarget);
 }
 
 void AHSREnemyAIController::HandleMoveFailedOrAborted()
 {
-	SetState(EHSREnemyExplorationState::MoveFailed);
+	BeginSpawnOriginRecovery(EHSREnemyExplorationState::MoveFailed);
+}
+
+void AHSREnemyAIController::BeginSpawnOriginRecovery(EHSREnemyExplorationState RecoveryState)
+{
+	AHSREnemyCharacter* Enemy = Cast<AHSREnemyCharacter>(GetPawn());
+	if (!Enemy || bRecoveryMoveActive)
+		return;
+
 	StopMovement();
-
-	AHSREnemyCharacter* EnemyChar = Cast<AHSREnemyCharacter>(GetPawn());
-	UHSREnemyDefinition* Def = EnemyChar ? EnemyChar->EnemyDefinition : nullptr;
-	float WaitTime = Def ? Def->PatrolWaitTime : 3.0f;
-
-	// Retry patrol after wait
-	GetWorld()->GetTimerManager().SetTimer(PatrolWaitTimerHandle, this, &AHSREnemyAIController::StartPatrol, WaitTime, false);
+	SetState(RecoveryState);
+	if (RuntimeBlackboard)
+	{
+		RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::PatrolLocation, Enemy->GetSpawnOrigin());
+	}
+	SetState(EHSREnemyExplorationState::ReturningToSpawnOrigin);
+	bRecoveryMoveActive = true;
+	if (MoveToLocation(Enemy->GetSpawnOrigin(), 25.0f, true) == EPathFollowingRequestResult::Failed)
+	{
+		bRecoveryMoveActive = false;
+		SetState(EHSREnemyExplorationState::MoveFailed);
+	}
 }
 
 void AHSREnemyAIController::TryRequestEncounterFromCharacter()
@@ -301,6 +344,11 @@ void AHSREnemyAIController::TryRequestEncounterFromCharacter()
 	{
 		UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::TryRequestEncounter - %s FAILED (state=%d, not Chasing)"),
 			*GetName(), static_cast<int32>(CurrentState));
+		return;
+	}
+	if (ActiveEncounterRequestId.IsValid())
+	{
+		UE_LOG(LogTemp, Log, TEXT("P17-PATCH-02 Encounter duplicate rejected: %s RequestId=%s"), *GetName(), *ActiveEncounterRequestId.ToString());
 		return;
 	}
 
@@ -339,6 +387,7 @@ void AHSREnemyAIController::TryRequestEncounterFromCharacter()
 	FHSREncounterResult EncResult = Subsystem->RequestEncounter(EncounterDef, EHSREncounterInitiative::Enemy);
 	if (EncResult.ResultType == EHSREncounterResultType::Success)
 	{
+		ActiveEncounterRequestId = EncResult.RequestId;
 		SetState(EHSREnemyExplorationState::EncounterPending);
 		StopMovement();
 		GetWorld()->GetTimerManager().ClearTimer(PatrolWaitTimerHandle);
@@ -351,5 +400,71 @@ void AHSREnemyAIController::TryRequestEncounterFromCharacter()
 		UE_LOG(LogTemp, Warning, TEXT("AHSREnemyAIController::TryRequestEncounter - %s FAILED (type=%d, msg=%s)"),
 			*GetName(), static_cast<int32>(EncResult.ResultType), *EncResult.Message.ToString());
 		// Stay in Chasing state - Encounter overlap may be retriggered
+	}
+}
+
+bool AHSREnemyAIController::StartBehaviorTreeRuntime()
+{
+	AHSREnemyCharacter* Enemy = Cast<AHSREnemyCharacter>(GetPawn());
+	UHSREnemyDefinition* Definition = Enemy ? Enemy->EnemyDefinition : nullptr;
+	UBehaviorTree* Tree = Definition ? Definition->BehaviorTreeAsset.LoadSynchronous() : nullptr;
+	UBlackboardData* BlackboardData = Definition ? Definition->BlackboardAsset.LoadSynchronous() : nullptr;
+	UBlackboardComponent* BlackboardComponent = nullptr;
+	if (!Tree || !BlackboardData || Tree->BlackboardAsset != BlackboardData || !UseBlackboard(BlackboardData, BlackboardComponent) || !BlackboardComponent || !RunBehaviorTree(Tree))
+	{
+		UE_LOG(LogTemp, Error, TEXT("P17-PATCH-02 AI init failed: %s has invalid BT/BB references"), *GetName());
+		return false;
+	}
+
+	RuntimeBlackboard = BlackboardComponent;
+	++BehaviorTreeEpoch;
+	ActiveEncounterRequestId.Invalidate();
+	WriteBlackboardRuntimeState();
+	return true;
+}
+
+void AHSREnemyAIController::StopBehaviorTreeRuntime()
+{
+	ClearBlackboardRuntimeState();
+	if (BrainComponent)
+	{
+		BrainComponent->StopLogic(TEXT("P17-PATCH-02 lifecycle teardown"));
+	}
+	ActiveEncounterRequestId.Invalidate();
+	bRecoveryMoveActive = false;
+	++BehaviorTreeEpoch;
+}
+
+void AHSREnemyAIController::WriteBlackboardRuntimeState()
+{
+	if (!RuntimeBlackboard)
+		return;
+
+	const AHSREnemyCharacter* Enemy = Cast<AHSREnemyCharacter>(GetPawn());
+	RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::SpawnOrigin, Enemy ? Enemy->GetSpawnOrigin() : FVector::ZeroVector);
+	RuntimeBlackboard->SetValueAsEnum(HSREnemyBlackboardKeys::AIState, static_cast<uint8>(CurrentState));
+	RuntimeBlackboard->SetValueAsInt(HSREnemyBlackboardKeys::TreeEpoch, BehaviorTreeEpoch);
+	RuntimeBlackboard->SetValueAsName(HSREnemyBlackboardKeys::EncounterRequestId, ActiveEncounterRequestId.IsValid() ? FName(*ActiveEncounterRequestId.ToString()) : NAME_None);
+	SetBlackboardTarget(CurrentTarget.Get());
+}
+
+void AHSREnemyAIController::ClearBlackboardRuntimeState()
+{
+	if (!RuntimeBlackboard)
+		return;
+
+	RuntimeBlackboard->ClearValue(HSREnemyBlackboardKeys::TargetActor);
+	RuntimeBlackboard->ClearValue(HSREnemyBlackboardKeys::PatrolLocation);
+	RuntimeBlackboard->ClearValue(HSREnemyBlackboardKeys::EncounterRequestId);
+	RuntimeBlackboard->ClearValue(HSREnemyBlackboardKeys::TreeEpoch);
+	RuntimeBlackboard->ClearValue(HSREnemyBlackboardKeys::AIState);
+	RuntimeBlackboard->ClearValue(HSREnemyBlackboardKeys::SpawnOrigin);
+}
+
+void AHSREnemyAIController::SetBlackboardTarget(AActor* Target)
+{
+	if (RuntimeBlackboard)
+	{
+		RuntimeBlackboard->SetValueAsObject(HSREnemyBlackboardKeys::TargetActor, Target);
 	}
 }

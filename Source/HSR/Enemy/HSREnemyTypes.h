@@ -13,5 +13,6 @@ enum class EHSREnemyExplorationState : uint8
 	Chasing UMETA(DisplayName = "Chasing"),
 	EncounterPending UMETA(DisplayName = "Encounter Pending"),
 	MoveFailed UMETA(DisplayName = "Move Failed"),
-	LostTarget UMETA(DisplayName = "Lost Target")
+	LostTarget UMETA(DisplayName = "Lost Target"),
+	ReturningToSpawnOrigin UMETA(DisplayName = "Returning to Spawn Origin")
 };

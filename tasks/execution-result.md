@@ -62,3 +62,25 @@ In `/Game/AI/Enemy/BT_HSREnemy_Exploration`, add and save explicit branches that
 5. EncounterPending: block/complete only from the authoritative C++ request/result transition; it must not call the battle subsystem directly or issue a second request.
 
 For every non-stock node, provide its exact asset path, parent class, exposed Blackboard key selectors, and whether it reacts only to C++-emitted events. Confirm there is no interval/tick Service. Save the BT, close and reopen the Editor, then provide either an Editor screenshot or a node/path listing showing the five branches and assigned Blackboard. Only after that evidence is supplied can C++ BT/BB reference fields and lifecycle binding be implemented.
+
+## Stage A implementation result
+
+Status: `IMPLEMENTED / STAGE-A BUILD PASS / STAGE-B USER EDITOR GATE PENDING`.
+
+- `UHSREnemyDefinition` now exposes default soft references to the user-owned `/Game/AI/Enemy/BT_HSREnemy_Exploration` and `/Game/AI/Enemy/BB_HSREnemy_Exploration` assets. No `.uasset` was edited.
+- `AHSREnemyAIController` validates the paired references, starts the tree/Blackboard only on successful Possess initialization, writes the six confirmed runtime keys, and stops/clears them before lifecycle teardown. `TargetActor` is cleared on loss and cleanup; epoch increments invalidate stale callbacks.
+- LostTarget and MoveFailed both create a bounded return-to-SpawnOrigin intent and movement request. Encounter submission remains solely in `TryRequestEncounterFromCharacter`; an admitted request ID rejects duplicate calls before reaching the subsystem. Actor Tick remains disabled.
+- Added `HSR.Exploration.Patch.BehaviorTreeAdapter` automation coverage for the exact soft paths, distinct recovery state, no-Tick default, and initial epoch. It compiled with the module but was not executed in this pass.
+
+### Build evidence
+
+`HSREditor Win64 Development -Project=HSR.uproject -WaitMutex`: `PASS` on 2026-07-27.
+
+- First attempt yielded the preserved real compile error `C4458`: local `Blackboard` hid `AAIController::Blackboard` in `HSREnemyAIController.cpp`.
+- The local was renamed to `BlackboardData` within the allowlist.
+- Retried build: 4 actions (compile, two link actions, metadata), exit `0`; only the pre-existing engine `AISystem.h` C4996 deprecation warning appeared.
+
+### Not verified
+
+- The new automation test was compiled but not run.
+- PIE/runtime evidence and the five Stage-B stock-node branches remain user-owned and pending. Do not treat the Stage-A build as proof of target acquisition/loss, travel failure, or end-to-end Encounter behavior.

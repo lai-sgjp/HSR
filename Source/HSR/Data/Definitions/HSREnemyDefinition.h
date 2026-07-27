@@ -7,6 +7,8 @@
 #include "HSREnemyDefinition.generated.h"
 
 class UHSREncounterDefinition;
+class UBehaviorTree;
+class UBlackboardData;
 
 UCLASS(BlueprintType)
 class HSR_API UHSREnemyDefinition : public UPrimaryDataAsset
@@ -14,6 +16,12 @@ class HSR_API UHSREnemyDefinition : public UPrimaryDataAsset
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|AI")
+	TSoftObjectPtr<UBehaviorTree> BehaviorTreeAsset = TSoftObjectPtr<UBehaviorTree>(FSoftObjectPath(TEXT("/Game/AI/Enemy/BT_HSREnemy_Exploration.BT_HSREnemy_Exploration")));
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|AI")
+	TSoftObjectPtr<UBlackboardData> BlackboardAsset = TSoftObjectPtr<UBlackboardData>(FSoftObjectPath(TEXT("/Game/AI/Enemy/BB_HSREnemy_Exploration.BB_HSREnemy_Exploration")));
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
 	FName EnemyDefinitionId;
 

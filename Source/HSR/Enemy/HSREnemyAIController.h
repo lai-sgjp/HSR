@@ -9,6 +9,7 @@
 
 class UAIPerceptionComponent;
 class UAISenseConfig_Sight;
+class UBlackboardComponent;
 
 UCLASS()
 class HSR_API AHSREnemyAIController : public AAIController
@@ -29,6 +30,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Enemy|AI")
 	void TryRequestEncounterFromCharacter();
 
+	UFUNCTION(BlueprintPure, Category = "Enemy|AI")
+	int32 GetBehaviorTreeEpoch() const { return BehaviorTreeEpoch; }
+
 protected:
 	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 
@@ -37,6 +41,12 @@ protected:
 	void OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 	void HandleChaseTargetLost();
 	void HandleMoveFailedOrAborted();
+	bool StartBehaviorTreeRuntime();
+	void StopBehaviorTreeRuntime();
+	void WriteBlackboardRuntimeState();
+	void ClearBlackboardRuntimeState();
+	void SetBlackboardTarget(AActor* Target);
+	void BeginSpawnOriginRecovery(EHSREnemyExplorationState RecoveryState);
 	void ClearState();
 	void SetState(EHSREnemyExplorationState NewState);
 
@@ -44,10 +54,16 @@ protected:
 	TWeakObjectPtr<AActor> CurrentTarget;
 
 	EHSREnemyExplorationState CurrentState;
+	int32 BehaviorTreeEpoch = 0;
+	bool bRecoveryMoveActive = false;
+	FGuid ActiveEncounterRequestId;
 
 	FTimerHandle PatrolWaitTimerHandle;
 	FTimerHandle InitTimerHandle;
 
 	UPROPERTY()
 	TObjectPtr<UAISenseConfig_Sight> SightConfig;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBlackboardComponent> RuntimeBlackboard;
 };

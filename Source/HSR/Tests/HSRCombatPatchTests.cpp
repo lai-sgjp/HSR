@@ -18,6 +18,8 @@
 #include "../GAS/HSRAbilitySystemComponent.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "../Status/HSRStatusComponent.h"
+#include "../Data/Definitions/HSREnemyDefinition.h"
+#include "../Enemy/HSREnemyAIController.h"
 #include <limits>
 
 namespace HSRActionDistanceAutomation
@@ -96,6 +98,19 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceLifecyclePatchTest, "HSR.Batt
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceThreeParticipantPatchTest, "HSR.Battle.Patch.ActionDistance.ThreeParticipant", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceRequestMatrixPatchTest, "HSR.Battle.Patch.ActionDistance.RequestMatrix", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceNumericLifecyclePatchTest, "HSR.Battle.Patch.ActionDistance.NumericAndBinding", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRBehaviorTreeAdapterPatchTest, "HSR.Exploration.Patch.BehaviorTreeAdapter", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
+{
+	UHSREnemyDefinition* Definition = NewObject<UHSREnemyDefinition>();
+	TestEqual(TEXT("Behavior Tree default reference is the Stage-A user asset"), Definition->BehaviorTreeAsset.ToSoftObjectPath().ToString(), FString(TEXT("/Game/AI/Enemy/BT_HSREnemy_Exploration.BT_HSREnemy_Exploration")));
+	TestEqual(TEXT("Blackboard default reference is the Stage-A user asset"), Definition->BlackboardAsset.ToSoftObjectPath().ToString(), FString(TEXT("/Game/AI/Enemy/BB_HSREnemy_Exploration.BB_HSREnemy_Exploration")));
+	TestTrue(TEXT("Recovery state is distinct from LostTarget and MoveFailed"), EHSREnemyExplorationState::ReturningToSpawnOrigin != EHSREnemyExplorationState::LostTarget && EHSREnemyExplorationState::ReturningToSpawnOrigin != EHSREnemyExplorationState::MoveFailed);
+	AHSREnemyAIController* Controller = NewObject<AHSREnemyAIController>();
+	TestFalse(TEXT("Behavior Tree adapter does not enable Actor Tick"), Controller->PrimaryActorTick.bCanEverTick);
+	TestEqual(TEXT("Fresh controller begins at epoch zero before Possess"), Controller->GetBehaviorTreeEpoch(), 0);
+	return true;
+}
 
 bool FHSRActionDistancePatchTest::RunTest(const FString& Parameters)
 {
