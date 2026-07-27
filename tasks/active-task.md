@@ -14,6 +14,8 @@ Status: `PLANNED / TASK GATE REVIEW REQUIRED`
 - `Source/HSR/Enemy/HSREnemyCharacter.cpp`
 - `Source/HSR/Enemy/HSREnemyTypes.h`
 - `Source/HSR/Battle/HSREncounterTypes.h`
+- `Source/HSR/Battle/HSRBattleTransitionSubsystem.h`（仅 `WITH_DEV_AUTOMATION_TESTS` Pending/Resolved seed、snapshot、reset；禁止修改生产请求签名/行为）
+- `Source/HSR/Battle/HSRBattleTransitionSubsystem.cpp`（仅实现上述测试 fixture；拒绝必须调用生产 `RequestEncounter`）
 - `Source/HSR/Data/Definitions/HSREnemyDefinition.h`
 - `Source/HSR/Data/Definitions/HSREnemyDefinition.cpp`
 - `Source/HSR/Tests/HSRCombatPatchTests.cpp`
@@ -50,3 +52,4 @@ Implementation 不得在 Task Gate/复述阶段修改文件；正式 Behavior Tr
 - Stage B occurs only after the Stage-A C++ adapter builds. Coordinator then gives the user exact Editor node construction using the compiled state/key contract. The user alone edits the three allowlisted `.uasset` files, saves/reopens, and supplies the five-branch screenshot/path evidence. Implementation must not binary-edit or submit those assets.
 - Stage B still forbids interval/tick Services. EncounterPending must observe the authoritative C++ result/key transition and must not call the battle subsystem; LostTarget/MoveFailed must use `Move To SpawnOrigin`.
 - Required runtime evidence after Asset Gate: acquire/loss, target destruction, move success/failure/abort, return-to-SpawnOrigin, duplicate overlap+perception, already-resolved rejection, stale callback after re-possess/EndPlay, and zero Tick/polling proof. Each case logs before/after state, tree epoch, target validity and Encounter request/result IDs.
+- 用户已精确授权 TransitionSubsystem 的 dev-only fixture：`FHSRTransitionAutomationSnapshot` 至少记录 state、pending request、travel kind/id、resolved membership、admission mutation count；`SeedPendingEncounterForAutomation`、`SeedResolvedEncounterForAutomation`、`ResetEncounterAutomationFixture` 只能准备/清理私有测试状态。Automation 必须通过生产 `RequestEncounter` 得到 `AlreadyPending`/`AlreadyConsumed`，并断言无新 RequestId 与 snapshot 零变化。
