@@ -26,3 +26,21 @@ Implementation 不得在 Task Gate/复述阶段修改文件；正式 Behavior Tr
 - 不修改 Battle/Turn/Status/Save/Network/UI、P17-005 或商业游戏公式；不引入 Tick 轮询。
 - 若迁移需要新增生产 C++ 文件、Content/Blueprint/DataAsset、Build.cs 或改变 Encounter 契约，必须停止并申请最小扩权。
 - Task Gate 需先审查现有 Controller 状态机和资产缺口；PASS 后只允许 Implementation 只读复述，实际实现仍需用户单独确认 `TASK-P17-PATCH-02`。
+
+## Frozen ownership and state contract
+
+- Enemy AIController owns `UBehaviorTreeComponent`/Blackboard startup and shutdown; EnemyCharacter owns perception source and movement callbacks; no subsystem or BT node may independently start a second tree. BeginPlay/Possess starts only after valid Blackboard/tree assets; UnPossess/EndPlay stops the tree and unbinds delegates before invalidating the epoch.
+- Blackboard keys are ephemeral runtime state only: `TargetActor` is weak/transient and must clear on perception loss, target destruction, UnPossess and EndPlay; stable encounter/request IDs may be plain values but never retain Actor references across map transitions. C++ Controller/Encounter path remains authoritative for Encounter admission, duplicate/resolved rejection and state epoch; BT tasks/services only orchestrate movement or observe results.
+- Required one-to-one mapping is frozen: `Idle` (no target, no request), `PatrolWait/PatrolMove` (SpawnOrigin patrol route), `Alert` (valid perceived target, pre-chase), `Chasing` (move toward target), `LostTarget` (clear target then return to SpawnOrigin), `MoveFailed` (abort current task, bounded recovery to SpawnOrigin), `EncounterPending` (request admitted, tree task completes only on result). No random patrol fallback may satisfy LostTarget/MoveFailed.
+- Perception delegates and movement completion/failure/abort callbacks produce BT events; no Tick-driven service or polling interval is allowed. A missing/invalid tree or Blackboard is a hard initialization failure with zero Encounter side effects.
+
+## Encounter transaction contract
+
+- The single authoritative submitter is `HSREnemyAIController::TryRequestEncounterFromCharacter`; overlap/perception paths may call it but must converge on one transaction key `(EnemyStableId, TargetStableId, BattleEpoch, RequestId)` and one pending record.
+- First admitted request creates one pending transaction. Same-frame duplicate overlap+perception returns `DuplicateRequest` with no new request ID, movement, or tree task. Already pending/traveling returns `AlreadyPending`; already consumed/resolved returns `AlreadyResolved`; invalid definition/target returns structured rejection. Travel failure completes and clears the task/pending record without restarting chase or enqueuing another request.
+- Encounter result consumption is exactly once by the authoritative controller; resolved rejection is terminal for that transaction key. A new BattleEpoch or explicit new encounter identity is required for a later request. Automation must cover same-frame duplicate and post-resolved rejection with before/after state, request ID and result reason.
+
+## User Asset Gate and acceptance matrix
+
+- Before implementation, user must provide or confirm exact paths and editable fields for one Behavior Tree, one Blackboard, any Service/Task nodes, perception configuration, and enemy Controller/Character Blueprint/DataAsset bindings; if these assets do not exist, implementation stops and requests the smallest asset authorization. No Content/Blueprint/Config is inferred from this card.
+- Required runtime evidence after Asset Gate: acquire/loss, target destruction, move success/failure/abort, return-to-SpawnOrigin, duplicate overlap+perception, already-resolved rejection, stale callback after re-possess/EndPlay, and zero Tick/polling proof. Each case logs before/after state, tree epoch, target validity and Encounter request/result IDs.
