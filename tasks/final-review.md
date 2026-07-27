@@ -406,3 +406,30 @@ After capture, restore the switch to `false`, Save All, and provide the complete
 ## Verdict
 
 `PASS WITH FOLLOW-UP` — The stale-Epoch PIE fixture defect is corrected narrowly and applicable Build/Automation evidence passes. Only the final user-owned production DataAsset/GE PIE rerun remains; return its complete log to an independent Reviewer before archival.
+
+---
+
+# TASK-P17-PATCH-01B Final PIE Evidence Review
+
+Status: `PASS`
+
+Role: `Independent Reviewer`
+Date: `2026-07-27`
+Evidence level: `USER FULL PIE LOG + PRIOR STATIC/BUILD/AUTOMATION REVIEW`
+Evidence file: `C:/Users/Lai/.codex/attachments/444716b6-6596-47bd-bde4-99cfc7974d79/pasted-text.txt`
+
+## Final evidence audit
+
+- `PASS` — First authoritative edge used ActionId `ECE736E54EF0688B56E64A8DC77F2947`: Break logged `Before=10.00 After=0.00 Triggered=1 Replay=0`, Break Status `Result=0` (`Success`), and Delay `Registered=1` followed by exactly one consumption.
+- `PASS` — Replay of the first ActionId logged the cached Break result with `Triggered=1 Replay=1` and produced no additional Break Status request or Delay registration.
+- `PASS` — Recovery lifecycle logged `Expired=1 Status=1->1 Delay=1->1`, proving natural Status expiry and zero new Break side effects during recovery/progression.
+- `PASS` — Second independent edge used distinct ActionId `63D7BCB94FC8800C0C1027B98555EC59`: Break logged `Before=10.00 After=0.00 Triggered=1 Replay=0`, Break Status `Result=0`, and Delay `Registered=1` followed by exactly one consumption.
+- `PASS` — Summary is exactly `Status=0->1->2 Delay=0->1->2`; `RepeatableBreak_FirstReplayRecoverySecond_ExactCounts Result=PASS`.
+- `PASS` — All nineteen emitted `P9-003 DotBreak Case=` records are `Result=PASS`, including the repeatable case; `P9-003 DotBreak Harness=COMPLETE` is present.
+- `PASS` — Mechanical scan of the complete supplied log finds zero `Result=FAIL`, zero `Harness=INCOMPLETE`, and zero `Harness=SKIPPED`.
+
+## Final verdict
+
+`PASS` — TASK-P17-PATCH-01B satisfies scope, implementation, Development Editor Build, deterministic `HSR.Battle.Patch` Automation, and production DataAsset/GE PIE evidence. Historical Task Gate revisions, fixture blockers, compile failure, first Automation failure, artificial-Health rejection, and failed first PIE run remain preserved in this review and `tasks/execution-result.md`.
+
+Coordinator is authorized to archive the PATCH-01B active task/execution result/review set, synchronize project state/worklog/todo to the verified evidence, make its own role commit, and prepare TASK-P17-PATCH-01C under Automatic Role Handoff. PATCH-01C implementation still requires its separate task-specific user confirmation.
