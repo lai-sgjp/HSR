@@ -268,6 +268,13 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Destroyed chase target clears TargetActor"), TeardownBlackboard->GetValueAsObject(TEXT("TargetActor")), static_cast<UObject*>(nullptr));
 	TestEqual(TEXT("Destroyed chase target publishes SpawnOrigin patrol location"), TeardownBlackboard->GetValueAsVector(TEXT("PatrolLocation")), ExpectedSpawnOrigin);
 	TestFalse(TEXT("Destroyed chase target does not create an encounter"), Controller->HasActiveEncounterRequestForAutomation());
+	Controller->CompleteReturnToPatrolForAutomation(TeardownBlackboard, ExpectedSpawnOrigin, CandidatePatrolLocation, EHSRPatrolIntentResult::Reachable);
+	TestEqual(TEXT("Return completion resumes MovingToPatrol exactly once"), Controller->GetCurrentState(), EHSREnemyExplorationState::MovingToPatrol);
+	TestEqual(TEXT("Return completion publishes next patrol candidate"), TeardownBlackboard->GetValueAsVector(TEXT("PatrolLocation")), CandidatePatrolLocation);
+	TestFalse(TEXT("Return completion does not create encounter"), Controller->HasActiveEncounterRequestForAutomation());
+	Controller->CompleteReturnToPatrolForAutomation(TeardownBlackboard, ExpectedSpawnOrigin, FVector::ZeroVector, EHSRPatrolIntentResult::RandomReachableFailed);
+	TestEqual(TEXT("Return completion fallback remains bounded PatrolWaiting"), Controller->GetCurrentState(), EHSREnemyExplorationState::PatrolWaiting);
+	TestEqual(TEXT("Return completion fallback keeps SpawnOrigin"), TeardownBlackboard->GetValueAsVector(TEXT("PatrolLocation")), ExpectedSpawnOrigin);
 	Controller->StopBehaviorTreeRuntimeForAutomation();
 	Controller->ClearStateForAutomation();
 	TestTrue(TEXT("EndPlay ordering Stop then ClearState leaves every Blackboard key clear"), AreSixRuntimeKeysClear());

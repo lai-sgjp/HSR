@@ -164,6 +164,15 @@ void AHSREnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathF
 				HandleChaseTargetLost();
 		}
 	}
+	else if (CurrentState == EHSREnemyExplorationState::ReturningToSpawnOrigin)
+	{
+		AHSREnemyCharacter* Enemy = Cast<AHSREnemyCharacter>(GetPawn());
+		UHSREnemyDefinition* Definition = Enemy ? Enemy->EnemyDefinition : nullptr;
+		if (Enemy && Definition)
+		{
+			ResumePatrolAfterReturn(Enemy->GetSpawnOrigin(), Definition->PatrolRadius);
+		}
+	}
 }
 
 void AHSREnemyAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
@@ -247,6 +256,13 @@ void AHSREnemyAIController::PublishSpawnOriginRecoveryIntent(const FVector& InSp
 	}
 	SetState(EHSREnemyExplorationState::ReturningToSpawnOrigin);
 	// Stage B's stock Move To consumes PatrolLocation=SpawnOrigin.
+}
+
+void AHSREnemyAIController::ResumePatrolAfterReturn(const FVector& InSpawnOrigin, float PatrolRadius)
+{
+	const float ReturnDistance = FVector::Dist(GetPawn() ? GetPawn()->GetActorLocation() : InSpawnOrigin, InSpawnOrigin);
+	UE_LOG(LogTemp, Log, TEXT("P17-PATCH-02 ReturnComplete Controller=%s Location=%s SpawnOrigin=%s Distance=%.2f RequestId=%s"), *GetName(), GetPawn() ? *GetPawn()->GetActorLocation().ToString() : TEXT("None"), *InSpawnOrigin.ToString(), ReturnDistance, *ActiveEncounterRequestId.ToString());
+	PublishNextPatrolIntent(InSpawnOrigin, PatrolRadius);
 }
 
 void AHSREnemyAIController::TryRequestEncounterFromCharacter()
@@ -572,5 +588,12 @@ void AHSREnemyAIController::PublishLostTargetRecoveryForAutomation(UBlackboardCo
 	CurrentTarget.Reset();
 	SetBlackboardTarget(nullptr);
 	PublishSpawnOriginRecoveryIntent(InSpawnOrigin, EHSREnemyExplorationState::LostTarget);
+}
+
+void AHSREnemyAIController::CompleteReturnToPatrolForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin, const FVector& InCandidate, EHSRPatrolIntentResult Result)
+{
+	RuntimeBlackboard = InBlackboard;
+	SetState(EHSREnemyExplorationState::ReturningToSpawnOrigin);
+	PublishPatrolIntent(InSpawnOrigin, InCandidate, Result);
 }
 #endif

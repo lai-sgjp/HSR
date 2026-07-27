@@ -250,6 +250,12 @@ Validation: Development Build `PASS`; `HSR.Exploration.Patch.BehaviorTreeAdapter
 
 Reviewer assertion strengthening: both rejection paths now assert invalid result RequestId, nonempty failure message, and complete `FHSREncounterRequest` equality (all existing request fields) within an otherwise identical transition snapshot.
 
+### Stage-B full return completion — return-to-spawn resumes patrol
+
+`OnMoveCompleted` now handles successful stock BT `MoveTo` completion while in `ReturningToSpawnOrigin`: it logs actor location, SpawnOrigin, distance, and request id, then publishes the next patrol intent. A reachable candidate resumes `MovingToPatrol`; navigation failure retains the existing bounded `PatrolWaiting`/SpawnOrigin fallback. No direct C++ Move request, recurring timer, or encounter request is added.
+
+Adapter automation covers return completion to a reachable next patrol candidate and the bounded random-reachability fallback, including no encounter creation. Development Build, `BehaviorTreeAdapter`, and `MapContract` all pass (exit `0`). User-owned assets remain untouched.
+
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
 
 ### Stage-B main-path PIE evidence — USER PROVIDED

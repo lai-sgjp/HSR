@@ -50,6 +50,7 @@ public:
 	void PublishLostTargetRecoveryForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin);
 	EHSREnemyExplorationState GetLastRecoveryStateForAutomation() const { return LastRecoveryStateForAutomation; }
 	bool IsNavReadyRetryScheduledForAutomation() const { return bNavReadyRetryScheduled; }
+	void CompleteReturnToPatrolForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin, const FVector& InCandidate, EHSRPatrolIntentResult Result);
 #endif
 
 protected:
@@ -71,6 +72,7 @@ protected:
 	void SetBlackboardTarget(AActor* Target);
 	void BeginSpawnOriginRecovery(EHSREnemyExplorationState RecoveryState);
 	void PublishSpawnOriginRecoveryIntent(const FVector& InSpawnOrigin, EHSREnemyExplorationState RecoveryState);
+	void ResumePatrolAfterReturn(const FVector& InSpawnOrigin, float PatrolRadius);
 	void ClearState();
 	void SetState(EHSREnemyExplorationState NewState);
 
