@@ -32,6 +32,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Enemy|AI")
 	int32 GetBehaviorTreeEpoch() const { return BehaviorTreeEpoch; }
 
+#if WITH_DEV_AUTOMATION_TESTS
+	bool GetPatrolLocationForAutomation(FVector& OutPatrolLocation) const;
+	void PublishInitialPatrolIntentForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin);
+#endif
+
 protected:
 	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 
@@ -42,6 +47,7 @@ protected:
 	bool StartBehaviorTreeRuntime();
 	void StopBehaviorTreeRuntime();
 	void WriteBlackboardRuntimeState();
+	void PublishInitialPatrolIntent(const FVector& InSpawnOrigin);
 	void ClearBlackboardRuntimeState();
 	void SetBlackboardTarget(AActor* Target);
 	void BeginSpawnOriginRecovery(EHSREnemyExplorationState RecoveryState);
@@ -54,6 +60,8 @@ protected:
 	EHSREnemyExplorationState CurrentState;
 	int32 BehaviorTreeEpoch = 0;
 	FGuid ActiveEncounterRequestId;
+	FVector PublishedPatrolLocation = FVector::ZeroVector;
+	bool bHasPublishedPatrolLocation = false;
 
 	UPROPERTY()
 	TObjectPtr<UAISenseConfig_Sight> SightConfig;

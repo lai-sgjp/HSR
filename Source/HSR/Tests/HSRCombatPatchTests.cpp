@@ -109,6 +109,12 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	AHSREnemyAIController* Controller = NewObject<AHSREnemyAIController>();
 	TestFalse(TEXT("Behavior Tree adapter does not enable Actor Tick"), Controller->PrimaryActorTick.bCanEverTick);
 	TestEqual(TEXT("Fresh controller begins at epoch zero before Possess"), Controller->GetBehaviorTreeEpoch(), 0);
+	const FVector ExpectedSpawnOrigin(137.0f, -29.0f, 11.0f);
+	Controller->PublishInitialPatrolIntentForAutomation(nullptr, ExpectedSpawnOrigin);
+	TestEqual(TEXT("BT initialization publishes a patrol state instead of Idle"), Controller->GetCurrentState(), EHSREnemyExplorationState::MovingToPatrol);
+	FVector PatrolLocation = FVector::ZeroVector;
+	TestTrue(TEXT("BT initialization writes PatrolLocation"), Controller->GetPatrolLocationForAutomation(PatrolLocation));
+	TestEqual(TEXT("Initial PatrolLocation is SpawnOrigin intent"), PatrolLocation, ExpectedSpawnOrigin);
 	return true;
 }
 

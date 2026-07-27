@@ -111,3 +111,22 @@ Post-revision validation:
 - `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, `Success`, exit `0`.
 
 This closes Stage-A C++ movement ownership: only Stage-B user-owned stock BT nodes may request movement. Stage B and PIE remain pending.
+
+### Stage-B PIE revision — initial patrol intent
+
+PIE diagnosis found that removing the legacy C++ patrol owner left a valid BT with no initial selector state: the Controller remained `Idle` while the user-built patrol branch requires a patrol state and `PatrolLocation`. A perception event could therefore transition directly from Alert to Chasing and submit the existing authoritative Encounter request without any stock BT Move To evidence.
+
+The minimal Controller-only repair publishes initial intent after `UseBlackboard` succeeds and before `RunBehaviorTree` evaluates the graph:
+
+- `AIState` becomes `MovingToPatrol`.
+- `PatrolLocation` and `SpawnOrigin` are both the Character's `SpawnOrigin`.
+- No navigation query, timer, direct movement request, BT node class, or user asset edit was added.
+
+The shared publication function is exercised by `HSR.Exploration.Patch.BehaviorTreeAdapter`, which asserts a non-Idle initial patrol state and the exact published SpawnOrigin patrol location. The Automation fixture was deliberately kept independent of a bare `UWorld` AI-runtime startup, because that fixture cannot initialize `UseBlackboard`/`RunBehaviorTree`; the production path still uses the same shared publisher immediately before `RunBehaviorTree`.
+
+Validation after the final seam correction:
+
+- `HSREditor Win64 Development`: `PASS`, 4 actions, exit `0` (only engine AISystem C4996 warning).
+- `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, `Success`, exit `0`.
+
+No Stage-B `.uasset` was modified. User PIE must now verify that the stock patrol branch consumes this published intent before a target is sensed.

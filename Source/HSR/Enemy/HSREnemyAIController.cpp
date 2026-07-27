@@ -121,6 +121,8 @@ void AHSREnemyAIController::ClearState()
 
 	CurrentTarget.Reset();
 	SetBlackboardTarget(nullptr);
+	bHasPublishedPatrolLocation = false;
+	PublishedPatrolLocation = FVector::ZeroVector;
 	CurrentState = EHSREnemyExplorationState::Idle;
 	WriteBlackboardRuntimeState();
 }
@@ -304,7 +306,7 @@ bool AHSREnemyAIController::StartBehaviorTreeRuntime()
 	UBehaviorTree* Tree = Definition ? Definition->BehaviorTreeAsset.LoadSynchronous() : nullptr;
 	UBlackboardData* BlackboardData = Definition ? Definition->BlackboardAsset.LoadSynchronous() : nullptr;
 	UBlackboardComponent* BlackboardComponent = nullptr;
-	if (!Tree || !BlackboardData || Tree->BlackboardAsset != BlackboardData || !UseBlackboard(BlackboardData, BlackboardComponent) || !BlackboardComponent || !RunBehaviorTree(Tree))
+	if (!Tree || !BlackboardData || Tree->BlackboardAsset != BlackboardData || !UseBlackboard(BlackboardData, BlackboardComponent) || !BlackboardComponent)
 	{
 		UE_LOG(LogTemp, Error, TEXT("P17-PATCH-02 AI init failed: %s has invalid BT/BB references"), *GetName());
 		return false;
@@ -313,7 +315,15 @@ bool AHSREnemyAIController::StartBehaviorTreeRuntime()
 	RuntimeBlackboard = BlackboardComponent;
 	++BehaviorTreeEpoch;
 	ActiveEncounterRequestId.Invalidate();
-	WriteBlackboardRuntimeState();
+	PublishInitialPatrolIntent(Enemy->GetSpawnOrigin());
+	if (!RunBehaviorTree(Tree))
+	{
+		ClearBlackboardRuntimeState();
+		RuntimeBlackboard = nullptr;
+		CurrentState = EHSREnemyExplorationState::Idle;
+		UE_LOG(LogTemp, Error, TEXT("P17-PATCH-02 AI init failed: %s could not run the Behavior Tree"), *GetName());
+		return false;
+	}
 	return true;
 }
 
@@ -341,6 +351,21 @@ void AHSREnemyAIController::WriteBlackboardRuntimeState()
 	SetBlackboardTarget(CurrentTarget.Get());
 }
 
+void AHSREnemyAIController::PublishInitialPatrolIntent(const FVector& InSpawnOrigin)
+{
+	bHasPublishedPatrolLocation = true;
+	PublishedPatrolLocation = InSpawnOrigin;
+	SetState(EHSREnemyExplorationState::MovingToPatrol);
+
+	if (!RuntimeBlackboard)
+	{
+		return;
+	}
+
+	RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::SpawnOrigin, InSpawnOrigin);
+	RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::PatrolLocation, InSpawnOrigin);
+}
+
 void AHSREnemyAIController::ClearBlackboardRuntimeState()
 {
 	if (!RuntimeBlackboard)
@@ -361,3 +386,23 @@ void AHSREnemyAIController::SetBlackboardTarget(AActor* Target)
 		RuntimeBlackboard->SetValueAsObject(HSREnemyBlackboardKeys::TargetActor, Target);
 	}
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+bool AHSREnemyAIController::GetPatrolLocationForAutomation(FVector& OutPatrolLocation) const
+{
+	if (!RuntimeBlackboard)
+	{
+		OutPatrolLocation = PublishedPatrolLocation;
+		return bHasPublishedPatrolLocation;
+	}
+
+	OutPatrolLocation = RuntimeBlackboard->GetValueAsVector(HSREnemyBlackboardKeys::PatrolLocation);
+	return true;
+}
+
+void AHSREnemyAIController::PublishInitialPatrolIntentForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin)
+{
+	RuntimeBlackboard = InBlackboard;
+	PublishInitialPatrolIntent(InSpawnOrigin);
+}
+#endif
