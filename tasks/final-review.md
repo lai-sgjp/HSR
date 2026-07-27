@@ -1,4 +1,33 @@
-# TASK-P17-PATCH-01A User PIE Evidence Review — 2026-07-27
+# TASK-P17-PATCH-01A Harness Assertion Fix Re-review — `06f84db`
+
+Status: `PASS WITH FOLLOW-UP`
+
+## Static gate
+
+- Commit `06f84db` changes exactly two authorized files: one expectation token in `Source/HSR/Battle/HSRBattleGameMode.cpp` and the execution record. No production Status validation/runtime code changed.
+- The harness now expects `InvalidDefinition` for the copied DoT object whose `StatusId` is changed to `Status.Unsupported` while its GrantedTag remains `Status.Debuff.DamageOverTime`. This matches the frozen generic semantics: `Status.Unsupported` has a valid `Status.*` root, but exact Tag/Id identity fails.
+- Missing infinite GE, missing DamageRule, and missing DamageType expectations remain unchanged. The prior PIE failure and all earlier review verdicts remain recorded below.
+- The reported Development Editor Build is credible for the one-token C++ harness change. The latest `Saved/Logs/HSR.log` independently shows one matched `HSR.Battle.Patch.StatusGeneric`, `Result={Success}`, and `TEST COMPLETE. EXIT CODE: 0` at 2026-07-27 18:38 local time.
+- Independent `git diff --check` exits 0. Dirty Coordinator/user files remain outside the implementation commit.
+
+## Required user P9 PIE rerun
+
+The static/Automation gate passes, but the corrected development harness must still be executed in PIE. Acceptance requires all of these exact markers in the new post-fix log:
+
+- `P9-001 Status Harness=COMPLETE`
+- `P9-002 Stack Case=OldRemoveFailure Result=PASS`
+- `P9-002 Stack Harness=COMPLETE`
+- `P9-003 DotBreak Case=InvalidDefinition_GE_Rule_DamageType Result=PASS`
+- `P9-003 DotBreak Harness=COMPLETE`
+- no `P9-001`, `P9-002`, or `P9-003` `Result=FAIL`, `Harness=INCOMPLETE`, or unexpected `SKIPPED` marker
+
+## Verdict and route
+
+`PASS WITH FOLLOW-UP`. The authorized assertion repair is correct, minimal, compiled, and leaves production behavior untouched. Route to the user for one P9 PIE rerun. If the exact acceptance markers above are present, return the log to this Reviewer for final `PASS`; otherwise return to the Implementation Agent only for the first real failing case.
+
+---
+
+# Prior Review — TASK-P17-PATCH-01A User PIE Evidence Review — 2026-07-27
 
 Status: `BLOCKED`
 
