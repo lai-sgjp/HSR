@@ -360,3 +360,49 @@ Required regression after the harness-only fix:
 ## Verdict
 
 `REVISE` — Production repeatable-Break behavior and Automation remain credible, but the required PIE gate failed because its fixture illegally changed the TurnManager epoch while retaining a live old-epoch Break Status. The minimal correction is entirely within the already-authorized `HSRBattleGameMode.cpp` P9 harness; route automatically to Implementation without further user authorization, then rebuild/retest and return to independent review before asking the user for one final PIE rerun.
+
+---
+
+# TASK-P17-PATCH-01B Post-PIE Harness Fix Re-review
+
+Status: `PASS WITH FOLLOW-UP`
+
+Role: `Independent Reviewer`
+Date: `2026-07-27`
+Evidence level: `STATIC FIX REVIEW + LOCAL BUILD/AUTOMATION EVIDENCE; FINAL USER PIE RERUN PENDING`
+Reviewed fix: Implementation `d1d3fc2` after failed-PIE review `ecf84bd`
+
+## Fix findings
+
+- `PASS` — Commit changes only the authorized P9 block in `HSRBattleGameMode.cpp` and `tasks/execution-result.md`; no production Status, TurnManager, Coordinator, Config or Content behavior changed.
+- `PASS` — Recovery advances the existing TurnManager with real `ResolveAction(GetCurrentParticipantId())` lifecycle calls, bounded to at most four steps.
+- `PASS` — The configured Break Status must naturally reach `InstanceCount == 0` before the harness reinitializes deterministic ordering. There is no direct clear, BattleEpoch mutation, GE-handle mutation, validation relaxation or status-container edit.
+- `PASS` — The harness captures Status/accepted-Delay counters before and after recovery lifecycle progression, logs them, and requires exact equality. Natural expiry is therefore not misreported as a new Break request or Delay registration.
+- `PASS` — If lifecycle progression cannot expire the instance within the bound, `bBreakStatusExpiredNaturally` is false and the repeatable case fails rather than hiding the condition.
+
+## Evidence findings
+
+- `PASS` — `git diff --check e5756c9..d1d3fc2` succeeds.
+- `PASS` — The execution report preserves the user's failed PIE evidence (`Result=17`, `Status=0->1->1`, `Delay=0->1->2`, `INCOMPLETE`) and the stale-Epoch root cause.
+- `PASS (reported)` — Development Editor Build succeeded after the harness-only fix.
+- `PASS (local log)` — Latest `Saved/Logs/HSR.log` at 11:58 shows `HSR.Battle.Patch` discovered two tests; `RepeatableBreak` and `StatusGeneric` both completed with `Result={Success}`, and the standalone World logged cleanup.
+- `PASS` — Worktree residue remains limited to pre-existing user `learn/SaveSystem.md` and `.claude/**`; the Implementation role commit contains only its two authorized files.
+
+## Final user PIE rerun
+
+Enable only `BP_HSRBattleGameMode -> Development | P9 -> Run P9 Dot Break Harness`, Save All, and enter Battle PIE through the normal encounter path.
+
+The complete log must contain:
+
+- `P9-003 RepeatableBreak RecoveryLifecycle Expired=1 Status=1->1 Delay=1->1`
+- `P9-003 DotBreak Case=RepeatableBreak_FirstReplayRecoverySecond_ExactCounts Result=PASS`
+- `P9-003 RepeatableBreak FirstActionId=<A> SecondActionId=<B> Status=0->1->2 Delay=0->1->2`, with valid distinct ActionIds
+- two corresponding Break records with `Triggered=1`, successful Break Status results, and accepted Delay registrations
+- `P9-003 DotBreak Harness=COMPLETE`
+- zero related `Result=FAIL`, `Harness=INCOMPLETE`, or `Harness=SKIPPED`
+
+After capture, restore the switch to `false`, Save All, and provide the complete log for final evidence review.
+
+## Verdict
+
+`PASS WITH FOLLOW-UP` — The stale-Epoch PIE fixture defect is corrected narrowly and applicable Build/Automation evidence passes. Only the final user-owned production DataAsset/GE PIE rerun remains; return its complete log to an independent Reviewer before archival.
