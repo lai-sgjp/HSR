@@ -54,3 +54,14 @@ Status: `REVISE / IMPLEMENTED, RUNTIME VALIDATION PENDING`
 - Isolated `HSR.Battle.Patch.RepeatableBreak`: `PASS`, including standalone World cleanup.
 - Serial `HSR.Battle.Patch`: `PASS` (2/2): `RepeatableBreak` and `StatusGeneric` both completed with `Result={Success}`.
 - PIE remains pending the existing user-run `P9-003` gate after independent review. Task status remains `REVISE` until that evidence is accepted.
+
+## Failed PIE harness lifecycle correction
+
+- User PIE evidence failed only `RepeatableBreak_FirstReplayRecoverySecond_ExactCounts`: first Break Status was `Success`, second was `InvalidRuntimeInstance (17)`, counters were `Status=0->1->1` and `Delay=0->1->2`, and the harness ended `INCOMPLETE`. Reviewer recorded the evidence and root cause in `ecf84bd`; it is preserved rather than replaced by later Automation success.
+- Root cause was fixture-only: after Toughness recovery, P9 called `RepeatManager->Initialize` while the first one-turn Break Status still belonged to the prior TurnManager epoch. Production correctly rejected that stale runtime instance.
+- The P9 repeatable block now advances the existing real turn lifecycle for at most four steps until the configured Break Status naturally expires. It asserts and logs `Expired=1` and exact zero changes to successful Break Status and accepted Delay counters during recovery/lifecycle progression, then reinitializes deterministic ordering and submits the second ActionId.
+- No direct Status clear, BattleEpoch/GE-handle mutation, or production validation relaxation was introduced. A final user PIE rerun remains required after Build, isolated Automation, shared Patch regression, and independent review.
+- Development Editor Build after the harness-only correction: `PASS` (`HSREditor Win64 Development`, 2026-07-27).
+- Isolated `HSR.Battle.Patch.RepeatableBreak`: `PASS`, with standalone World cleanup.
+- Serial `HSR.Battle.Patch`: `PASS` (2/2): `RepeatableBreak` and `StatusGeneric` both completed with `Result={Success}`.
+- `git diff --check`: `PASS`. Final PIE evidence remains user-owned and pending independent re-review.

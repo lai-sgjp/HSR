@@ -1264,6 +1264,18 @@ namespace HSRBattleDevelopmentTest
 				RepeatTarget.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetToughnessAttribute(), BreakDamage);
 				const int32 StatusAfterRecovery = Coordinator->GetBreakStatusRequestCountForDevelopmentTest();
 				const int32 DelayAfterRecovery = Coordinator->GetBreakDelayRegistrationCountForDevelopmentTest();
+				UHSRStatusComponent* RepeatStatusComponent = Coordinator->GetStatusComponent(RepeatTarget.ParticipantId);
+				for (int32 Step = 0; RepeatStatusComponent && Step < 4
+					&& RepeatStatusComponent->GetSnapshot(BreakDefinition->StatusId).InstanceCount > 0; ++Step)
+				{
+					RepeatManager->ResolveAction(RepeatManager->GetCurrentParticipantId());
+				}
+				const bool bBreakStatusExpiredNaturally = RepeatStatusComponent
+					&& RepeatStatusComponent->GetSnapshot(BreakDefinition->StatusId).InstanceCount == 0;
+				const int32 StatusAfterLifecycle = Coordinator->GetBreakStatusRequestCountForDevelopmentTest();
+				const int32 DelayAfterLifecycle = Coordinator->GetBreakDelayRegistrationCountForDevelopmentTest();
+				UE_LOG(LogTemp, Log, TEXT("P9-003 RepeatableBreak RecoveryLifecycle Expired=%d Status=%d->%d Delay=%d->%d"),
+					bBreakStatusExpiredNaturally ? 1 : 0, StatusAfterRecovery, StatusAfterLifecycle, DelayAfterRecovery, DelayAfterLifecycle);
 				RepeatManager->Initialize(Coordinator->GetParticipants());
 				SecondBreakActionId = FGuid::NewGuid(); const FHSRAbilityResolution Second = Coordinator->RequestAction(MakeRepeatCommand(SecondBreakActionId));
 				const EHSRStatusOperationResult SecondStatusResult = Coordinator->GetLastBreakStatusResultForDevelopmentTest();
@@ -1274,6 +1286,7 @@ namespace HSRBattleDevelopmentTest
 					&& bFirstDelayAccepted && bSecondDelayAccepted
 					&& StatusAfterReplay == StatusBefore + 1 && DelayAfterReplay == DelayBefore + 1
 					&& StatusAfterRecovery == StatusAfterReplay && DelayAfterRecovery == DelayAfterReplay
+					&& bBreakStatusExpiredNaturally && StatusAfterLifecycle == StatusAfterRecovery && DelayAfterLifecycle == DelayAfterRecovery
 					&& Coordinator->GetBreakStatusRequestCountForDevelopmentTest() == StatusBefore + 2
 					&& Coordinator->GetBreakDelayRegistrationCountForDevelopmentTest() == DelayBefore + 2;
 				UE_LOG(LogTemp, Log, TEXT("P9-003 RepeatableBreak FirstActionId=%s SecondActionId=%s Status=%d->%d->%d Delay=%d->%d->%d"), *FirstBreakActionId.ToString(), *SecondBreakActionId.ToString(), StatusBefore, StatusAfterReplay, Coordinator->GetBreakStatusRequestCountForDevelopmentTest(), DelayBefore, DelayAfterReplay, Coordinator->GetBreakDelayRegistrationCountForDevelopmentTest());
