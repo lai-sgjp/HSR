@@ -21,6 +21,32 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRStatusGenericPatchTest, "HSR.Battle.Patch.StatusGeneric", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRRepeatableBreakPatchTest, "HSR.Battle.Patch.RepeatableBreak", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistancePatchTest, "HSR.Battle.Patch.ActionDistance", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSRActionDistancePatchTest::RunTest(const FString& Parameters)
+{
+	if (!GEngine) return false;
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GEngine); GameInstance->AddToRoot();
+	UWorld* World = nullptr; UHSRBattleCoordinator* Coordinator = nullptr;
+	ON_SCOPE_EXIT { if (Coordinator) Coordinator->Reset(); if (GameInstance) { GameInstance->Shutdown(); if (World) { World->DestroyWorld(false); GEngine->DestroyWorldContext(World); } GameInstance->RemoveFromRoot(); } };
+	GameInstance->InitializeStandalone(FName(*FString::Printf(TEXT("HSRActionDistance_%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits))));
+	World = GameInstance->GetWorld();
+	TSubclassOf<AHSRBattleGameMode> Class = LoadClass<AHSRBattleGameMode>(nullptr, TEXT("/Game/Blueprints/Framework/BP_HSRBattleGameMode.BP_HSRBattleGameMode_C"));
+	FText Failure; Coordinator = World && Class ? AHSRBattleGameMode::CreateRepeatableBreakAutomationFixture(GameInstance, World, Class, Failure) : nullptr;
+	if (!TestNotNull(TEXT("Action-distance fixture builds"), Coordinator) || !TestNotNull(TEXT("Action-distance manager exists"), Coordinator->GetTurnManager())) return false;
+	UHSRTurnManager* Manager = Coordinator->GetTurnManager();
+	const FName Current = Manager->GetCurrentParticipantId();
+	const uint64 Epoch = Manager->GetBattleEpoch(); const uint64 Sequence = Manager->GetTurnSequence();
+	FHSRActionDistanceRequest Delay; Delay.BattleEpoch = Epoch; Delay.OperationId = FGuid::NewGuid(); Delay.TargetParticipantId = Current; Delay.Ratio = 0.3f; Delay.Kind = EHSRActionDistanceAdjustmentKind::Delay;
+	TestEqual(TEXT("Current actor delay is accepted as ordered pending"), Manager->RequestActionDistanceAdjustment(Delay).Result, EHSRActionDistanceAdjustmentResult::Accepted);
+	TestEqual(TEXT("Duplicate operation has zero mutation"), Manager->RequestActionDistanceAdjustment(Delay).Result, EHSRActionDistanceAdjustmentResult::DuplicateOperation);
+	TestEqual(TEXT("Adjustment does not advance lifecycle"), Manager->GetTurnSequence(), Sequence);
+	TestTrue(TEXT("Current action resolves after pending delay"), Manager->ResolveAction(Current));
+	TestEqual(TEXT("Resolve emits exactly one successor turn"), Manager->GetTurnSequence(), Sequence + 1);
+	FHSRActionDistanceRequest OldEpoch = Delay; OldEpoch.OperationId = FGuid::NewGuid(); OldEpoch.BattleEpoch = Epoch - 1;
+	TestEqual(TEXT("Old epoch is rejected after consuming its valid operation id"), Manager->RequestActionDistanceAdjustment(OldEpoch).Result, EHSRActionDistanceAdjustmentResult::InvalidEpoch);
+	return true;
+}
 
 bool FHSRRepeatableBreakPatchTest::RunTest(const FString& Parameters)
 {
@@ -121,6 +147,13 @@ bool FHSRRepeatableBreakPatchTest::RunTest(const FString& Parameters)
 	{
 		Coordinator->GetTurnManager()->ResolveAction(Coordinator->GetTurnManager()->GetCurrentParticipantId());
 	}
+	// Action distance preserves a full +Base Delay rather than the former skip-once
+	// queue slot. Reach the player-owned command boundary deterministically.
+	for (int32 Step = 0; Step < 8 && Coordinator->GetTurnManager()->GetCurrentParticipantId() != Coordinator->GetParticipants()[0].ParticipantId; ++Step)
+	{
+		Coordinator->GetTurnManager()->ResolveAction(Coordinator->GetTurnManager()->GetCurrentParticipantId());
+	}
+	TestEqual(TEXT("Second edge reaches the player command boundary"), Coordinator->GetTurnManager()->GetCurrentParticipantId(), Coordinator->GetParticipants()[0].ParticipantId);
 	TestTrue(TEXT("Second action runtime prepares"), Prepare(BreakDamage, true));
 	const FGuid SecondId = FGuid::NewGuid();
 	const uint64 TurnBeforeSecond = Coordinator->GetTurnManager()->GetTurnSequence();

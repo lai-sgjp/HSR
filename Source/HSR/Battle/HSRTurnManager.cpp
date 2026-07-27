@@ -3,243 +3,183 @@
 #include "AbilitySystemComponent.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 
+bool UHSRTurnManager::MakeBaseActionDistance(float Speed, float& OutBase)
+{
+	if (!FMath::IsFinite(Speed)) return false;
+	OutBase = MaximumBaseActionDistance / FMath::Max(Speed, 1.0f);
+	return FMath::IsFinite(OutBase) && OutBase > 0.0f;
+}
+
 bool UHSRTurnManager::Initialize(const TArray<FHSRBattleParticipant>& InParticipants)
 {
 	Reset();
-	if (InParticipants.IsEmpty())
+	if (InParticipants.IsEmpty()) return false;
+	TArray<FHSRBattleParticipant> Candidate = InParticipants;
+	for (FHSRBattleParticipant& Participant : Candidate)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRTurnManager::Initialize - REJECTED empty participant list"));
-		return false;
+		if (!Participant.IsValid() || Participant.ParticipantId.IsNone()) return false;
+		const float Speed = Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetSpeedAttribute());
+		float Base = 0.0f;
+		if (!MakeBaseActionDistance(Speed, Base)) return false;
+		Participant.InitiativeSpeed = FMath::Max(Speed, 1.0f);
+		Participant.EffectiveSpeed = FMath::Max(Speed, 1.0f);
+		Participant.BaseActionDistance = Base;
+		Participant.RemainingActionDistance = Base;
 	}
-
-	OrderedParticipants = InParticipants;
-	for (FHSRBattleParticipant& Participant : OrderedParticipants)
-	{
-		Participant.InitiativeSpeed = ReadInitiativeSpeed(Participant);
-	}
-	OrderedParticipants.Sort([](const FHSRBattleParticipant& Left, const FHSRBattleParticipant& Right)
-	{
-		if (!FMath::IsNearlyEqual(Left.InitiativeSpeed, Right.InitiativeSpeed))
-		{
-			return Left.InitiativeSpeed > Right.InitiativeSpeed;
-		}
-		return Left.ParticipantId.LexicalLess(Right.ParticipantId);
-	});
+	Candidate.Sort([](const FHSRBattleParticipant& A, const FHSRBattleParticipant& B) { return A.ParticipantId.LexicalLess(B.ParticipantId); });
+	for (int32 Index = 1; Index < Candidate.Num(); ++Index) if (Candidate[Index - 1].ParticipantId == Candidate[Index].ParticipantId) return false;
+	OrderedParticipants = MoveTemp(Candidate);
 	++BattleEpochCounter;
-	if (BattleEpochCounter == 0)
-	{
-		++BattleEpochCounter;
-	}
+	if (BattleEpochCounter == 0) ++BattleEpochCounter;
 	BattleEpoch = BattleEpochCounter;
+	if (!BindSpeedDelegates()) { Reset(); return false; }
+	if (!AdvanceToNextValidTurn()) { Reset(); return false; }
+	return true;
+}
 
-	UE_LOG(LogTemp, Log, TEXT("UHSRTurnManager::Initialize - Queue built Count=%d"), OrderedParticipants.Num());
-	if (!AdvanceToNextValidTurn())
+bool UHSRTurnManager::BindSpeedDelegates()
+{
+	for (const FHSRBattleParticipant& Participant : OrderedParticipants)
 	{
-		BattleEpoch = 0;
-		TurnSequence = 0;
-		return false;
+#if WITH_DEV_AUTOMATION_TESTS
+		if (SpeedDelegateBindFailureAfter != INDEX_NONE && SpeedDelegateBindings.Num() >= SpeedDelegateBindFailureAfter) { UnbindSpeedDelegates(); return false; }
+#endif
+		UAbilitySystemComponent* ASC = Participant.AbilitySystemComponent.Get();
+		if (!ASC) { UnbindSpeedDelegates(); return false; }
+		const FName Id = Participant.ParticipantId;
+		const uint64 Epoch = BattleEpoch;
+		TWeakObjectPtr<UHSRTurnManager> WeakThis(this);
+		FDelegateHandle Handle = ASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetSpeedAttribute()).AddLambda(
+			[WeakThis, Id, WeakASC = TWeakObjectPtr<UAbilitySystemComponent>(ASC), Epoch](const FOnAttributeChangeData& Data)
+			{ if (UHSRTurnManager* This = WeakThis.Get()) This->HandleSpeedChanged(Id, WeakASC.Get(), Epoch, Data.NewValue); });
+		if (!Handle.IsValid()) { UnbindSpeedDelegates(); return false; }
+		FSpeedDelegateBinding& Binding = SpeedDelegateBindings.AddDefaulted_GetRef();
+		Binding.ParticipantId = Id; Binding.AbilitySystemComponent = ASC; Binding.Handle = Handle; Binding.Epoch = Epoch;
 	}
 	return true;
+}
+
+void UHSRTurnManager::UnbindSpeedDelegates()
+{
+	for (const FSpeedDelegateBinding& Binding : SpeedDelegateBindings)
+		if (UAbilitySystemComponent* ASC = Binding.AbilitySystemComponent.Get()) if (Binding.Handle.IsValid()) ASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetSpeedAttribute()).Remove(Binding.Handle);
+	SpeedDelegateBindings.Empty();
+}
+
+void UHSRTurnManager::HandleSpeedChanged(FName ParticipantId, UAbilitySystemComponent* SourceASC, uint64 BoundEpoch, float NewSpeed)
+{
+	if (BoundEpoch == 0 || BoundEpoch != BattleEpoch || State == EHSRTurnManagerState::Finished || !SourceASC || !FMath::IsFinite(NewSpeed)) return;
+	const int32 Index = FindParticipantIndex(ParticipantId);
+	if (!OrderedParticipants.IsValidIndex(Index) || OrderedParticipants[Index].AbilitySystemComponent.Get() != SourceASC) return;
+	FHSRBattleParticipant& Participant = OrderedParticipants[Index];
+	float NewBase = 0.0f;
+	if (!MakeBaseActionDistance(NewSpeed, NewBase)) return;
+	if (Index == CurrentTurnIndex) { Participant.EffectiveSpeed = FMath::Max(NewSpeed, 1.0f); Participant.BaseActionDistance = NewBase; return; }
+	const float NewRemaining = Participant.RemainingActionDistance * NewBase / Participant.BaseActionDistance;
+	if (!FMath::IsFinite(NewRemaining) || NewRemaining < 0.0f) return;
+	Participant.EffectiveSpeed = FMath::Max(NewSpeed, 1.0f);
+	Participant.BaseActionDistance = NewBase;
+	Participant.RemainingActionDistance = FMath::Abs(NewRemaining) <= DistanceEpsilon ? 0.0f : NewRemaining;
 }
 
 bool UHSRTurnManager::ResolveAction(FName ResolvingParticipantId)
 {
-	if (CurrentTurnIndex == INDEX_NONE || State == EHSRTurnManagerState::Finished)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRTurnManager::ResolveAction - REJECTED no active turn ParticipantId=%s"), *ResolvingParticipantId.ToString());
-		return false;
-	}
-
-	const FHSRBattleParticipant& Current = OrderedParticipants[CurrentTurnIndex];
-	if (Current.ParticipantId != ResolvingParticipantId)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRTurnManager::ResolveAction - REJECTED non-current ParticipantId=%s Current=%s"), *ResolvingParticipantId.ToString(), *Current.ParticipantId.ToString());
-		return false;
-	}
-	if (!IsCurrentParticipantValid())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRTurnManager::ResolveAction - REJECTED invalid current ParticipantId=%s; advancing"), *ResolvingParticipantId.ToString());
-		AdvanceToNextValidTurn();
-		return false;
-	}
-
-	const FName ResolvedId = Current.ParticipantId;
+	if (bSelectingOrResolving || CurrentTurnIndex == INDEX_NONE || State == EHSRTurnManagerState::Finished || GetCurrentParticipantId() != ResolvingParticipantId || !IsCurrentParticipantValid()) return false;
+	bSelectingOrResolving = true;
+	const FName ResolvedId = ResolvingParticipantId;
 	BroadcastLifecycleEvent(EHSRTurnLifecycleEventType::TurnEnded, ResolvedId);
-	if (State == EHSRTurnManagerState::Finished || CurrentTurnIndex == INDEX_NONE)
+	bool bSucceeded = ApplyCurrentPendingAfterRecharge();
+	if (bSucceeded) AdvanceToNextValidTurn();
+	bSelectingOrResolving = false;
+	if (bSucceeded) ActionResolved.Broadcast(ResolvedId);
+	return bSucceeded;
+}
+
+bool UHSRTurnManager::ApplyCurrentPendingAfterRecharge()
+{
+	if (!OrderedParticipants.IsValidIndex(CurrentTurnIndex)) return false;
+	FHSRBattleParticipant& Current = OrderedParticipants[CurrentTurnIndex];
+	float Candidate = Current.RemainingActionDistance + Current.BaseActionDistance;
+	if (!FMath::IsFinite(Candidate)) return false;
+	for (const FPendingPostActionOperation& Pending : PendingPostActionOperations)
 	{
-		ActionResolved.Broadcast(ResolvedId);
-		UE_LOG(LogTemp, Log, TEXT("UHSRTurnManager::ResolveAction - SUCCESS terminal ParticipantId=%s Next=None"), *ResolvedId.ToString());
-		return true;
+		Candidate = Pending.Kind == EHSRActionDistanceAdjustmentKind::Advance ? FMath::Max(0.0f, Candidate - Pending.Distance) : Candidate + Pending.Distance;
+		if (!FMath::IsFinite(Candidate)) return false;
 	}
-	AdvanceToNextValidTurn();
-	ActionResolved.Broadcast(ResolvedId);
-	UE_LOG(LogTemp, Log, TEXT("UHSRTurnManager::ResolveAction - SUCCESS ParticipantId=%s Next=%s"), *ResolvedId.ToString(), *GetCurrentParticipantId().ToString());
+	Current.RemainingActionDistance = FMath::Abs(Candidate) <= DistanceEpsilon ? 0.0f : Candidate;
+	PendingPostActionOperations.Empty();
 	return true;
+}
+
+FHSRActionDistanceResult UHSRTurnManager::RequestActionDistanceAdjustment(const FHSRActionDistanceRequest& Request, bool bAllowPendingDeferredDefeat)
+{
+	if (!Request.OperationId.IsValid() || Request.TargetParticipantId.IsNone() || !FMath::IsFinite(Request.Ratio) || Request.Ratio < 0.0f || Request.Ratio > 1.0f) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::InvalidRequest);
+	if (ConsumedOperationIds.Contains(Request.OperationId)) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::DuplicateOperation);
+	ConsumedOperationIds.Add(Request.OperationId);
+	if (Request.BattleEpoch != BattleEpoch || BattleEpoch == 0) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::InvalidEpoch);
+	if (State == EHSRTurnManagerState::Finished) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::Finished);
+	const int32 Index = FindParticipantIndex(Request.TargetParticipantId);
+	if (!OrderedParticipants.IsValidIndex(Index)) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::InvalidTarget);
+	FHSRBattleParticipant& Target = OrderedParticipants[Index];
+	if (!Target.IsValid()) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::InvalidTarget, Index);
+	if (!IsParticipantTurnEligible(Target) && !bAllowPendingDeferredDefeat) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::DefeatedTarget, Index);
+	const float Distance = Target.BaseActionDistance * Request.Ratio;
+	if (!FMath::IsFinite(Distance)) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::ArithmeticFailure, Index);
+	if (Index == CurrentTurnIndex)
+	{
+		// A future speed callback can make recharge as large as 10000; prove the entire ordered queue first.
+		float Preview = Target.RemainingActionDistance + MaximumBaseActionDistance;
+		for (const FPendingPostActionOperation& Pending : PendingPostActionOperations) { Preview = Pending.Kind == EHSRActionDistanceAdjustmentKind::Advance ? FMath::Max(0.0f, Preview - Pending.Distance) : Preview + Pending.Distance; if (!FMath::IsFinite(Preview)) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::ArithmeticFailure, Index); }
+		Preview = Request.Kind == EHSRActionDistanceAdjustmentKind::Advance ? FMath::Max(0.0f, Preview - Distance) : Preview + Distance;
+		if (!FMath::IsFinite(Preview)) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::ArithmeticFailure, Index);
+		PendingPostActionOperations.Add({ Request.Kind, Distance });
+	}
+	else
+	{
+		const float Value = Request.Kind == EHSRActionDistanceAdjustmentKind::Advance ? FMath::Max(0.0f, Target.RemainingActionDistance - Distance) : Target.RemainingActionDistance + Distance;
+		if (!FMath::IsFinite(Value)) return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::ArithmeticFailure, Index);
+		Target.RemainingActionDistance = FMath::Abs(Value) <= DistanceEpsilon ? 0.0f : Value;
+	}
+	return MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult::Accepted, Index);
 }
 
 bool UHSRTurnManager::ConsumeBreakDelay(const FHSRTurnDelayRequest& Request, bool bAllowPendingDeferredDefeat)
 {
-	if (!Request.ActionId.IsValid() || Request.TargetParticipantId.IsNone())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("P8-004 Delay ActionId=%s Target=%s Applied=0 Reason=InvalidRequest"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString());
-		return false;
-	}
-	if (ConsumedBreakDelayActionIds.Contains(Request.ActionId))
-	{
-		UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Applied=0 Reason=Replay"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString());
-		return false;
-	}
-	ConsumedBreakDelayActionIds.Add(Request.ActionId);
-	if (State == EHSRTurnManagerState::Finished)
-	{
-		UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Applied=0 Reason=Finished"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString());
-		return false;
-	}
-	const int32 TargetIndex = OrderedParticipants.IndexOfByPredicate([&Request](const FHSRBattleParticipant& Participant)
-	{
-		return Participant.ParticipantId == Request.TargetParticipantId;
-	});
-	if (!OrderedParticipants.IsValidIndex(TargetIndex)
-		|| (!bAllowPendingDeferredDefeat && !IsParticipantTurnEligible(OrderedParticipants[TargetIndex])))
-	{
-		UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Applied=0 Reason=InvalidTarget"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString());
-		return false;
-	}
-
-	PendingBreakDelayActionIds.Add(Request.TargetParticipantId, Request.ActionId);
-	UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Registered=1 Consumed=0 Next=%s Reason=None"), *Request.ActionId.ToString(), *Request.TargetParticipantId.ToString(), *GetCurrentParticipantId().ToString());
-	return true;
+	FHSRActionDistanceRequest DistanceRequest; DistanceRequest.BattleEpoch = BattleEpoch; DistanceRequest.OperationId = Request.ActionId; DistanceRequest.TargetParticipantId = Request.TargetParticipantId; DistanceRequest.Ratio = 1.0f; DistanceRequest.Kind = EHSRActionDistanceAdjustmentKind::Delay;
+	return RequestActionDistanceAdjustment(DistanceRequest, bAllowPendingDeferredDefeat).Result == EHSRActionDistanceAdjustmentResult::Accepted;
 }
 
-void UHSRTurnManager::FinishBattle()
-{
-	State = EHSRTurnManagerState::Finished;
-	CurrentTurnIndex = INDEX_NONE;
-	UE_LOG(LogTemp, Log, TEXT("UHSRTurnManager::FinishBattle - Turn progression stopped"));
-}
-
-void UHSRTurnManager::Reset()
-{
-	OrderedParticipants.Empty();
-	ConsumedBreakDelayActionIds.Empty();
-	PendingBreakDelayActionIds.Empty();
-	CurrentTurnIndex = INDEX_NONE;
-	BattleEpoch = 0;
-	TurnSequence = 0;
-	State = EHSRTurnManagerState::Waiting;
-}
-
-FName UHSRTurnManager::GetCurrentParticipantId() const
-{
-	return OrderedParticipants.IsValidIndex(CurrentTurnIndex) ? OrderedParticipants[CurrentTurnIndex].ParticipantId : NAME_None;
-}
+void UHSRTurnManager::FinishBattle() { PendingPostActionOperations.Empty(); UnbindSpeedDelegates(); State = EHSRTurnManagerState::Finished; CurrentTurnIndex = INDEX_NONE; }
+void UHSRTurnManager::Reset() { UnbindSpeedDelegates(); OrderedParticipants.Empty(); PendingPostActionOperations.Empty(); ConsumedOperationIds.Empty(); CurrentTurnIndex = INDEX_NONE; BattleEpoch = 0; TurnSequence = 0; State = EHSRTurnManagerState::Waiting; bSelectingOrResolving = false; }
+FName UHSRTurnManager::GetCurrentParticipantId() const { return OrderedParticipants.IsValidIndex(CurrentTurnIndex) ? OrderedParticipants[CurrentTurnIndex].ParticipantId : NAME_None; }
+int32 UHSRTurnManager::FindParticipantIndex(FName ParticipantId) const { return OrderedParticipants.IndexOfByPredicate([ParticipantId](const FHSRBattleParticipant& P) { return P.ParticipantId == ParticipantId; }); }
 
 bool UHSRTurnManager::AdvanceToNextValidTurn()
 {
-	if (OrderedParticipants.IsEmpty())
-	{
-		State = EHSRTurnManagerState::Finished;
-		CurrentTurnIndex = INDEX_NONE;
-		return false;
-	}
-
-	const int32 StartIndex = CurrentTurnIndex == INDEX_NONE ? 0 : (CurrentTurnIndex + 1) % OrderedParticipants.Num();
-	FName ConsumedDelayTarget = NAME_None;
-	FGuid ConsumedDelayActionId;
-	for (int32 Offset = 0; Offset < OrderedParticipants.Num(); ++Offset)
-	{
-		const int32 CandidateIndex = (StartIndex + Offset) % OrderedParticipants.Num();
-		const FHSRBattleParticipant& Candidate = OrderedParticipants[CandidateIndex];
-		if (!IsParticipantTurnEligible(Candidate))
-		{
-			if (const FGuid* PendingActionId = PendingBreakDelayActionIds.Find(Candidate.ParticipantId))
-			{
-				const FGuid ClearedActionId = *PendingActionId;
-				PendingBreakDelayActionIds.Remove(Candidate.ParticipantId);
-				UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Registered=0 Consumed=1 Next=%s Reason=InvalidTarget"), *ClearedActionId.ToString(), *Candidate.ParticipantId.ToString(), *GetCurrentParticipantId().ToString());
-			}
-			continue;
-		}
-		if (const FGuid* PendingActionId = PendingBreakDelayActionIds.Find(Candidate.ParticipantId))
-		{
-			ConsumedDelayTarget = Candidate.ParticipantId;
-			ConsumedDelayActionId = *PendingActionId;
-			PendingBreakDelayActionIds.Remove(Candidate.ParticipantId);
-			continue;
-		}
-		if (IsParticipantTurnEligible(Candidate))
-		{
-			CurrentTurnIndex = CandidateIndex;
-			State = Candidate.Team == EHSRBattleParticipantTeam::Player ? EHSRTurnManagerState::PlayerTurn : EHSRTurnManagerState::EnemyTurn;
-			++TurnSequence;
-			if (!ConsumedDelayTarget.IsNone())
-			{
-				UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Registered=0 Consumed=1 Next=%s Reason=None"), *ConsumedDelayActionId.ToString(), *ConsumedDelayTarget.ToString(), *Candidate.ParticipantId.ToString());
-			}
-			BroadcastLifecycleEvent(EHSRTurnLifecycleEventType::TurnStarted, Candidate.ParticipantId);
-			return true;
-		}
-	}
-
-	UE_LOG(LogTemp, Warning, TEXT("UHSRTurnManager::AdvanceToNextValidTurn - FINISHED no valid participants"));
-	State = EHSRTurnManagerState::Finished;
-	CurrentTurnIndex = INDEX_NONE;
-	if (!ConsumedDelayTarget.IsNone())
-	{
-		UE_LOG(LogTemp, Log, TEXT("P8-004 Delay ActionId=%s Target=%s Registered=0 Consumed=1 Next=None Reason=NoValidParticipant"), *ConsumedDelayActionId.ToString(), *ConsumedDelayTarget.ToString());
-	}
-	return false;
-}
-
-void UHSRTurnManager::BroadcastLifecycleEvent(EHSRTurnLifecycleEventType EventType, FName ParticipantId)
-{
-	if (BattleEpoch == 0 || TurnSequence == 0 || ParticipantId.IsNone() || State == EHSRTurnManagerState::Finished)
-	{
-		return;
-	}
-
-	FHSRTurnLifecycleEvent Event;
-	Event.BattleEpoch = BattleEpoch;
-	Event.ParticipantId = ParticipantId;
-	Event.TurnSequence = TurnSequence;
-	Event.EventType = EventType;
-	if (EventType == EHSRTurnLifecycleEventType::TurnStarted)
-	{
-		TurnStarted.Broadcast(Event);
-	}
-	else
-	{
-		TurnEnded.Broadcast(Event);
-	}
-}
-
-bool UHSRTurnManager::IsCurrentParticipantValid() const
-{
-	return OrderedParticipants.IsValidIndex(CurrentTurnIndex) && IsParticipantTurnEligible(OrderedParticipants[CurrentTurnIndex]);
-}
-
-bool UHSRTurnManager::IsParticipantTurnEligible(const FHSRBattleParticipant& Participant)
-{
-	return Participant.IsValid()
-		&& Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) > 0.0f;
-}
-
-float UHSRTurnManager::ReadInitiativeSpeed(const FHSRBattleParticipant& Participant)
-{
-	return Participant.AbilitySystemComponent.IsValid() ? FMath::Max(0.0f, Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetSpeedAttribute())) : 0.0f;
-}
-
-#if WITH_EDITOR
-bool UHSRTurnManager::InvalidateCurrentParticipantForDevelopmentTest()
-{
-	if (!OrderedParticipants.IsValidIndex(CurrentTurnIndex))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRTurnManager::InvalidateCurrentParticipantForDevelopmentTest - REJECTED no active turn"));
-		return false;
-	}
-
-	OrderedParticipants[CurrentTurnIndex].Actor.Reset();
-	UE_LOG(LogTemp, Log, TEXT("UHSRTurnManager::InvalidateCurrentParticipantForDevelopmentTest - SUCCESS ParticipantId=%s"), *GetCurrentParticipantId().ToString());
+	TArray<int32> Eligible;
+	float Minimum = TNumericLimits<float>::Max();
+	for (int32 I = 0; I < OrderedParticipants.Num(); ++I) if (IsParticipantTurnEligible(OrderedParticipants[I])) { if (!FMath::IsFinite(OrderedParticipants[I].RemainingActionDistance)) { State = EHSRTurnManagerState::Finished; CurrentTurnIndex = INDEX_NONE; return false; } Eligible.Add(I); Minimum = FMath::Min(Minimum, OrderedParticipants[I].RemainingActionDistance); }
+	if (Eligible.IsEmpty()) { State = EHSRTurnManagerState::Finished; CurrentTurnIndex = INDEX_NONE; return false; }
+	TArray<int32> FrozenCandidates;
+	for (int32 I : Eligible) if (FMath::Abs(OrderedParticipants[I].RemainingActionDistance - Minimum) <= DistanceEpsilon) FrozenCandidates.Add(I);
+	for (int32 I : Eligible) { float& Value = OrderedParticipants[I].RemainingActionDistance; Value -= Minimum; if (FMath::Abs(Value) <= DistanceEpsilon) Value = 0.0f; }
+	FrozenCandidates.Sort([this](int32 A, int32 B) { return OrderedParticipants[A].ParticipantId.LexicalLess(OrderedParticipants[B].ParticipantId); });
+	CurrentTurnIndex = FrozenCandidates[0];
+	State = OrderedParticipants[CurrentTurnIndex].Team == EHSRBattleParticipantTeam::Player ? EHSRTurnManagerState::PlayerTurn : EHSRTurnManagerState::EnemyTurn;
+	++TurnSequence;
+	BroadcastLifecycleEvent(EHSRTurnLifecycleEventType::TurnStarted, GetCurrentParticipantId());
 	return true;
 }
+
+void UHSRTurnManager::BroadcastLifecycleEvent(EHSRTurnLifecycleEventType Type, FName Id)
+{
+	if (BattleEpoch == 0 || TurnSequence == 0 || Id.IsNone()) return;
+	FHSRTurnLifecycleEvent Event; Event.BattleEpoch = BattleEpoch; Event.ParticipantId = Id; Event.TurnSequence = TurnSequence; Event.EventType = Type;
+	if (Type == EHSRTurnLifecycleEventType::TurnStarted) TurnStarted.Broadcast(Event); else TurnEnded.Broadcast(Event);
+}
+bool UHSRTurnManager::IsCurrentParticipantValid() const { return OrderedParticipants.IsValidIndex(CurrentTurnIndex) && IsParticipantTurnEligible(OrderedParticipants[CurrentTurnIndex]); }
+bool UHSRTurnManager::IsParticipantTurnEligible(const FHSRBattleParticipant& P) { return P.IsValid() && P.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) > 0.0f; }
+FHSRActionDistanceResult UHSRTurnManager::MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult Result, int32 Index) const { FHSRActionDistanceResult Out; Out.Result = Result; Out.BattleEpoch = BattleEpoch; Out.TurnSequence = TurnSequence; Out.CurrentParticipantId = GetCurrentParticipantId(); Out.NextParticipantId = GetCurrentParticipantId(); Out.PendingOperationCount = PendingPostActionOperations.Num(); if (OrderedParticipants.IsValidIndex(Index)) { const FHSRBattleParticipant& P = OrderedParticipants[Index]; Out.OldBase = Out.NewBase = P.BaseActionDistance; Out.OldRemaining = Out.NewRemaining = P.RemainingActionDistance; } return Out; }
+#if WITH_EDITOR
+bool UHSRTurnManager::InvalidateCurrentParticipantForDevelopmentTest() { if (!OrderedParticipants.IsValidIndex(CurrentTurnIndex)) return false; OrderedParticipants[CurrentTurnIndex].Actor.Reset(); return true; }
 #endif

@@ -14,8 +14,11 @@ struct FHSRBattleParticipant
 	EHSRBattleParticipantTeam Team = EHSRBattleParticipantTeam::Player;
 	FGameplayTagContainer WeaknessTags;
 
-	/** Snapshot when the turn order is built. TurnManager never polls this every frame. */
+	/** Legacy diagnostic speed snapshot; action-distance state below is owned battle-locally by TurnManager. */
 	float InitiativeSpeed = 0.0f;
+	float EffectiveSpeed = 0.0f;
+	float BaseActionDistance = 0.0f;
+	float RemainingActionDistance = 0.0f;
 	bool bDefeated = false;
 	TWeakObjectPtr<AActor> Actor;
 	TWeakObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;

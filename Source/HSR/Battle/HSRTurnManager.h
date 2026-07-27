@@ -5,28 +5,17 @@
 #include "../Data/HSRBreakTypes.h"
 #include "HSRTurnManager.generated.h"
 
+class UAbilitySystemComponent;
+
 UENUM(BlueprintType)
-enum class EHSRTurnManagerState : uint8
-{
-	Waiting,
-	PlayerTurn,
-	EnemyTurn,
-	Finished
-};
-
+enum class EHSRTurnManagerState : uint8 { Waiting, PlayerTurn, EnemyTurn, Finished };
 UENUM()
-enum class EHSRTurnLifecycleEventType : uint8
-{
-	TurnStarted,
-	TurnEnded
-};
+enum class EHSRTurnLifecycleEventType : uint8 { TurnStarted, TurnEnded };
 
-/** Pure-value turn boundary notification. Runtime object references are intentionally excluded. */
 USTRUCT()
 struct HSR_API FHSRTurnLifecycleEvent
 {
 	GENERATED_BODY()
-
 	uint64 BattleEpoch = 0;
 	FName ParticipantId;
 	uint64 TurnSequence = 0;
@@ -41,13 +30,12 @@ UCLASS()
 class HSR_API UHSRTurnManager : public UObject
 {
 	GENERATED_BODY()
-
 public:
 	bool Initialize(const TArray<FHSRBattleParticipant>& InParticipants);
 	bool ResolveAction(FName ResolvingParticipantId);
-	/** Registers one pure break-delay request. The next candidate turn for its living target is skipped once. */
+	FHSRActionDistanceResult RequestActionDistanceAdjustment(const FHSRActionDistanceRequest& Request, bool bAllowPendingDeferredDefeat = false);
+	/** P8 compatibility bridge. It keeps no second delay state. */
 	bool ConsumeBreakDelay(const FHSRTurnDelayRequest& Request, bool bAllowPendingDeferredDefeat = false);
-	/** Stops turn progression after a terminal battle result. */
 	void FinishBattle();
 	void Reset();
 
@@ -55,33 +43,51 @@ public:
 	FName GetCurrentParticipantId() const;
 	uint64 GetBattleEpoch() const { return BattleEpoch; }
 	uint64 GetTurnSequence() const { return TurnSequence; }
+	/** Stable participant registry/diagnostic view, not a prediction of future turns. */
 	const TArray<FHSRBattleParticipant>& GetOrderedParticipants() const { return OrderedParticipants; }
 	FHSRTurnLifecycleDelegate& OnTurnStarted() { return TurnStarted; }
 	FHSRTurnLifecycleDelegate& OnTurnEnded() { return TurnEnded; }
-	/** Compatibility notification. Status lifecycles must use the explicit turn-boundary delegates. */
 	FHSRActionResolvedDelegate& OnActionResolved() { return ActionResolved; }
 
 #if WITH_EDITOR
-	/** Development-only seam used by the Battle GameMode PIE verification harness. */
 	bool InvalidateCurrentParticipantForDevelopmentTest();
+#endif
+#if WITH_DEV_AUTOMATION_TESTS
+	void SetSpeedDelegateBindFailureAfterForAutomation(int32 InBindCount) { SpeedDelegateBindFailureAfter = InBindCount; }
 #endif
 
 private:
+	struct FPendingPostActionOperation { EHSRActionDistanceAdjustmentKind Kind = EHSRActionDistanceAdjustmentKind::Advance; float Distance = 0.0f; };
+	struct FSpeedDelegateBinding { FName ParticipantId; TWeakObjectPtr<UAbilitySystemComponent> AbilitySystemComponent; FDelegateHandle Handle; uint64 Epoch = 0; };
+
+	static constexpr float DistanceEpsilon = 1.e-4f;
+	static constexpr float MaximumBaseActionDistance = 10000.0f;
 	bool AdvanceToNextValidTurn();
 	bool IsCurrentParticipantValid() const;
 	static bool IsParticipantTurnEligible(const FHSRBattleParticipant& Participant);
 	void BroadcastLifecycleEvent(EHSRTurnLifecycleEventType EventType, FName ParticipantId);
-	static float ReadInitiativeSpeed(const FHSRBattleParticipant& Participant);
+	static bool MakeBaseActionDistance(float Speed, float& OutBase);
+	bool BindSpeedDelegates();
+	void UnbindSpeedDelegates();
+	void HandleSpeedChanged(FName ParticipantId, UAbilitySystemComponent* SourceASC, uint64 BoundEpoch, float NewSpeed);
+	bool ApplyCurrentPendingAfterRecharge();
+	int32 FindParticipantIndex(FName ParticipantId) const;
+	FHSRActionDistanceResult MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult Result, int32 ParticipantIndex = INDEX_NONE) const;
 
 	TArray<FHSRBattleParticipant> OrderedParticipants;
-	TSet<FGuid> ConsumedBreakDelayActionIds;
-	TMap<FName, FGuid> PendingBreakDelayActionIds;
+	TArray<FPendingPostActionOperation> PendingPostActionOperations;
+	TArray<FSpeedDelegateBinding> SpeedDelegateBindings;
+	TSet<FGuid> ConsumedOperationIds;
 	int32 CurrentTurnIndex = INDEX_NONE;
 	EHSRTurnManagerState State = EHSRTurnManagerState::Waiting;
 	uint64 BattleEpochCounter = 0;
 	uint64 BattleEpoch = 0;
 	uint64 TurnSequence = 0;
+	bool bSelectingOrResolving = false;
 	FHSRTurnLifecycleDelegate TurnStarted;
 	FHSRTurnLifecycleDelegate TurnEnded;
 	FHSRActionResolvedDelegate ActionResolved;
+#if WITH_DEV_AUTOMATION_TESTS
+	int32 SpeedDelegateBindFailureAfter = INDEX_NONE;
+#endif
 };

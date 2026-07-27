@@ -47,6 +47,49 @@ struct HSR_API FHSRTurnDelayRequest
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly) FName TargetParticipantId;
 };
 
+/** Battle-local, pure-value action-distance adjustment.  It deliberately has no Actor/ASC state. */
+enum class EHSRActionDistanceAdjustmentKind : uint8
+{
+	Advance,
+	Delay
+};
+
+enum class EHSRActionDistanceAdjustmentResult : uint8
+{
+	Accepted,
+	DuplicateOperation,
+	InvalidRequest,
+	InvalidEpoch,
+	InvalidTarget,
+	DefeatedTarget,
+	Finished,
+	ArithmeticFailure
+};
+
+struct HSR_API FHSRActionDistanceRequest
+{
+	uint64 BattleEpoch = 0;
+	FGuid OperationId;
+	FName TargetParticipantId;
+	float Ratio = 0.0f;
+	EHSRActionDistanceAdjustmentKind Kind = EHSRActionDistanceAdjustmentKind::Advance;
+};
+
+/** Diagnostic result; callers can verify rejection and replay without querying runtime objects. */
+struct HSR_API FHSRActionDistanceResult
+{
+	EHSRActionDistanceAdjustmentResult Result = EHSRActionDistanceAdjustmentResult::InvalidRequest;
+	float OldBase = 0.0f;
+	float NewBase = 0.0f;
+	float OldRemaining = 0.0f;
+	float NewRemaining = 0.0f;
+	int32 PendingOperationCount = 0;
+	FName CurrentParticipantId;
+	FName NextParticipantId;
+	uint64 BattleEpoch = 0;
+	uint64 TurnSequence = 0;
+};
+
 /** Pure Phase 8 authoring validation; it has no runtime battle side effects. */
 struct HSR_API FHSRToughnessConfiguration
 {
