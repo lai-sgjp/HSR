@@ -1,4 +1,35 @@
-# TASK-P17-PATCH-01A Harness Assertion Fix Re-review — `06f84db`
+# TASK-P17-PATCH-01A Final User PIE Evidence Review — 2026-07-27
+
+Status: `PASS`
+
+## Evidence level and source
+
+- Independently inspected the complete user-supplied post-fix PIE log at `C:/Users/Lai/.codex/attachments/2ce4b82e-1141-4016-a248-7020a2feb232/pasted-text.txt` (42,567 bytes; 2026-07-27 18:41 local time).
+- This is production PIE/development-harness evidence for the existing project entry path. It complements, rather than replaces, the successful Development Editor Build and `HSR.Battle.Patch.StatusGeneric` Automation evidence recorded in prior review sections.
+
+## Final P9 gate
+
+Each required acceptance marker occurs exactly once:
+
+- `P9-001 Status Harness=COMPLETE`
+- `P9-002 Stack Case=OldRemoveFailure Result=PASS`
+- `P9-002 Stack Harness=COMPLETE`
+- `P9-003 DotBreak Case=InvalidDefinition_GE_Rule_DamageType Result=PASS`
+- `P9-003 DotBreak Harness=COMPLETE`
+
+Across P9-001, P9-002, and P9-003, the log contains zero `Result=FAIL`, zero `Harness=INCOMPLETE`, and zero `Harness=SKIPPED`. It also contains no fatal error, unhandled exception, failed ensure, or failed assertion marker.
+
+The detailed cases confirm legacy add/refresh/expiry/duplicate-turn behavior, stack/max/replace and both replacement failure compensations, target death/reset/finish cleanup, DoT timing and failure retry, duplicate Break operation, DoT/Break coexistence, invalid Definition/target/ASC handling, manager replacement, EndPlay cleanup, and lethal exactly-once behavior. The corrected field-driven validation assertion passes in the real P9 path.
+
+## Final verdict and route
+
+`PASS`. PATCH-01A now satisfies its scope, implementation, Development Editor Build, generic runtime Automation, failure compensation, and user P9 PIE regression gates. All prior `REVISE`, `PASS WITH FOLLOW-UP`, and authorization `BLOCKED` findings remain preserved below as audit history and are closed by the subsequent implementation/evidence chain.
+
+Coordinator may archive TASK-P17-PATCH-01A, update the project snapshot/worklog according to the repository handoff rules, and prepare the separately scoped TASK-P17-PATCH-01B. This verdict does not authorize starting PATCH-01B implementation before its own card/confirmation workflow.
+
+---
+
+# Prior Review — TASK-P17-PATCH-01A Harness Assertion Fix Re-review — `06f84db`
 
 Status: `PASS WITH FOLLOW-UP`
 
