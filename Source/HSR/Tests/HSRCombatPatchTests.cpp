@@ -129,18 +129,36 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	SeedRequest.RequestId = FGuid(11, 22, 33, 44);
 	SeedRequest.EncounterId = EncounterDefinition->EncounterId;
 	SeedRequest.EnemyDefinitionId = EncounterDefinition->EnemyDefinitionId;
+	const auto SameEncounterRequest = [](const FHSREncounterRequest& Left, const FHSREncounterRequest& Right)
+	{
+		return Left.RequestId == Right.RequestId && Left.EncounterId == Right.EncounterId
+			&& Left.EnemyDefinitionId == Right.EnemyDefinitionId && Left.Initiative == Right.Initiative
+			&& Left.BattleMapPath == Right.BattleMapPath && Left.ReturnTransform.Equals(Right.ReturnTransform)
+			&& Left.ExplorationMapPath == Right.ExplorationMapPath && Left.RewardDefinitionId == Right.RewardDefinitionId
+			&& Left.RewardSeed == Right.RewardSeed;
+	};
+	const auto SameTransitionSnapshot = [&SameEncounterRequest](const FHSRTransitionAutomationSnapshot& Left, const FHSRTransitionAutomationSnapshot& Right)
+	{
+		return Left.State == Right.State && SameEncounterRequest(Left.PendingRequest, Right.PendingRequest)
+			&& Left.TravelKind == Right.TravelKind && Left.TravelRequestId == Right.TravelRequestId
+			&& Left.bResolvedMembership == Right.bResolvedMembership && Left.AdmissionMutationCount == Right.AdmissionMutationCount;
+	};
 	Transition->SeedPendingEncounterForAutomation(SeedRequest);
 	const FHSRTransitionAutomationSnapshot PendingBefore = Transition->GetAutomationSnapshot(EncounterDefinition->EncounterId);
 	const FHSREncounterResult PendingDuplicate = Transition->RequestEncounter(EncounterDefinition, EHSREncounterInitiative::Enemy);
 	const FHSRTransitionAutomationSnapshot PendingAfter = Transition->GetAutomationSnapshot(EncounterDefinition->EncounterId);
 	TestEqual(TEXT("Same-frame duplicate encounter returns AlreadyPending"), PendingDuplicate.ResultType, EHSREncounterResultType::AlreadyPending);
-	TestTrue(TEXT("Same-frame duplicate encounter has zero snapshot mutation"), PendingBefore.State == PendingAfter.State && PendingBefore.PendingRequest.RequestId == PendingAfter.PendingRequest.RequestId && PendingBefore.TravelKind == PendingAfter.TravelKind && PendingBefore.TravelRequestId == PendingAfter.TravelRequestId && PendingBefore.bResolvedMembership == PendingAfter.bResolvedMembership && PendingBefore.AdmissionMutationCount == PendingAfter.AdmissionMutationCount);
+	TestFalse(TEXT("Same-frame duplicate encounter returns no new RequestId"), PendingDuplicate.RequestId.IsValid());
+	TestFalse(TEXT("Same-frame duplicate encounter has failure message"), PendingDuplicate.Message.IsEmpty());
+	TestTrue(TEXT("Same-frame duplicate encounter preserves full snapshot and request"), SameTransitionSnapshot(PendingBefore, PendingAfter));
 	Transition->SeedResolvedEncounterForAutomation(EncounterDefinition->EncounterId);
 	const FHSRTransitionAutomationSnapshot ResolvedBefore = Transition->GetAutomationSnapshot(EncounterDefinition->EncounterId);
 	const FHSREncounterResult ResolvedReplay = Transition->RequestEncounter(EncounterDefinition, EHSREncounterInitiative::Enemy);
 	const FHSRTransitionAutomationSnapshot ResolvedAfter = Transition->GetAutomationSnapshot(EncounterDefinition->EncounterId);
 	TestEqual(TEXT("Resolved encounter replay returns AlreadyConsumed"), ResolvedReplay.ResultType, EHSREncounterResultType::AlreadyConsumed);
-	TestTrue(TEXT("Resolved encounter replay has zero snapshot mutation"), ResolvedBefore.State == ResolvedAfter.State && ResolvedBefore.PendingRequest.RequestId == ResolvedAfter.PendingRequest.RequestId && ResolvedBefore.TravelKind == ResolvedAfter.TravelKind && ResolvedBefore.TravelRequestId == ResolvedAfter.TravelRequestId && ResolvedBefore.bResolvedMembership == ResolvedAfter.bResolvedMembership && ResolvedBefore.AdmissionMutationCount == ResolvedAfter.AdmissionMutationCount);
+	TestFalse(TEXT("Resolved encounter replay returns no new RequestId"), ResolvedReplay.RequestId.IsValid());
+	TestFalse(TEXT("Resolved encounter replay has failure message"), ResolvedReplay.Message.IsEmpty());
+	TestTrue(TEXT("Resolved encounter replay preserves full snapshot and request"), SameTransitionSnapshot(ResolvedBefore, ResolvedAfter));
 	TestEqual(TEXT("Fresh controller begins at epoch zero before Possess"), Controller->GetBehaviorTreeEpoch(), 0);
 	const FVector ExpectedSpawnOrigin(137.0f, -29.0f, 11.0f);
 	const FVector CandidatePatrolLocation(291.0f, -83.0f, 11.0f);

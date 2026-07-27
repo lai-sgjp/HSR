@@ -248,6 +248,8 @@ Adapter automation seeds a pending request and calls production `RequestEncounte
 
 Validation: Development Build `PASS`; `HSR.Exploration.Patch.BehaviorTreeAdapter` `PASS`; `HSR.BattleReturn.MapContract` `PASS` (all exit `0`). User-owned assets remain untouched.
 
+Reviewer assertion strengthening: both rejection paths now assert invalid result RequestId, nonempty failure message, and complete `FHSREncounterRequest` equality (all existing request fields) within an otherwise identical transition snapshot.
+
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
 
 ### Stage-B main-path PIE evidence — USER PROVIDED
