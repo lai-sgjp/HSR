@@ -260,6 +260,21 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Move failure recovery publishes ReturningToSpawnOrigin"), Controller->GetCurrentState(), EHSREnemyExplorationState::ReturningToSpawnOrigin);
 	TestEqual(TEXT("Move failure recovery publishes SpawnOrigin patrol location"), TeardownBlackboard->GetValueAsVector(TEXT("PatrolLocation")), ExpectedSpawnOrigin);
 	TestFalse(TEXT("Move failure recovery does not arm a C++ retry loop"), Controller->IsNavReadyRetryScheduledForAutomation());
+	Controller->SetStateForAutomation(EHSREnemyExplorationState::MovingToPatrol);
+	TestTrue(TEXT("MovingToPatrol failure is handled by production decision seam"), Controller->HandleMoveFailureForAutomation(TeardownBlackboard, ExpectedSpawnOrigin));
+	TestEqual(TEXT("MovingToPatrol failure transitions through MoveFailed to Returning"), Controller->GetLastRecoveryStateForAutomation(), EHSREnemyExplorationState::MoveFailed);
+	Controller->SetStateForAutomation(EHSREnemyExplorationState::ReturningToSpawnOrigin);
+	TestTrue(TEXT("ReturningToSpawnOrigin failure is handled by production decision seam"), Controller->HandleMoveFailureForAutomation(TeardownBlackboard, ExpectedSpawnOrigin));
+	TestEqual(TEXT("Returning failure remains bounded ReturningToSpawnOrigin"), Controller->GetCurrentState(), EHSREnemyExplorationState::ReturningToSpawnOrigin);
+	for (const EHSREnemyExplorationState IgnoredState : { EHSREnemyExplorationState::Alert, EHSREnemyExplorationState::Chasing, EHSREnemyExplorationState::EncounterPending, EHSREnemyExplorationState::Idle })
+	{
+		Controller->SetStateForAutomation(IgnoredState);
+		const FVector PatrolBeforeIgnored = TeardownBlackboard->GetValueAsVector(TEXT("PatrolLocation"));
+		const int32 EpochBeforeIgnored = Controller->GetBehaviorTreeEpoch();
+		const int32 AttemptsBeforeIgnored = Controller->GetEncounterSubmissionAttemptsForAutomation();
+		TestFalse(TEXT("Non-owning state move abort is ignored"), Controller->HandleMoveFailureForAutomation(TeardownBlackboard, ExpectedSpawnOrigin));
+		TestTrue(TEXT("Ignored abort has exact relevant zero mutation"), Controller->GetCurrentState() == IgnoredState && TeardownBlackboard->GetValueAsVector(TEXT("PatrolLocation")) == PatrolBeforeIgnored && Controller->GetBehaviorTreeEpoch() == EpochBeforeIgnored && Controller->GetEncounterSubmissionAttemptsForAutomation() == AttemptsBeforeIgnored && !Controller->IsNavReadyRetryScheduledForAutomation());
+	}
 	Controller->ApplySuccessfulPerceptionForAutomation(PerceivedTarget);
 	const EHSREnemyExplorationState ChasingBeforeIntentionalAbort = Controller->GetCurrentState();
 	TestFalse(TEXT("Branch-switch abort after Alert/Chasing is ignored"), Controller->HandleMoveFailureForAutomation(TeardownBlackboard, ExpectedSpawnOrigin));

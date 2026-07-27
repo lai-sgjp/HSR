@@ -52,6 +52,7 @@ public:
 	bool IsNavReadyRetryScheduledForAutomation() const { return bNavReadyRetryScheduled; }
 	void CompleteReturnToPatrolForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin, const FVector& InCandidate, EHSRPatrolIntentResult Result);
 	bool HandleMoveFailureForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin);
+	void SetStateForAutomation(EHSREnemyExplorationState InState) { SetState(InState); }
 #endif
 
 protected:

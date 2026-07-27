@@ -262,6 +262,8 @@ User PIE showed a patrol `MoveTo` abort when perception changed the BT from patr
 
 Adapter verifies a Chasing branch-switch abort is ignored and a true patrol failure still records `MoveFailed` then publishes the bounded return intent. Development Build, `BehaviorTreeAdapter`, and `MapContract` pass (exit `0`); user assets remain untouched.
 
+Reviewer matrix expansion: the production failure decision seam now proves both movement-owning states (`MovingToPatrol`, `ReturningToSpawnOrigin`) are handled into bounded recovery, while `Alert`, `Chasing`, `EncounterPending`, and `Idle` are each independently ignored with relevant state, patrol Blackboard value, epoch, encounter attempts, and retry-arm state unchanged.
+
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
 
 ### Stage-B main-path PIE evidence — USER PROVIDED
