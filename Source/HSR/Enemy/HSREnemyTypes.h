@@ -16,3 +16,11 @@ enum class EHSREnemyExplorationState : uint8
 	LostTarget UMETA(DisplayName = "Lost Target"),
 	ReturningToSpawnOrigin UMETA(DisplayName = "Returning to Spawn Origin")
 };
+
+UENUM()
+enum class EHSRPatrolIntentResult : uint8
+{
+	Reachable,
+	ProjectPointFailed,
+	RandomReachableFailed
+};

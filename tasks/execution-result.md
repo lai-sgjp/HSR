@@ -201,3 +201,16 @@ Validation:
 
 - `HSREditor Win64 Development`: `PASS`, 5 actions, exit `0` (only engine AISystem C4996 warning).
 - `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`; controllable candidate and bounded fallback seam assertions pass.
+
+### Stage-B reviewer revision — distinguish projection and random-reachability failures
+
+The patrol intent seam now uses `EHSRPatrolIntentResult` with three explicit outcomes: `Reachable`, `ProjectPointFailed`, and `RandomReachableFailed`. Production maps the projection and random-query results to those outcomes before publishing Blackboard intent.
+
+Automation independently verifies a reachable candidate, a projection-failure fallback, and a random-reachability-failure fallback. Both failures retain the required bounded `PatrolWaiting`/SpawnOrigin fallback, while their result values remain distinct.
+
+Validation:
+
+- `HSREditor Win64 Development`: `PASS`, 8 actions, exit `0` (only engine AISystem C4996 warning).
+- `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
+
+No user-owned map, enemy DataAsset, or `Content/AI/**` asset was changed.

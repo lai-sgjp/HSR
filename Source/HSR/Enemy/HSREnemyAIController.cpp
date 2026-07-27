@@ -392,7 +392,9 @@ void AHSREnemyAIController::PublishNextPatrolIntent(const FVector& InSpawnOrigin
 		UE_LOG(LogTemp, Warning, TEXT("P17-PATCH-02 patrol intent fallback: %s Reason=%s"), *GetName(),
 			bProjected ? TEXT("RandomReachableFailed") : TEXT("ProjectPointFailed"));
 	}
-	PublishPatrolIntent(InSpawnOrigin, Candidate.Location, bHasReachableCandidate);
+	PublishPatrolIntent(InSpawnOrigin, Candidate.Location, bHasReachableCandidate
+		? EHSRPatrolIntentResult::Reachable
+		: (bProjected ? EHSRPatrolIntentResult::RandomReachableFailed : EHSRPatrolIntentResult::ProjectPointFailed));
 }
 
 void AHSREnemyAIController::ScheduleNavReadyPatrolIntent()
@@ -441,8 +443,9 @@ void AHSREnemyAIController::RunNavReadyPatrolIntent(int32 ScheduledEpoch)
 	}
 }
 
-void AHSREnemyAIController::PublishPatrolIntent(const FVector& InSpawnOrigin, const FVector& InCandidate, bool bHasReachableCandidate)
+void AHSREnemyAIController::PublishPatrolIntent(const FVector& InSpawnOrigin, const FVector& InCandidate, EHSRPatrolIntentResult Result)
 {
+	const bool bHasReachableCandidate = Result == EHSRPatrolIntentResult::Reachable;
 	const FVector PublishedLocation = bHasReachableCandidate ? InCandidate : InSpawnOrigin;
 	bHasPublishedPatrolLocation = true;
 	PublishedPatrolLocation = PublishedLocation;
@@ -491,10 +494,10 @@ bool AHSREnemyAIController::GetPatrolLocationForAutomation(FVector& OutPatrolLoc
 	return true;
 }
 
-void AHSREnemyAIController::PublishPatrolIntentForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin, const FVector& InCandidate, bool bHasReachableCandidate)
+void AHSREnemyAIController::PublishPatrolIntentForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin, const FVector& InCandidate, EHSRPatrolIntentResult Result)
 {
 	RuntimeBlackboard = InBlackboard;
-	PublishPatrolIntent(InSpawnOrigin, InCandidate, bHasReachableCandidate);
+	PublishPatrolIntent(InSpawnOrigin, InCandidate, Result);
 }
 
 bool AHSREnemyAIController::ArmNavReadyRetryForAutomation(int32 InEpoch)

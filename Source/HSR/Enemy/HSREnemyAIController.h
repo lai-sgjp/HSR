@@ -35,7 +35,7 @@ public:
 
 #if WITH_DEV_AUTOMATION_TESTS
 	bool GetPatrolLocationForAutomation(FVector& OutPatrolLocation) const;
-	void PublishPatrolIntentForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin, const FVector& InCandidate, bool bHasReachableCandidate);
+	void PublishPatrolIntentForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin, const FVector& InCandidate, EHSRPatrolIntentResult Result);
 	bool ArmNavReadyRetryForAutomation(int32 InEpoch);
 	bool ConsumeNavReadyRetryForAutomation(int32 InEpoch);
 #endif
@@ -51,7 +51,7 @@ protected:
 	void StopBehaviorTreeRuntime();
 	void WriteBlackboardRuntimeState();
 	void PublishNextPatrolIntent(const FVector& InSpawnOrigin, float PatrolRadius);
-	void PublishPatrolIntent(const FVector& InSpawnOrigin, const FVector& InCandidate, bool bHasReachableCandidate);
+	void PublishPatrolIntent(const FVector& InSpawnOrigin, const FVector& InCandidate, EHSRPatrolIntentResult Result);
 	void ScheduleNavReadyPatrolIntent();
 	void RunNavReadyPatrolIntent(int32 ScheduledEpoch);
 	void ClearBlackboardRuntimeState();
