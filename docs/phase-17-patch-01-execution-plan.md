@@ -12,6 +12,8 @@
 >
 > 进度更新：PATCH-01D 已完成 fresh `HSREditor Win64 Development` Build、`HSR.Battle` 9/9 和 `HSR.Progression` 3/3 Automation（均 exit 0），等待 Independent Reviewer 审核与 Coordinator 归档；01A/01B 的用户 PIE 证据等级和 01C 的 `PIE NOT VERIFIED` 边界不变。
 
+> 进度更新：PATCH-01D 已归档并由 Independent Reviewer 判定 `PASS WITH FOLLOW-UP`（`56380dc`）；Patch 01 方向 1～3 已关闭。Behavior Tree 改进进入独立 Patch 02，不等同于 P17-005。
+
 ## 1. 当前事实与 Gate
 
 - `UHSRStatusDefinition::Validate` 只接受三个硬编码 StatusId；`UHSRStatusComponent` 又把 `Status.Buff.AttackUp` 放入 `ActiveStatus` 特殊槽位，其余状态放入 `AdditionalStatuses`，并维护两套幂等集合。

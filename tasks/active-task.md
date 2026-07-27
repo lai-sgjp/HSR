@@ -1,45 +1,28 @@
-# TASK-P17-PATCH-01D — Patch 01 Regression and Closeout
+# TASK-P17-PATCH-02 — Behavior Tree AI Migration Planning Gate
 
 Status: `PLANNED / TASK GATE REVIEW REQUIRED`
 
 ## Single outcome
 
-对 PATCH-01A～01C 做一次不新增 Gameplay 的最终回归与证据审计，确认 ActiveStatus、RepeatableBreak、ActionDistance 及既有 Battle/Progression 边界可共同通过，并把 Patch 01 结论真实同步到计划、状态、日志和归档；PIE 未运行项必须明确保留为 `NOT VERIFIED`。
+为改进方向 4 建立独立 Behavior Tree/Blackboard 迁移契约：保留现有探索敌人感知、巡逻/追击、返回出生点、Encounter 请求幂等、已解决 Encounter 拒绝和无 Tick 所有权；本卡只冻结范围与用户 Asset Gate，不开始实现。
 
-## Frozen scope and ownership
+## Exact candidate allowlist for discovery
 
-- 本任务只允许测试、证据汇总、文档状态同步和三件套归档；禁止修改 Status、Break、TurnManager、Coordinator 或其他生产 Gameplay 逻辑。
-- 已通过的 PATCH-01A/B/C Reviewer 结论与历史 REVISE/Build 首错不得覆盖或改写。
-- Automation、Build、PIE、用户提供证据必须分级记录；Automation 不冒充 PIE。
-- 若最终回归发现生产缺陷，本任务停止并创建独立 revision task card；不得在 closeout 卡内顺手修复。
-
-## Exact allowlist
-
-- `Source/HSR/Tests/HSRCombatPatchTests.cpp`（仅当 Task Gate 证明现有测试入口无法组合运行时，才允许最小测试编排修订；禁止生产行为变化）
-- `docs/phase-17-patch-01-execution-plan.md`
-- `PROJECT_STATE.md`
-- `worklog.md`
-- `todo_plan.md`
-- `learning-journal.md`
+- `Source/HSR/Enemy/HSREnemyAIController.h`
+- `Source/HSR/Enemy/HSREnemyAIController.cpp`
+- `Source/HSR/Enemy/HSREnemyCharacter.h`
+- `Source/HSR/Enemy/HSREnemyCharacter.cpp`
+- `Source/HSR/Enemy/HSREnemyTypes.h`
+- `Source/HSR/Battle/HSREncounterTypes.h`
+- `Source/HSR/Data/Definitions/HSREnemyDefinition.h`
+- `Source/HSR/Data/Definitions/HSREnemyDefinition.cpp`
+- `Source/HSR/Tests/HSRCombatPatchTests.cpp`
 - `tasks/execution-result.md`
 
-Implementation 不得修改生产 Battle/Status/Turn 代码、Config、Content、Build.cs、Save、UI、网络、Behavior Tree 或 P17-005 文件。需要任何白名单外修订时立即停止申请最小授权。
+Implementation 不得在 Task Gate/复述阶段修改文件；正式 Behavior Tree、Blackboard、服务/任务节点、Blueprint/DataAsset 和感知资产需要用户 Asset Gate 与最小授权，不能从本卡推断授权。
 
-## Required evidence matrix
+## Frozen non-goals and stop conditions
 
-- Fresh `HSREditor Win64 Development`：记录 Target、UHT、Compile、Link、WriteMetadata、exit code 与首个真实错误/警告。
-- 运行 `Automation RunTests HSR.Battle`，至少确认 ActionDistance 六组、RepeatableBreak、StatusGeneric、BattleReturn MapContract 全部 Success。
-- 运行可用的 `HSR.Progression` 定向 Automation；不存在或环境不可用时记录准确命令与 `NOT RUN`，不得写成通过。
-- 审计 PATCH-01A 用户 P9-001/002/003 证据、PATCH-01B 用户 P9-003 19-case PIE 与 PATCH-01C `PIE NOT RUN` 边界，保持来源等级。
-- `git diff --check`；审计 PATCH-01A～C commit/provenance、三件套归档、allowlist 和用户本地 `learn/SaveSystem.md`、`.claude/**` 隔离。
-- 输出 Patch 01 总结：方向 1～3 是否全部关闭、保留 follow-up、为何 Behavior Tree 属于独立 Patch 02、为何 P17-005 尚未开始。
-
-## Acceptance
-
-- 所有实际运行的 Build/Automation 通过且日志可复核；任何失败保留首错并返回 `REVISE/BLOCKED`，不能用旧成功替代。
-- 文档只陈述真实证据；PATCH-01A～C 三件套已归档，01D 完成后再由 Coordinator 归档本卡。
-- Independent Reviewer 确认范围、证据等级、用户文件隔离与 Patch 01 完成结论为 `PASS` 或 `PASS WITH FOLLOW-UP`。
-
-## Non-goals and stop conditions
-
-不实现 Behavior Tree Patch 02、P17-005、正式 Action Bar、资产、Config、网络、Save 或任何生产 Gameplay。发现回归失败、缺少必要测试入口、需修改生产代码或需用户 Editor 操作时停止并报告精确边界；未经授权不得扩权。
+- 不修改 Battle/Turn/Status/Save/Network/UI、P17-005 或商业游戏公式；不引入 Tick 轮询。
+- 若迁移需要新增生产 C++ 文件、Content/Blueprint/DataAsset、Build.cs 或改变 Encounter 契约，必须停止并申请最小扩权。
+- Task Gate 需先审查现有 Controller 状态机和资产缺口；PASS 后只允许 Implementation 只读复述，实际实现仍需用户单独确认 `TASK-P17-PATCH-02`。

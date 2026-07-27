@@ -8,6 +8,14 @@
 - PIE was not run and is not claimed. The task used controlled runtime Automation because no authorized production Speed/Advance/Delay asset entry exists.
 - The three task files are archived as `TASK-P17-PATCH-01C-*`; user-local `learn/SaveSystem.md` and `.claude/**` remain outside all role commits.
 
+## 2026-07-27｜TASK-P17-PATCH-01D regression closeout
+
+- Implementation `e8b59de`; Independent Reviewer `PASS WITH FOLLOW-UP`, committed as `56380dc` after Coordinator-assisted review-file commit due `.git/index.lock` permission.
+- Fresh authorized `HSREditor Win64 Development -Rebuild` passed: 17 actions, HSR compile/link/WriteMetadata, exit 0. First sandbox UnauthorizedAccessException is retained as historical first failure.
+- `HSR.Battle` 9/9 and `HSR.Progression` 3/3 Success, exit 0; `git diff --check` passed. The independent PowerShell wrapper status-1 caveat is retained without overriding the authoritative UE log exit 0.
+- 01A/01B PIE remains `USER PROVIDED`; 01C PIE remains `NOT VERIFIED`. Patch 01 directions 1–3 are closed; Behavior Tree remains independent Patch 02 and P17-005 has not started.
+- 01D three files are archived; user-local files remain uncommitted and isolated.
+
 ## 2026-07-24｜P10-005 closeout archived
 
 - P10-004 latest USER PROVIDED log closes the base-PlayerController integration across three result/return rounds; Reviewer conclusion is `PASS WITH FOLLOW-UP`.

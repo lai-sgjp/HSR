@@ -8,6 +8,11 @@
 - GAS Attribute delegate 的安全性不仅是解绑数量：Reset、reinitialize、Finish 后要真实广播旧 ASC，并比较完整 fresh/Finished 快照，才能证明 stale callback 零副作用。
 - Automation 的测试名和总 PASS 不能替代矩阵证据；每个冻结契约都应有真实触发路径、精确数值和生命周期计数。
 
+## 2026-07-27｜Patch closeout 的证据分级
+
+- Fresh Build、Automation、PIE 和用户 Editor 观察是不同证据等级；回归 closeout 必须保留首个环境失败，并明确后续授权重试的真实结果。
+- Automation 的组合入口可以证明 runtime contracts，但不能升级既有用户 PIE 或未运行 PIE 为自动化通过。
+
 ## 2026-07-24｜Phase 10 closeout learning boundary
 
 - A static review, a Development harness, User-provided PIE, and `USER ACCEPTED` are distinct evidence labels. User acceptance can close a planning gate without becoming a fabricated dynamic test or Independent Reviewer PASS.
