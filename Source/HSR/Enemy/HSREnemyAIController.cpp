@@ -267,6 +267,11 @@ void AHSREnemyAIController::PublishSpawnOriginRecoveryIntent(const FVector& InSp
 		RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::PatrolLocation, InSpawnOrigin);
 	}
 	SetState(EHSREnemyExplorationState::ReturningToSpawnOrigin);
+	if (RuntimeBlackboard)
+	{
+		RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::SpawnOrigin, InSpawnOrigin);
+		RuntimeBlackboard->SetValueAsVector(HSREnemyBlackboardKeys::PatrolLocation, InSpawnOrigin);
+	}
 	// Stage B's stock Move To consumes PatrolLocation=SpawnOrigin.
 }
 

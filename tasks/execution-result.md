@@ -266,6 +266,8 @@ Reviewer matrix expansion: the production failure decision seam now proves both 
 
 Reviewer snapshot strengthening: each ignored-state abort now compares a full test-local controller snapshot before/after: controller state and target identity, all six Blackboard runtime keys, active request id, epoch, retry state, encounter attempts, and recovery marker. Build, Adapter, and MapContract pass.
 
+Recovery Blackboard revision: bounded handled recovery now explicitly writes both `SpawnOrigin` and `PatrolLocation` after state publication; Adapter verifies both equal the expected origin with Returning state and cleared target. Build, Adapter, and MapContract pass.
+
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
 
 ### Stage-B main-path PIE evidence — USER PROVIDED
