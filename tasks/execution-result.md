@@ -284,6 +284,8 @@ Reviewer test-realism revision: Adapter now invokes the same production percepti
 
 Apply zero-mutation evidence: actual Character no-Definition apply reads the default `EncounterCollision` radius `200` and preserves Tick, SpawnOrigin, and ActorLocation. Controller apply preserves state, epoch, target, active request, retry, attempts, and Tick while changing only perception configuration.
 
+Final test matrix strengthening: shared Controller snapshot now covers fallback, normalized, and negative applies including explicit unbound Blackboard runtime state; shared Character runtime snapshot covers fallback, `333`, and negative encounter-radius applies. Build and Adapter pass.
+
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
 
 ### Stage-B main-path PIE evidence — USER PROVIDED
