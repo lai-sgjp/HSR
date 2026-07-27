@@ -45,7 +45,7 @@ public:
 	void StopBehaviorTreeRuntimeForAutomation();
 	void ClearStateForAutomation();
 	bool HasRuntimeBlackboardForAutomation() const { return RuntimeBlackboard != nullptr; }
-	bool AreBlackboardRuntimeKeysClearForAutomation(const UBlackboardComponent* InBlackboard) const;
+	void SetActiveEncounterRequestForAutomation(const FGuid& InRequestId);
 #endif
 
 protected:
@@ -83,7 +83,6 @@ protected:
 
 #if WITH_DEV_AUTOMATION_TESTS
 	int32 EncounterSubmissionAttemptsForAutomation = 0;
-	uint8 BlackboardRuntimeKeyWriteMaskForAutomation = 0;
 #endif
 
 	UPROPERTY()

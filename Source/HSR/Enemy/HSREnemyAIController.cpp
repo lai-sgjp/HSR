@@ -372,9 +372,6 @@ void AHSREnemyAIController::WriteBlackboardRuntimeState()
 	RuntimeBlackboard->SetValueAsInt(HSREnemyBlackboardKeys::TreeEpoch, BehaviorTreeEpoch);
 	RuntimeBlackboard->SetValueAsName(HSREnemyBlackboardKeys::EncounterRequestId, ActiveEncounterRequestId.IsValid() ? FName(*ActiveEncounterRequestId.ToString()) : NAME_None);
 	SetBlackboardTarget(CurrentTarget.Get());
-#if WITH_DEV_AUTOMATION_TESTS
-	BlackboardRuntimeKeyWriteMaskForAutomation = 0x3f;
-#endif
 }
 
 void AHSREnemyAIController::PublishNextPatrolIntent(const FVector& InSpawnOrigin, float PatrolRadius)
@@ -478,9 +475,6 @@ void AHSREnemyAIController::ClearBlackboardRuntimeState()
 	RuntimeBlackboard->ClearValue(HSREnemyBlackboardKeys::TreeEpoch);
 	RuntimeBlackboard->ClearValue(HSREnemyBlackboardKeys::AIState);
 	RuntimeBlackboard->ClearValue(HSREnemyBlackboardKeys::SpawnOrigin);
-#if WITH_DEV_AUTOMATION_TESTS
-	BlackboardRuntimeKeyWriteMaskForAutomation = 0;
-#endif
 }
 
 void AHSREnemyAIController::SetBlackboardTarget(AActor* Target)
@@ -553,8 +547,8 @@ void AHSREnemyAIController::ClearStateForAutomation()
 	ClearState();
 }
 
-bool AHSREnemyAIController::AreBlackboardRuntimeKeysClearForAutomation(const UBlackboardComponent* InBlackboard) const
+void AHSREnemyAIController::SetActiveEncounterRequestForAutomation(const FGuid& InRequestId)
 {
-	return InBlackboard && BlackboardRuntimeKeyWriteMaskForAutomation == 0;
+	ActiveEncounterRequestId = InRequestId;
 }
 #endif

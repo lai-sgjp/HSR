@@ -268,3 +268,17 @@ Validation:
 - `HSR.BattleReturn.MapContract`: `PASS`, exit `0`.
 
 This revision does not claim new live-PIE coverage for same-frame duplicate overlap response payload/reason preservation, post-resolved rejection, stock MoveTo return completion, move failure/abort, or target destruction. Those require a fully wired encounter/BT PIE fixture and remain explicitly unobserved here. No Encounter DTO or user-owned map, DataAsset, or `Content/AI/**` asset changed.
+
+### Stage-B reviewer revision — real Blackboard six-key teardown assertions
+
+The teardown automation no longer uses a synthetic write-mask as a pass oracle. It creates an AI World-backed, initialized Blackboard and directly reads every runtime key. Before teardown it seeds and verifies: a `TargetActor` object, `SpawnOrigin` vector, `PatrolLocation` vector, nondefault `AIState`, nonzero `TreeEpoch`, and nonempty `EncounterRequestId`.
+
+Each key is then directly asserted at its Blackboard default/empty value after Stop, Stop then ClearState, repeated Stop, fresh runtime rebind followed by a stale retry callback, and the EndPlay-equivalent Stop then ClearState ordering. Blackboard Vector clear semantics are correctly checked against `FAISystem::InvalidLocation` rather than a zero vector.
+
+Validation:
+
+- `HSREditor Win64 Development`: `PASS`, 4 actions, exit `0` (only engine AISystem C4996 warning).
+- `HSR.Exploration.Patch.BehaviorTreeAdapter`: `PASS`, exit `0`.
+- `HSR.BattleReturn.MapContract`: `PASS`, exit `0`.
+
+No production behavior, Encounter DTO, or user-owned map, DataAsset, or `Content/AI/**` asset changed in this revision.

@@ -16,6 +16,7 @@
 #include "BehaviorTree/Blackboard/BlackboardKeyType_Name.h"
 #include "BehaviorTree/Blackboard/BlackboardKeyType_Int.h"
 #include "BehaviorTree/Blackboard/BlackboardKeyType_Enum.h"
+#include "AISystem.h"
 #include "../Battle/HSRBattleCoordinator.h"
 #include "../Battle/HSRBattleGameMode.h"
 #include "../Battle/HSRBattleParticipant.h"
@@ -176,29 +177,45 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
+	const auto AreSixRuntimeKeysClear = [TeardownBlackboard]()
+	{
+		return TeardownBlackboard->GetValueAsObject(TEXT("TargetActor")) == nullptr
+			&& TeardownBlackboard->GetValueAsVector(TEXT("SpawnOrigin")).Equals(FAISystem::InvalidLocation)
+			&& TeardownBlackboard->GetValueAsVector(TEXT("PatrolLocation")).Equals(FAISystem::InvalidLocation)
+			&& TeardownBlackboard->GetValueAsEnum(TEXT("AIState")) == 0
+			&& TeardownBlackboard->GetValueAsInt(TEXT("TreeEpoch")) == 0
+			&& TeardownBlackboard->GetValueAsName(TEXT("EncounterRequestId")).IsNone();
+	};
 	Controller->BindRuntimeBlackboardForAutomation(TeardownBlackboard);
 	const int32 OldRuntimeEpoch = Controller->GetBehaviorTreeEpoch();
+	const FGuid SeedRequestId(1, 2, 3, 4);
+	Controller->SetActiveEncounterRequestForAutomation(SeedRequestId);
 	Controller->PublishPatrolIntentForAutomation(TeardownBlackboard, ExpectedSpawnOrigin, CandidatePatrolLocation, EHSRPatrolIntentResult::Reachable);
-	TestFalse(TEXT("Runtime fixture has writes before Stop"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
+	TestEqual(TEXT("Runtime fixture seeds TargetActor"), TeardownBlackboard->GetValueAsObject(TEXT("TargetActor")), static_cast<UObject*>(PerceivedTarget));
+	TestEqual(TEXT("Runtime fixture seeds SpawnOrigin"), TeardownBlackboard->GetValueAsVector(TEXT("SpawnOrigin")), ExpectedSpawnOrigin);
+	TestEqual(TEXT("Runtime fixture seeds PatrolLocation"), TeardownBlackboard->GetValueAsVector(TEXT("PatrolLocation")), CandidatePatrolLocation);
+	TestNotEqual(TEXT("Runtime fixture seeds nondefault AIState"), TeardownBlackboard->GetValueAsEnum(TEXT("AIState")), static_cast<uint8>(0));
+	TestNotEqual(TEXT("Runtime fixture seeds nonzero TreeEpoch"), TeardownBlackboard->GetValueAsInt(TEXT("TreeEpoch")), 0);
+	TestEqual(TEXT("Runtime fixture seeds EncounterRequestId"), TeardownBlackboard->GetValueAsName(TEXT("EncounterRequestId")), FName(*SeedRequestId.ToString()));
 	Controller->StopBehaviorTreeRuntimeForAutomation();
 	const int32 StoppedEpoch = Controller->GetBehaviorTreeEpoch();
-	TestTrue(TEXT("Stop clears all six runtime Blackboard keys"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
+	TestTrue(TEXT("Stop clears each of six runtime Blackboard keys"), AreSixRuntimeKeysClear());
 	TestFalse(TEXT("Stop detaches RuntimeBlackboard before caller cleanup"), Controller->HasRuntimeBlackboardForAutomation());
 	TestEqual(TEXT("Stop invalidates the active runtime epoch once"), StoppedEpoch, OldRuntimeEpoch + 1);
 	Controller->ClearStateForAutomation();
-	TestTrue(TEXT("Stop then ClearState cannot repopulate cleared Blackboard keys"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
+	TestTrue(TEXT("Stop then ClearState keeps every Blackboard key clear"), AreSixRuntimeKeysClear());
 	Controller->StopBehaviorTreeRuntimeForAutomation();
 	TestEqual(TEXT("Repeated Stop is epoch-idempotent after teardown"), Controller->GetBehaviorTreeEpoch(), StoppedEpoch);
-	TestTrue(TEXT("Repeated Stop preserves six cleared Blackboard keys"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
+	TestTrue(TEXT("Repeated Stop preserves every cleared Blackboard key"), AreSixRuntimeKeysClear());
 	Controller->BindRuntimeBlackboardForAutomation(TeardownBlackboard);
 	const int32 RepossessEpoch = Controller->GetBehaviorTreeEpoch();
 	TestTrue(TEXT("Fresh runtime bind receives a new epoch"), RepossessEpoch > StoppedEpoch);
-	TestTrue(TEXT("Fresh runtime Blackboard begins clear"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
+	TestTrue(TEXT("Fresh runtime Blackboard begins with each key clear"), AreSixRuntimeKeysClear());
 	TestFalse(TEXT("Old retry callback cannot consume after Stop and rebind"), Controller->ConsumeNavReadyRetryForAutomation(OldRuntimeEpoch));
-	TestTrue(TEXT("Old retry callback leaves fresh runtime Blackboard clear"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
+	TestTrue(TEXT("Old retry callback leaves every fresh runtime Blackboard key clear"), AreSixRuntimeKeysClear());
 	Controller->StopBehaviorTreeRuntimeForAutomation();
 	Controller->ClearStateForAutomation();
-	TestTrue(TEXT("EndPlay ordering Stop then ClearState remains idempotently clear"), Controller->AreBlackboardRuntimeKeysClearForAutomation(TeardownBlackboard));
+	TestTrue(TEXT("EndPlay ordering Stop then ClearState leaves every Blackboard key clear"), AreSixRuntimeKeysClear());
 	AHSREnemyCharacter* OriginEnemy = OriginWorld ? OriginWorld->SpawnActor<AHSREnemyCharacter>() : nullptr;
 	if (!TestNotNull(TEXT("Origin fallback fixture spawns Enemy"), OriginEnemy))
 	{
