@@ -252,3 +252,56 @@ Then tighten Automation to compare cached Resolution fields and exact deltas, ad
 ## Verdict
 
 `BLOCKED` — Automation infrastructure and current runtime coverage are materially improved, but the production same-frame lethal workaround publishes an artificial revival state and the exact matrix remains incomplete. Fixing it requires the four-file consumer allowlist expansion above; Coordinator must request that narrow user authorization. Do not request the user PIE gate until the revision passes independent review.
+
+---
+
+# TASK-P17-PATCH-01B Deferred-Defeat Final Re-review
+
+Status: `PASS WITH FOLLOW-UP`
+
+Role: `Independent Reviewer`
+Date: `2026-07-27`
+Evidence level: `STATIC CODE REVIEW + INDEPENDENT AUTOMATION RERUN; USER PIE PENDING`
+Reviewed fix: Implementation `e5756c9` atop `2412d9b`
+
+## Implementation findings
+
+- `PASS` — Both temporary Health writes are removed. Same-frame lethal snapshots now retain committed Health zero throughout Break Status/Delay publication and deferred `ResolveDefeat`.
+- `PASS` — `bAllowPendingDeferredDefeat` is a non-reflected, non-persisted C++ parameter with default `false` on Status and Turn consumers. ReplaceStatus explicitly uses `false`; all ordinary call sites retain dead-target rejection.
+- `PASS` — Coordinator captures target Health at command admission and passes `true` only on the same synchronous `RequestActionCore` stack when that target was alive and `PendingDefeatedParticipantId` matches it. The value is local, is not cached or stored, and cannot leak to a later request.
+- `PASS` — Break/Status/Delay still occur before `Finalize` and deferred `ResolveDefeat`. No Status refresh algorithm, Turn sorting, pending skip-once storage/consumption, action-value behavior, Tick, reflection, GC ownership, network, Config or Content behavior changed.
+- `PASS` — Ordinary pre-dead and Finished paths remain default-deny. The runtime test independently observes pre-dead rejection with zero Status/Delay/turn delta.
+
+## Runtime matrix findings
+
+- `PASS` — Cached replay compares every reflected `FHSRAbilityResolution` field and asserts zero Status, Delay and turn deltas.
+- `PASS` — First and second independent edges assert exact Status success, accepted Delay and `+1` turn deltas; recovery itself remains zero-delta.
+- `PASS` — Initial/continued zero, non-zero and weakness-failure paths produce zero Break side effects.
+- `PASS` — Reset creates a new BattleId; stale old-BattleId command is zero-delta; reused old ActionId in the new epoch triggers a new edge with Status `+1`, accepted Delay `+1`, exact Toughness zero and turn `+1`.
+- `PASS` — Same-frame lethal asserts Break plus Status/Delay `+1`, Defeat `+1`, Finished state, and exact zero normal turn-advance delta; the subsequent Finished request is rejected with zero side effects.
+
+## Validation and provenance
+
+- `PASS` — Candidate and fix commits contain only authorized production/test/report files. Current unrelated `learn/SaveSystem.md` and `.claude/**` changes remain outside role commits.
+- `PASS` — `git diff --check 2412d9b..e5756c9` succeeds.
+- `PASS` — Execution history preserves the first API-revision compile failure (ordinary ReplaceStatus validator arity) and its narrow correction, rather than overwriting it with the successful rebuild.
+- `PASS (reported)` — Development Editor rebuild succeeded; only the previously known external `AISystem.h` C4996 warning remains.
+- `PASS (independently rerun)` — On 2026-07-27 at 11:49 local log time, `Automation RunTests HSR.Battle.Patch` discovered two tests; `RepeatableBreak` and `StatusGeneric` both completed with `Result={Success}`, and the unique standalone World logged `CleanupWorld`. The independent command exited `0`.
+
+## Required user PIE follow-up
+
+Enable only the existing `BP_HSRBattleGameMode` Class Defaults switch `Development | P9 | Run P9 Dot Break Harness` (`bRunP9DotBreakHarness`), Save All, and enter Battle PIE through the normal encounter path.
+
+Required evidence:
+
+- `P9-003 DotBreak Case=RepeatableBreak_FirstReplayRecoverySecond_ExactCounts Result=PASS`
+- `P9-003 RepeatableBreak FirstActionId=<A> SecondActionId=<B> Status=0->1->2 Delay=0->1->2`, with valid distinct `<A>` and `<B>`
+- two corresponding triggered Break records (`Triggered=1`), successful Break Status results, and accepted Delay registrations
+- `P9-003 DotBreak Harness=COMPLETE`
+- zero related `Result=FAIL`, `Harness=INCOMPLETE`, or `Harness=SKIPPED`
+
+After capture, restore `Run P9 Dot Break Harness` to `false` and Save All. Provide the complete log, not only screenshots or selected lines.
+
+## Verdict
+
+`PASS WITH FOLLOW-UP` — Code, scope, build claim and deterministic runtime Automation satisfy the implementation gate. The task is not yet archival-complete because its required production DataAsset/GE PIE gate remains user-owned and pending. Route to the user PIE gate now; return the full log to an independent Reviewer before Coordinator archival.
