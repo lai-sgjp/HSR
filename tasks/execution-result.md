@@ -286,6 +286,8 @@ Apply zero-mutation evidence: actual Character no-Definition apply reads the def
 
 Final test matrix strengthening: shared Controller snapshot now covers fallback, normalized, and negative applies including explicit unbound Blackboard runtime state; shared Character runtime snapshot covers fallback, `333`, and negative encounter-radius applies. Build and Adapter pass.
 
+Reviewer Tick addition: shared Controller apply snapshot now also includes `PrimaryActorTick.bCanEverTick` across all three apply cases. Build and Adapter pass.
+
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
 
 ### Stage-B main-path PIE evidence — USER PROVIDED

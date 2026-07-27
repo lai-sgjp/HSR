@@ -118,7 +118,7 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	Definition->SightRadius = 1200.0f;
 	Definition->LoseSightRadius = 1000.0f;
 	AHSREnemyAIController* RadiusController = NewObject<AHSREnemyAIController>();
-	const auto ControllerApplySnapshot = [RadiusController]() { return TTuple<EHSREnemyExplorationState, int32, AActor*, FGuid, bool, int32, bool>(RadiusController->GetCurrentState(), RadiusController->GetBehaviorTreeEpoch(), RadiusController->GetCurrentTargetForAutomation(), RadiusController->GetActiveEncounterRequestIdForAutomation(), RadiusController->IsNavReadyRetryScheduledForAutomation(), RadiusController->GetEncounterSubmissionAttemptsForAutomation(), RadiusController->HasRuntimeBlackboardForAutomation()); };
+	const auto ControllerApplySnapshot = [RadiusController]() { return TTuple<EHSREnemyExplorationState, int32, AActor*, FGuid, bool, int32, bool, bool>(RadiusController->GetCurrentState(), RadiusController->GetBehaviorTreeEpoch(), RadiusController->GetCurrentTargetForAutomation(), RadiusController->GetActiveEncounterRequestIdForAutomation(), RadiusController->IsNavReadyRetryScheduledForAutomation(), RadiusController->GetEncounterSubmissionAttemptsForAutomation(), RadiusController->HasRuntimeBlackboardForAutomation(), !!RadiusController->PrimaryActorTick.bCanEverTick); };
 	const auto ControllerBeforeApply = ControllerApplySnapshot();
 	RadiusController->ApplyDefinitionPerceptionConfigForAutomation(nullptr);
 	TestTrue(TEXT("No-Definition perception fallback preserves prior defaults"), FMath::IsNearlyEqual(RadiusController->GetSightRadiusForAutomation(), 1000.0f) && FMath::IsNearlyEqual(RadiusController->GetLoseSightRadiusForAutomation(), 1500.0f));
