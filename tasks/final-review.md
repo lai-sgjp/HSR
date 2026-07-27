@@ -1,4 +1,4 @@
-# TASK-P17-PATCH-01C Final Review
+# TASK-P17-PATCH-01C Final Re-review
 
 ## 审查对象
 
@@ -6,43 +6,37 @@
 - 任务名称：Complete Action-Distance Turn Model
 - 审查角色：Independent Prompt Reviewer + Safety Reviewer
 - 审查日期：2026-07-27
+- 本轮修订提交：`5af130e`
 
-## 审查输入与独立证据
+## 独立证据
 
-- 已阅读 `.agents/agents.md` 的 Automatic Role Handoff 规则、`tasks/active-task.md`、`tasks/review-template.md`、`tasks/execution-result.md` 及 commit `ee6e70b` 的完整 diff 和相关 Coordinator/Status/Turn 调用链。
-- `git show --stat ee6e70b` 显示仅修改 `HSRBattleParticipant.h`、`HSRTurnManager.h/.cpp`、`HSRBreakTypes.h`、`HSRCombatPatchTests.cpp`、`tasks/execution-result.md`；均处于 allowlist，未触及既存用户改动 `learn/SaveSystem.md` 或 `.claude/**`。
-- 独立执行 `git diff --check ee6e70b^ ee6e70b`，通过。
-- `Saved/Logs/HSR.log` 记录 2026-07-27 的受控运行：`Automation RunTests HSR.Battle.Patch` 发现并运行 3 项测试，`ActionDistance`、`RepeatableBreak`、`StatusGeneric` 均为 Success，最终 exit code 0。该日志证明自动化实际运行过，但不能弥补下列缺失断言。
-- Implementation 报告声称 Development Editor Build 成功；本审查未重新运行 Build。PIE 未运行，且本任务不需要新的用户可见入口。
+- 已按 Automatic Role Handoff 重读 `tasks/active-task.md`、`tasks/execution-result.md`、上轮审查 `50cceae`，并审查 `5af130e` 完整 diff、TurnManager 与 Coordinator 调用链。
+- `git show --stat 5af130e` 仅涉及 `HSRBattleCoordinator.cpp`、`HSRTurnManager.h/.cpp`、`HSRBreakTypes.h`、`HSRCombatPatchTests.cpp`、`tasks/execution-result.md`，均在 allowlist 内；`git diff --check 5af130e^ 5af130e` 通过。
+- `Saved/Logs/HSR.log` 的 2026-07-27 12:39 受控运行实际发现并执行 `HSR.Battle.Patch.ActionDistance`、`RepeatableBreak`、`StatusGeneric`，三项均 Success，最终 exit code 0。Implementation 报告称 Development Editor Build 成功；本审查未重新执行 Build。PIE 未运行。
+- `learn/SaveSystem.md` 与 `.claude/settings.json`、`.claude/settings.local.json`、`.claude/statusline-command.sh` 仍是未提交本地文件；未被本轮审查修改或暂存。
 
-## 范围与实现审查
+## 上轮阻断复核
 
-- 单一目标、allowlist 和无 Tick 的边界符合任务卡；旧 Break skip-once 容器已从 TurnManager 删除，Break 入口目前转发至统一 Delay 请求。
-- 公式、ParticipantId tie-break、当前行动锁、delegate 的 weak ASC/epoch 基本骨架及 Initialize 绑定失败回滚 seam 均已出现于实现中。
-- 但冻结契约要求的请求验证、结构化结果、deferred-defeat 权限收口、运行时可观测性以及完整 Automation 矩阵尚未满足，不能归档。
+- 未知 Kind：已在消费 OperationId 前显式限制为 Advance/Delay；新增测试实际验证 InvalidRequest 后使用同一 ID 的合法请求可被接受。该项关闭。
+- old/new 快照：accepted 请求现在先捕获 before snapshot，并新增 old/new pending count。Base 在此类请求中不变、Remaining 的 before/after 实现已能产生不同值；但当前测试只检查 pending count，尚未给出 Remaining 的数值断言。
+- deferred-defeat：普通 `RequestActionDistanceAdjustment` 与 `ConsumeBreakDelay` 已去除公开 bypass。Coordinator 通过友元私有 `ConsumeAdmittedBreakDelay` 走 admitted-alive 窄路径，公开权限绕过项关闭。
 
 ## 问题清单
 
 | 严重度 | 文件/符号 | 问题 | 必须采取的动作 |
 |---|---|---|---|
-| Blocking | `Source/HSR/Battle/HSRTurnManager.cpp` — `RequestActionDistanceAdjustment` | 未验证 `Request.Kind`。经 `static_cast<EHSRActionDistanceAdjustmentKind>` 传入未知枚举值会走 Delay 分支、消费 OperationId 并修改状态，而任务卡要求非法 Kind 返回 `InvalidRequest` 且不消费 ID。 | 在任何 `ConsumedOperationIds.Add` 前显式只接受 Advance/Delay；添加非法 Kind 首次请求及同 ID 重放的零变更断言。 |
-| Blocking | `Source/HSR/Battle/HSRTurnManager.cpp` — `MakeAdjustmentResult` | 结果对象在 mutation 后才读取 Participant，并把 `OldBase == NewBase`、`OldRemaining == NewRemaining`；accepted Advance/Delay 无法报告冻结契约要求的真实 old/new 快照。`NextParticipantId` 也始终复制 current，无法成为有意义的结构化快照。 | 在验证后、写入前捕获 old snapshot，在成功写入后捕获 new snapshot；明确 pending 的前后计数与 current/next 语义，并用测试验证实际差异与 duplicate/reject 零变化。 |
-| Blocking | `Source/HSR/Battle/HSRTurnManager.h/.cpp` — public `bAllowPendingDeferredDefeat` 参数 | 通用公开入口和 `ConsumeBreakDelay` 均可由任意调用方传 `true` 绕过死亡目标拒绝，未实现“仅 Coordinator 当前同步事务可保留 admitted-alive 资格”的边界。 | 将该资格收口为 Coordinator 的窄转发路径（不得进入 DTO 或普通请求）；普通调用者即使传入等价输入也必须拒绝死亡目标，并补 same-frame lethal/已死亡/重放回归。 |
-| Blocking | `Source/HSR/Tests/HSRCombatPatchTests.cpp` — `FHSRActionDistancePatchTest` | 新测试仅覆盖 current Delay、一次 duplicate、Resolve 和旧 epoch，未覆盖 Required matrix：A/B/C 行动频率、Speed Up/Slow 比例换算、当前 Advance/Delay 的有序 pending 与 Speed 变化、ratio 0/边界/NaN/Inf、epsilon tie、唯一/无合法参与者、Reset/旧 callback、部分绑定失败回滚、delegate count，以及 Break `+1.0 Base` 的数值证据。现有 RepeatableBreak 只验证“Delay accepted”，未验证距离增量。 | 以受控 runtime Automation 扩充矩阵；必要时只添加任务卡允许的 `WITH_DEV_AUTOMATION_TESTS` 纯值 seam（距离/pending/delegate count/nth bind failure）。每类断言 Base、Remaining、pending、current/next、epoch、sequence、lifecycle 次数与旧 callback 零副作用。 |
-| Risk | `Source/HSR/Battle/HSRTurnManager.cpp` — `HandleSpeedChanged`、调整入口 | 非有限 Speed callback 直接静默返回，调整请求也没有记录 OperationId、old/new Base/Remaining、current/next、sequence 和接受/拒绝结果；不满足任务卡的结构化记录与运行时证据要求。 | 对非法 Speed 及每次调整生成可审计的结构化日志/测试记录，不得改变 state 或 lifecycle；将其纳入 Automation 断言。 |
+| Blocking | `Source/HSR/Tests/HSRCombatPatchTests.cpp` — `FHSRActionDistancePatchTest` | Required matrix 仍未实现。当前测试只有 current Delay、duplicate、非法 Kind、Resolve 与旧 epoch；没有 A/B/C 初始距离与高速多行动、非当前 Speed Up/Slow 的比例换算、当前 Speed 在 TurnEnded 同步回调后 recharge、Advance/Delay 0/0.25/1 和有序组合、epsilon tie、NaN/Inf/未知/死亡/Finished、唯一/无候选、Reset/旧 callback、nth-bind rollback/delegate count，或 Break `+1.0 Base` 的距离数值证据。 | 在现有 allowlist 内补齐受控 runtime Automation。每类必须断言 Base、Remaining、pending、current/next、epoch、sequence、lifecycle 次数与 delegate/旧 callback 零副作用；不得仅以“测试通过”替代数值断言。 |
+| Blocking | `Source/HSR/Battle/HSRTurnManager.cpp` — `ConsumeAdmittedBreakDelay` | admitted-alive 分支复制了 Delay 写入逻辑，未复用通用请求的 current pending 最大 recharge 预演及结构化结果路径。若当前目标存在接近有限上限的已有 pending，该路径可以接受一项随后在 Resolve 时才发生的算术失败，违背已接受 pending 不得延迟失败的原子保证；也削弱 Break 映射为同一通用 Delay 请求的契约。 | 将 private admitted-alive 资格作为同一私有通用事务的狭窄授权，仅放宽目标资格，保留相同的 Ratio=1、预演、old/new 结果、dedupe 与零变更规则；补 same-frame lethal、already-dead、replay 及 current-target admission 覆盖。 |
+| Risk | `Source/HSR/Battle/HSRTurnManager.cpp` — `HandleSpeedChanged`、调整入口 | 非有限 Speed callback 仍静默返回，调整入口也未生成任务卡所要求的 OperationId、old/new Base/Remaining、current/next、sequence、接受/拒绝结构化记录。现有 Automation 日志只证明测试成功，不能提供这些运行时审计数据。 | 为每次调整和非法 Speed 拒绝写入可审计的结构化记录或等价受控测试记录；确保没有 state/lifecycle 副作用，并将其列入自动化断言。 |
+| Risk | `Source/HSR/Tests/HSRCombatPatchTests.cpp` | 旧 Epoch 只断言一次 `InvalidEpoch`，没有按照任务卡验证“被拒绝后用同一 OperationId 重放”必须得到 `DuplicateOperation` 和零变更；其它拒绝类型同样没有重复语义证据。 | 为旧 Epoch、未知/死亡目标和 Finished 至少补充同 ID replay、状态快照与 lifecycle 零变化断言。 |
 
 ## 审查结论
 
 `REVISE`
 
-实现的基础方向正确，且现有三项 Automation 有真实 PASS 日志；但存在一个可触发的非法枚举状态写入、错误的 old/new 结果快照、deferred-defeat 权限未收口，以及绝大多数强制测试矩阵缺失。修复必须限定在现有 allowlist 内，不得改动 `learn/SaveSystem.md` 或 `.claude/**`。修订后需要重新执行 Development Editor Build、`Automation RunTests HSR.Battle.Patch`、`git diff --check`，再进行独立复审。
+本轮已关闭上轮三项直接代码缺陷，且 Automation 有真实复跑 PASS 证据；但任务卡把 Required matrix 明确列为验收要求，当前覆盖仍不足，且 admitted-alive 的复制分支未保持通用事务的算术原子性。因此活动卡仍不可归档。修订必须继续限制在当前 allowlist，且不得改动或提交任何用户本地文件。完成后重新运行 Development Editor Build、`Automation RunTests HSR.Battle.Patch` 与 `git diff --check`，再触发独立复审。
 
-## Git 交付审查
+## Git 交付
 
-- 本次审查提交仅包含本文件。
-- 未暂存或提交任何既存用户/本地改动。
-
-## 归档与下一步
-
-- 活动卡不可归档。
-- 唯一下一步：由原 Implementation Agent 在同一 allowlist 内按上述最小修订修复并重新提交证据；随后重新触发独立 Review。
+- 本审查提交仅包含 `tasks/final-review.md`。
+- 未暂存或提交 `learn/SaveSystem.md` 或 `.claude/**`。
