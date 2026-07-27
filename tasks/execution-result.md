@@ -268,6 +268,8 @@ Reviewer snapshot strengthening: each ignored-state abort now compares a full te
 
 Recovery Blackboard revision: bounded handled recovery now explicitly writes both `SpawnOrigin` and `PatrolLocation` after state publication; Adapter verifies both equal the expected origin with Returning state and cleared target. Build, Adapter, and MapContract pass.
 
+Handled-fixture isolation revision: Moving and Returning failures independently reset the recovery marker and capture controller/Blackboard epochs plus encounter attempts before invoking the production decision seam. Each verifies unchanged epochs/counts, empty request/targets, no retry, and an independently observed `MoveFailed` source marker.
+
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
 
 ### Stage-B main-path PIE evidence — USER PROVIDED

@@ -55,6 +55,7 @@ public:
 	void SetStateForAutomation(EHSREnemyExplorationState InState) { SetState(InState); }
 	AActor* GetCurrentTargetForAutomation() const { return CurrentTarget.Get(); }
 	FGuid GetActiveEncounterRequestIdForAutomation() const { return ActiveEncounterRequestId; }
+	void ResetRecoveryMarkerForAutomation() { LastRecoveryStateForAutomation = EHSREnemyExplorationState::Idle; }
 #endif
 
 protected:
