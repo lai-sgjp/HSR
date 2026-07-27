@@ -1395,3 +1395,7 @@ UI 像银行对账屏：它订阅 Attribute/Resolution 事件并显示 Weakness�
 - 用户能区分 Automation、Selected Viewport PIE、Editor 冷重启的证据边界，并明确 Standalone、packaged、真实 travel failure/包损坏/强杀进程与多人环境未验证。
 - Guided corrections：`FName` 稳定来自项目 ID 约定而非编译器自动保证；实际 Arrival Consumer 使用 BeginPlay/有限 Timer retry；未来启动旅行必须由独立启动流程显式授权，不能从 Save Load 隐式推导。
 - Teacher Gate：`PASS WITH GUIDED CORRECTION`。
+# Patch 01D — regression evidence boundary (2026-07-27)
+
+- A fresh Editor Build proves compilation/link/metadata for the current source tree; headless Automation proves the registered runtime contracts. Neither is visual PIE evidence.
+- Evidence must retain its origin: 01A/01B user-supplied PIE logs remain user evidence, while the new 01C action-distance validation remains Automation-only because this patch intentionally created no user-facing Speed/Advance/Delay asset entry point.

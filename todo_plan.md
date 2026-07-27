@@ -7,7 +7,7 @@
 - [x] TASK-P17-PATCH-01A：ActiveStatus 通用化（Reviewer `PASS`，已归档）。
 - [x] TASK-P17-PATCH-01B：可重复 Break（Reviewer `PASS`，已归档）。
 - [x] TASK-P17-PATCH-01C：完整行动距离模型（Reviewer `PASS`=`28d3213`；Build、9 项 Battle Automation、diff-check 通过，已归档）。
-- [ ] TASK-P17-PATCH-01D：Patch 01 最终回归、证据汇总与归档（活动卡等待 Task Gate；不新增 Gameplay）。
+- [ ] TASK-P17-PATCH-01D：Patch 01 最终回归、证据汇总与归档（fresh Build、Battle 9/9、Progression 3/3、diff-check 已通过；等待 Independent Reviewer 与归档；不新增 Gameplay）。
 
 - [x] P7-000：只读校准 Phase 6→7 门禁，冻结 CoreAttributeSet 原位扩展、原创公式、CritDamage/Capture/RNG/单一伤害入口和结构化失败协议。
 - [x] P7-001：战斗属性、原创规则与初始化基线（Reviewer `PASS WITH FOLLOW-UP`，已归档，follow-up 保留）。

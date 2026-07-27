@@ -2138,3 +2138,8 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Automation fixture 采用 `UGameInstance::InitializeStandalone` 和配置 GameMode CDO，通过正式 Submit/BuildParticipants；多轮 fixture/生命周期/临时 Health/测试覆盖问题均以 REVISE/BLOCKED 保留。
 - 最终 Build、`HSR.Battle.Patch` 2/2 与用户 P9-003 通过：Recovery natural expiry；两个独立 ActionId；Status 0→1→2、Delay 0→1→2；19 cases PASS；零 FAIL/INCOMPLETE/SKIPPED。
 - Independent Reviewer final=`PASS`，commit `4a074c5`；三件套归档，活动切换 PATCH-01C Task Gate。
+# 2026-07-27 — TASK-P17-PATCH-01D regression execution
+
+- Fresh `HSREditor Win64 Development -Rebuild -NoHotReload -WaitMutex` passed: 17 actions, HSR compile, lib/dll link and `WriteMetadata`, exit 0. The first sandbox-only UBT user-cache permission stop was rerun with approval and is retained as environment setup history, not a source failure.
+- Headless `HSR.Battle` Automation passed 9/9 (six ActionDistance cases, RepeatableBreak, StatusGeneric and BattleReturn MapContract); `HSR.Progression` passed 3/3 (Transaction, Effect Contract, Profile Authority); both command-line runs exited 0. `git diff --check` passed.
+- No Source/Config/Content or test-source change was made. `learn/SaveSystem.md` and `.claude/**` remain user-local and unstaged. 01A/01B remain USER PROVIDED PIE evidence; 01C PIE remains NOT VERIFIED. Waiting for Independent Review and Coordinator archive; Behavior Tree Patch 02 and P17-005 have not started.

@@ -10,6 +10,7 @@
 - `TASK-P17-PATCH-01C` 完整行动距离模型最终 Reviewer=`PASS`（`28d3213`）：最终 Development Editor Build、`Automation RunTests HSR.Battle` 9 项与 `git diff --check` 均由 Reviewer 独立复跑通过；CurrentPending、同步 Speed recharge、A/B/C 频率、全局 OperationId、delegate rollback/stale callback 与 Break `+Base` 均有 runtime 证据。
 - PATCH-01A Implementation commits：`e93b04c`、`955d5d3`、`d1f8eb0`、`06f84db`；REVISE/BLOCKED 与首错历史保存在三件套归档。
 - `TASK-P17-PATCH-01C` 三件套已归档；当前唯一活动任务为 `TASK-P17-PATCH-01D`，只做 Patch 01 最终回归、证据汇总与归档，不新增 Gameplay，等待 Task Gate 审查。
+- `TASK-P17-PATCH-01D` 已执行 fresh Development Editor Build（17 actions、HSR link、WriteMetadata，exit 0）、`HSR.Battle` 9/9 与 `HSR.Progression` 3/3 Automation（均 exit 0）和 diff-check；等待 Independent Reviewer，01C PIE 仍为 `NOT VERIFIED`，不自动进入 Patch 02 或 P17-005。
 - `learn/SaveSystem.md` 与 `.claude/**` 的未提交变化不属于 PATCH-01A Coordinator 产物，保持不触碰。
 
 ## 历史 Phase 15 状态

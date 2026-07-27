@@ -9,6 +9,8 @@
 > 进度更新：PATCH-01B 已归档并由 Independent Reviewer 最终判定 `PASS`；PATCH-01C 完整行动距离模型活动卡已创建，等待 Task Gate 审查。
 >
 > 进度更新：PATCH-01C 已归档并由 Independent Reviewer 最终判定 `PASS`（`28d3213`）；PATCH-01D 最终回归与归档活动卡已创建，等待 Task Gate 审查。
+>
+> 进度更新：PATCH-01D 已完成 fresh `HSREditor Win64 Development` Build、`HSR.Battle` 9/9 和 `HSR.Progression` 3/3 Automation（均 exit 0），等待 Independent Reviewer 审核与 Coordinator 归档；01A/01B 的用户 PIE 证据等级和 01C 的 `PIE NOT VERIFIED` 边界不变。
 
 ## 1. 当前事实与 Gate
 
