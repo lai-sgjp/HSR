@@ -1,42 +1,43 @@
-# TASK-P17-PATCH-02 Move-Ownership Matrix Review
+# TASK-P17-PATCH-02 Full Move-Ownership Snapshot Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `21996d1`
+- Reviewed revision: `555200c`
 - Result: `REVISE`
 - Date: 2026-07-28
 
-## Verified
+## Ignored-state matrix accepted
 
-- The test now reaches the production decision seam for both handled states, `MovingToPatrol` and `ReturningToSpawnOrigin`, rather than relying only on the direct recovery publisher.
-- Alert, Chasing, EncounterPending, and Idle are each passed through the same seam and return `false`.
-- Production classification remains correct, and no production `.cpp` behavior changed in this assertion revision.
-- Build, `BehaviorTreeAdapter`, and `MapContract` remain reported/logged as successful. Revision provenance is restricted to the allowlisted header/test/result files; user Blueprints, Map, DataAsset, and AI assets remain isolated.
+- The test-local snapshot now covers controller state and target identity, all six Blackboard runtime values, active Encounter RequestId, controller epoch, retry flag, Encounter attempt count, and last recovery marker.
+- Alert, Chasing, EncounterPending, and Idle each execute the production failure decision seam and compare the complete snapshot exactly before/after.
+- Final `BehaviorTreeAdapter` and `MapContract` runs are logged as Success/exit `0`; Build is reported successful. Revision provenance remains inside the header/test/result allowlist, and user assets remain isolated.
 
-## Blocking assertion gaps
+## Remaining blocking handled-state assertions
 
-The new ignored-state assertion is still not the “full relevant snapshot” required by the preceding review. It checks only CurrentState, PatrolLocation, controller epoch, Encounter attempt count, and retry flag. It does not check:
+The two handled paths still do not satisfy the explicitly requested complete invariant matrix:
 
-- Blackboard `AIState`, `TargetActor`, `SpawnOrigin`, `TreeEpoch`, or `EncounterRequestId`;
-- controller active Encounter request identity;
-- the last recovery marker;
-- target identity/validity.
+- `MovingToPatrol` asserts only `true` and the recovery marker; it does not assert final Returning state, cleared target, both SpawnOrigin/PatrolLocation Blackboard values, retry state, active request identity, attempt count, or unchanged epoch.
+- `ReturningToSpawnOrigin` asserts only `true` and final state; it omits the same remaining invariants and does not independently assert the `MoveFailed` recovery marker.
+- `PublishSpawnOriginRecoveryIntent` currently writes only `PatrolLocation=InSpawnOrigin`. Its `SetState` calls refresh Blackboard `SpawnOrigin` from the pawn; in the pawnless deterministic seam this becomes zero. Therefore the requested explicit Blackboard SpawnOrigin invariant cannot currently be proven from the supplied `InSpawnOrigin`.
 
-Consequently, mutations to most Blackboard runtime state or the active request would remain undetected. The handled-state checks are also incomplete: the new Moving/Returning decision calls do not each assert final `PatrolLocation=SpawnOrigin`, no retry, no Encounter creation/identity change, and bounded final `ReturningToSpawnOrigin` state.
+Minimum correction inside the existing allowlist:
 
-Minimum correction inside the current allowlist:
-
-1. Add a test-local snapshot containing CurrentState, all six Blackboard values, tree epoch, active Encounter request validity/identity, Encounter attempt count, retry flag, last recovery marker, and target object/validity.
-2. Seed non-default TargetActor, SpawnOrigin, PatrolLocation, TreeEpoch, EncounterRequestId/active request, and recovery marker where necessary.
-3. For each of Alert, Chasing, EncounterPending, and Idle, capture before/after snapshots around `HandleMoveFailureForAutomation`, require `false`, and compare every snapshot field exactly.
-4. For MovingToPatrol and ReturningToSpawnOrigin, require `true` and independently assert recorded `MoveFailed`, final `ReturningToSpawnOrigin`, `PatrolLocation=SpawnOrigin`, unchanged/no Encounter admission, no retry arm, and unchanged epoch.
-5. Rebuild and rerun `BehaviorTreeAdapter`; `MapContract` only needs a fresh rerun if production/Transition code changes.
+1. In `PublishSpawnOriginRecoveryIntent`, publish both `SpawnOrigin=InSpawnOrigin` and `PatrolLocation=InSpawnOrigin` when a runtime Blackboard is present. This is redundant-but-consistent in production and makes the shared recovery payload explicit.
+2. Before each handled case, seed/confirm no target and no active Encounter request; capture epoch, attempt count, and retry state.
+3. For both MovingToPatrol and ReturningToSpawnOrigin, independently require:
+   - seam returns `true`;
+   - recovery marker is `MoveFailed`;
+   - final state and Blackboard AIState are `ReturningToSpawnOrigin`;
+   - TargetActor/controller target are clear;
+   - Blackboard SpawnOrigin and PatrolLocation equal ExpectedSpawnOrigin;
+   - no retry, no active/request-name Encounter, no attempt increase, and unchanged epoch.
+4. Rebuild and rerun `BehaviorTreeAdapter`; rerun `MapContract` only if Transition production changes.
 
 ## Remaining task gate
 
-After this exact snapshot matrix passes, the code Gate should have no known remaining issue. The sole task-level requirement will be full-return user PIE: one real `ReturnComplete` within acceptance radius, cleared target/no Encounter, then a new patrol candidate or bounded fallback, with no duplicate completion or Controller Move/retry.
+After these two handled snapshots pass, no known code Gate issue remains. The sole task-level item will be final full-return user PIE with one `ReturnComplete` within acceptance radius, no Encounter, and transition to the next patrol candidate or bounded fallback.
 
 ## Conclusion
 
-`REVISE`: the decision seam is now invoked for all six states, but the required handled invariants and full ignored-state zero-mutation snapshot are not yet proven.
+`REVISE`: the four ignored states now have exact full zero-mutation coverage, but the two handled states still lack their required complete bounded-recovery assertions and explicit Blackboard SpawnOrigin publication.
