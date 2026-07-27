@@ -22,6 +22,7 @@ Status: `PLANNED / IMPLEMENTATION RESTATEMENT REQUIRED`
 - `Source/HSR/Battle/HSRBattleCoordinator.h`
 - `Source/HSR/Battle/HSRBattleCoordinator.cpp`
 - `Source/HSR/Battle/HSRBattleGameMode.cpp`（仅 P8/P9 repeatable-Break development harness）
+- `Source/HSR/Battle/HSRBattleGameMode.h`（用户精确扩权：仅在 `#if WITH_DEV_AUTOMATION_TESTS` 下添加非 UFUNCTION/非 Blueprint/非 Shipping 的 `CreateRepeatableBreakAutomationFixture` 静态入口；禁止新增属性、BeginPlay 开关或通用状态 mutator）
 - `Source/HSR/Tests/HSRCombatPatchTests.cpp`
 - `tasks/execution-result.md`
 
@@ -37,7 +38,7 @@ Implementation Agent 不得修改本活动卡、计划、PROJECT_STATE、worklog
 - 同帧致死+击破按冻结优先级各发布一次 Break/Status/Delay，随后完成 Defeat；不得重复行动或结果。
 - Development Editor Build、`HSR.Battle.Patch.RepeatableBreak`、适用 P8/P9/Battle 回归、`git diff --check`。
 - Automation 负责真实/受控 runtime 的 first/replay/recovery/second/0->0/Finished/Reset/stale BattleId/reused ActionId 与精确计数；不得以 Definition-only 测试代替 runtime。
-- PIE 复用现有 `bRunP9DotBreakHarness` 与 `P9-003 DotBreak Harness`，只在现有开关中增加 repeatable-Break 案例和日志；不得新增 `HSRBattleGameMode.h` 属性。用户 PIE 必须提供两次独立 Break ActionId、各副作用计数与零 FAIL/INCOMPLETE/SKIPPED。
+- PIE 复用现有 `bRunP9DotBreakHarness` 与 `P9-003 DotBreak Harness`，只在现有开关中增加 repeatable-Break 案例和日志；不得新增 GameMode 属性。Automation factory 只读取传入 ConfiguredGameModeClass CDO 的现有配置，通过正式 `SubmitBattleRequest -> BuildParticipants` 构建 transient Coordinator，不修改 CDO/Content。用户 PIE 必须提供两次独立 Break ActionId、各副作用计数与零 FAIL/INCOMPLETE/SKIPPED。
 
 ## Explicit non-goals and stop conditions
 
