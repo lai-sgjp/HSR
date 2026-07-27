@@ -1,27 +1,33 @@
-# TASK-P17-PATCH-02 Navigation-Readiness Review
+# TASK-P17-PATCH-02 Navigation-Projection Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `46e86e1`
-- Result: `PASS WITH FOLLOW-UP`
+- Reviewed revision: `292deb0`
+- Result: `REVISE`
 - Date: 2026-07-28
 
-## Verified
+## Verified production behavior
 
-- The 0.2-second Nav-ready timer is non-repeating and only republishes patrol intent. It does not request movement, retry itself, or poll.
-- Scheduling requires a valid Blackboard, pawn, definition, and world; duplicate pending arms are rejected. The callback captures `BehaviorTreeEpoch`, consumes its pending state before work, and rejects a mismatched epoch without Blackboard/navigation side effects.
-- `StopBehaviorTreeRuntime` clears the timer and invalidates its pending flag/epoch; therefore UnPossess and EndPlay teardown also neutralize queued or stale callbacks.
-- Patrol diagnostics include Controller, center, radius, NavSystem, NavData, reachable/fallback result, candidate, scheduled epoch, and stale/current epoch information.
-- The automation seam verifies one arm, duplicate-arm rejection, stale rejection without consumption, one exact matching consumption, and no repeat consumption.
-- Static inspection finds no `MoveToLocation` or `MoveToActor`; the only `SetTimer` is the explicit one-shot Nav-ready timer.
-- Final `Saved/Logs/HSR.log` records `BehaviorTreeAdapter` as `Success` and `TEST COMPLETE. EXIT CODE: 0`. The execution report records the editor Build as 7 actions, exit `0`.
-- Revision provenance is limited to the allowlisted Controller, test, and execution-result files. Dirty user Map, Enemy DataAsset, `Content/AI/**`, learning file, and `.claude/**` changes remain isolated.
+- After obtaining valid NavData, production code projects `SpawnOrigin` with extent `(100,100,300)` and calls `GetRandomReachablePointInRadius` only when projection succeeds, using the projected center.
+- Projection failure and post-projection random failure have distinct warning reasons (`ProjectPointFailed` and `RandomReachableFailed`) and both use the bounded SpawnOrigin/`PatrolWaiting` fallback.
+- No direct movement, repeating timer, polling loop, or user asset edit was added. Revision provenance is limited to the allowlisted Controller, test, and execution-result files.
+- The execution report records Build as 5 actions, exit `0`; final `Saved/Logs/HSR.log` records `BehaviorTreeAdapter` success and test exit `0`.
 
-## Follow-up boundary
+## Blocking finding
 
-User PIE must still show the scheduled retry followed by a reachable patrol candidate and stock-BT movement. This acceptance does not complete the broader five-branch/runtime matrix or PATCH-02.
+The claimed Automation coverage does not actually distinguish the four requested outcomes. The test calls `PublishPatrolIntentForAutomation(..., true)` once for a candidate and `PublishPatrolIntentForAutomation(..., false)` once for fallback. It never supplies or observes separate projection-success/random-failure versus projection-failure inputs. The assertion named “Projection failure and random failure...” merely rechecks the same single fallback result, so it cannot detect a regression that conflates or reverses the two production branches or their reason classification.
+
+## Minimum correction
+
+- Add an allowlisted deterministic seam/helper that accepts projection success and random success independently (or returns an explicit failure reason), while keeping real NavSystem calls in production.
+- Exercise all four requested cases separately: projection+random success, projected random candidate publication, projection failure, and random failure after successful projection. Assert the distinct failure classification and the common bounded fallback.
+- Rebuild and rerun `HSR.Exploration.Patch.BehaviorTreeAdapter`; keep user Map/DataAsset/AI assets isolated.
+
+## Scope boundary
+
+PIE remains user-pending and PATCH-02 is not complete. This revision request stays inside the existing Controller/test/result allowlist and needs no new authorization.
 
 ## Conclusion
 
-`PASS WITH FOLLOW-UP`: the navigation-readiness workaround is a bounded, epoch-safe, one-shot intent refresh and does not reintroduce polling or C++ movement ownership.
+`REVISE`: production projection flow is bounded and plausible, but the required branch-exact Automation evidence is not present.
