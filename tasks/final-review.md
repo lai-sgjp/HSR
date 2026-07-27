@@ -1,36 +1,38 @@
-# TASK-P17-PATCH-02 Return-Completion Review
+# TASK-P17-PATCH-02 Intentional-Abort Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `c1d33d9`
-- Result: `REVISE` (implementation passes; final user PIE evidence pending)
+- Reviewed revision: `2ed4786`
+- Result: `REVISE`
 - Date: 2026-07-28
 
-## Implementation accepted
+## Production behavior verified
 
-- A successful `OnMoveCompleted` while `ReturningToSpawnOrigin` obtains the same Character SpawnOrigin/definition used by recovery and emits `ReturnComplete` with Controller, Actor location, SpawnOrigin, distance, and current Encounter RequestId.
-- Completion then calls `PublishNextPatrolIntent` exactly once in that handler. A reachable navigation candidate transitions to `MovingToPatrol`; projection/random failure uses the existing bounded `PatrolWaiting` plus `PatrolLocation=SpawnOrigin` fallback.
-- No direct Move request, repeating timer, polling loop, Encounter request, or new recovery retry was added. Recovery state is exited by publishing the next patrol/fallback state.
-- Adapter coverage verifies reachable next-candidate publication, bounded fallback, and no Encounter creation. It does not substitute for the physical Move To completion evidence.
-- Raw logs confirm final `BehaviorTreeAdapter` and `MapContract` Success/exit `0`; the execution report records the Development Build as passing. Revision provenance is confined to the Controller/test/result allowlist, and user assets remain isolated.
+- Failed/aborted movement is converted to recovery only while the current state owns patrol/recovery movement: `MovingToPatrol` or `ReturningToSpawnOrigin`.
+- Abort callbacks arriving after a branch switch to Alert, Chasing, EncounterPending, or Idle are ignored with structured `MoveAbortIgnored ... Reason=BranchSwitch` logging; the ignored branch contains no state or Blackboard write.
+- True handled failure still uses the existing `MoveFailed -> ReturningToSpawnOrigin` publisher and does not introduce direct movement or a retry loop.
+- Build, `BehaviorTreeAdapter`, and `MapContract` are reported/logged as Success with exit `0`. Revision provenance remains in the Controller/test/result allowlist; dirty user Blueprints, Map, DataAsset, and AI assets remain isolated.
 
-## Final required USER PIE evidence
+## Blocking Automation gaps
 
-PATCH-02 has no remaining known C++/Automation correction. It remains open only until the real stock-BT return completes in PIE. The expected evidence is:
+The report claims both paths are verified, but the new predicate is exercised only for the ignored Chasing path:
 
-1. Before loss: one `Chasing` state record with tree epoch, valid target, Actor location, and SpawnOrigin.
-2. Loss: `Chasing -> LostTarget -> ReturningToSpawnOrigin`, `TargetActor` cleared, and no Encounter request.
-3. Completion: exactly one `P17-PATCH-02 ReturnComplete` line for that movement request, containing:
-   - Actor `Location`;
-   - `SpawnOrigin`;
-   - `Distance` within the configured Move To acceptance radius;
-   - invalid/empty Encounter `RequestId` for this no-overlap path.
-4. Immediately after completion:
-   - either `PatrolIntent ... Result=Reachable` followed by `MovingToPatrol` and a new candidate;
-   - or a projection/random failure reason followed by bounded `PatrolWaiting` and `PatrolLocation=SpawnOrigin`.
-5. No second `ReturnComplete` for the same completion, no direct Controller Move, no repeating retry, and no Encounter submission. Preserve the first failure/SKIPPED reason if the run cannot reach SpawnOrigin.
+- The earlier “true patrol failure” assertions call `PublishMoveFailureRecoveryForAutomation` directly, bypassing `ShouldHandleMoveFailureOrAbort` and the new `HandleMoveFailureForAutomation` decision path. A regression that rejects `MovingToPatrol` would still pass.
+- The ignored path asserts only that `CurrentState` remains Chasing. It does not snapshot Blackboard values, active Encounter request, Nav-ready retry state, target identity, or recovery marker, so the claimed state/Blackboard zero mutation is incomplete.
+- ReturningToSpawnOrigin, Alert, EncounterPending, and Idle predicate classifications are not asserted despite being explicitly named by the contract.
+
+Minimum correction inside the existing allowlist:
+
+1. Publish a reachable patrol intent to establish `MovingToPatrol`, call `HandleMoveFailureForAutomation`, require `true`, and assert `MoveFailed` was recorded before final `ReturningToSpawnOrigin` with `PatrolLocation=SpawnOrigin` and no retry/Encounter.
+2. Establish `ReturningToSpawnOrigin` and assert the same handled result.
+3. For Alert, Chasing, EncounterPending, and Idle, capture a full relevant snapshot before/after (AIState, TargetActor, PatrolLocation, SpawnOrigin, TreeEpoch, EncounterRequestId/active request, retry flag, and last recovery marker), call the decision seam, require `false`, and assert exact zero mutation.
+4. Rebuild and rerun both Automation tests.
+
+## Remaining user gate
+
+After those deterministic assertions pass, the only remaining task-level evidence is still the real full-return PIE: `Chasing -> LostTarget -> ReturningToSpawnOrigin`, one `ReturnComplete` within acceptance radius, cleared target/no Encounter, followed by the next patrol candidate or bounded fallback, with no duplicate completion or C++ Move/retry.
 
 ## Conclusion
 
-`REVISE`: `c1d33d9` is accepted and closes the implementation side of return completion. The complete Gate now depends only on the final user-provided PIE log above; do not archive before it is reviewed.
+`REVISE`: production filtering is appropriately scoped, but Automation does not yet prove the handled predicate path or the claimed zero-mutation matrix. Full-return user PIE remains pending afterward.
