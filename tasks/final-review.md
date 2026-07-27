@@ -1,30 +1,24 @@
-# TASK-P17-PATCH-02 Final Radius-Matrix Review
+# TASK-P17-PATCH-02 Final Radius Addendum Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `e7a59ef`
-- Prior finding: `38e5762`
-- Result: `REVISE`
+- Reviewed revision: `87e694e`
+- Prior finding: `6659e20`
+- Result: `PASS WITH FOLLOW-UP`
 - Date: 2026-07-28
 
-## Closed coverage
+## Verification
 
-- The shared Controller snapshot is compared after fallback, normalized, and negative perception applies and covers state, epoch, target, active request, retry, attempts, and `HasRuntimeBlackboardForAutomation`.
-- The shared Character predicate is checked after fallback, `333`, and negative EncounterRadius applies and covers Tick, ActorLocation, and SpawnOrigin.
-- Actual radius assertions remain paired with each production-helper call. No production, BT, state, Encounter-admission, or user-asset scope creep was introduced.
-- Build and `BehaviorTreeAdapter` are reported passing; the revision is test/result-only.
+- `ControllerApplySnapshot` now includes `PrimaryActorTick.bCanEverTick` and is compared unchanged after all three production-helper calls: no-Definition fallback, normalized Definition, and negative Definition.
+- The same snapshot still covers state, epoch, target, active request, retry, encounter attempts, and `HasRuntimeBlackboardForAutomation`.
+- Character runtime snapshot continues to cover Tick, ActorLocation, and SpawnOrigin after no-Definition, `333`, and negative EncounterRadius helper calls; actual sphere values are asserted separately.
+- The final `BehaviorTreeAdapter` run is recorded as Success with exit `0`. This revision is test-only; no BT/state/Encounter production code or user asset changed. `MapContract` need not be rerun because Transition/Encounter production was untouched.
 
-## Final blocking omission
+## Remaining task boundary
 
-The Controller snapshot still omits `PrimaryActorTick.bCanEverTick`. Tick is checked only after the first fallback call, outside the tuple. The normalized and negative Controller applies compare a tuple that cannot detect Tick mutation, so the complete shared snapshot requested in `38e5762` is not yet satisfied.
-
-Minimum correction:
-
-- Add `PrimaryActorTick.bCanEverTick` to `ControllerApplySnapshot` (or explicitly assert it remains false after both normalized and negative calls).
-- Rebuild and rerun `BehaviorTreeAdapter`.
-- No `MapContract` rerun is needed because this remains test-only and does not touch Transition/Encounter production behavior.
+The radius parameterization addendum has no remaining code/test blocker. The previously accepted PATCH-02 Code Gate and the required full-return user PIE evidence remain separate: do not archive the overall task unless the final PIE return completion record has already been reviewed.
 
 ## Conclusion
 
-`REVISE`: all other radius-integration and zero-mutation requirements are closed. Only Controller Tick coverage for the normalized and negative apply calls remains before this addendum can receive PASS.
+`PASS WITH FOLLOW-UP`: the f81b80f zero-mutation requirements are fully closed, including Controller Tick and unbound Blackboard state across all three applications. Only the previously stated full-return USER PIE follow-up remains for the overall PATCH-02 archive.
