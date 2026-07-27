@@ -1,29 +1,47 @@
-# TASK-P17-PATCH-02 Final Code-Gate Review
+# TASK-P17-PATCH-02 Data-Driven Radius Addendum Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `0c9aa0a`
-- Result: `PASS WITH FOLLOW-UP`
+- Reviewed revision: `f6ec65e`
+- Baseline Code Gate: `eb67ede`
+- User PIE evidence baseline: `4f07f0d`
+- Result: `REVISE`
 - Date: 2026-07-28
 
-## Code Gate accepted
+## Production review
 
-- MovingToPatrol and ReturningToSpawnOrigin fixtures independently reset the recovery marker and execute the production move-failure decision seam.
-- Each handled case verifies its own `MoveFailed` marker, final controller/Blackboard `ReturningToSpawnOrigin`, null controller and Blackboard targets, expected Blackboard SpawnOrigin/PatrolLocation, no active or Blackboard Encounter request, no retry arm, unchanged controller/Blackboard epoch, and unchanged Encounter attempt/admission count.
-- Alert, Chasing, EncounterPending, and Idle retain the previously accepted full controller-plus-six-key Blackboard exact zero-mutation snapshots.
-- Final raw logs record `BehaviorTreeAdapter` and `MapContract` as Success with exit `0`; Build is reported successful. Revision provenance is confined to the allowlisted header/test/result files, and user-owned Blueprint/Map/DataAsset/AI changes remain isolated.
+- Scope is authorized and allowlisted: the user explicitly requested moving SightRadius, LoseSightRadius, and EncounterRadius into `UHSREnemyDefinition`; no new file, BT behavior, state transition, Move To ownership, or Encounter admission path was added.
+- Defaults preserve existing behavior: Definition values are `1000/1500/200`, matching Controller sight defaults and Character sphere-constructor default.
+- Controller data flow is correctly located after possession, when the possessed Character and its Definition are available. Sight is clamped nonnegative and LoseSight is normalized to at least Sight. Missing Definition/SightConfig leaves constructor defaults unchanged.
+- Character applies EncounterRadius during BeginPlay, after Blueprint/DataAsset properties are available, with a nonnegative clamp. Missing Definition leaves the constructor radius `200` unchanged.
+- Dirty user Blueprint, Map, DataAsset, and `Content/AI/**` assets remain outside `f6ec65e`; provenance separation is intact.
 
-## Sole remaining task-level follow-up — USER PIE
+## Blocking test finding
 
-The C++/Automation Code Gate now has no known remaining defect. PATCH-02 itself must remain open until the real stock-BT return is observed:
+Automation does not test the production data flow. It only:
 
-1. Acquire the player, then leave sight without reacquiring or overlapping.
-2. Capture `Chasing -> LostTarget -> ReturningToSpawnOrigin`, epoch, cleared TargetActor, Actor start location, and SpawnOrigin.
-3. Capture exactly one `P17-PATCH-02 ReturnComplete` line with Actor Location, SpawnOrigin, Distance within the configured Move To acceptance radius, and empty Encounter RequestId.
-4. Capture the next reachable patrol candidate/`MovingToPatrol`, or the bounded failure fallback to `PatrolWaiting`/SpawnOrigin.
-5. Confirm no duplicate ReturnComplete, Controller Move request, repeating retry, or Encounter submission. Preserve the first failure/SKIPPED reason if the run cannot complete.
+- reads the three Definition defaults; and
+- repeats the normalization expression directly in the test with `FMath::Max`.
+
+It never invokes `ApplyDefinitionPerceptionConfig`, never inspects the actual `SightConfig`, never verifies the no-Definition fallback, never applies EncounterRadius to `EncounterCollision`, and never verifies the Character lifecycle/helper result. Therefore the test would pass if the production calls were removed, reversed, or wired to the wrong fields.
+
+## Minimum correction within the existing allowlist
+
+- Extract/reuse a single production helper for applying Controller perception values, called by `OnPossess`, and expose only a `WITH_DEV_AUTOMATION_TESTS` seam/getters for the actual SightConfig radii.
+- Extract/reuse a Character helper for applying Definition EncounterRadius, called by BeginPlay, with a dev-only seam/getter for the actual sphere radius.
+- Automation must assert actual component/config state for:
+  1. fresh no-Definition fallback remains `1000/1500/200`;
+  2. Definition `1200/1000/333` produces sight `1200`, lose sight `1200`, encounter `333`;
+  3. negative Definition values clamp safely to zero while LoseSight remains at least Sight;
+  4. applying these values does not change AI state, epoch, target, active Encounter request, retry state, or enable Tick.
+- Ensure the perception listener refresh uses the same configured SightConfig object; retain `RequestStimuliListenerUpdate` (and call `ConfigureSense` again only if required by the actual UE5.6 component contract).
+- Rebuild and rerun `BehaviorTreeAdapter`; rerun `MapContract` only if Encounter/Transition production code changes.
+
+## Existing Gate status
+
+The earlier BT/Behavior code Gate and user PIE evidence are not invalidated by this addendum. This `REVISE` applies only to the new radius parameterization evidence. Do not mark the addendum accepted until its production seams are actually exercised.
 
 ## Conclusion
 
-`PASS WITH FOLLOW-UP`: the final Code Gate passes. The only remaining requirement is user-provided full-return PIE evidence; this review must not be interpreted as authorization to archive PATCH-02 before that evidence is reviewed.
+`REVISE`: production wiring is plausible and backward-compatible, but current Automation is tautological and cannot detect broken Controller/Character Definition integration. No production code should be changed by Reviewer; return the precise test repair above to Implementation.
