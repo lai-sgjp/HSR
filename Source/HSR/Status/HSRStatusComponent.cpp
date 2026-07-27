@@ -281,19 +281,31 @@ EHSRStatusOperationResult UHSRStatusComponent::ClearStatus()
 	FName StatusId = NAME_None;
 	FName TargetId = ParticipantId;
 	bool bFailed = false;
-	for (const TPair<FName, FHSRStatusInstance>& Pair : Statuses)
+	for (auto It = Statuses.CreateIterator(); It; ++It)
 	{
+		const TPair<FName, FHSRStatusInstance>& Pair = *It;
 		StatusId = StatusId.IsNone() ? Pair.Key : StatusId;
 		TargetId = Pair.Value.TargetParticipantId;
 		LastRemovedRemainingTurns = Pair.Value.RemainingTurns;
 		LastRemovedTurnSequence = Pair.Value.LastConsumedTurnSequence;
 		if (AbilitySystem.IsValid() && Pair.Value.ActiveGameplayEffectHandle.IsValid() && AbilitySystem->GetActiveGameplayEffect(Pair.Value.ActiveGameplayEffectHandle))
 		{
-			if (AbilitySystem->RemoveActiveGameplayEffect(Pair.Value.ActiveGameplayEffectHandle)) ++RemoveCount; else bFailed = true;
+			bool bRemoved = false;
+#if WITH_EDITOR
+			bRemoved = !bForceClearRemoveFailure && AbilitySystem->RemoveActiveGameplayEffect(Pair.Value.ActiveGameplayEffectHandle);
+#else
+			bRemoved = AbilitySystem->RemoveActiveGameplayEffect(Pair.Value.ActiveGameplayEffectHandle);
+#endif
+			if (!bRemoved)
+			{
+				bFailed = true;
+				continue;
+			}
+			++RemoveCount;
 		}
+		RuntimeDefinitions.Remove(Pair.Key);
+		It.RemoveCurrent();
 	}
-	Statuses.Empty();
-	RuntimeDefinitions.Empty();
 	LastResult = bFailed ? EHSRStatusOperationResult::RemoveFailed : EHSRStatusOperationResult::Success;
 	RecordPublicOperation(EHSRStatusPublicOperation::Clear, LastResult, StatusId, TargetId);
 	NotifyStatusChanged();

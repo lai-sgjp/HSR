@@ -2,6 +2,12 @@
 
 Status: `IMPLEMENTED / ENGINEERING VALIDATION PARTIAL`
 
+## REVISE follow-up
+
+- Reviewer blockers fixed: `ClearStatus` now retains active entries whose GE removal fails and removes only successful/inactive entries; the controlled Automation proves retained typed ownership/handle followed by a successful retry.
+- `HSR.Battle.Patch.StatusGeneric` now uses a transient World, project ASC, registered CoreAttributeSet, initialized ActorInfo, positive MaxHealth/Health/Speed, TurnManager and Infinite GE fixture. It covers distinct Attack/Speed/Shield add/query, Attack refresh, Speed stack, turn expiry, duplicate OperationId, unknown lookup, clear failure retention and retry.
+- Historical failures preserved: the first expanded Automation exited `-1` because Health was clamped against default MaxHealth 0, and one intermediate compile failed at an invalid base-to-derived `const_cast`. The fixture now initializes MaxHealth before Health; final Development build and named Automation both exit 0.
+
 ## Implemented before the gate
 
 - Audited the existing allowed-file drafts rather than assuming them correct. `ActiveStatus`/`AdditionalStatuses`, AttackUp-specific routing, dual OperationId sets, and the secondary owned-handle path were replaced in the working tree with one `TMap<FName, FHSRStatusInstance>` and one `TSet<FGuid>` dedupe path.

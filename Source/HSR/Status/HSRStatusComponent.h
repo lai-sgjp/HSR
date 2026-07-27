@@ -42,6 +42,7 @@ public:
 	void SetForceApplyFailureForDevelopmentTest(bool bInForce) { bForceApplyFailure = bInForce; }
 	void SetForceOldRemoveFailureForDevelopmentTest(bool bInForce) { bForceOldRemoveFailure = bInForce; }
 	void SetForceDispelRemoveFailureForDevelopmentTest(bool bInForce) { bForceDispelRemoveFailure = bInForce; }
+	void SetForceClearRemoveFailureForDevelopmentTest(bool bInForce) { bForceClearRemoveFailure = bInForce; }
 	void ConsumeLifecycleEventForDevelopmentTest(const FHSRTurnLifecycleEvent& Event) { HandleTurnEnded(Event); }
 	void InvalidateAbilitySystemForDevelopmentTest() { AbilitySystem.Reset(); }
 	FActiveGameplayEffectHandle GetPrimaryHandleForDevelopmentTest() const { return Statuses.IsEmpty() ? FActiveGameplayEffectHandle() : Statuses.CreateConstIterator().Value().ActiveGameplayEffectHandle; }
@@ -79,5 +80,6 @@ private:
 	bool bForceApplyFailure = false;
 	bool bForceOldRemoveFailure = false;
 	bool bForceDispelRemoveFailure = false;
+	bool bForceClearRemoveFailure = false;
 #endif
 };
