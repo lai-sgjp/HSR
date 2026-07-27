@@ -51,6 +51,7 @@ public:
 	EHSREnemyExplorationState GetLastRecoveryStateForAutomation() const { return LastRecoveryStateForAutomation; }
 	bool IsNavReadyRetryScheduledForAutomation() const { return bNavReadyRetryScheduled; }
 	void CompleteReturnToPatrolForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin, const FVector& InCandidate, EHSRPatrolIntentResult Result);
+	bool HandleMoveFailureForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin);
 #endif
 
 protected:
@@ -61,6 +62,7 @@ protected:
 	void BeginChasingTarget(AActor* Actor);
 	void HandleChaseTargetLost();
 	void HandleMoveFailedOrAborted();
+	bool ShouldHandleMoveFailureOrAbort() const;
 	bool StartBehaviorTreeRuntime();
 	void StopBehaviorTreeRuntime();
 	void WriteBlackboardRuntimeState();

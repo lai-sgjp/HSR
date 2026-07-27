@@ -261,6 +261,9 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Move failure recovery publishes SpawnOrigin patrol location"), TeardownBlackboard->GetValueAsVector(TEXT("PatrolLocation")), ExpectedSpawnOrigin);
 	TestFalse(TEXT("Move failure recovery does not arm a C++ retry loop"), Controller->IsNavReadyRetryScheduledForAutomation());
 	Controller->ApplySuccessfulPerceptionForAutomation(PerceivedTarget);
+	const EHSREnemyExplorationState ChasingBeforeIntentionalAbort = Controller->GetCurrentState();
+	TestFalse(TEXT("Branch-switch abort after Alert/Chasing is ignored"), Controller->HandleMoveFailureForAutomation(TeardownBlackboard, ExpectedSpawnOrigin));
+	TestEqual(TEXT("Branch-switch abort preserves Chasing state"), Controller->GetCurrentState(), ChasingBeforeIntentionalAbort);
 	PerceivedTarget->Destroy();
 	Controller->PublishLostTargetRecoveryForAutomation(TeardownBlackboard, ExpectedSpawnOrigin);
 	TestEqual(TEXT("Destroyed chase target records LostTarget before return intent"), Controller->GetLastRecoveryStateForAutomation(), EHSREnemyExplorationState::LostTarget);

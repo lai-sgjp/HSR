@@ -256,6 +256,12 @@ Reviewer assertion strengthening: both rejection paths now assert invalid result
 
 Adapter automation covers return completion to a reachable next patrol candidate and the bounded random-reachability fallback, including no encounter creation. Development Build, `BehaviorTreeAdapter`, and `MapContract` all pass (exit `0`). User-owned assets remain untouched.
 
+### Stage-B PIE follow-up — intentional BT branch-switch abort
+
+User PIE showed a patrol `MoveTo` abort when perception changed the BT from patrol to Alert/Chasing. `OnMoveCompleted` now only converts failure/abort into `MoveFailed -> ReturningToSpawnOrigin` while still in a movement-owning patrol/recovery state (`MovingToPatrol` or `ReturningToSpawnOrigin`). Branch-switch aborts in Alert/Chasing/EncounterPending/Idle are ignored with `MoveAbortIgnored` structured logging and make no Blackboard or state mutation.
+
+Adapter verifies a Chasing branch-switch abort is ignored and a true patrol failure still records `MoveFailed` then publishes the bounded return intent. Development Build, `BehaviorTreeAdapter`, and `MapContract` pass (exit `0`); user assets remain untouched.
+
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
 
 ### Stage-B main-path PIE evidence — USER PROVIDED

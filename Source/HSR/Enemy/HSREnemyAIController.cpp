@@ -144,7 +144,14 @@ void AHSREnemyAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathF
 
 	if (!Result.IsSuccess())
 	{
-		HandleMoveFailedOrAborted();
+		if (ShouldHandleMoveFailureOrAbort())
+		{
+			HandleMoveFailedOrAborted();
+		}
+		else
+		{
+			UE_LOG(LogTemp, Log, TEXT("P17-PATCH-02 MoveAbortIgnored Controller=%s State=%d Reason=BranchSwitch"), *GetName(), static_cast<int32>(CurrentState));
+		}
 	}
 	else if (CurrentState == EHSREnemyExplorationState::MovingToPatrol)
 	{
@@ -233,6 +240,11 @@ void AHSREnemyAIController::BeginChasingTarget(AActor* Actor)
 void AHSREnemyAIController::HandleMoveFailedOrAborted()
 {
 	BeginSpawnOriginRecovery(EHSREnemyExplorationState::MoveFailed);
+}
+
+bool AHSREnemyAIController::ShouldHandleMoveFailureOrAbort() const
+{
+	return CurrentState == EHSREnemyExplorationState::MovingToPatrol || CurrentState == EHSREnemyExplorationState::ReturningToSpawnOrigin;
 }
 
 void AHSREnemyAIController::BeginSpawnOriginRecovery(EHSREnemyExplorationState RecoveryState)
@@ -595,5 +607,16 @@ void AHSREnemyAIController::CompleteReturnToPatrolForAutomation(UBlackboardCompo
 	RuntimeBlackboard = InBlackboard;
 	SetState(EHSREnemyExplorationState::ReturningToSpawnOrigin);
 	PublishPatrolIntent(InSpawnOrigin, InCandidate, Result);
+}
+
+bool AHSREnemyAIController::HandleMoveFailureForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin)
+{
+	RuntimeBlackboard = InBlackboard;
+	if (!ShouldHandleMoveFailureOrAbort())
+	{
+		return false;
+	}
+	PublishSpawnOriginRecoveryIntent(InSpawnOrigin, EHSREnemyExplorationState::MoveFailed);
+	return true;
 }
 #endif
