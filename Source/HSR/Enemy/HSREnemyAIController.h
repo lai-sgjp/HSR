@@ -53,6 +53,8 @@ public:
 	void CompleteReturnToPatrolForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin, const FVector& InCandidate, EHSRPatrolIntentResult Result);
 	bool HandleMoveFailureForAutomation(UBlackboardComponent* InBlackboard, const FVector& InSpawnOrigin);
 	void SetStateForAutomation(EHSREnemyExplorationState InState) { SetState(InState); }
+	AActor* GetCurrentTargetForAutomation() const { return CurrentTarget.Get(); }
+	FGuid GetActiveEncounterRequestIdForAutomation() const { return ActiveEncounterRequestId; }
 #endif
 
 protected:

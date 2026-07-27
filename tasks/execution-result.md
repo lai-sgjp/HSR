@@ -264,6 +264,8 @@ Adapter verifies a Chasing branch-switch abort is ignored and a true patrol fail
 
 Reviewer matrix expansion: the production failure decision seam now proves both movement-owning states (`MovingToPatrol`, `ReturningToSpawnOrigin`) are handled into bounded recovery, while `Alert`, `Chasing`, `EncounterPending`, and `Idle` are each independently ignored with relevant state, patrol Blackboard value, epoch, encounter attempts, and retry-arm state unchanged.
 
+Reviewer snapshot strengthening: each ignored-state abort now compares a full test-local controller snapshot before/after: controller state and target identity, all six Blackboard runtime keys, active request id, epoch, retry state, encounter attempts, and recovery marker. Build, Adapter, and MapContract pass.
+
 User-owned map, enemy DataAsset, and `Content/AI/**` remain unstaged and unmodified by this task.
 
 ### Stage-B main-path PIE evidence — USER PROVIDED

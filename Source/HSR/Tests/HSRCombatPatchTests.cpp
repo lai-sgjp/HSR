@@ -266,14 +266,15 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	Controller->SetStateForAutomation(EHSREnemyExplorationState::ReturningToSpawnOrigin);
 	TestTrue(TEXT("ReturningToSpawnOrigin failure is handled by production decision seam"), Controller->HandleMoveFailureForAutomation(TeardownBlackboard, ExpectedSpawnOrigin));
 	TestEqual(TEXT("Returning failure remains bounded ReturningToSpawnOrigin"), Controller->GetCurrentState(), EHSREnemyExplorationState::ReturningToSpawnOrigin);
+	struct FControllerSnapshot { EHSREnemyExplorationState State; UObject* Target; FVector Spawn; FVector Patrol; uint8 BlackboardState; int32 BlackboardEpoch; FName RequestName; FGuid ActiveRequest; int32 Epoch; bool Retry; int32 Attempts; EHSREnemyExplorationState Recovery; };
+	const auto SnapshotController = [Controller, TeardownBlackboard]() { return FControllerSnapshot{ Controller->GetCurrentState(), Controller->GetCurrentTargetForAutomation(), TeardownBlackboard->GetValueAsVector(TEXT("SpawnOrigin")), TeardownBlackboard->GetValueAsVector(TEXT("PatrolLocation")), TeardownBlackboard->GetValueAsEnum(TEXT("AIState")), TeardownBlackboard->GetValueAsInt(TEXT("TreeEpoch")), TeardownBlackboard->GetValueAsName(TEXT("EncounterRequestId")), Controller->GetActiveEncounterRequestIdForAutomation(), Controller->GetBehaviorTreeEpoch(), Controller->IsNavReadyRetryScheduledForAutomation(), Controller->GetEncounterSubmissionAttemptsForAutomation(), Controller->GetLastRecoveryStateForAutomation() }; };
+	const auto SameControllerSnapshot = [](const FControllerSnapshot& A, const FControllerSnapshot& B) { return A.State == B.State && A.Target == B.Target && A.Spawn == B.Spawn && A.Patrol == B.Patrol && A.BlackboardState == B.BlackboardState && A.BlackboardEpoch == B.BlackboardEpoch && A.RequestName == B.RequestName && A.ActiveRequest == B.ActiveRequest && A.Epoch == B.Epoch && A.Retry == B.Retry && A.Attempts == B.Attempts && A.Recovery == B.Recovery; };
 	for (const EHSREnemyExplorationState IgnoredState : { EHSREnemyExplorationState::Alert, EHSREnemyExplorationState::Chasing, EHSREnemyExplorationState::EncounterPending, EHSREnemyExplorationState::Idle })
 	{
 		Controller->SetStateForAutomation(IgnoredState);
-		const FVector PatrolBeforeIgnored = TeardownBlackboard->GetValueAsVector(TEXT("PatrolLocation"));
-		const int32 EpochBeforeIgnored = Controller->GetBehaviorTreeEpoch();
-		const int32 AttemptsBeforeIgnored = Controller->GetEncounterSubmissionAttemptsForAutomation();
+		const FControllerSnapshot BeforeIgnored = SnapshotController();
 		TestFalse(TEXT("Non-owning state move abort is ignored"), Controller->HandleMoveFailureForAutomation(TeardownBlackboard, ExpectedSpawnOrigin));
-		TestTrue(TEXT("Ignored abort has exact relevant zero mutation"), Controller->GetCurrentState() == IgnoredState && TeardownBlackboard->GetValueAsVector(TEXT("PatrolLocation")) == PatrolBeforeIgnored && Controller->GetBehaviorTreeEpoch() == EpochBeforeIgnored && Controller->GetEncounterSubmissionAttemptsForAutomation() == AttemptsBeforeIgnored && !Controller->IsNavReadyRetryScheduledForAutomation());
+		TestTrue(TEXT("Ignored abort has exact full controller snapshot zero mutation"), SameControllerSnapshot(BeforeIgnored, SnapshotController()));
 	}
 	Controller->ApplySuccessfulPerceptionForAutomation(PerceivedTarget);
 	const EHSREnemyExplorationState ChasingBeforeIntentionalAbort = Controller->GetCurrentState();
