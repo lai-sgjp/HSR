@@ -1,39 +1,29 @@
-# TASK-P17-PATCH-02 Handled-Recovery Matrix Review
+# TASK-P17-PATCH-02 Final Code-Gate Review
 
 ## Review metadata
 
 - Reviewer: Independent Reviewer / Safety Reviewer
-- Reviewed revision: `9f3bdec`
-- Result: `REVISE`
+- Reviewed revision: `0c9aa0a`
+- Result: `PASS WITH FOLLOW-UP`
 - Date: 2026-07-28
 
-## Verified
+## Code Gate accepted
 
-- The shared recovery publisher now explicitly writes both Blackboard `SpawnOrigin` and `PatrolLocation` after final Returning state publication, preventing pawnless fixture state refresh from obscuring the intended origin.
-- Both MovingToPatrol and ReturningToSpawnOrigin decision calls assert final controller/Blackboard Returning state, null Blackboard target, expected origin values, no active Encounter request, and no retry arm.
-- Production behavior remains bounded; Build, `BehaviorTreeAdapter`, and `MapContract` are reported/logged as passing. Changes stay inside the Controller/test/result allowlist, with user assets isolated.
+- MovingToPatrol and ReturningToSpawnOrigin fixtures independently reset the recovery marker and execute the production move-failure decision seam.
+- Each handled case verifies its own `MoveFailed` marker, final controller/Blackboard `ReturningToSpawnOrigin`, null controller and Blackboard targets, expected Blackboard SpawnOrigin/PatrolLocation, no active or Blackboard Encounter request, no retry arm, unchanged controller/Blackboard epoch, and unchanged Encounter attempt/admission count.
+- Alert, Chasing, EncounterPending, and Idle retain the previously accepted full controller-plus-six-key Blackboard exact zero-mutation snapshots.
+- Final raw logs record `BehaviorTreeAdapter` and `MapContract` as Success with exit `0`; Build is reported successful. Revision provenance is confined to the allowlisted header/test/result files, and user-owned Blueprint/Map/DataAsset/AI changes remain isolated.
 
-## Remaining blocking assertions
+## Sole remaining task-level follow-up — USER PIE
 
-The explicit matrix requested by the preceding review is still only partially implemented:
+The C++/Automation Code Gate now has no known remaining defect. PATCH-02 itself must remain open until the real stock-BT return is observed:
 
-- Neither handled case captures and proves controller epoch and Blackboard TreeEpoch unchanged.
-- Neither captures and proves Encounter attempt/admission count unchanged.
-- Neither asserts Blackboard `EncounterRequestId` remains empty/no admission payload.
-- Neither asserts the controller `CurrentTarget` is clear; only the Blackboard object key is checked.
-- ReturningToSpawnOrigin does not independently assert the `MoveFailed` recovery marker after its own seam call. Its marker could be inherited from the prior MovingToPatrol case.
-
-Minimum correction, test-only within the current allowlist:
-
-1. Before each handled call independently capture controller epoch, Blackboard TreeEpoch, Encounter attempt count, active RequestId, Blackboard EncounterRequestId, target pointer, and retry flag.
-2. After each call assert: final controller/BB Returning state; controller and Blackboard targets null; SpawnOrigin and PatrolLocation equal ExpectedSpawnOrigin; recovery marker `MoveFailed`; controller/BB epochs unchanged; attempt count unchanged; active and Blackboard request IDs empty/unchanged; retry remains false.
-3. Reset or seed the recovery marker independently before the second case so its assertion cannot pass by inheritance.
-4. Rebuild and rerun `BehaviorTreeAdapter`. A fresh `MapContract` is unnecessary unless Transition production changes.
-
-## Remaining task gate
-
-After these final handled-state assertions pass, the code Gate should be closed. Only full-return user PIE will remain: one real `ReturnComplete` within acceptance radius, no target/Encounter, then a new patrol candidate or bounded fallback without duplicate completion or Controller Move/retry.
+1. Acquire the player, then leave sight without reacquiring or overlapping.
+2. Capture `Chasing -> LostTarget -> ReturningToSpawnOrigin`, epoch, cleared TargetActor, Actor start location, and SpawnOrigin.
+3. Capture exactly one `P17-PATCH-02 ReturnComplete` line with Actor Location, SpawnOrigin, Distance within the configured Move To acceptance radius, and empty Encounter RequestId.
+4. Capture the next reachable patrol candidate/`MovingToPatrol`, or the bounded failure fallback to `PatrolWaiting`/SpawnOrigin.
+5. Confirm no duplicate ReturnComplete, Controller Move request, repeating retry, or Encounter submission. Preserve the first failure/SKIPPED reason if the run cannot complete.
 
 ## Conclusion
 
-`REVISE`: explicit origin publication is fixed, but epoch, admission, controller-target, request-name, and independent second-marker invariants are still not proven for both handled paths.
+`PASS WITH FOLLOW-UP`: the final Code Gate passes. The only remaining requirement is user-provided full-return PIE evidence; this review must not be interpreted as authorization to archive PATCH-02 before that evidence is reviewed.
