@@ -6,6 +6,8 @@
 
 > 当前进度：PATCH-01A 已归档并由 Independent Reviewer 最终判定 `PASS`；PATCH-01B 活动卡已创建，等待 Implementation 只读复述与用户单独确认。
 
+> 进度更新：PATCH-01B 已归档并由 Independent Reviewer 最终判定 `PASS`；PATCH-01C 完整行动距离模型活动卡已创建，等待 Task Gate 审查。
+
 ## 1. 当前事实与 Gate
 
 - `UHSRStatusDefinition::Validate` 只接受三个硬编码 StatusId；`UHSRStatusComponent` 又把 `Status.Buff.AttackUp` 放入 `ActiveStatus` 特殊槽位，其余状态放入 `AdditionalStatuses`，并维护两套幂等集合。

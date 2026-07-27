@@ -1,50 +1,59 @@
-# TASK-P17-PATCH-01B — Repeatable Break Edge Transactions
+# TASK-P17-PATCH-01C — Complete Action-Distance Turn Model
 
-Status: `PLANNED / IMPLEMENTATION RESTATEMENT REQUIRED`
+Status: `PLANNED / TASK GATE REVIEW REQUIRED`
 
 ## Single outcome
 
-同一存活目标每次 Toughness 从大于零降到零都恰好发布一个独立 Break；恢复到正数后再次归零可再次 Break，而同一 ActionId replay、零到零、恢复本身、请求准入前死亡、Finished、Reset 与跨地图重建不会伪造或重复 Break/Status/Delay。
+TurnManager 使用统一行动距离决定下一行动者：运行中 Speed/Slow、Advance、Delay 与 Break Delay 均可重排未来行动，当前已开始的行动不被取消；高速角色可更频繁行动，所有请求 exactly-once，Tie-break、BattleEpoch、TurnSequence 与回合预算保持一致。
 
-## Frozen ownership and data flow
+## Frozen model and ownership
 
-- 本次权威 Toughness damage transaction 的 `Before > 0 && After == 0` 是 Break 边沿真源。
-- Coordinator 继续拥有 ActionId 幂等结果；不得在 Widget、GameplayCue、Status 或 TurnManager 中复制 Break 判定。
-- 移除 `FHSRBattleParticipant::bBreakResultPublished` 角色终身闩锁；不得用另一个布尔字段改名替代。
-- 每个成功边沿分别 exactly-once 请求 Break Status 与 Turn Delay；PATCH-01B 不改变 Delay 的现有 skip-once 语义，完整行动值迁移属于 PATCH-01C。
-- Toughness 恢复由既有 authority 或 Automation fixture 提供；本卡不新增自动恢复 Gameplay 规则。
-- 同一合法伤害事务若让入场时存活目标同时 `HP > 0 -> 0` 且 `Toughness > 0 -> 0`，保持现有管线优先级：先发布该事务唯一 Break/Status/Delay，再由 `ResolveDefeat` 收尾；不得因稍后的死亡清理抹掉已发布结果。请求准入前已经死亡的目标仍拒绝且不产生 Break。
-- 同帧致死例外只能由 Coordinator 在同一开放 `RequestAction` 事务内、`PendingDefeatedParticipantId == TargetParticipantId` 且目标在请求准入时存活时传入 Status/Delay；禁止写入临时正 Health、禁止持久化或缓存该资格，其他调用默认参数 `false` 并继续拒绝死亡目标。
+- TurnManager 是 battle-local 行动距离和顺序唯一 authority；ASC Speed 是有效速度真源；Status/GAS/Coordinator 只能提交变化或纯值请求，UI 只读快照。
+- 原创公式：`BaseActionDistance = 10000.0 / max(EffectiveSpeed, 1.0)`；距离越小越早行动。
+- 每个参与者保存纯值 `EffectiveSpeed`、`BaseActionDistance`、`RemainingActionDistance` 与稳定 ParticipantId；不持久化、不跨地图、不保存到 SaveGame。
+- 初始化时 Remaining=Base。选人前从所有合法候选 Remaining 减去最小值；零距离候选按 ParticipantId 字典序稳定 Tie-break。
+- 当前行动一旦 TurnStarted 即锁定。Speed/Advance/Delay 只影响未来选择，不取消、不重播当前行动。
+- ResolveAction 后，行动者 Remaining 增加当前 Base；不得简单重置并丢失超前/延后余额。
+- Speed/Slow 通过 ASC Speed delegate 事件驱动，无 Tick。非当前参与者按 `NewRemaining = OldRemaining * NewBase / OldBase` 保留进度；当前参与者的新 Base 在本次行动结束补距时生效。
+- 通用 Advance/Delay 请求为纯值：BattleEpoch、OperationId、TargetParticipantId、Ratio、Kind。Ratio 必须 finite 且 `[0,1]`；Advance 减 `Base*Ratio`（下限 0），Delay 加 `Base*Ratio`。
+- Break Delay 适配为同一 Delay 请求、Ratio=`1.0`，保持延后一整个自身基础行动距离；PATCH-01B 的 admitted-alive pending-deferred-defeat 资格仍只限当前同步事务。
+- OperationId battle-local exactly-once；无效、重复、旧 Epoch、未知/死亡目标、Finished 请求零变化并返回结构化结果。
 
-## Exact allowlist
+## Exact candidate allowlist
 
 - `Source/HSR/Data/HSRBreakTypes.h`
 - `Source/HSR/Battle/HSRBattleParticipant.h`
+- `Source/HSR/Battle/HSRTurnManager.h`
+- `Source/HSR/Battle/HSRTurnManager.cpp`
 - `Source/HSR/Battle/HSRBattleCoordinator.h`
 - `Source/HSR/Battle/HSRBattleCoordinator.cpp`
-- `Source/HSR/Status/HSRStatusComponent.h`（仅增加非反射的 admitted-alive/pending-deferred-defeat 参数；默认 `false`，普通死亡拒绝不变）
-- `Source/HSR/Status/HSRStatusComponent.cpp`（仅实现上述当前同步事务例外；禁止临时改写 Health）
-- `Source/HSR/Battle/HSRTurnManager.h`（仅为 Delay 接受路径增加非反射 pending-deferred-defeat 参数；默认 `false`）
-- `Source/HSR/Battle/HSRTurnManager.cpp`（仅实现上述例外；禁止修改排序、skip-once 或 Delay 算法）
-- `Source/HSR/Battle/HSRBattleGameMode.cpp`（仅 P8/P9 repeatable-Break development harness）
-- `Source/HSR/Battle/HSRBattleGameMode.h`（用户精确扩权：仅在 `#if WITH_DEV_AUTOMATION_TESTS` 下添加非 UFUNCTION/非 Blueprint/非 Shipping 的 `CreateRepeatableBreakAutomationFixture` 静态入口；禁止新增属性、BeginPlay 开关或通用状态 mutator）
+- `Source/HSR/Battle/HSRBattleGameMode.h`（仅复用/最小扩展 `WITH_DEV_AUTOMATION_TESTS` fixture；禁止新属性/开关）
+- `Source/HSR/Battle/HSRBattleGameMode.cpp`（仅 fixture 与现有 P8/P9/Turn harness）
 - `Source/HSR/Tests/HSRCombatPatchTests.cpp`
 - `tasks/execution-result.md`
 
-Implementation Agent 不得修改本活动卡、计划、PROJECT_STATE、worklog、todo、学习文档、Config 或 Content。
+Implementation 不得修改 active-task、计划、PROJECT_STATE、worklog/todo/learn、Config、Content、Save、UI 或网络代码。新增生产文件、Build.cs、Gameplay Tag/GE/DataAsset 或 Turn UI 快照文件需停止申请授权。
 
-## Required validation
+## Required matrix
 
-- 首次 `>0 -> 0` 必须记录：BreakResult triggered/event 增量 `+1`、Break Status request/result 增量 `+1`、Delay registration `+1`、Toughness 归零，当前行动只按既有流程 resolve 一次。
-- 同 BattleId + 同 ActionId replay 返回缓存 Resolution；Break/Status/Delay/Toughness/Turn 增量全部为 `+0`。
-- 恢复到 `>0` 本身所有副作用增量为 `+0`；第二个新 ActionId 再归零时 Break/Status/Delay 分别再 `+1`，且两次 Break ActionId 不同。
-- 初始/持续 `0 -> 0`、未归零、无弱点、Finished、请求准入前死亡均要求所有副作用计数 `+0`。
-- Reset 后旧 BattleId 请求结构化拒绝且计数 `+0`；新 BattleId 下复用旧 ActionId 视为新 Battle-local 事务，可在新的正数到零边沿触发一次。不得测试不存在的“旧 target callback”抽象。
-- 同帧致死+击破按冻结优先级各发布一次 Break/Status/Delay，随后完成 Defeat；不得重复行动或结果。
-- Development Editor Build、`HSR.Battle.Patch.RepeatableBreak`、适用 P8/P9/Battle 回归、`git diff --check`。
-- Automation 负责真实/受控 runtime 的 first/replay/recovery/second/0->0/Finished/Reset/stale BattleId/reused ActionId 与精确计数；不得以 Definition-only 测试代替 runtime。
-- PIE 复用现有 `bRunP9DotBreakHarness` 与 `P9-003 DotBreak Harness`，只在现有开关中增加 repeatable-Break 案例和日志；不得新增 GameMode 属性。Automation factory 只读取传入 ConfiguredGameModeClass CDO 的现有配置，通过正式 `SubmitBattleRequest -> BuildParticipants` 构建 transient Coordinator，不修改 CDO/Content。用户 PIE 必须提供两次独立 Break ActionId、各副作用计数与零 FAIL/INCOMPLETE/SKIPPED。
+- A/B/C 初始速度产生可解释的行动距离与稳定顺序；高速角色在足够多次 resolve 中可比低速角色多行动。
+- 当前 A 行动期间 B Speed Up、C Slow：A 不变，后续 Remaining 按进度比例换算，下一行动者正确。
+- Advance 0/0.25/1、Delay 0/0.3/1、连续组合及边界值；重复 OperationId 全部零变化。
+- Break Delay 只接受一次并表现为 `+1.0 Base`；不得再保留独立 skip-once 容器或双重延后。
+- 相同 Remaining 使用 ParticipantId Tie-break；浮点比较使用明确容差，不依赖 UObject 地址或数组偶然顺序。
+- 当前行动者 Speed 变化不取消当前行动；Resolve 后使用新 Base 补距。
+- 无效 Ratio、NaN/Inf、旧 Epoch、未知/死亡目标、Finished、全部失效、唯一存活角色均结构化且无重复/丢失行动。
+- Reset/新 Battle 清理 delegate、OperationId 与行动距离；旧 ASC Speed callback 零副作用；不得泄漏绑定。
+- same-frame deferred defeat 仍通过 PATCH-01B 回归；Status/Break 不因行动值迁移回归。
+
+## Evidence and user gate
+
+- Development Editor Build。
+- `HSR.Battle.Patch.ActionDistance` 真实/受控 runtime Automation；回归 `HSR.Battle.Patch`、适用 Turn/P8/P9/Battle tests。
+- 日志记录每次 OperationId、old/new Speed、Base/Remaining、current/next、TurnSequence、接受/拒绝结果。
+- PIE 复用既有 Battle development harness；若无合法 Speed/Advance/Delay 资产入口，结构化 harness 证明 runtime，用户只验证现有 Battle 行动不中断与 Break 回归，不得临时创建 Content/Blueprint 规则。
+- `git diff --check` 与 allowlist/provenance 审计。
 
 ## Explicit non-goals and stop conditions
 
-不实现行动值、Speed/Advance/Delay/Slow 重排；除已授权的 pending-deferred-defeat Delay 准入参数外不修改 TurnManager；不新增 Toughness 自动恢复、Status Definition、GE、Tag、Content、Config、Save、UI、网络或 Tick。需要白名单外生产文件、资产或契约扩张时立即停止请求最小授权。
+不实现正式行动条 UI、动画、VFX、网络预测/复制、SaveGame、AI、Behavior Tree、P17-005 或新 Content/Config。不得复制商业游戏常量/公式。需要白名单外生产消费者、反射接口、资产或扩大 Ratio/公式契约时停止请求最小授权。

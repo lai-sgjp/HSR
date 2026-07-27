@@ -2121,3 +2121,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 历史首错保留：msbuild PATH 不可用；transient ASC Health=0 导致 Automation exit -1；Reviewer `REVISE` 指出测试仅 Definition 与 Clear 丢失所有权；首次用户 PIE 因旧 `Status.Unsupported` 预期产生 P9-003 FAIL/INCOMPLETE，Reviewer=`BLOCKED`。
 - 最终 Development Editor Build、`HSR.Battle.Patch.StatusGeneric` exit 0；用户重跑 P9：P9-001/002/003 COMPLETE，OldRemoveFailure 与 InvalidDefinition PASS，相关 FAIL/INCOMPLETE/SKIPPED 均为 0。
 - Independent Reviewer 最终=`PASS`，commit `8cc09ed`；三件套已归档。当前活动切换到 PATCH-01B，只规划可重复 Break，尚未授权实现。
+
+# 2026-07-27｜TASK-P17-PATCH-01B 可重复 Break
+
+- 移除 participant 生命周期 `bBreakResultPublished`，以每个权威 Action 的 `Toughness > 0 -> 0` 边沿触发；Replay 返回缓存且无新 Status/Delay/Turn/Toughness 副作用。
+- 恢复后新 ActionId 可再次 Break；Reset/stale BattleId/reused ActionId、0→0、未归零、无弱点、死亡、Finished 与同帧致死均进入 runtime 矩阵。
+- 同帧致死不临时写 Health；Status/Delay 默认拒绝死亡，只有同一开放 RequestAction、准入时存活且 PendingDefeat 匹配时允许，随后 ResolveDefeat。
+- Automation fixture 采用 `UGameInstance::InitializeStandalone` 和配置 GameMode CDO，通过正式 Submit/BuildParticipants；多轮 fixture/生命周期/临时 Health/测试覆盖问题均以 REVISE/BLOCKED 保留。
+- 最终 Build、`HSR.Battle.Patch` 2/2 与用户 P9-003 通过：Recovery natural expiry；两个独立 ActionId；Status 0→1→2、Delay 0→1→2；19 cases PASS；零 FAIL/INCOMPLETE/SKIPPED。
+- Independent Reviewer final=`PASS`，commit `4a074c5`；三件套归档，活动切换 PATCH-01C Task Gate。

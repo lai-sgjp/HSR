@@ -6,8 +6,9 @@
 
 - Phase 17 P17-001～004 已完成；在 P17-005 前执行独立 Patch 01。
 - `TASK-P17-PATCH-01A` ActiveStatus 通用化最终 Reviewer=`PASS`（`8cc09ed`）：Build、`HSR.Battle.Patch.StatusGeneric` 与用户 P9-001/002/003 PIE 全部通过。
+- `TASK-P17-PATCH-01B` 可重复 Break 最终 Reviewer=`PASS`（`4a074c5`）：Build、RepeatableBreak Automation、Patch 2/2 与用户 P9-003 19-case PIE 全部通过。
 - PATCH-01A Implementation commits：`e93b04c`、`955d5d3`、`d1f8eb0`、`06f84db`；REVISE/BLOCKED 与首错历史保存在三件套归档。
-- 当前唯一活动任务为 `TASK-P17-PATCH-01B`，只处理可重复 Break；状态=`PLANNED / IMPLEMENTATION RESTATEMENT REQUIRED`，尚未获得该任务的用户实现确认。
+- 当前唯一活动任务为 `TASK-P17-PATCH-01C`，规划完整行动距离模型；状态=`PLANNED / TASK GATE REVIEW REQUIRED`，尚未获得该任务的用户实现确认。
 - `learn/SaveSystem.md` 与 `.claude/**` 的未提交变化不属于 PATCH-01A Coordinator 产物，保持不触碰。
 
 ## 历史 Phase 15 状态

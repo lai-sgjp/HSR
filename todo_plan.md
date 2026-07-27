@@ -311,7 +311,8 @@
 - [x] P17-001：纯值 Screen Stack、唯一 HUD root、Input/Focus Policy 与失败零污染合同；Build 11/11、Automation 3/3、Independent Review `PASS WITH FOLLOW-UP`。
 - [x] P17-002～004：探索 Pause/Input/Focus、Character/Inventory 接入、Travel teardown/rebuild 与用户 PIE Gate 已完成。
 - [x] PATCH-01A：ActiveStatus 通用化；Build、真实 runtime Automation、P9-001/002/003 用户 PIE 与 Independent Reviewer `PASS`。
-- [ ] PATCH-01B：移除终身 Break 闩锁，以独立 `>0 -> 0` 边沿与 ActionId 幂等支持恢复后再次 Break；等待 Implementation 只读复述和用户确认。
+- [x] PATCH-01B：移除终身 Break 闩锁；恢复后再次 Break、Replay/Reset/death/Finished、同帧致死、Automation 与用户 P9-003 PIE 全部通过。
+- [ ] PATCH-01C：统一行动距离模型，接入 Speed/Slow/Advance/Delay/Break Delay；等待 Task Gate 审查。
 - [ ] 完成主菜单、暂停、角色、队伍、背包、任务、地图和设置界面。
 - [ ] 建立 Screen Stack、统一 InputMode 和导航。
 - [ ] 验证地图旅行后的 UI 重建。
