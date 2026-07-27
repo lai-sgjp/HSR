@@ -5,6 +5,8 @@
 #include "HSRPlayerController.generated.h"
 
 class UInputMappingContext;
+struct FHSRInputModePolicy;
+enum class EHSRUIInputIntent : uint8;
 
 UENUM(BlueprintType)
 enum class EHSRPlayerControlMode : uint8
@@ -32,6 +34,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Control")
 	EHSRPlayerControlMode GetControlMode() const { return CurrentControlMode; }
 
+	bool ApplyUIInputPolicy(const FHSRInputModePolicy& Policy, EHSRPlayerControlMode SemanticMode);
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Navigation")
+	void RequestOpenPauseScreen();
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Navigation")
+	void RequestOpenCharacterDetailScreen();
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Navigation")
+	void RequestOpenInventoryScreen();
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Navigation")
+	void RequestBackScreen();
+
 protected:
 	virtual void SetupInputComponent() override;
 
@@ -49,4 +65,5 @@ protected:
 
 	bool bExplorationContextAdded;
 	bool bInputSystemReady;
+	EHSRUIInputIntent AppliedInputIntent;
 };

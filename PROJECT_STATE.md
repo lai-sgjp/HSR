@@ -1,8 +1,8 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-07-26
+> 最后更新：2026-07-27
 
-## Phase 15 当前状态
+## 历史 Phase 15 状态
 
 - Phase 15 P15-001～005 均最终 `PASS` 并归档，阶段状态=`Ready with inherited follow-ups`；等待 Phase 16 Gate 0 四角色规划。
 - P14-001～003 核心 Quest/Dialogue/Save v4 链路已通过自动化；P14-004 的 `HSREditor Win64 Development`、`HSR.QuestDialogue`、`HSR.Save` 8/8 已通过。
@@ -11,7 +11,9 @@
 - Teacher Gate 已完成：`PASS WITH GUIDED CORRECTION`；P14-001 已归档为 `PASS WITH FOLLOW-UP`。分支选择后的可视化奖励结果继续作为 inherited follow-up。
 > 作用：CC-SWITCH 切换模型后的快速恢复快照。高级模型负责维护；低级模型不得把本文件作为执行入口。
 
-## 当前 Phase
+## 当前 Phase（以下旧阶段明细由文末 2026-07-27 最新权威摘要覆盖）
+
+- **Phase 16 已完成 closeout；Phase 17 Gate 0=`PASS`，P17-001 已完成并获 Independent Reviewer `PASS WITH FOLLOW-UP`。**
 
 - **Phase 13 为 `Ready with inherited follow-ups`：P13-001～005 已归档；Item/Inventory、Reward/Drop、Encounter 驱动的 Battle victory 与 Reward Chest、Save v3、只读 UI、Teaching 和 provenance 均闭合。最终 Independent Reviewer 为 `PASS WITH FOLLOW-UP`。**
 - **Phase 12 已完成提交与远端交付：`HEAD=origin/main=7606235`。旧“等待 commit/push”描述已由 Git 与归档证据校准。**
@@ -26,9 +28,9 @@
 - Phase 0 已完成并处于 `Ready`；UE5.6 Blank C++ 工程基线、基础插件/模块、Gameplay Tags、`Map_ProjectSetup`、Development Editor、Editor 重开、空白 PIE 与用户确认的 C++20 均有真实证据。
 - P1-001 的 Character/Camera 骨架及构建证据已被 P1-004 的资产、Possession、输入、移动与 PIE 集成证据继续覆盖。
 
-## 当前任务
+## 当前任务（2026-07-27）
 
-- 当前无工程活动任务；Phase 16 Gameplay 在 Gate 0 四角色计划通过前禁止开始。
+- 当前无待实施的 Phase 17 工程任务；P17-001 已归档，P17-002 尚未创建或授权。
 
 - 当前无 Phase 9 活动任务。P9-006 已完成 Teacher 六题掌握、Reviewer Gate、provenance、Config EOF 修复、全局 diff-check、四个角色提交和三件套归档；Coordinator closeout Markdown 等待单独提交。
 - Phase 9 角色提交：User `2a2eb3d`、Implementation `a996475`、Teacher `39e0449`、Independent Reviewer `db383b3`。`.agents/CLAUDE.md` 经用户确认纳入 User/project-owned 交付集合。
@@ -557,3 +559,10 @@
 - Phase 16 四角色只读规划完成；Reviewer 两轮 `REVISE` 的阻塞已冻结，最终复核=`PASS`，Gate 0=`PASS`。
 - UE5.6 本地确认 memory/slot API 存在，但尚未证明槽位替换原子性；不得宣称真实断电安全。
 - 唯一活动任务为 `TASK-P16-001`，状态 `PLANNED / USER AUTHORIZATION REQUIRED`；尚未进入 Phase 16 实现。
+
+# 2026-07-27 Phase 17 进入状态（最新权威摘要）
+
+- Phase 16 已由 closeout commit `2c11415` 收尾；`tasks/active-task.md` 为 P16-005 `COMPLETE / AGENT VERIFIED / INDEPENDENT REVIEW PASS`，`tasks/final-review.md` 为 `PASS`，`HSR.Save` 16/16 与五进程冷恢复链通过。
+- Phase 16 未验证 graphical Editor、Packaged/Shipping、真实断电/磁盘故障、跨平台、云和多人；这些边界不外推。
+- Phase 17 Gate 0=`PASS`。P17-001 已完成并获 Independent Reviewer=`PASS WITH FOLLOW-UP`；P17-002 Task Gate=`PASS`，等待用户单独确认，尚未实施 Source/Content。
+- 当前工作树中的 `learn/CppEngineDepth.md`、`learn/AI.md`、`.claude/settings.local.json`、`Content/UI/WBP_Reward_Summary_P13.uasset` 为用户既有改动，Phase 17 不认领、不回退。

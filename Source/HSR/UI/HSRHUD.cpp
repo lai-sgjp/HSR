@@ -11,11 +11,45 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "../Character/HSRCharacterBase.h"
+#include "HSRScreenWidget.h"
+#include "HSRUIManagerSubsystem.h"
+#include "../Player/HSRPlayerController.h"
+#include "Engine/LocalPlayer.h"
+#include "../Map/HSRMapSubsystem.h"
+#include "../Battle/HSRBattleTransitionSubsystem.h"
 
 void AHSRHUD::BeginPlay()
 {
 	Super::BeginPlay();
 	ShowExplorationHUD();
+}
+
+void AHSRHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	UGameInstance* GI = GetGameInstance();
+	const UHSRMapSubsystem* Maps = GI ? GI->GetSubsystem<UHSRMapSubsystem>() : nullptr;
+	const UHSRBattleTransitionSubsystem* BattleTravel = GI ? GI->GetSubsystem<UHSRBattleTransitionSubsystem>() : nullptr;
+	const bool bAuthorizedTravelPending = (Maps && Maps->HasPendingTravel())
+		|| (BattleTravel && (BattleTravel->HasPending() || BattleTravel->HasReturnPending()));
+	const bool bCaptureTravel = ShouldCaptureTravelRestore(EndPlayReason, bAuthorizedTravelPending);
+	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 HUD EndPlay Reason=%d CaptureTravel=%s"),
+		static_cast<int32>(EndPlayReason), bCaptureTravel ? TEXT("true") : TEXT("false"));
+	if (bCaptureTravel)
+	{
+		if (AHSRPlayerController* HSRPC = Cast<AHSRPlayerController>(GetOwningPlayerController()))
+		{
+			if (ULocalPlayer* LP = HSRPC->GetLocalPlayer())
+			{
+				if (UHSRUIManagerSubsystem* UIManager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
+				{
+					const EHSRUIScreenResult Result = UIManager->TeardownExplorationHostForTravel(this, HSRPC);
+					bUIHostAlreadyUnregistered = Result != EHSRUIScreenResult::InvalidHost;
+				}
+			}
+		}
+	}
+	RemoveExplorationHUD();
+	Super::EndPlay(EndPlayReason);
 }
 
 void AHSRHUD::ShowExplorationHUD()
@@ -46,22 +80,43 @@ void AHSRHUD::ShowExplorationHUD()
 	}
 
 	ExplorationWidgetInstance->AddToViewport();
+	if (AHSRPlayerController* HSRPC = Cast<AHSRPlayerController>(PC))
+	{
+		if (ULocalPlayer* LP = HSRPC->GetLocalPlayer())
+		{
+			if (UHSRUIManagerSubsystem* UIManager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
+			{
+				UIManager->RegisterExplorationHost(this, HSRPC, ExplorationWidgetInstance, PauseWidgetClass,
+					CharacterDetailWidgetClass, InventoryWidgetClass);
+			}
+		}
+	}
 	UGameInstance* GameInstance = GetGameInstance();
 	UHSRInventorySubsystem* Inventory = GameInstance ? GameInstance->GetSubsystem<UHSRInventorySubsystem>() : nullptr;
 	UHSRRewardSubsystem* Reward = GameInstance ? GameInstance->GetSubsystem<UHSRRewardSubsystem>() : nullptr;
-	if (Inventory && Reward)
+	if (Inventory && Reward && RewardSummaryWidgetClass)
 	{
-		InventoryRewardViewModel = NewObject<UHSRInventoryRewardViewModel>(this);
-		InventoryRewardViewModel->Initialize(Inventory, Reward);
-		if (InventoryWidgetClass)
-		{
-			InventoryWidgetInstance = CreateWidget<UHSRInventoryWidget>(PC, InventoryWidgetClass);
-			if (InventoryWidgetInstance) { InventoryWidgetInstance->SetViewModel(InventoryRewardViewModel); InventoryWidgetInstance->AddToViewport(); }
-		}
-		if (RewardSummaryWidgetClass)
+		RewardSummaryViewModel = NewObject<UHSRInventoryRewardViewModel>(this);
+		RewardSummaryViewModel->Initialize(Inventory, Reward);
+		FHSRInventoryRewardSnapshot InitialSnapshot;
+		if (RewardSummaryViewModel->GetSnapshot(InitialSnapshot))
 		{
 			RewardSummaryWidgetInstance = CreateWidget<UHSRRewardSummaryWidget>(PC, RewardSummaryWidgetClass);
-			if (RewardSummaryWidgetInstance) { RewardSummaryWidgetInstance->SetViewModel(InventoryRewardViewModel); RewardSummaryWidgetInstance->AddToViewport(); }
+			if (RewardSummaryWidgetInstance)
+			{
+				RewardSummaryWidgetInstance->SetViewModel(RewardSummaryViewModel);
+				RewardSummaryWidgetInstance->AddToViewport();
+			}
+			else
+			{
+				RewardSummaryViewModel->Shutdown();
+				RewardSummaryViewModel = nullptr;
+			}
+		}
+		else
+		{
+			RewardSummaryViewModel->Shutdown();
+			RewardSummaryViewModel = nullptr;
 		}
 	}
 
@@ -173,10 +228,28 @@ void AHSRHUD::RequestRebuildExplorationHUDForPhase2Test()
 
 void AHSRHUD::RemoveExplorationHUD()
 {
+	if (!bUIHostAlreadyUnregistered)
+	{
+		if (AHSRPlayerController* HSRPC = Cast<AHSRPlayerController>(GetOwningPlayerController()))
+		{
+			if (ULocalPlayer* LP = HSRPC->GetLocalPlayer())
+			{
+				if (UHSRUIManagerSubsystem* UIManager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
+				{
+					const EHSRUIScreenResult Result = UIManager->UnregisterExplorationHost(this, HSRPC);
+					if (Result != EHSRUIScreenResult::Success)
+					{
+						UE_LOG(LogTemp, Error, TEXT("HSRUI P17 HUD host teardown Result=%d; manager forced stale-host cleanup"),
+							static_cast<int32>(Result));
+					}
+				}
+			}
+		}
+	}
+	bUIHostAlreadyUnregistered = false;
 	ClearInteractionObserverInstance();
-	if (InventoryWidgetInstance) { InventoryWidgetInstance->RemoveFromParent(); InventoryWidgetInstance = nullptr; }
 	if (RewardSummaryWidgetInstance) { RewardSummaryWidgetInstance->RemoveFromParent(); RewardSummaryWidgetInstance = nullptr; }
-	if (InventoryRewardViewModel) { InventoryRewardViewModel->Shutdown(); InventoryRewardViewModel = nullptr; }
+	if (RewardSummaryViewModel) { RewardSummaryViewModel->Shutdown(); RewardSummaryViewModel = nullptr; }
 
 	if (!ExplorationWidgetInstance)
 	{

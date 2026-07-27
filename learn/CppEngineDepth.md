@@ -438,4 +438,52 @@ UE 容器的好处：
   → 空检查更友好（IsValidIndex、Contains）
 ```
 
+---
+
+## Subsystem
+
+### 四种类型与生命周期
+
+| 类型 | 生命周期 | 用途 |
+|---|---|---|
+| `UEngineSubsystem` | 引擎启动→关闭 | 全局管理器 |
+| `UGameInstanceSubsystem` | GameInstance 创建→销毁 | **跨地图存活**（你项目的 TransitionSubsystem） |
+| `UWorldSubsystem` | World 创建→销毁 | 绑定地图 |
+| `ULocalPlayerSubsystem` | LocalPlayer 创建→销毁 | 输入映射、玩家设置 |
+
+### 为什么 TransitionSubsystem 是 GameInstanceSubsystem
+
+OpenLevel 会替换整个 UWorld，WorldSubsystem 会被销毁。GameInstanceSubsystem 不依赖 World，跨地图存活。
+
+### 访问方式
+
+```cpp
+// GameInstanceSubsystem
+UGameInstance* GI = GetWorld()->GetGameInstance();
+UHSRBattleTransitionSubsystem* Sub = GI->GetSubsystem<UHSRBattleTransitionSubsystem>();
+
+// WorldSubsystem
+UMyWorldSubsystem* Sub = GetWorld()->GetSubsystem<UMyWorldSubsystem>();
+
+// LocalPlayerSubsystem
+ULocalPlayer* LP = GetWorld()->GetFirstPlayerController()->GetLocalPlayer();
+UEnhancedInputLocalPlayerSubsystem* InputSub = LP->GetSubsystem<...>();
+```
+
+### Subsystem 自动生命周期
+
+```cpp
+UCLASS()
+class UMySubsystem : public UGameInstanceSubsystem
+{
+    GENERATED_BODY()
+    virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+    virtual void Deinitialize() override;
+};
+```
+
+UE 自动创建/销毁，不需要手动 new。`Initialize`/`Deinitialize` 分别在创建和销毁时调用。
+
+---
+
 > 你在 `HSRBattleParticipant` 中用了 `TWeakObjectPtr<AActor>`。如果改成 `TObjectPtr<AActor>`，会有什么具体问题？在什么场景下会出 Bug？

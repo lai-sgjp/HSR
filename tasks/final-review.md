@@ -1,11 +1,29 @@
-# TASK-P16-005 Final Review
+# TASK-P17-004 Final Review
 
 Status: `PASS`
 
-Independent reviewer found no blocking issue. The five formal processes used distinct PIDs, each ran exactly one named cold-save test, exited 0, and logged Success. Seed/Primary/controlled-corruption/Backup/Cleanup semantics, every existing authority's distinguishable S1/S2 state, lineage/generation/source diagnostics, exactly-once restore behavior, read-only Load behavior, and exact-role cleanup were confirmed.
+## Engineering review
 
-The reviewer also confirmed that replacing process-local `GetTypeHash(FName)` with deterministic UTF-8 FNV-1a fixes the cross-process Equipment owner mapping without weakening collision validation, and that `HSR.Save` remains 16/16 passing.
+- Independent implementation review: `PASS`. Prior blockers for exact-root forced cleanup, strict newer-host matching, arrival latch/baseline, stale/superseded events and missing test coverage are closed.
+- Development Editor Build succeeded after the final monotonic-token correction.
+- `Saved/Logs/P17-004-ScreenLifecycle-Final4.log`: 7 Success, 0 Fail.
+- `Saved/Logs/P17-004-Map-Final.log`: 5 Success, 0 Fail.
+- `Saved/Logs/P17-004-ScreenStack-Final.log`: 3 Success, 0 Fail.
+- `git diff --check` exits 0; line-ending notices only. P17-004 edits remain inside its frozen allowlist; unrelated dirty-worktree files were preserved.
 
-Non-blocking follow-ups: Primary cold verification could also byte-compare both disk roles and directly compare result SaveId with the decoded header; future schema work should replace the `CanPrepareSnapshot` literal schema ceiling with the shared constant; diagnostic logs must not be mistaken for the formal evidence chain.
+## Evidence boundary
 
-Not verified: graphical Editor, packaged/Shipping, non-Windows or cross-platform interchange, real crash/power-loss/disk-full/permissions/locking/partial writes, concurrent processes, cloud saves, multiplayer, or automatic cold coverage of future schema fields.
+Automation proves the internal transaction, both host/arrival orderings, typed publisher contract, failure compensation and stale/supersession behavior. It does not prove real World/Pawn placement, production ordinary/battle callsite emission, visible Slate focus, physical input or Reward Summary presentation.
+
+## User PIE gate
+
+- Initial PIE exposed that this project's OpenLevel reports HUD `EndPlay(Destroyed)`, not `LevelTransition`; the trigger was repaired with an authorized-pending guard and its Build/Automation recheck passed.
+- Post-fix A-to-B proved one exact Freeze/Arrival/Consume across Host 1 to Host 2, with root `Result=0`, `Stack=1`; PIE Stop remained non-capturing.
+- The full log proves nine exact production transaction pairs, including two battle returns, with monotonic Host/Arrival generations, root success and no structured failures.
+- User confirmation received: HUD, W/A/S/D and mouse behavior were normal after every return, and Reward Summary appeared exactly once in each of the two battle rounds.
+- CharacterDetail/Inventory and Pause travel through the current UIOnly interaction are `NOT EXECUTABLE` where no legal travel entry remains available; no OpenLevel workaround was added.
+- Unsafe travel-failure injection is `NOT USER VERIFIED`; physical gamepad is `NOT VERIFIED`.
+
+## Verdict
+
+P17-004 passes its engineering, independent review and User PIE gates. Production ordinary travel and battle return both rebuild the root UI exactly once with restored input, cursor and HUD behavior; each tested battle round shows one Reward Summary. No Git stage, commit or push was performed.

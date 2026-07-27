@@ -2085,3 +2085,30 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Coordinator 冻结 authority coverage、Primary/Staging/Backup、candidate-first、失败矩阵、golden fixture 与证据边界；窄范围复核要求 on-disk contract 精确到字节，已补充 format v1 固定布局、canonical codec、上限、SHA-256 scope 与分类顺序，等待最终复核。
 - 已创建 P16-001 卡，仅规划 Header、v6、版本分类和相邻迁移；未修改 Source、未构建、未运行测试、未实施备份写盘。
 - 最终 Independent Review=`PASS`；on-disk format v1 已精确到外层 bytes、offset、canonical codec、上限、SHA-256 scope、分类与 lineage 规则。Gate 0 通过，但 P16-001 仍等待用户授权。
+
+# 2026-07-27｜Phase 17 Gate 0 规划启动
+
+- Phase 16 权威证据校准为 closeout commit `2c11415`、P16-005 `COMPLETE / AGENT VERIFIED / INDEPENDENT REVIEW PASS`、`tasks/final-review.md`=`PASS`；不把 graphical Editor、Packaged/Shipping 或真实断电外推为已验证。
+- Coordinator、Independent Reviewer、Teacher、Implementation 完成只读审查。Reviewer 首轮=`REVISE`，指出状态文档陈旧、InputMode/Widget 双所有权、Travel/Focus 策略和证据分级必须先冻结。
+- `docs/phase-17-execution-plan.md` 已冻结 LocalPlayer UI Manager、纯值 Screen Stack、唯一 InputMode Coordinator、HUD/Battle 渐进迁移、旅行后候选重建、失败矩阵、用户 WBP 边界和 P17-001～005。
+- 当前只完成规划与状态校准；未修改 Source/Content/Config，未 Build/Automation/Editor/PIE，未创建 P17-001 活动卡。等待 Independent Reviewer 窄范围复核。
+- Independent Reviewer 最终窄范围复核=`PASS`；首轮 1～7 项规划阻塞全部冻结，Phase 17 Gate 0 通过。
+- 已创建唯一活动卡 `TASK-P17-001`，只允许纯值 Screen Stack/Input Policy 与 Automation 文件；状态为 `PLANNED / USER AUTHORIZATION REQUIRED`，尚未实施。
+
+# 2026-07-27｜TASK-P17-001 完成
+
+- 用户在 Coordinator 明确请求确认 TASK-P17-001 后回复“开始工作”，实施授权已落盘。
+- 新增纯值 Screen Stack、唯一受保护 HUD root、layer precedence、单调 token、Input/Focus policy 与 LocalPlayer UI session 入口；无 Widget/Slate/真实 InputMode、Tick、Timer、Travel 或业务 authority。
+- Reviewer 首轮 `REVISE` 的授权状态、root invariant 和失败矩阵三项阻断已闭合。
+- 最终 `Saved/Logs/P17-001-Build-Final.log`：UHT 3、11/11 actions、lib/dll、`Result: Succeeded`；`HSR.UI.ScreenStack` 3/3 Success、exit code 0。
+- Independent Reviewer 最终=`PASS WITH FOLLOW-UP`。UIManager lifecycle 测试留给 P17-002 邻接包；不外推真实 Widget/focus/PIE/travel/分辨率/设备。
+- P17-001 已归档；尚未创建或实施 P17-002，未 stage/commit/push。
+
+# 2026-07-27｜TASK-P17-002 规划
+
+- 已创建 P17-002 活动卡候选：唯一结果为 Exploration Pause modal Open→Back 后 input/cursor/focus/IMC 与暂停所有权 exactly-once 恢复。
+- 冻结 UIManager、InputModeCoordinator、PlayerController、HUD 与 ScreenWidget 所有权；P17-001 root/token/policy 合同只允许最小扩展，不得重写。
+- 用户 Content 精确边界为两个 P17 WBP 与现有 HUD/PlayerController BP 接线；Implementation 不修改 Content，新 IA/IMC/Config 需要另行授权。
+- 当前只完成任务规划；等待 Independent Reviewer 任务 Gate 审查，未修改 Source/Content、未 Build/Automation/Editor/PIE。
+- Task Gate 首轮 Reviewer/Implementation 均=`REVISE`；已冻结现有 ExplorationWidget 为唯一 root、Pause-only 新 WBP、UIOnly Back 入口、Open/Close 新 token 补偿、非 Slate UE5.6 API 路线、外部暂停拒绝和 Automation seam，等待最终复核。
+- Independent Reviewer 与 Implementation 最终 Task Gate 均=`PASS`；目标、allowlist、事务补偿、API 路线和证据边界可实施。当前仍等待用户对 TASK-P17-002 的单独确认，未修改 Source/Content。

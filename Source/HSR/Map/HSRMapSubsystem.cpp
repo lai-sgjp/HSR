@@ -335,6 +335,7 @@ EHSRMapOperationResult UHSRMapSubsystem::CommitPendingArrival(const FName Destin
 		World->GetTimerManager().ClearTimer(TravelTimeoutTimer);
 	}
 	CommitStateChange();
+	PublishArrivalCommitted(DestinationMapId, ArrivalId, EHSRMapArrivalCommitKind::OrdinaryTravel);
 	UE_LOG(LogTemp, Log, TEXT("HSR Map arrival committed RequestId=%s Map=%s Arrival=%s Location=%s"),
 		*CompletedRequestId.ToString(), *DestinationMapId.ToString(), *ArrivalId.ToString(),
 		*ArrivalTransform.GetLocation().ToString());
@@ -367,6 +368,7 @@ EHSRMapOperationResult UHSRMapSubsystem::CommitBattleReturnLocation(const FName 
 	Snapshot.CurrentLocation.ArrivalId = NAME_None;
 	Snapshot.CurrentLocation.WorldTransform = ReturnTransform;
 	CommitStateChange();
+	PublishArrivalCommitted(MapId, NAME_None, EHSRMapArrivalCommitKind::BattleReturn);
 	UE_LOG(LogTemp, Log, TEXT("HSR Battle map location committed Map=%s Location=%s"),
 		*MapId.ToString(), *ReturnTransform.GetLocation().ToString());
 	return EHSRMapOperationResult::Success;
@@ -599,4 +601,17 @@ void UHSRMapSubsystem::CommitStateChange()
 {
 	++Snapshot.Revision;
 	MapStateChanged.Broadcast(Snapshot);
+}
+
+void UHSRMapSubsystem::PublishArrivalCommitted(const FName MapId, const FName ArrivalId,
+	const EHSRMapArrivalCommitKind Kind)
+{
+	FHSRMapArrivalCommitInfo Info;
+	Info.CommitGeneration = ++ArrivalCommitGeneration;
+	Info.MapId = MapId;
+	Info.ArrivalId = ArrivalId;
+	Info.Kind = Kind;
+	ArrivalCommitted.Broadcast(Info);
+	UE_LOG(LogTemp, Log, TEXT("HSR Map ArrivalCommitted Generation=%lld Map=%s Arrival=%s Kind=%d"),
+		Info.CommitGeneration, *MapId.ToString(), *ArrivalId.ToString(), static_cast<int32>(Kind));
 }

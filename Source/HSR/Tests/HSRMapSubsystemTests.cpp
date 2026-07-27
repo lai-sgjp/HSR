@@ -181,6 +181,36 @@ bool FHSRMapTravelTransactionTest::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRMapArrivalCommitNotificationTest, "HSR.Map.ArrivalCommitNotification",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRMapArrivalCommitNotificationTest::RunTest(const FString&)
+{
+	using namespace HSR::P15::Tests;
+	UGameInstance* GameInstance = NewObject<UGameInstance>();
+	UHSRMapSubsystem* Maps = NewObject<UHSRMapSubsystem>(GameInstance);
+	Maps->RegisterMapDefinition(*MakeMap(TEXT("Map.A"), TEXT("/Game/Maps/Map_A.Map_A"), TEXT("Region.A"), TEXT("Arrival.A")));
+	TArray<FHSRMapArrivalCommitInfo> Events;
+	Maps->OnArrivalCommitted().AddLambda([&Events](const FHSRMapArrivalCommitInfo& Info) { Events.Add(Info); });
+
+	TestEqual(TEXT("set location is not arrival"), Maps->SetCurrentLocation(TEXT("Map.A")), EHSRMapOperationResult::Success);
+	TestEqual(TEXT("unlock region is not arrival"), Maps->UnlockRegion(TEXT("Region.A")), EHSRMapOperationResult::Success);
+	TestEqual(TEXT("flag is not arrival"), Maps->SetExplorationFlag(TEXT("Exploration.Arrival.Test")), EHSRMapOperationResult::Success);
+	TestEqual(TEXT("unrelated state emits no arrival"), Events.Num(), 0);
+
+	Maps->PublishArrivalCommittedForAutomation(TEXT("Map.B"), TEXT("Arrival.FromA"), EHSRMapArrivalCommitKind::OrdinaryTravel);
+	Maps->PublishArrivalCommittedForAutomation(TEXT("Map.B"), NAME_None, EHSRMapArrivalCommitKind::BattleReturn);
+	TestEqual(TEXT("two shared publisher calls emit twice"), Events.Num(), 2);
+	TestEqual(TEXT("ordinary generation"), Events[0].CommitGeneration, static_cast<int64>(1));
+	TestEqual(TEXT("ordinary map"), Events[0].MapId, FName(TEXT("Map.B")));
+	TestEqual(TEXT("ordinary arrival"), Events[0].ArrivalId, FName(TEXT("Arrival.FromA")));
+	TestEqual(TEXT("ordinary kind"), Events[0].Kind, EHSRMapArrivalCommitKind::OrdinaryTravel);
+	TestEqual(TEXT("battle generation"), Events[1].CommitGeneration, static_cast<int64>(2));
+	TestEqual(TEXT("battle arrival none"), Events[1].ArrivalId, NAME_None);
+	TestEqual(TEXT("battle kind"), Events[1].Kind, EHSRMapArrivalCommitKind::BattleReturn);
+	TestEqual(TEXT("generation getter tracks publisher"), Maps->GetArrivalCommitGeneration(), static_cast<int64>(2));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRMapSaveProjectionTest, "HSR.Map.SaveV5Projection",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FHSRMapSaveProjectionTest::RunTest(const FString&)

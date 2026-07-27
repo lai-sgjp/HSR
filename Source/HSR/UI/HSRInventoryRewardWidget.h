@@ -1,14 +1,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
+#include "HSRScreenWidget.h"
 #include "HSRInventoryRewardTypes.h"
 #include "HSRInventoryRewardWidget.generated.h"
 
 class UHSRInventoryRewardViewModel;
 
-UCLASS(Abstract, Blueprintable)
-class HSR_API UHSRInventoryWidget : public UUserWidget
+UCLASS(Blueprintable)
+class HSR_API UHSRInventoryWidget : public UHSRScreenWidget
 {
 	GENERATED_BODY()
 
@@ -19,6 +19,12 @@ public:
 	bool GetCurrentSnapshot(FHSRInventorySnapshot& OutSnapshot) const;
 	UFUNCTION(BlueprintImplementableEvent, Category = "HSR|Inventory")
 	void OnInventorySnapshotChanged(const FHSRInventorySnapshot& Snapshot);
+
+#if WITH_DEV_AUTOMATION_TESTS
+	void AttachForAutomation() { BindAndRefresh(); }
+	int32 GetBindCountForAutomation() const { return BindCount; }
+	int32 GetUnbindCountForAutomation() const { return UnbindCount; }
+#endif
 
 protected:
 	virtual void NativeConstruct() override;
@@ -32,6 +38,10 @@ private:
 	FDelegateHandle Subscription;
 	FHSRInventorySnapshot Current;
 	bool bHasSnapshot = false;
+#if WITH_DEV_AUTOMATION_TESTS
+	int32 BindCount = 0;
+	int32 UnbindCount = 0;
+#endif
 };
 
 UCLASS(Abstract, Blueprintable)

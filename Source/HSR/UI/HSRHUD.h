@@ -9,6 +9,8 @@ class UHSRInteractionViewModel;
 class UHSRInventoryRewardViewModel;
 class UHSRInventoryWidget;
 class UHSRRewardSummaryWidget;
+class UHSRScreenWidget;
+class UHSRCharacterDetailWidget;
 
 UCLASS()
 class HSR_API AHSRHUD : public AHUD
@@ -17,6 +19,12 @@ class HSR_API AHSRHUD : public AHUD
 
 public:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	static bool ShouldCaptureTravelRestore(EEndPlayReason::Type EndPlayReason, bool bAuthorizedTravelPending)
+	{
+		return EndPlayReason == EEndPlayReason::LevelTransition
+			|| (EndPlayReason == EEndPlayReason::Destroyed && bAuthorizedTravelPending);
+	}
 
 	UFUNCTION(BlueprintCallable, Category = "HUD")
 	void ShowExplorationHUD();
@@ -42,6 +50,12 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UHSRUserWidget> ExplorationWidgetInstance;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
+	TSubclassOf<UHSRScreenWidget> PauseWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
+	TSubclassOf<UHSRCharacterDetailWidget> CharacterDetailWidgetClass;
+
 	UPROPERTY()
 	TObjectPtr<UHSRInteractionViewModel> InteractionViewModel;
 
@@ -50,9 +64,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P13")
 	TSubclassOf<UHSRRewardSummaryWidget> RewardSummaryWidgetClass;
 	UPROPERTY(Transient)
-	TObjectPtr<UHSRInventoryRewardViewModel> InventoryRewardViewModel;
-	UPROPERTY(Transient)
-	TObjectPtr<UHSRInventoryWidget> InventoryWidgetInstance;
+	TObjectPtr<UHSRInventoryRewardViewModel> RewardSummaryViewModel;
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRRewardSummaryWidget> RewardSummaryWidgetInstance;
+	bool bUIHostAlreadyUnregistered = false;
 };

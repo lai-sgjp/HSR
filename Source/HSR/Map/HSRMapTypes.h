@@ -26,6 +26,31 @@ enum class EHSRMapOperationResult : uint8
 	RequestMismatch
 };
 
+UENUM(BlueprintType)
+enum class EHSRMapArrivalCommitKind : uint8
+{
+	OrdinaryTravel,
+	BattleReturn
+};
+
+USTRUCT(BlueprintType)
+struct FHSRMapArrivalCommitInfo
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly)
+	int64 CommitGeneration = 0;
+
+	UPROPERTY(BlueprintReadOnly)
+	FName MapId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly)
+	FName ArrivalId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly)
+	EHSRMapArrivalCommitKind Kind = EHSRMapArrivalCommitKind::OrdinaryTravel;
+};
+
 USTRUCT(BlueprintType)
 struct FHSRMapLocation
 {
@@ -107,3 +132,4 @@ struct FHSRMapSaveData
 };
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRMapStateChanged, const FHSRMapRuntimeSnapshot&);
+DECLARE_MULTICAST_DELEGATE_OneParam(FHSRMapArrivalCommitted, const FHSRMapArrivalCommitInfo&);

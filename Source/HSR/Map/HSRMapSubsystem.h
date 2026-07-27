@@ -51,6 +51,8 @@ public:
 	bool HasTeleportDefinition(FName TeleportId) const { return Teleports.Contains(TeleportId); }
 	const FHSRMapRuntimeSnapshot& GetSnapshot() const { return Snapshot; }
 	FHSRMapStateChanged& OnMapStateChanged() { return MapStateChanged; }
+	FHSRMapArrivalCommitted& OnArrivalCommitted() { return ArrivalCommitted; }
+	int64 GetArrivalCommitGeneration() const { return ArrivalCommitGeneration; }
 	void ExportSaveData(FHSRMapSaveData& OutData) const;
 	bool PrepareRestore(const FHSRMapSaveData& Data, FHSRMapRuntimeSnapshot& OutCandidate) const;
 	bool IsRestoreDifferent(const FHSRMapRuntimeSnapshot& Candidate) const;
@@ -63,6 +65,10 @@ public:
 #if WITH_DEV_AUTOMATION_TESTS
 	EHSRMapOperationResult StageTeleportForAutomation(FName TeleportId);
 	bool DoesRegisteredMapPackageExistForAutomation(FName MapId) const;
+	void PublishArrivalCommittedForAutomation(FName MapId, FName ArrivalId, EHSRMapArrivalCommitKind Kind)
+	{
+		PublishArrivalCommitted(MapId, ArrivalId, Kind);
+	}
 #endif
 
 private:
@@ -82,6 +88,7 @@ private:
 	};
 
 	void CommitStateChange();
+	void PublishArrivalCommitted(FName MapId, FName ArrivalId, EHSRMapArrivalCommitKind Kind);
 	void HandleTravelTimeout();
 
 	TMap<FName, FRegisteredMap> Maps;
@@ -91,6 +98,8 @@ private:
 	FHSRMapRuntimeSnapshot Snapshot;
 
 	FHSRMapStateChanged MapStateChanged;
+	FHSRMapArrivalCommitted ArrivalCommitted;
+	int64 ArrivalCommitGeneration = 0;
 	FHSRTeleportRequest PendingRequest;
 	bool bTravelPending = false;
 	FTimerHandle TravelTimeoutTimer;

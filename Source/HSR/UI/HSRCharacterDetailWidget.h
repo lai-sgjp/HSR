@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
+#include "HSRScreenWidget.h"
 #include "HSRCharacterDetailTypes.h"
 #include "HSRCharacterDetailWidget.generated.h"
 
@@ -11,8 +11,8 @@ class UHSRCharacterDetailViewModel;
  * Native owner for WBP_CharacterDetail_P11. It only consumes the ViewModel's
  * pure-value snapshots; Blueprint presentation must not query battle actors or ASC state.
  */
-UCLASS(Abstract, Blueprintable)
-class HSR_API UHSRCharacterDetailWidget : public UUserWidget
+UCLASS(Blueprintable)
+class HSR_API UHSRCharacterDetailWidget : public UHSRScreenWidget
 {
 	GENERATED_BODY()
 

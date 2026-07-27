@@ -1840,6 +1840,11 @@ GE 移除时：
   → Aggregator->RemoveMod(Handle)
   → Evaluate() 重新计算（无此 Mod 后的值）
   → 属性自动回退
+
+注意：ExecCalc（Execution）**永远不会注册到 Aggregator**。
+  Modifiers → 可进入 Aggregator（Duration/Infinite）或直接执行（Instant）
+  Executions → 只能在 ExecuteActiveEffectsFrom 中触发（Instant 或 Periodic）
+  Duration GE（Period=0）不会触发 ExecCalc，也不会写入 IncomingDamage。
 ```
 
 ## "自动回退"的底层原因

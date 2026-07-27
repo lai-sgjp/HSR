@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 0～3 均为 `Ready`。Phase 4～15 均为 `Ready with inherited follow-ups`。Phase 15 已完成，准备进入 Phase 16 Gate 0；既有 inherited follow-ups 原样保留。
+> 当前状态：Phase 16 已由 commit `2c11415` 收尾并通过独立复审；Phase 17 四角色 Gate 0 最终复核中，尚未实施 Source/Content/Config。
 
 ## 已完成的规划工作
 
@@ -299,13 +299,17 @@
 ## Phase 16：存档系统总整合
 
 - [x] P16-000：四角色 Gate 0；冻结所有权、磁盘合同、显式迁移、备份恢复、失败矩阵与证据边界。
-- [ ] P16-001：Envelope/Header、schema v6、版本分类与 v1→v6 相邻迁移；已建任务卡，等待用户确认。
-- [ ] 整合角色、队伍、背包、装备、遗器、任务、宝箱、敌人、地图和位置。
-- [ ] 建立 SaveVersion、验证、备份、迁移和失败恢复。
-- [ ] 确保不保存 Actor、Widget、ASC 或 GE Handle。
+- [x] P16-001～005：Envelope/schema v6、迁移、完整性、Primary/Staging/Backup、全 authority 冷恢复与独立复审完成。
+- [x] 整合现有角色、队伍、背包、装备/遗器、奖励账本、任务与地图 authority；无独立 authority 的宝箱/敌人不虚构持久化。
+- [x] 建立 SaveVersion、验证、备份、迁移和受控失败恢复。
+- [x] 确保不保存 Actor、Widget、ASC 或 GE Handle。
+- [x] Phase 16 closeout commit `2c11415`；保留 graphical Editor、Packaged/Shipping、真实断电/磁盘故障等证据边界。
 
 ## Phase 17：UI 总整合
 
+- [x] P17-000：四角色 Gate 0 规划与 Independent Reviewer 最终复核 `PASS`。
+- [x] P17-001：纯值 Screen Stack、唯一 HUD root、Input/Focus Policy 与失败零污染合同；Build 11/11、Automation 3/3、Independent Review `PASS WITH FOLLOW-UP`。
+- [ ] P17-002：探索 Pause Host、真实 InputMode/Focus 与 UIManager 生命周期闭环；Task Gate=`PASS`，等待用户确认实施。
 - [ ] 完成主菜单、暂停、角色、队伍、背包、任务、地图和设置界面。
 - [ ] 建立 Screen Stack、统一 InputMode 和导航。
 - [ ] 验证地图旅行后的 UI 重建。

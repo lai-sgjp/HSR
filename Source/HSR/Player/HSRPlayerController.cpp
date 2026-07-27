@@ -4,6 +4,8 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
+#include "../UI/HSRScreenStackTypes.h"
+#include "../UI/HSRUIManagerSubsystem.h"
 
 AHSRPlayerController::AHSRPlayerController()
 {
@@ -14,6 +16,7 @@ AHSRPlayerController::AHSRPlayerController()
 	bControlModeApplied = false;
 	bExplorationContextAdded = false;
 	bInputSystemReady = false;
+	AppliedInputIntent = EHSRUIInputIntent::GameOnly;
 }
 
 void AHSRPlayerController::SetupInputComponent()
@@ -107,47 +110,119 @@ void AHSRPlayerController::OnUnPossess()
 
 void AHSRPlayerController::SetControlMode(EHSRPlayerControlMode NewMode)
 {
-	if (bControlModeApplied && CurrentControlMode == NewMode)
-	{
-		return;
-	}
+	FHSRInputModePolicy Policy;
+	Policy.InputIntent = NewMode == EHSRPlayerControlMode::UIOnly ? EHSRUIInputIntent::UIOnly : EHSRUIInputIntent::GameOnly;
+	Policy.bShowMouseCursor = NewMode == EHSRPlayerControlMode::UIOnly;
+	ApplyUIInputPolicy(Policy, NewMode);
+	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::SetControlMode - Applied mode %d"),
+		static_cast<uint8>(CurrentControlMode));
+}
 
+bool AHSRPlayerController::ApplyUIInputPolicy(const FHSRInputModePolicy& Policy, const EHSRPlayerControlMode SemanticMode)
+{
+	if (!IsLocalPlayerController())
+	{
+		return false;
+	}
+	if (bControlModeApplied && CurrentControlMode == SemanticMode
+		&& AppliedInputIntent == Policy.InputIntent && bShowMouseCursor == Policy.bShowMouseCursor)
+	{
+		return true;
+	}
 	if (bControlModeApplied)
 	{
 		RemoveExplorationContext();
 	}
 
-	CurrentControlMode = NewMode;
-
-	switch (NewMode)
+	switch (Policy.InputIntent)
 	{
-	case EHSRPlayerControlMode::Exploration:
+	case EHSRUIInputIntent::GameOnly:
 		SetInputMode(FInputModeGameOnly());
-		bShowMouseCursor = false;
-		if (bInputSystemReady)
-		{
-			AddExplorationContext();
-		}
 		break;
-
-	case EHSRPlayerControlMode::UIOnly:
-		SetInputMode(FInputModeUIOnly());
-		bShowMouseCursor = true;
-		break;
-
-	case EHSRPlayerControlMode::Battle:
-		SetInputMode(FInputModeGameOnly());
-		bShowMouseCursor = false;
-		UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::SetControlMode - Battle mode (placeholder)"));
-		break;
-
-	default:
+	case EHSRUIInputIntent::UIOnly:
+	{
+		FInputModeUIOnly Mode;
+		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(Mode);
 		break;
 	}
+	case EHSRUIInputIntent::GameAndUI:
+	{
+		FInputModeGameAndUI Mode;
+		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		Mode.SetHideCursorDuringCapture(false);
+		SetInputMode(Mode);
+		break;
+	}
+	default:
+		return false;
+	}
 
+	CurrentControlMode = SemanticMode;
+	AppliedInputIntent = Policy.InputIntent;
+	bShowMouseCursor = Policy.bShowMouseCursor;
+	if (SemanticMode == EHSRPlayerControlMode::Exploration && bInputSystemReady)
+	{
+		AddExplorationContext();
+	}
 	bControlModeApplied = true;
-	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::SetControlMode - Applied mode %d"),
-		static_cast<uint8>(CurrentControlMode));
+	return true;
+}
+
+void AHSRPlayerController::RequestOpenPauseScreen()
+{
+	if (ULocalPlayer* LP = GetLocalPlayer())
+	{
+		if (UHSRUIManagerSubsystem* Manager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
+		{
+			const EHSRUIScreenResult Result = Manager->OpenPauseScreen();
+			UE_LOG(LogTemp, Log, TEXT("HSRUI P17 RequestOpen Result=%d Stack=%d HasPause=%s"),
+				static_cast<int32>(Result), Manager->GetLogicalScreenCount(),
+				Manager->HasOpenPauseScreen() ? TEXT("true") : TEXT("false"));
+		}
+	}
+}
+
+void AHSRPlayerController::RequestBackScreen()
+{
+	if (ULocalPlayer* LP = GetLocalPlayer())
+	{
+		if (UHSRUIManagerSubsystem* Manager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
+		{
+			const EHSRUIScreenResult Result = Manager->RequestBack();
+			UE_LOG(LogTemp, Log, TEXT("HSRUI P17 RequestBack Result=%d Stack=%d HasPause=%s"),
+				static_cast<int32>(Result), Manager->GetLogicalScreenCount(),
+				Manager->HasOpenPauseScreen() ? TEXT("true") : TEXT("false"));
+		}
+	}
+}
+
+void AHSRPlayerController::RequestOpenCharacterDetailScreen()
+{
+	if (ULocalPlayer* LP = GetLocalPlayer())
+	{
+		if (UHSRUIManagerSubsystem* Manager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
+		{
+			const EHSRUIScreenResult Result = Manager->OpenCharacterDetailScreen();
+			UE_LOG(LogTemp, Log, TEXT("HSRUI P17 CharacterDetail RequestOpen Result=%d Stack=%d HasDetail=%s"),
+				static_cast<int32>(Result), Manager->GetLogicalScreenCount(),
+				Manager->HasOpenCharacterDetailScreen() ? TEXT("true") : TEXT("false"));
+		}
+	}
+}
+
+void AHSRPlayerController::RequestOpenInventoryScreen()
+{
+	if (ULocalPlayer* LP = GetLocalPlayer())
+	{
+		if (UHSRUIManagerSubsystem* Manager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
+		{
+			const EHSRUIScreenResult Result = Manager->OpenInventoryScreen();
+			UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Inventory RequestOpen Result=%d Stack=%d HasInventory=%s"),
+				static_cast<int32>(Result), Manager->GetLogicalScreenCount(),
+				Manager->HasOpenInventoryScreen() ? TEXT("true") : TEXT("false"));
+		}
+	}
 }
 
 void AHSRPlayerController::AddExplorationContext()
