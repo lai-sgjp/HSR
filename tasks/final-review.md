@@ -1,25 +1,43 @@
-# TASK-P17-PATCH-02 — Transition Automation Fixture Allowlist Review
+# TASK-P17-PATCH-02 Transition-Fixture Review
 
 ## Review metadata
 
-- Reviewer: Independent Task-Gate / Prompt-Safety Reviewer
+- Reviewer: Independent Reviewer / Safety Reviewer
+- Reviewed revision: `b181534`
+- Result: `REVISE`
 - Date: 2026-07-28
-- Result: `PASS`
-- Reviewed revision: Coordinator commit `63a041e`
 
-## Findings
+## Fixture design verified
 
-The allowlist expansion is narrow and test-only. `HSRBattleTransitionSubsystem.h/.cpp` may expose only `WITH_DEV_AUTOMATION_TESTS` seed, snapshot, and reset seams; the production `RequestEncounter` signature, validation order, state mutation, travel behavior, and result behavior remain frozen.
+- `RequestEncounter` keeps its production signature and rejection flow. New snapshot/seed/reset APIs and the admission counter are guarded by `WITH_DEV_AUTOMATION_TESTS`.
+- The fixture uses a valid `UGameInstance` outer. Pending and resolved seeds only prepare private state; both rejection checks execute production `RequestEncounter`.
+- Pending rejection returns `AlreadyPending`; resolved rejection returns `AlreadyConsumed`; state/travel/request-ID membership and admission-count fields currently compared by the test remain unchanged.
+- Build, `BehaviorTreeAdapter`, and `MapContract` are reported and logged as successful with exit `0`. The earlier invalid-outer failure remains preserved. Revision provenance is limited to the approved Transition/test/result expansion, and user assets remain isolated.
 
-The fixture contract correctly separates preparation from verification. `SeedPendingEncounterForAutomation` and `SeedResolvedEncounterForAutomation` may prepare private state, while the rejection assertion must call the production `RequestEncounter` path. The snapshot fields—encounter state, complete pending request, travel kind/id, queried resolved membership, and admission mutation count—are sufficient to compare before/after state and prove both `AlreadyPending` and `AlreadyConsumed` produce no new request ID and zero mutation. Reset provides deterministic cleanup between cases.
+## Blocking assertion gap
 
-## Handoff constraints
+The test text claims “full snapshot zero mutation” and “no new ID”, but it does not prove either completely:
 
-- Every fixture declaration and definition must be compiled only under `WITH_DEV_AUTOMATION_TESTS`.
-- Seed/reset helpers must not invoke travel, generate production admissions, or become callable production behavior.
-- Tests must snapshot before and after invoking production `RequestEncounter`, assert the exact production rejection result, invalid/no new returned RequestId, unchanged pending/travel/resolved state, and unchanged admission mutation count.
-- Any change to the production request signature/behavior, non-test storage, or broader subsystem API is a hard stop.
+- It never asserts that `PendingDuplicate.RequestId` and `ResolvedReplay.RequestId` are invalid/no-new-ID.
+- Although the snapshot contains a full `FHSREncounterRequest`, comparison checks only `PendingRequest.RequestId`. Mutations to EncounterId, EnemyDefinitionId, Initiative, BattleMapPath, ReturnTransform, ExplorationMapPath, RewardDefinitionId, or RewardSeed would pass unnoticed.
+- It does not assert a nonempty structured failure message/reason payload.
+
+Minimum correction inside the existing allowlist:
+
+- Add a test-local equality helper for every `FHSREncounterRequest` field listed above and use it for pending/resolved before/after snapshots.
+- Assert both returned rejection RequestIds are invalid, both result types are exact, and both failure messages are nonempty.
+- Retain the existing state, TravelKind, TravelRequestId, resolved-membership, and admission-count equality checks.
+- Rebuild and rerun `BehaviorTreeAdapter` and `MapContract`, preserving the prior invalid-outer first error.
+
+## Remaining task gate after that correction
+
+If those deterministic assertions pass, the only remaining acceptance item is user PIE proof of full stock `Move To SpawnOrigin` completion:
+
+1. Acquire the player, then leave sight without reacquiring or overlapping.
+2. Capture `Chasing -> LostTarget -> ReturningToSpawnOrigin`, epoch, cleared target, start location, and SpawnOrigin.
+3. Wait for Move To completion and capture final location/distance within acceptance radius plus final state/Blackboard values.
+4. Confirm no C++ Move or repeating retry occurred; preserve the first failure/SKIPPED reason if completion cannot be produced.
 
 ## Conclusion
 
-`PASS` — the expansion provides the minimum private-state fixture needed to verify production rejection semantics without replacing or modifying the production Encounter path. It may hand back to Implementation automatically under the existing task authorization.
+`REVISE`: the dev-only fixture correctly reaches the production rejection branches, but its current assertions do not yet establish the claimed no-new-ID and full-request zero-mutation guarantees. After this narrow test fix, only full-return user PIE should remain.
