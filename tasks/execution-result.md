@@ -41,3 +41,9 @@ Status: `IMPLEMENTATION GREEN / REVIEW REQUIRED`
 - Removed legacy `SchemaVersion=5` coercion after successful primary/backup envelope decoding; disk restore now preserves migrated schema 7 Registry data.
 - Legacy `Equip/Replace` now rolls back a newly registered instance when placement fails.
 - Rebuilt successfully; Registry 3/3 and Save 16/16 reran successfully with zero failure lines.
+
+### Reviewer REVISE correction
+
+- Schema-7 decode now enforces strict placement order by `CharacterId`, `Kind`, then `Slot` and rejects duplicate slots, invalid kind/slot ranges and negative revisions as `NonCanonical`.
+- Added a byte-level negative codec test that swaps two serialized placement rows.
+- Build succeeded; focused VersionClassification and full Save 16/16 succeeded.
