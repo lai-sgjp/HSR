@@ -2219,3 +2219,17 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - User configured and saved `DA_Encounter_Phase5Test` with `VictoryExperience=100`; evidence commit `998ed6e` records the asset and PIE results.
 - PIE verified defeat zero-settlement, victory `Revision=0/EXP=0 -> Revision=1/EXP=100`, duplicate confirmation without a second mutation/consume/return, exactly-once return commit and `AlreadyConsumed` on the second context read.
 - Final review is `PASS`. 03D2 is ready for archive; the only adjacent next action is 03E Task Gate, not implementation.
+
+# 2026-07-29 | TASK-P17-PATCH-03E Task Gate
+
+- Read-only evidence found that Inventory unique items persist only InstanceId/DefinitionId, while Equipment instances additionally require Kind, enhancement and modifiers. Once unequipped, the complete payload has no durable authority and cold restore would be lossy.
+- Current Inventory removal, Equipment equip/replace/unequip and ASC EffectBridge calls mutate independently; there is no OperationId, expected Inventory/Equipment revision pair, aggregate candidate or delayed publication boundary.
+- Save correctly rejects one InstanceId appearing in both Inventory and equipped rows, but has no independent full-payload registry. Existing isolated tests cannot prove owned bag -> equip -> replace -> unequip -> cold restore.
+- Task Gate verdict is `REVISE`. Recommended next planning unit is `03E1 - Equipment Instance Ownership Foundation`; Source/Content implementation remains unauthorized.
+
+# 2026-07-29 | TASK-P17-PATCH-03E1 revised Task Gate
+
+- User accepted the recommended model: Equipment Registry owns complete instance payload permanently; Inventory owns bag membership; loadout owns ID-only placement.
+- 03E is split into 03E1 ownership/persistence foundation and 03E2 aggregate movement/projection. 03E1 excludes Inventory mutation, live ASC changes and UI routing.
+- 03E1 freezes Save schema 7 with separate registry/placement DTOs. Schema 6 equipped rows migrate losslessly; Inventory unique rows are not guessed into equipment records.
+- Exact Equipment/Save allowlist and registry/migration/restore TDD matrix are frozen. Task Gate review is `PASS`; implementation awaits separate user confirmation.

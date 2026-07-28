@@ -5,7 +5,7 @@
 ## 2026-07-28 最新权威摘要
 
 - `TASK-P17-PATCH-03D2` 已完成：RED `3036609`、实现 `05c0549`、Editor/PIE 证据 `998ed6e`；胜利统一通过 SettlementAuthority 原子提交 Inventory/Profile/Reward，战败零结算，重复确认与返回 exactly-once。HSREditor、聚焦测试及 29/29 回归通过，最终复核 `PASS`。
-- 当前相邻下一工作包为 `P17-PATCH-03E` Task Gate；尚未授权其实施。
+- 用户接受 Equipment Registry 所有权模型；03E 已拆为 03E1 ownership/persistence foundation 与 03E2 atomic equip/projection。03E1 Task Gate 已冻结 schema 7、ID-only placement、保守 schema-6 migration 与最小 allowlist并复核 `PASS`，当前等待用户单独确认实施。
 - P17-005 已暂停并形成 checkpoint commit `4ef49f7`：代码 Gate 与 11/11 窄域 Automation 通过，Input/WBP 资产存在，用户 PIE 已证明 Character route 可打开/返回；但 Character read model 返回 `PartySlotEmpty`，所以 P17-005 最终 PASS 不可用。
 - 用户要求把八子系统整合作为全新阶段 `P17-PATCH-03`。四角色 Gate 0 已在修订后收束为 PASS；03A 已完成实现、Code Gate 与用户 PIE 验收。
 - Patch 03 已拆成串行 03A、03B、03C、03D1、03D2、03E～03H；03A～03D2 已 PASS，下一相邻任务为 03E Task Gate。

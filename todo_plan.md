@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：P17-005 已暂停并 checkpoint 于 `4ef49f7`；最终 PASS 不可用。P17-PATCH-03 Gate 0 已 PASS，03A～03D2 已完成；下一相邻任务为 03E Task Gate，尚未授权实施。
+> 当前状态：P17-005 已暂停并 checkpoint 于 `4ef49f7`；最终 PASS 不可用。P17-PATCH-03 Gate 0 已 PASS，03A～03D2 已完成；用户已接受 Registry 模型，03E1 Task Gate `PASS`，等待单独确认实施。
 
 ## 已完成的规划工作
 
@@ -16,7 +16,9 @@
 - [x] TASK-P17-PATCH-03C：Interaction -> Encounter -> Battle Admission（Build、Automation、胜利/失败 PIE、resolved replay 与 defeat retry 均通过；最终 Reviewer `PASS`，已归档）。
 - [x] TASK-P17-PATCH-03D1：Atomic Settlement Foundation（Build、13/13 Automation、Independent Reviewer `PASS`、Reward/Catalog Save/reopen 与胜利/战败 PIE 均通过，已归档）。
 - [x] TASK-P17-PATCH-03D2：Battle Result Settlement Integration（RED/GREEN、29/29 回归、胜利/战败/重复确认/返回 PIE 与最终复核均 `PASS`）。
-- [ ] P17-PATCH-03E～03G：按计划串行整合 Inventory/Equipment、Map travel、Save restore。
+- [ ] P17-PATCH-03E1：Equipment Instance Ownership Foundation；Task Gate `PASS`，等待实施确认。
+- [ ] P17-PATCH-03E2：Inventory/Equipment 原子移动、OperationId/双 revision、ASC 与 UI 投影；必须等待 03E1 PASS。
+- [ ] P17-PATCH-03F～03G：按计划串行整合 Map travel、Save restore。
 - [ ] P17-PATCH-03H：clean-save 端到端 closeout；不得以其结果倒推 P17-005 已完成。
 
 - [x] P7-000：只读校准 Phase 6→7 门禁，冻结 CoreAttributeSet 原位扩展、原创公式、CritDamage/Capture/RNG/单一伤害入口和结构化失败协议。
