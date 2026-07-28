@@ -79,6 +79,9 @@ struct FHSREncounterRequest
 	UPROPERTY(BlueprintReadOnly, Category = "Encounter|Reward")
 	int32 RewardSeed = 0;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Encounter|Reward")
+	int32 VictoryExperience = 0;
+
 	FHSREncounterRequest() = default;
 };
 

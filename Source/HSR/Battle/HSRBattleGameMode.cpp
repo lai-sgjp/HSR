@@ -25,6 +25,8 @@
 #include "Blueprint/UserWidget.h"
 #include "InputCoreTypes.h"
 #include "../Reward/HSRRewardSubsystem.h"
+#include "../Reward/HSRSettlementAuthority.h"
+#include "../Inventory/HSRInventorySubsystem.h"
 
 namespace
 {
@@ -1549,6 +1551,7 @@ void AHSRBattleGameMode::BeginPlay()
 	}
 
 	ActivePlayerCharacterId = ConsumeResult.ConsumedRequest.PlayerCharacterId;
+	ActiveEncounterRequest = ConsumeResult.ConsumedRequest;
 	if (ActivePlayerCharacterId.IsNone())
 	{
 		UE_LOG(LogTemp, Error, TEXT("AHSRBattleGameMode::BeginPlay - consumed encounter has no PlayerCharacterId"));
@@ -2435,9 +2438,11 @@ void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& Request
 	}
 
 	FHSRBattleResult PreviewResult;
-	PreviewResult.RequestId = RequestId;
-	// The Coordinator owns the authoritative payload; Validate uses only return data and must precede consume.
-	if (!Coordinator->GetBattleResultForPresentation(PreviewResult))
+	if (SettlementState.bHasCommittedBattleResult)
+	{
+		PreviewResult = SettlementState.CommittedBattleResult;
+	}
+	else if (!Coordinator->GetBattleResultForPresentation(PreviewResult))
 	{
 		CommandViewModel->RejectBattleResultConfirm(RequestId);
 		UE_LOG(LogTemp, Error, TEXT("P10-004 ReturnPreflight Result=FAILED Reason=MissingAuthoritativeResult RequestId=%s"), *RequestId.ToString());
@@ -2451,41 +2456,122 @@ void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& Request
 		return;
 	}
 
-	FHSRRewardRequest RewardRequest;
-	if (Coordinator->BuildVictoryRewardRequest(PreviewResult, RewardRequest))
+	if (ProcessSettlement(GetGameInstance(), ActiveEncounterRequest, PreviewResult, SettlementState)
+		!= EHSRBattleSettlementConfirmResult::ReadyToReturn)
 	{
-		UHSRRewardSubsystem* RewardSubsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRRewardSubsystem>() : nullptr;
-		FHSRRewardReceipt Receipt;
-		const EHSRRewardOperationResult RewardResult = RewardSubsystem ? RewardSubsystem->SubmitReward(RewardRequest, Receipt) : EHSRRewardOperationResult::InventoryRejected;
-		if (RewardResult != EHSRRewardOperationResult::Success && RewardResult != EHSRRewardOperationResult::NoOp)
-		{
-			CommandViewModel->RejectBattleResultConfirm(RequestId);
-			UE_LOG(LogTemp, Warning, TEXT("P13-003 BattleReward Result=REJECTED Type=%d RequestId=%s ConfirmRestored=1"), static_cast<int32>(RewardResult), *RequestId.ToString());
-			return;
-		}
-		UE_LOG(LogTemp, Log, TEXT("P13-003 BattleReward Result=%s RequestId=%s Revision=%lld"), RewardResult == EHSRRewardOperationResult::Success ? TEXT("SUCCESS") : TEXT("NOOP"), *RequestId.ToString(), Receipt.Revision);
-	}
-
-	FHSRBattleResult ConsumedResult;
-	if (!Coordinator->ConsumeBattleResult(ConsumedResult))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultConfirmRequested - REJECTED duplicate RequestId=%s"), *RequestId.ToString());
+		CommandViewModel->RejectBattleResultConfirm(RequestId);
+		UE_LOG(LogTemp, Warning, TEXT("P17-PATCH-03D2 Settlement Result=REJECTED RequestId=%s ConfirmRestored=1"), *RequestId.ToString());
 		return;
 	}
-	RestoreP10004GameInput(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr, TEXT("ConfirmedReturn"));
 
-	const FHSRExplorationReturnResult ReturnResult = Subsystem->RequestBattleReturn(ConsumedResult);
+	if (!SettlementState.bHasCommittedBattleResult)
+	{
+		if (!Coordinator->ConsumeBattleResult(SettlementState.CommittedBattleResult))
+		{
+			CommandViewModel->RejectBattleResultConfirm(RequestId);
+			UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultConfirmRequested - REJECTED duplicate RequestId=%s"), *RequestId.ToString());
+			return;
+		}
+		SettlementState.bHasCommittedBattleResult = true;
+	}
+
+	const FHSRExplorationReturnResult ReturnResult = Subsystem->RequestBattleReturn(SettlementState.CommittedBattleResult);
 	if (ReturnResult.ResultType == EHSREncounterReturnResultType::Success)
 	{
+		RestoreP10004GameInput(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr, TEXT("ConfirmedReturn"));
 		UE_LOG(LogTemp, Log, TEXT("AHSRBattleGameMode::HandleBattleResultConfirmRequested - Return request type=%d Outcome=%d RequestId=%s"),
-			static_cast<int32>(ReturnResult.ResultType), static_cast<int32>(ConsumedResult.Outcome), *ConsumedResult.RequestId.ToString());
+			static_cast<int32>(ReturnResult.ResultType), static_cast<int32>(SettlementState.CommittedBattleResult.Outcome), *SettlementState.CommittedBattleResult.RequestId.ToString());
 	}
 	else
 	{
+		CommandViewModel->RejectBattleResultConfirm(RequestId);
 		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultConfirmRequested - Return request type=%d Outcome=%d RequestId=%s"),
-			static_cast<int32>(ReturnResult.ResultType), static_cast<int32>(ConsumedResult.Outcome), *ConsumedResult.RequestId.ToString());
+			static_cast<int32>(ReturnResult.ResultType), static_cast<int32>(SettlementState.CommittedBattleResult.Outcome), *SettlementState.CommittedBattleResult.RequestId.ToString());
 	}
 }
+
+EHSRBattleSettlementConfirmResult AHSRBattleGameMode::ProcessSettlement(UGameInstance* GameInstance,
+	const FHSREncounterRequest& EncounterRequest, const FHSRBattleResult& BattleResult,
+	FHSRBattleSettlementState& State)
+{
+	if (!GameInstance || !BattleResult.IsValid() || BattleResult.RequestId != EncounterRequest.RequestId
+		|| BattleResult.EncounterId != EncounterRequest.EncounterId || EncounterRequest.PlayerCharacterId.IsNone())
+	{
+		return EHSRBattleSettlementConfirmResult::Rejected;
+	}
+	if (BattleResult.Outcome == EHSRBattleOutcome::PlayerDefeat)
+	{
+		return EHSRBattleSettlementConfirmResult::ReadyToReturn;
+	}
+	if (BattleResult.Outcome != EHSRBattleOutcome::PlayerVictory || EncounterRequest.RewardDefinitionId.IsNone())
+	{
+		return EHSRBattleSettlementConfirmResult::Rejected;
+	}
+
+	auto MatchesEncounter = [&EncounterRequest](const FHSRSettlementRequest& Request)
+	{
+		return Request.TransactionId == EncounterRequest.RequestId
+			&& Request.RewardDefinitionId == EncounterRequest.RewardDefinitionId
+			&& Request.PlayerCharacterId == EncounterRequest.PlayerCharacterId
+			&& Request.RewardSeed == EncounterRequest.RewardSeed
+			&& Request.Experience == EncounterRequest.VictoryExperience;
+	};
+	if (State.bHasRequest && !MatchesEncounter(State.Request))
+	{
+		return EHSRBattleSettlementConfirmResult::Rejected;
+	}
+	if (State.bSettlementCommitted)
+	{
+		return EHSRBattleSettlementConfirmResult::ReadyToReturn;
+	}
+
+	UHSRInventorySubsystem* Inventory = GameInstance->GetSubsystem<UHSRInventorySubsystem>();
+	UHSRCharacterProfileSubsystem* Profiles = GameInstance->GetSubsystem<UHSRCharacterProfileSubsystem>();
+	UHSRRewardSubsystem* Reward = GameInstance->GetSubsystem<UHSRRewardSubsystem>();
+	UHSRSettlementAuthority* Authority = GameInstance->GetSubsystem<UHSRSettlementAuthority>();
+	if (!Inventory || !Profiles || !Reward || !Authority)
+	{
+		return EHSRBattleSettlementConfirmResult::Rejected;
+	}
+	if (!State.bHasRequest)
+	{
+		FHSRInventorySnapshot InventorySnapshot;
+		FHSRCharacterProfileSnapshot ProfileSnapshot;
+		FHSRRewardSaveData RewardSnapshot;
+		Inventory->GetSnapshot(InventorySnapshot);
+		if (!Profiles->GetProfileSnapshot(EncounterRequest.PlayerCharacterId, ProfileSnapshot))
+		{
+			return EHSRBattleSettlementConfirmResult::Rejected;
+		}
+		Reward->ExportSaveData(RewardSnapshot);
+		State.Request.TransactionId = EncounterRequest.RequestId;
+		State.Request.RewardDefinitionId = EncounterRequest.RewardDefinitionId;
+		State.Request.PlayerCharacterId = EncounterRequest.PlayerCharacterId;
+		State.Request.RewardSeed = EncounterRequest.RewardSeed;
+		State.Request.Experience = EncounterRequest.VictoryExperience;
+		State.Request.ExpectedInventoryRevision = InventorySnapshot.Revision;
+		State.Request.ExpectedProfileRevision = ProfileSnapshot.RuntimeRevision;
+		State.Request.ExpectedRewardRevision = RewardSnapshot.Revision;
+		State.bHasRequest = true;
+	}
+
+	const EHSRSettlementResult Result = Authority->SubmitSettlement(State.Request, State.Receipt);
+	if (Result != EHSRSettlementResult::Success && Result != EHSRSettlementResult::NoOp)
+	{
+		return EHSRBattleSettlementConfirmResult::Rejected;
+	}
+	State.bSettlementCommitted = true;
+	return EHSRBattleSettlementConfirmResult::ReadyToReturn;
+}
+
+#if WITH_DEV_AUTOMATION_TESTS
+EHSRBattleSettlementConfirmResult AHSRBattleGameMode::ProcessSettlementForAutomation(UGameInstance* GameInstance,
+	const FHSREncounterRequest& EncounterRequest, const FHSRBattleResult& BattleResult,
+	FHSRBattleSettlementState& State)
+{
+	return ProcessSettlement(GameInstance, EncounterRequest, BattleResult, State);
+}
+#endif
 
 void AHSRBattleGameMode::RunTerminalScenarioForDevelopment()
 {

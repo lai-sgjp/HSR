@@ -191,6 +191,53 @@ bool FHSRBattleSettlementIntegrationTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Invalid identities perform no aggregate install"), InvalidFixture.Authority->GetAutomationSnapshot().AggregateInstallCount, 0);
 	}
 	InvalidFixture.Shutdown();
+
+	for (int32 Domain = 0; Domain < 3; ++Domain)
+	{
+		FFixture StaleFixture;
+		if (TestTrue(TEXT("Stale revision fixture initializes"), StaleFixture.Initialize(*this)))
+		{
+			FHSRBattleSettlementState StaleState;
+			StaleState.bHasRequest = true;
+			StaleState.Request.TransactionId = StaleFixture.RequestId;
+			StaleState.Request.RewardDefinitionId = StaleFixture.RewardId;
+			StaleState.Request.PlayerCharacterId = StaleFixture.CharacterId;
+			StaleState.Request.RewardSeed = 17;
+			StaleState.Request.Experience = 10;
+			if (Domain == 0) StaleState.Request.ExpectedInventoryRevision = 99;
+			if (Domain == 1) StaleState.Request.ExpectedProfileRevision = 99;
+			if (Domain == 2) StaleState.Request.ExpectedRewardRevision = 99;
+			TestEqual(TEXT("Stale domain revision rejects"),
+				AHSRBattleGameMode::ProcessSettlementForAutomation(StaleFixture.GameInstance, StaleFixture.Encounter(),
+					StaleFixture.Battle(), StaleState), EHSRBattleSettlementConfirmResult::Rejected);
+			TestTrue(TEXT("Stale request remains cached for explicit retry policy"), StaleState.bHasRequest);
+			TestFalse(TEXT("Stale request is not committed"), StaleState.bSettlementCommitted);
+			TestEqual(TEXT("Stale revision performs no aggregate install"),
+				StaleFixture.Authority->GetAutomationSnapshot().AggregateInstallCount, 0);
+			TestEqual(TEXT("Stale revision performs no publication"),
+				StaleFixture.Authority->GetAutomationSnapshot().PublicationCount, 0);
+		}
+		StaleFixture.Shutdown();
+	}
+
+	FFixture PrepareFixture;
+	if (TestTrue(TEXT("Prepare failure fixture initializes"), PrepareFixture.Initialize(*this)))
+	{
+		FHSRBattleSettlementState PrepareState;
+		PrepareFixture.Authority->SetPrepareFailureForAutomation(EHSRSettlementPrepareFailurePoint::AfterInventory);
+		TestEqual(TEXT("Prepare failure rejects before return"),
+			AHSRBattleGameMode::ProcessSettlementForAutomation(PrepareFixture.GameInstance, PrepareFixture.Encounter(),
+				PrepareFixture.Battle(), PrepareState), EHSRBattleSettlementConfirmResult::Rejected);
+		TestTrue(TEXT("Prepare failure preserves immutable request"), PrepareState.bHasRequest);
+		TestFalse(TEXT("Prepare failure does not commit"), PrepareState.bSettlementCommitted);
+		TestEqual(TEXT("Prepare failure performs no aggregate install"),
+			PrepareFixture.Authority->GetAutomationSnapshot().AggregateInstallCount, 0);
+		PrepareFixture.Authority->SetPrepareFailureForAutomation(EHSRSettlementPrepareFailurePoint::None);
+		TestEqual(TEXT("Prepare retry reuses request and commits"),
+			AHSRBattleGameMode::ProcessSettlementForAutomation(PrepareFixture.GameInstance, PrepareFixture.Encounter(),
+				PrepareFixture.Battle(), PrepareState), EHSRBattleSettlementConfirmResult::ReadyToReturn);
+	}
+	PrepareFixture.Shutdown();
 	return true;
 }
 

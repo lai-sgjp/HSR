@@ -164,6 +164,7 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 	{
 		NewRequest.RewardDefinitionId = Definition->VictoryRewardDefinition->RewardDefinitionId;
 		NewRequest.RewardSeed = Definition->RewardSeed;
+		NewRequest.VictoryExperience = FMath::Max(0, Definition->VictoryExperience);
 	}
 
 	PendingRequest = NewRequest;

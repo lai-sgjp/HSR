@@ -35,4 +35,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter|Reward")
 	int32 RewardSeed = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter|Reward", meta = (ClampMin = "0"))
+	int32 VictoryExperience = 0;
 };

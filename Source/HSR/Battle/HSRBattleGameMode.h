@@ -3,6 +3,9 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameplayTagContainer.h"
+#include "HSRBattleTypes.h"
+#include "HSREncounterTypes.h"
+#include "../Reward/HSRSettlementTypes.h"
 #include "HSRBattleGameMode.generated.h"
 
 class UHSRBattleCoordinator;
@@ -15,8 +18,23 @@ class UGameplayEffect;
 class UHSREnemyDefinition;
 class UHSRStatusDefinition;
 class UHSRCharacterCatalog;
-struct FHSRBattleResult;
 struct FHSRRestoreCommitInfo;
+
+enum class EHSRBattleSettlementConfirmResult : uint8
+{
+	Rejected,
+	ReadyToReturn
+};
+
+struct FHSRBattleSettlementState
+{
+	bool bHasRequest = false;
+	bool bSettlementCommitted = false;
+	bool bHasCommittedBattleResult = false;
+	FHSRSettlementRequest Request;
+	FHSRSettlementReceipt Receipt;
+	FHSRBattleResult CommittedBattleResult;
+};
 
 UENUM(BlueprintType)
 enum class EHSRP5TerminalTestScenario : uint8
@@ -46,6 +64,9 @@ public:
 	UHSRBattleCoordinator* GetCoordinator() const { return Coordinator; }
 #if WITH_DEV_AUTOMATION_TESTS
 	static UHSRBattleCoordinator* CreateRepeatableBreakAutomationFixture(UObject* Outer, UWorld* BattleWorld, TSubclassOf<AHSRBattleGameMode> ConfiguredGameModeClass, FText& OutFailure);
+	static EHSRBattleSettlementConfirmResult ProcessSettlementForAutomation(UGameInstance* GameInstance,
+		const FHSREncounterRequest& EncounterRequest, const FHSRBattleResult& BattleResult,
+		FHSRBattleSettlementState& State);
 #endif
 	UFUNCTION(BlueprintPure, Category = "Battle") UHSRBattleCommandViewModel* GetCommandViewModel() const { return CommandViewModel; }
 	UFUNCTION(BlueprintCallable, Category = "Battle|UI") void ShowCharacterDetail();
@@ -157,12 +178,17 @@ protected:
 	int64 PendingRestoreTransaction=0;
 	FName PendingRestoreCharacterId;
 	FName ActivePlayerCharacterId;
+	FHSREncounterRequest ActiveEncounterRequest;
+	FHSRBattleSettlementState SettlementState;
 	bool bCharacterDetailVisible=false;
 	void HandleCharacterDetailToggleInput();
 	void HandleCharacterDetailBackInput();
 
 	void HandleBattleResultReady(const FHSRBattleResult& Result);
 	void HandleBattleResultConfirmRequested(const FGuid& RequestId);
+	static EHSRBattleSettlementConfirmResult ProcessSettlement(UGameInstance* GameInstance,
+		const FHSREncounterRequest& EncounterRequest, const FHSRBattleResult& BattleResult,
+		FHSRBattleSettlementState& State);
 	void HandleCommandStateReady(const struct FHSRBattleCommandViewState& State);
 	void RunTerminalScenarioForDevelopment();
 	#if WITH_EDITOR
