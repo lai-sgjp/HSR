@@ -24,11 +24,7 @@ void UHSRCharacterDetailWidget::NativeConstruct()
 
 	ViewModel->Initialize(Profiles, Save, Party);
 	DetailChangedHandle = ViewModel->OnChanged().AddUObject(this, &UHSRCharacterDetailWidget::HandleDetailChanged);
-	EHSRCharacterDetailResult Result = ViewModel->SelectCharacter(TEXT("Character.A"));
-	if (Result != EHSRCharacterDetailResult::Success)
-	{
-		Result = ViewModel->SelectPartySlot0();
-	}
+	const EHSRCharacterDetailResult Result = ViewModel->SelectPartySlot0();
 	if (Result == EHSRCharacterDetailResult::Success)
 	{
 		UE_LOG(LogTemp, Log, TEXT("P11-005 DetailWidgetInit Result=SUCCESS SelectionResult=%d"), static_cast<int32>(Result));
@@ -36,6 +32,7 @@ void UHSRCharacterDetailWidget::NativeConstruct()
 	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("P11-005 DetailWidgetInit Result=FAIL SelectionResult=%d"), static_cast<int32>(Result));
+		OnDetailUnavailable(Result);
 	}
 }
 

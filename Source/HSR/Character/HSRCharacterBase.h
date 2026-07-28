@@ -11,6 +11,7 @@ class UHSRAbilitySystemComponent;
 class UHSRCoreAttributeSet;
 class UHSRAttributeViewModel;
 class AController;
+class AHSRGameModeBase;
 
 UCLASS(Abstract)
 class HSR_API AHSRCharacterBase : public ACharacter, public IAbilitySystemInterface
@@ -26,6 +27,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "GAS")
 	UHSRAttributeViewModel* GetAttributeViewModel() const { return AttributeViewModel; }
 	bool HasAppliedInitialAttributes() const { return bInitialAttributesApplied; }
+	FName GetProjectedCharacterId() const { return ProjectedCharacterId; }
 
 	// Development-only Phase 2 test interfaces
 	UFUNCTION(BlueprintCallable, Category = "GAS|Development", meta = (DevelopmentOnly))
@@ -60,4 +62,12 @@ protected:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "GAS")
 	int32 InitialAttributesApplySuccessCount;
+
+private:
+	friend class AHSRGameModeBase;
+	bool SetProjectedCharacterId(FName CharacterId);
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "Character|Identity",
+		meta = (AllowPrivateAccess = "true"))
+	FName ProjectedCharacterId;
 };

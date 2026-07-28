@@ -4,6 +4,30 @@
 #include "GameFramework/GameModeBase.h"
 #include "HSRGameModeBase.generated.h"
 
+class AController;
+class UHSRCharacterCatalog;
+
+UENUM(BlueprintType)
+enum class EHSRCharacterBootstrapMode : uint8
+{
+	NewGameDefaults,
+	UseCommittedRuntime
+};
+
+UENUM(BlueprintType)
+enum class EHSRCharacterBootstrapResult : uint8
+{
+	Success,
+	NoOp,
+	MissingCatalog,
+	InvalidInitialCharacter,
+	CatalogConflict,
+	ProfileRegistrationFailed,
+	PartyUnavailable,
+	NoCommittedSelection,
+	PawnProjectionFailed
+};
+
 UCLASS()
 class HSR_API AHSRGameModeBase : public AGameModeBase
 {
@@ -11,4 +35,37 @@ class HSR_API AHSRGameModeBase : public AGameModeBase
 
 public:
 	AHSRGameModeBase();
+	virtual void RestartPlayer(AController* NewPlayer) override;
+	EHSRCharacterBootstrapResult BootstrapCharacterIdentity(EHSRCharacterBootstrapMode Mode);
+	EHSRCharacterBootstrapResult GetLastCharacterBootstrapResult() const { return LastCharacterBootstrapResult; }
+	FName GetResolvedCharacterId() const { return ResolvedCharacterId; }
+
+#if WITH_DEV_AUTOMATION_TESTS
+	void ConfigureCharacterBootstrapForAutomation(UHSRCharacterCatalog* InCatalog, FName InInitialCharacterId,
+		AController* InController);
+#endif
+
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character|Bootstrap")
+	TObjectPtr<UHSRCharacterCatalog> CharacterCatalog;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character|Bootstrap")
+	FName InitialCharacterId = TEXT("Character.A");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character|Bootstrap")
+	EHSRCharacterBootstrapMode CharacterBootstrapMode = EHSRCharacterBootstrapMode::NewGameDefaults;
+
+private:
+	EHSRCharacterBootstrapResult FinishBootstrap(EHSRCharacterBootstrapResult Result, FName CharacterId = NAME_None);
+	AController* ResolveBootstrapController() const;
+
+	UPROPERTY(Transient)
+	EHSRCharacterBootstrapResult LastCharacterBootstrapResult = EHSRCharacterBootstrapResult::MissingCatalog;
+
+	UPROPERTY(Transient)
+	FName ResolvedCharacterId;
+
+#if WITH_DEV_AUTOMATION_TESTS
+	TWeakObjectPtr<AController> AutomationController;
+#endif
 };
