@@ -143,6 +143,34 @@ bool FHSRProductionBootstrapCharacterIdentityTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Failed committed-runtime bootstrap leaves Party revision zero"), EmptyParty.Revision, static_cast<int64>(0));
 	EmptyFixture.Shutdown();
 
+	FHSRBootstrapFixture NonPrimarySlotFixture;
+	if (!TestTrue(TEXT("Non-primary-slot fixture initializes"), NonPrimarySlotFixture.Initialize()))
+	{
+		NonPrimarySlotFixture.Shutdown();
+		return false;
+	}
+	UHSRCharacterProfileSubsystem* NonPrimaryProfiles =
+		NonPrimarySlotFixture.GameInstance->GetSubsystem<UHSRCharacterProfileSubsystem>();
+	UHSRPartySubsystem* NonPrimaryParty = NonPrimarySlotFixture.GameInstance->GetSubsystem<UHSRPartySubsystem>();
+	TestEqual(TEXT("Non-primary-slot fixture registers Catalog"),
+		NonPrimaryProfiles->RegisterLoadedCatalog(NonPrimarySlotFixture.Catalog), EHSRCharacterProfileResult::Success);
+	TestEqual(TEXT("Committed Character.B occupies slot 1"),
+		NonPrimaryParty->AddCharacter(TEXT("Character.B"), 1), EHSRPartyResult::Success);
+	FHSRPartySnapshot NonPrimaryBefore;
+	NonPrimaryParty->GetSnapshot(NonPrimaryBefore);
+	TestEqual(TEXT("New-game defaults reject a non-empty Party with empty slot 0"),
+		NonPrimarySlotFixture.GameMode->BootstrapCharacterIdentity(EHSRCharacterBootstrapMode::NewGameDefaults),
+		EHSRCharacterBootstrapResult::NoCommittedSelection);
+	FHSRPartySnapshot NonPrimaryAfter;
+	NonPrimaryParty->GetSnapshot(NonPrimaryAfter);
+	TestTrue(TEXT("Non-primary selection rejection preserves all Party slots"),
+		NonPrimaryAfter.Slots[0].IsEmpty() && NonPrimaryAfter.Slots[1].CharacterId == TEXT("Character.B"));
+	TestEqual(TEXT("Non-primary selection rejection preserves Party revision"),
+		NonPrimaryAfter.Revision, NonPrimaryBefore.Revision);
+	TestTrue(TEXT("Non-primary selection rejection leaves Pawn identity empty"),
+		NonPrimarySlotFixture.Pawn->GetProjectedCharacterId().IsNone());
+	NonPrimarySlotFixture.Shutdown();
+
 	FHSRBootstrapFixture InvalidIdFixture;
 	if (!TestTrue(TEXT("Invalid-id fixture initializes"), InvalidIdFixture.Initialize()))
 	{
