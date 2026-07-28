@@ -1,6 +1,6 @@
 # TASK-P17-PATCH-03D2 Execution Result
 
-Status: `IMPLEMENTED / C++ GREEN / EDITOR ASSET GATE REQUIRED`
+Status: `IMPLEMENTED / C++ GREEN / EDITOR AND PIE GATES PASS`
 
 ## Observable outcome
 
@@ -39,7 +39,10 @@ One authoritative victory now creates one immutable settlement request whose tra
 
 ## Not verified
 
-- No Content asset was edited by this implementation.
-- Editor Asset Gate remains: set non-negative `VictoryExperience` on `/Game/Data/Encounters/DA_Encounter_Phase5Test`, preserve canonical reward `/Game/Data/Rewards/DA_Reward_P13_Standard`, and use `/Game/UI/WBP_RewardSummary_P13`.
-- Save All/reopen and PIE victory/defeat/duplicate-confirm evidence remain `NOT VERIFIED`.
+- User configured and saved `VictoryExperience=100` on `/Game/Data/Encounters/DA_Encounter_Phase5Test`; the canonical reward remains `/Game/Data/Rewards/DA_Reward_P13_Standard`.
+- PIE defeat request `7C3BB9894BF35BE9CDE8519AAA483475` produced `Outcome=2`, consumed one Battle result, returned once, and produced no settlement/profile revision.
+- PIE victory request `7F6B80EA42984A3F7576DAA1572C3574` began at Profile `Revision=0 / Experience=0`, settled to `Revision=1 / Experience=100`, consumed one Battle result, requested one return, and retained `Revision=1 / Experience=100` after arrival.
+- Rapid duplicate confirmation produced no second Battle-result consumption, return request, return commit, Profile revision or EXP grant. The second Return Context read correctly returned `AlreadyConsumed`.
+- No `P17-PATCH-03D2 Settlement Result=REJECTED`, legacy `P13-003 BattleReward`, Blueprint Runtime Error, ensure or assertion was present in the accepted PIE evidence.
+- Reward receipt and Inventory exactly-once behavior are covered by `HSR.BattleSettlement.Integration`; the PIE UI opened Inventory successfully but its current logs do not print item quantities or receipt count.
 - The installed MSVC 14.51 toolchain is accepted by UBT but reported as non-preferred versus 14.38.
