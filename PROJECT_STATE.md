@@ -4,9 +4,11 @@
 
 ## 2026-07-28 最新权威摘要
 
+- `TASK-P17-PATCH-03B` 已完成并归档为 `PASS`：Production Bootstrap、稳定 CharacterId、Party-only Character Detail、focused/regression Automation、Code Gate、happy/unavailable PIE 以及 `BP_HSRGameMode=NewGameDefaults` Save/reopen 均闭合；最终状态 commit `1921f6f`，后续证据 commits `26eb3e0`、`1e9cecf`。
+- 当前唯一活动卡为 `TASK-P17-PATCH-03C - Interaction to Battle Admission`，状态仅为 `PLANNED / TASK GATE REVIEW REQUIRED / IMPLEMENTATION NOT AUTHORIZED`。03C Source/Content/Build/Automation/PIE 尚未授权或开始。
 - P17-005 已暂停并形成 checkpoint commit `4ef49f7`：代码 Gate 与 11/11 窄域 Automation 通过，Input/WBP 资产存在，用户 PIE 已证明 Character route 可打开/返回；但 Character read model 返回 `PartySlotEmpty`，所以 P17-005 最终 PASS 不可用。
 - 用户要求把八子系统整合作为全新阶段 `P17-PATCH-03`。四角色 Gate 0 已在修订后收束为 PASS；03A 已完成实现、Code Gate 与用户 PIE 验收。
-- Patch 03 已拆成串行 03A、03B、03C、03D1、03D2、03E～03H；当前唯一活动卡是 `TASK-P17-PATCH-03B`，状态为 `PLANNED / TASK GATE REQUIRED / USER CONFIRMATION REQUIRED`，尚未授权实施。
+- Patch 03 已拆成串行 03A、03B、03C、03D1、03D2、03E～03H；03A、03B 已 PASS，03C 正在 Task Gate。
 - P17-005 checkpoint 不代表 P17-005 完成；`PartySlotEmpty` 与 Exploration Pawn/Party/Profile/CharacterId 未统一是 03B 的前置事实。
 - 当前未授权 push。Enemy/Player Character、Enemy DataAsset、`Map_Phase1_Exploration`、`Content/AI/**`、`.claude/**`、`learn/SaveSystem.md` 与 Phase 20 存档演进改动继续按用户既有修改隔离。
 

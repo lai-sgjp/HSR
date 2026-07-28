@@ -2178,3 +2178,10 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - User PIE established the final return gate: chase, sight loss `4 -> 7 -> 8`, one `ReturnComplete` at distance `41.38` with no active request, `8 -> 2` patrol resume, rejection of overlap while Returning, and a later single admitted/consumed Encounter. Evidence remains `USER PROVIDED`; Reviewer inspected but did not rerun PIE.
 - `UHSREnemyDefinition` now data-drives Sight/LoseSight/Encounter radii with compatible `1000 / 1500 / 200` defaults and tested normalization/fallback. User-owned Blueprint, DataAsset, map and `Content/AI/**` changes were not staged by agents.
 - Overall Independent Review `ff8f213` is `PASS WITH FOLLOW-UP`; radius addendum review `990d95d` is closed. The task triplet is archived; P17-005 remains not started.
+# 2026-07-28 | Coordinator: close 03B and draft TASK-P17-PATCH-03C
+
+- `TASK-P17-PATCH-03B` completed Code Gate, focused/regression Automation, happy-path PIE, controlled `NoCommittedSelection / PartySlotEmpty` PIE and final `BP_HSRGameMode=NewGameDefaults` Compile/Save/reopen confirmation; final status is `PASS`.
+- Archived the 03B active task, execution result and final review. User-owned Blueprint/map/input/AI/learning changes remain unstaged and untouched.
+- Created the only active card `TASK-P17-PATCH-03C - Interaction to Battle Admission` at `TASK GATE REVIEW REQUIRED`; no 03C implementation, Content, Build, Automation or PIE action is authorized yet.
+- Source audit found the Gate-0 candidate list omitted the actual neutral encounter adapter `AHSRGrayboxInteractable`; the draft freezes it while keeping Enemy/Behavior Tree and BattleGameMode/Coordinator read-only.
+- The draft freezes candidate observation, adapter intent, BattleTransition admission/travel authority, pure-value request DTO, duplicate/resolved/lost-target rejection, cross-World single consumption, exact TDD and User Asset Gate evidence.

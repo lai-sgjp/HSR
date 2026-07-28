@@ -12,8 +12,9 @@
 - [x] P17-005 当前进度 checkpoint：commit `4ef49f7`（仅表示暂停点，不表示任务完成或最终 PASS）。
 - [x] P17-PATCH-03 Gate 0：四角色最终 PASS；已冻结八子系统所有权、稳定 ID、事务、生命周期、失败矩阵、Editor exercise 与串行包。
 - [x] TASK-P17-PATCH-03A：Frontend Boundary Contract Reconciliation；Build、11/11 Automation 与用户 X 返回探索 PIE 通过，双分辨率为 `USER ACCEPTED / NOT VERIFIED`。
-- [ ] TASK-P17-PATCH-03B：Production Bootstrap and Character Identity（活动卡仅规划；Task Gate 与用户再次确认前禁止实施；解决 `PartySlotEmpty` 与 Pawn/Profile/Party/CharacterId 一致性）。
-- [ ] P17-PATCH-03C～03G：按计划串行整合 Interaction/Battle admission、03D1 atomic foundation、03D2 settlement integration、Inventory/Equipment、Map travel、Save restore。
+- [x] TASK-P17-PATCH-03B：Production Bootstrap and Character Identity（Code Gate、Automation、happy/unavailable PIE 与最终 Blueprint Save/reopen 均 PASS，已归档）。
+- [ ] TASK-P17-PATCH-03C：Interaction -> Encounter -> Battle Admission（当前唯一活动卡；仅 Task Gate review，实施尚未授权）。
+- [ ] P17-PATCH-03D1～03G：按计划串行整合 atomic foundation、settlement integration、Inventory/Equipment、Map travel、Save restore。
 - [ ] P17-PATCH-03H：clean-save 端到端 closeout；不得以其结果倒推 P17-005 已完成。
 
 - [x] P7-000：只读校准 Phase 6→7 门禁，冻结 CoreAttributeSet 原位扩展、原创公式、CritDamage/Capture/RNG/单一伤害入口和结构化失败协议。
