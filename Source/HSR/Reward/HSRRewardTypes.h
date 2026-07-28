@@ -96,7 +96,8 @@ enum class EHSRRewardOperationResult : uint8
 	ClaimConflict,
 	ResolveFailed,
 	InventoryRejected,
-	InjectedFailure
+	InjectedFailure,
+	RevisionConflict
 };
 
 struct FHSRRewardDefinitionRule

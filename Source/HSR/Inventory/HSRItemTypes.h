@@ -27,7 +27,8 @@ enum class EHSRInventoryOperationResult : uint8
 	DuplicateInstanceId,
 	InstanceNotFound,
 	InsufficientQuantity,
-	StorageKindMismatch
+	StorageKindMismatch,
+	RevisionConflict
 };
 
 USTRUCT(BlueprintType)

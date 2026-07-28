@@ -14,7 +14,8 @@ enum class EHSRCharacterProfileResult : uint8
 	CatalogNotLoaded,
 	EmptyAssetPath,
 	AssetLoadFailed,
-	ExperienceCurveLoadFailed
+	ExperienceCurveLoadFailed,
+	RevisionConflict
 };
 
 USTRUCT(BlueprintType)

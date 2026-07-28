@@ -6,6 +6,7 @@
 #include "../Data/Definitions/HSRRewardDefinition.h"
 #include "../Inventory/HSRInventorySubsystem.h"
 #include "Misc/Crc.h"
+#include "HSRSettlementTypes.h"
 
 namespace
 {
@@ -385,6 +386,82 @@ void UHSRRewardSubsystem::CommitRestore(FHSRRewardRestoreState&& Candidate, bool
 	{
 		RewardRestored.Broadcast(Revision);
 	}
+}
+
+EHSRRewardOperationResult UHSRRewardSubsystem::PrepareSettlementCandidate(const FHSRSettlementRequest& Request,
+	FHSRRewardSettlementCandidate& OutCandidate, FHSRSettlementReceipt& OutPreparedReceipt,
+	TArray<FHSRInventoryGrant>& OutGrants, FHSRSettlementReceipt& OutExistingReceipt) const
+{
+	if (const FHSRSettlementReceipt* Existing = SettlementLedger.Find(Request.TransactionId))
+	{
+		if (Existing->RewardDefinitionId != Request.RewardDefinitionId
+			|| Existing->PlayerCharacterId != Request.PlayerCharacterId
+			|| Existing->RewardSeed != Request.RewardSeed
+			|| Existing->Experience != Request.Experience
+			|| Existing->ExpectedInventoryRevision != Request.ExpectedInventoryRevision
+			|| Existing->ExpectedProfileRevision != Request.ExpectedProfileRevision
+			|| Existing->ExpectedRewardRevision != Request.ExpectedRewardRevision)
+		{
+			return EHSRRewardOperationResult::ClaimConflict;
+		}
+		OutExistingReceipt = *Existing;
+		return EHSRRewardOperationResult::NoOp;
+	}
+	if (Request.ExpectedRewardRevision != Revision)
+	{
+		return EHSRRewardOperationResult::RevisionConflict;
+	}
+	const FHSRRewardDefinitionRule* Rule = Rewards.Find(Request.RewardDefinitionId);
+	if (!Rule)
+	{
+		return EHSRRewardOperationResult::UnknownRewardDefinition;
+	}
+	FHSRRewardRequest RewardRequest;
+	RewardRequest.ClaimId = Request.TransactionId;
+	RewardRequest.RewardDefinitionId = Request.RewardDefinitionId;
+	RewardRequest.Seed = Request.RewardSeed;
+	if (!BuildGrants(RewardRequest, *Rule, OutGrants))
+	{
+		return EHSRRewardOperationResult::ResolveFailed;
+	}
+
+	FHSRRewardSettlementCandidate Candidate;
+	Candidate.TransactionId = Request.TransactionId;
+	Candidate.Receipts = Receipts;
+	Candidate.SettlementLedger = SettlementLedger;
+	Candidate.NextRevision = Revision + 1;
+	Candidate.PublishedRewardReceipt.Request = RewardRequest;
+	Candidate.PublishedRewardReceipt.Grants = OutGrants;
+	Candidate.PublishedRewardReceipt.Revision = Candidate.NextRevision;
+	Candidate.Receipts.Add(Request.TransactionId, Candidate.PublishedRewardReceipt);
+
+	FHSRSettlementReceipt Receipt;
+	Receipt.TransactionId = Request.TransactionId;
+	Receipt.RewardDefinitionId = Request.RewardDefinitionId;
+	Receipt.PlayerCharacterId = Request.PlayerCharacterId;
+	Receipt.RewardSeed = Request.RewardSeed;
+	Receipt.Experience = Request.Experience;
+	Receipt.ExpectedInventoryRevision = Request.ExpectedInventoryRevision;
+	Receipt.ExpectedProfileRevision = Request.ExpectedProfileRevision;
+	Receipt.ExpectedRewardRevision = Request.ExpectedRewardRevision;
+	Receipt.RewardReceipt = Candidate.PublishedRewardReceipt;
+	Receipt.RewardRevision = Candidate.NextRevision;
+	Candidate.SettlementLedger.Add(Request.TransactionId, Receipt);
+	OutPreparedReceipt = Receipt;
+	OutCandidate = MoveTemp(Candidate);
+	return EHSRRewardOperationResult::Success;
+}
+
+void UHSRRewardSubsystem::InstallSettlementCandidateNoFail(FHSRRewardSettlementCandidate&& Candidate)
+{
+	Receipts = MoveTemp(Candidate.Receipts);
+	SettlementLedger = MoveTemp(Candidate.SettlementLedger);
+}
+
+void UHSRRewardSubsystem::PublishSettlementCommit(const FHSRRewardReceipt& PreparedReceipt, int64 PreparedRevision)
+{
+	Revision = PreparedRevision;
+	RewardCommitted.Broadcast(PreparedReceipt);
 }
 
 FGuid UHSRRewardSubsystem::MakeInstanceId(const FGuid& ClaimId, FName ItemId, int32 Ordinal)

@@ -7,6 +7,8 @@
 
 class UHSRItemDefinition;
 class UHSRRewardSubsystem;
+class UHSRSettlementAuthority;
+struct FHSRInventorySettlementCandidate;
 
 UCLASS()
 class HSR_API UHSRInventorySubsystem : public UGameInstanceSubsystem
@@ -36,6 +38,7 @@ public:
 
 private:
 	friend class UHSRRewardSubsystem;
+	friend class UHSRSettlementAuthority;
 	struct FDefinitionRule
 	{
 		EHSRItemStorageKind StorageKind = EHSRItemStorageKind::Stackable;
@@ -46,6 +49,11 @@ private:
 	EHSRInventoryOperationResult ApplyGrantsInternal(const TArray<FHSRInventoryGrant>& Grants, bool bBroadcast, int64& OutRevision);
 	void BroadcastRevision(int64 CommittedRevision) { InventoryChanged.Broadcast(CommittedRevision); }
 	void Commit(TMap<FName, int32>&& CandidateStacks, TMap<FGuid, FHSRItemInstance>&& CandidateUniqueItems);
+	EHSRInventoryOperationResult PrepareSettlementCandidate(const FGuid& TransactionId,
+		const TArray<FHSRInventoryGrant>& Grants, int64 ExpectedRevision,
+		FHSRInventorySettlementCandidate& OutCandidate) const;
+	void InstallSettlementCandidateNoFail(FHSRInventorySettlementCandidate&& Candidate);
+	void PublishSettlementCommit(int64 PreparedRevision);
 
 	TMap<FName, FDefinitionRule> Definitions;
 	TMap<FName, int32> Stacks;

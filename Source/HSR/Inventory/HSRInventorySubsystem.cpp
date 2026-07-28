@@ -1,6 +1,7 @@
 #include "HSRInventorySubsystem.h"
 
 #include "../Data/Definitions/HSRItemDefinition.h"
+#include "../Reward/HSRSettlementTypes.h"
 
 EHSRInventoryOperationResult UHSRInventorySubsystem::RegisterDefinition(const UHSRItemDefinition& Definition)
 {
@@ -363,6 +364,74 @@ void UHSRInventorySubsystem::CommitRestore(FHSRInventoryRestoreState&& Candidate
 	{
 		InventoryChanged.Broadcast(Revision);
 	}
+}
+
+EHSRInventoryOperationResult UHSRInventorySubsystem::PrepareSettlementCandidate(const FGuid& TransactionId,
+	const TArray<FHSRInventoryGrant>& Grants, int64 ExpectedRevision,
+	FHSRInventorySettlementCandidate& OutCandidate) const
+{
+	if (ExpectedRevision != Revision)
+	{
+		return EHSRInventoryOperationResult::RevisionConflict;
+	}
+	if (Grants.IsEmpty())
+	{
+		return EHSRInventoryOperationResult::NoOp;
+	}
+	FHSRInventorySettlementCandidate Candidate;
+	Candidate.TransactionId = TransactionId;
+	Candidate.Stacks = Stacks;
+	Candidate.UniqueItems = UniqueItems;
+	for (const FHSRInventoryGrant& Grant : Grants)
+	{
+		if (Grant.ItemId.IsNone() || Grant.Quantity <= 0)
+		{
+			return EHSRInventoryOperationResult::InvalidQuantity;
+		}
+		const FDefinitionRule* Rule = Definitions.Find(Grant.ItemId);
+		if (!Rule)
+		{
+			return EHSRInventoryOperationResult::UnknownDefinition;
+		}
+		if (Rule->StorageKind == EHSRItemStorageKind::Stackable)
+		{
+			if (!Grant.InstanceIds.IsEmpty()) return EHSRInventoryOperationResult::StorageKindMismatch;
+			const int32 Existing = Candidate.Stacks.FindRef(Grant.ItemId);
+			if (Grant.Quantity > MAX_int32 - Existing) return EHSRInventoryOperationResult::QuantityOverflow;
+			const int32 NewQuantity = Existing + Grant.Quantity;
+			if (NewQuantity > Rule->MaxStack) return EHSRInventoryOperationResult::StackLimitExceeded;
+			Candidate.Stacks.Add(Grant.ItemId, NewQuantity);
+		}
+		else
+		{
+			if (Grant.InstanceIds.Num() != Grant.Quantity) return EHSRInventoryOperationResult::StorageKindMismatch;
+			for (const FGuid& InstanceId : Grant.InstanceIds)
+			{
+				if (!InstanceId.IsValid()) return EHSRInventoryOperationResult::InvalidInstanceId;
+				if (Candidate.UniqueItems.Contains(InstanceId)) return EHSRInventoryOperationResult::DuplicateInstanceId;
+				Candidate.UniqueItems.Add(InstanceId, {InstanceId, Grant.ItemId});
+			}
+		}
+	}
+	if (GetUsedSlots(Candidate.Stacks, Candidate.UniqueItems) > Capacity)
+	{
+		return EHSRInventoryOperationResult::CapacityExceeded;
+	}
+	Candidate.NextRevision = Revision + 1;
+	OutCandidate = MoveTemp(Candidate);
+	return EHSRInventoryOperationResult::Success;
+}
+
+void UHSRInventorySubsystem::InstallSettlementCandidateNoFail(FHSRInventorySettlementCandidate&& Candidate)
+{
+	Stacks = MoveTemp(Candidate.Stacks);
+	UniqueItems = MoveTemp(Candidate.UniqueItems);
+}
+
+void UHSRInventorySubsystem::PublishSettlementCommit(int64 PreparedRevision)
+{
+	Revision = PreparedRevision;
+	BroadcastRevision(Revision);
 }
 
 #if WITH_DEV_AUTOMATION_TESTS
