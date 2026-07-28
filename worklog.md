@@ -2196,3 +2196,11 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Asset Gate commit `6942b9a` contains only the user-configured neutral Encounter Blueprint and execution evidence. Unrelated Content/map/learning/ECC changes remain excluded.
 - Independent Reviewer found no code blocker; two stale execution-report statements were corrected. Final verdict is `PASS`. Physical controller, Standalone, Packaged and Shipping remain `NOT VERIFIED`.
 - 03C three-file task packet is archived. The only adjacent next task is 03D1 Atomic Settlement Foundation Task Gate; no 03D1 Source or production-flow change is authorized.
+# 2026-07-28 | TASK-P17-PATCH-03D1 final closeout
+
+- Atomic Settlement Foundation implemented in `773e1f6`; Reviewer REVISE findings for callback-time publication coherence, candidate TransactionId defense and zero-EXP Profile publication were fixed in `2bbcd47`.
+- Fresh HSREditor Build passed UHT, compile, lib/dll link and metadata. Settlement 1, Inventory 3, Reward 6 and Progression 3 Automation tests all passed (13/13).
+- Independent Reviewer rereviewed the fix, recorded `PASS` and committed `tasks/final-review.md` as `dc30603`.
+- User confirmed `DA_Reward_P13_Standard` and `DA_CharacterCatalog_P11` Save All/reopen with stable `Character.A`.
+- User PIE log proves defeat `Outcome=2` emitted no BattleReward and returned to Exploration; victory `Outcome=1` emitted one `P13-003 BattleReward Result=SUCCESS Revision=1` and returned to Exploration. Both return contexts were consumed once and duplicate consumption returned `AlreadyConsumed`.
+- 03D1 is complete. The adjacent next task is 03D2 Task Gate only; production settlement integration remains unauthorized until separate confirmation.

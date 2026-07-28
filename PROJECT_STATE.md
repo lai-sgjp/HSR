@@ -4,11 +4,11 @@
 
 ## 2026-07-28 最新权威摘要
 
-- `TASK-P17-PATCH-03C` 已完成并通过最终复核：Interaction -> Encounter -> Battle admission 的稳定 CharacterId、纯值 Request、exactly-once consume、胜利 resolved replay、失败零旅行与战败新 RequestId 重试均有 Build/Automation/用户 PIE 证据；Implementation commit `2988e11`，Asset Gate commit `6942b9a`。
-- 当前唯一活动卡切换为 `TASK-P17-PATCH-03D1 - Atomic Settlement Foundation`，仅进入 Task Gate；生产结算切换属于 03D2，03D1 尚未获得实施授权。
+- `TASK-P17-PATCH-03D1` 已完成并通过最终复核与用户 Editor Gate：三域候选纯准备、不可失败安装、延迟一致发布、幂等/冲突、候选 ID 防御和零 EXP 语义均有 Build、13/13 Automation 与用户胜利/战败返回 PIE 证据；Implementation commits `773e1f6`、`2bbcd47`，Reviewer commit `dc30603`。
+- 当前唯一活动卡切换为 `TASK-P17-PATCH-03D2 - Battle Result Settlement Integration`，仅进入 Task Gate；03D2 尚未获得实施授权。
 - P17-005 已暂停并形成 checkpoint commit `4ef49f7`：代码 Gate 与 11/11 窄域 Automation 通过，Input/WBP 资产存在，用户 PIE 已证明 Character route 可打开/返回；但 Character read model 返回 `PartySlotEmpty`，所以 P17-005 最终 PASS 不可用。
 - 用户要求把八子系统整合作为全新阶段 `P17-PATCH-03`。四角色 Gate 0 已在修订后收束为 PASS；03A 已完成实现、Code Gate 与用户 PIE 验收。
-- Patch 03 已拆成串行 03A、03B、03C、03D1、03D2、03E～03H；03A、03B、03C 已 PASS，下一相邻任务为 03D1 Task Gate。
+- Patch 03 已拆成串行 03A、03B、03C、03D1、03D2、03E～03H；03A、03B、03C、03D1 已 PASS，下一相邻任务为 03D2 Task Gate。
 - P17-005 checkpoint 不代表 P17-005 完成；`PartySlotEmpty` 与 Exploration Pawn/Party/Profile/CharacterId 未统一是 03B 的前置事实。
 - 当前未授权 push。Enemy/Player Character、Enemy DataAsset、`Map_Phase1_Exploration`、`Content/AI/**`、`.claude/**`、`learn/SaveSystem.md` 与 Phase 20 存档演进改动继续按用户既有修改隔离。
 
