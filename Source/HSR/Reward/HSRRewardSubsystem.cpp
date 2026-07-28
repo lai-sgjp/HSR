@@ -458,9 +458,13 @@ void UHSRRewardSubsystem::InstallSettlementCandidateNoFail(FHSRRewardSettlementC
 	SettlementLedger = MoveTemp(Candidate.SettlementLedger);
 }
 
-void UHSRRewardSubsystem::PublishSettlementCommit(const FHSRRewardReceipt& PreparedReceipt, int64 PreparedRevision)
+void UHSRRewardSubsystem::FinalizeSettlementRevisionNoFail(int64 PreparedRevision)
 {
 	Revision = PreparedRevision;
+}
+
+void UHSRRewardSubsystem::PublishSettlementCommit(const FHSRRewardReceipt& PreparedReceipt, int64 PreparedRevision)
+{
 	RewardCommitted.Broadcast(PreparedReceipt);
 }
 

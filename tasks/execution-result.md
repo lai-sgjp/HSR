@@ -2,6 +2,8 @@
 
 Status: `IMPLEMENTATION GREEN / INDEPENDENT REVIEW PENDING`
 
+Independent Review history: initial review returned `REVISE` for publication callback coherence, missing candidate-identity defense, and zero-EXP Profile publication. All three findings were corrected inside the frozen allowlist and revalidated; rereview is pending.
+
 ## Outcome
 
 - Added a three-domain atomic settlement foundation without switching the production Battle caller.
@@ -18,6 +20,8 @@ Status: `IMPLEMENTATION GREEN / INDEPENDENT REVIEW PENDING`
 - Discovered groups: Settlement 1, Inventory 3, Reward 6, Progression 3.
 
 `HSR.Settlement.Foundation` proves pure prepare snapshots, complete candidates, fixed publication order, one revision/event/receipt per changed domain, matching retry idempotency, changed-payload and changed-revision conflicts, stale revisions, invalid transaction/reward/character/EXP/item/amount/capacity/overflow rejection, and deterministic failures after each domain prepare with zero live mutation.
+
+The revised GREEN additionally proves that an Inventory publication callback observes the new Reward receipt together with its new revision, corrupted Inventory/Profile/Reward candidate TransactionIds are rejected before install, and zero EXP commits no Profile revision/event.
 
 ## Build And Static Evidence
 

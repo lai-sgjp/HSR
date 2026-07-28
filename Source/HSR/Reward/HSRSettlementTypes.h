@@ -17,6 +17,7 @@ enum class EHSRSettlementResult : uint8
 	RewardRejected,
 	InventoryRejected,
 	ProfileRejected,
+	CandidateMismatch,
 	InjectedPrepareFailure
 };
 
@@ -89,6 +90,14 @@ enum class EHSRSettlementPrepareFailurePoint : uint8
 	AfterReward,
 	AfterInventory,
 	AfterProfile
+};
+
+enum class EHSRSettlementCandidateMismatchDomain : uint8
+{
+	None,
+	Inventory,
+	Profile,
+	Reward
 };
 
 struct FHSRSettlementAutomationSnapshot

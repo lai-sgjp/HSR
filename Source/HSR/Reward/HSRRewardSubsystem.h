@@ -55,6 +55,7 @@ private:
 		FHSRRewardSettlementCandidate& OutCandidate, FHSRSettlementReceipt& OutPreparedReceipt,
 		TArray<FHSRInventoryGrant>& OutGrants, FHSRSettlementReceipt& OutExistingReceipt) const;
 	void InstallSettlementCandidateNoFail(FHSRRewardSettlementCandidate&& Candidate);
+	void FinalizeSettlementRevisionNoFail(int64 PreparedRevision);
 	void PublishSettlementCommit(const FHSRRewardReceipt& PreparedReceipt, int64 PreparedRevision);
 
 	TWeakObjectPtr<UHSRInventorySubsystem> Inventory;

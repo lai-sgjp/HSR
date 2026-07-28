@@ -22,6 +22,7 @@ public:
 
 #if WITH_DEV_AUTOMATION_TESTS
 	void SetPrepareFailureForAutomation(EHSRSettlementPrepareFailurePoint Point) { PrepareFailurePoint = Point; }
+	void SetCandidateMismatchForAutomation(EHSRSettlementCandidateMismatchDomain Domain) { CandidateMismatchDomain = Domain; }
 	FHSRSettlementAutomationSnapshot GetAutomationSnapshot() const { return AutomationSnapshot; }
 #endif
 
@@ -32,6 +33,7 @@ private:
 
 #if WITH_DEV_AUTOMATION_TESTS
 	EHSRSettlementPrepareFailurePoint PrepareFailurePoint = EHSRSettlementPrepareFailurePoint::None;
+	EHSRSettlementCandidateMismatchDomain CandidateMismatchDomain = EHSRSettlementCandidateMismatchDomain::None;
 	FHSRSettlementAutomationSnapshot AutomationSnapshot;
 #endif
 };

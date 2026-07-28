@@ -53,6 +53,7 @@ private:
 		const TArray<FHSRInventoryGrant>& Grants, int64 ExpectedRevision,
 		FHSRInventorySettlementCandidate& OutCandidate) const;
 	void InstallSettlementCandidateNoFail(FHSRInventorySettlementCandidate&& Candidate);
+	void FinalizeSettlementRevisionNoFail(int64 PreparedRevision);
 	void PublishSettlementCommit(int64 PreparedRevision);
 
 	TMap<FName, FDefinitionRule> Definitions;

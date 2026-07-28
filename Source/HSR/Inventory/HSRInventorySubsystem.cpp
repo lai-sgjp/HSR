@@ -428,9 +428,13 @@ void UHSRInventorySubsystem::InstallSettlementCandidateNoFail(FHSRInventorySettl
 	UniqueItems = MoveTemp(Candidate.UniqueItems);
 }
 
-void UHSRInventorySubsystem::PublishSettlementCommit(int64 PreparedRevision)
+void UHSRInventorySubsystem::FinalizeSettlementRevisionNoFail(int64 PreparedRevision)
 {
 	Revision = PreparedRevision;
+}
+
+void UHSRInventorySubsystem::PublishSettlementCommit(int64 PreparedRevision)
+{
 	BroadcastRevision(Revision);
 }
 

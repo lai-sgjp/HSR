@@ -166,7 +166,17 @@ bool FHSRSettlementFoundationTest::RunTest(const FString& Parameters)
 
 	TArray<FString> PublicationOrder;
 	int32 InventoryEvents = 0, ProfileEvents = 0, RewardEvents = 0;
-	Fixture.Inventory->OnInventoryChanged().AddLambda([&](int64){ ++InventoryEvents; PublicationOrder.Add(TEXT("Inventory")); });
+	int64 RewardRevisionObservedFromInventoryEvent = -1;
+	int32 RewardReceiptsObservedFromInventoryEvent = -1;
+	Fixture.Inventory->OnInventoryChanged().AddLambda([&](int64)
+	{
+		++InventoryEvents;
+		PublicationOrder.Add(TEXT("Inventory"));
+		FHSRRewardSaveData RewardState;
+		Fixture.Reward->ExportSaveData(RewardState);
+		RewardRevisionObservedFromInventoryEvent = RewardState.Revision;
+		RewardReceiptsObservedFromInventoryEvent = RewardState.Receipts.Num();
+	});
 	Fixture.Profiles->OnProfileChanged().AddLambda([&](FName, int64){ ++ProfileEvents; PublicationOrder.Add(TEXT("Profile")); });
 	Fixture.Reward->OnRewardCommitted().AddLambda([&](const FHSRRewardReceipt&){ ++RewardEvents; PublicationOrder.Add(TEXT("Reward")); });
 	FHSRSettlementReceipt Receipt;
@@ -177,6 +187,8 @@ bool FHSRSettlementFoundationTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Inventory publishes once"), InventoryEvents, 1);
 	TestEqual(TEXT("Profile publishes once"), ProfileEvents, 1);
 	TestEqual(TEXT("Reward publishes once"), RewardEvents, 1);
+	TestEqual(TEXT("Inventory callback sees coherent Reward revision"), RewardRevisionObservedFromInventoryEvent, int64(1));
+	TestEqual(TEXT("Inventory callback sees coherent Reward receipt"), RewardReceiptsObservedFromInventoryEvent, 1);
 	TestEqual(TEXT("First publication is Inventory"), PublicationOrder[0], FString(TEXT("Inventory")));
 	TestEqual(TEXT("Second publication is Profile"), PublicationOrder[1], FString(TEXT("Profile")));
 	TestEqual(TEXT("Third publication is Reward"), PublicationOrder[2], FString(TEXT("Reward")));
@@ -233,6 +245,33 @@ bool FHSRSettlementFoundationTest::RunTest(const FString& Parameters)
 	}
 	Fixture.Authority->SetPrepareFailureForAutomation(EHSRSettlementPrepareFailurePoint::None);
 	Fixture.Shutdown();
+
+	for (EHSRSettlementCandidateMismatchDomain Domain : {EHSRSettlementCandidateMismatchDomain::Inventory,
+		EHSRSettlementCandidateMismatchDomain::Profile, EHSRSettlementCandidateMismatchDomain::Reward})
+	{
+		FFixture MismatchFixture;
+		if (TestTrue(TEXT("Candidate mismatch fixture initializes"), MismatchFixture.Initialize(*this)))
+		{
+			MismatchFixture.Authority->SetCandidateMismatchForAutomation(Domain);
+			ExpectRejectedWithoutMutation(*this, MismatchFixture, TEXT("Mismatched candidate transaction rejected"),
+				MismatchFixture.Request(150 + static_cast<uint32>(Domain)), EHSRSettlementResult::CandidateMismatch);
+		}
+		MismatchFixture.Shutdown();
+	}
+
+	FFixture ZeroExperienceFixture;
+	if (TestTrue(TEXT("Zero EXP fixture initializes"), ZeroExperienceFixture.Initialize(*this)))
+	{
+		int32 ZeroProfileEvents = 0;
+		ZeroExperienceFixture.Profiles->OnProfileChanged().AddLambda([&](FName, int64){ ++ZeroProfileEvents; });
+		FHSRSettlementReceipt ZeroReceipt;
+		TestEqual(TEXT("Zero EXP settlement succeeds"),
+			ZeroExperienceFixture.Authority->SubmitSettlement(ZeroExperienceFixture.Request(160, 0), ZeroReceipt),
+			EHSRSettlementResult::Success);
+		TestEqual(TEXT("Zero EXP preserves profile revision"), ZeroReceipt.ProfileRevision, int64(0));
+		TestEqual(TEXT("Zero EXP emits no profile event"), ZeroProfileEvents, 0);
+	}
+	ZeroExperienceFixture.Shutdown();
 
 	FFixture CapacityFixture;
 	if (TestTrue(TEXT("Capacity fixture initializes"), CapacityFixture.Initialize(*this, 1)))

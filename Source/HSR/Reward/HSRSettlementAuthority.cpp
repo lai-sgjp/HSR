@@ -99,6 +99,23 @@ EHSRSettlementResult UHSRSettlementAuthority::PrepareSettlement(const FHSRSettle
 		return EHSRSettlementResult::RewardRejected;
 	}
 	*PreparedLedgerReceipt = Candidate.Receipt;
+#if WITH_DEV_AUTOMATION_TESTS
+	switch (CandidateMismatchDomain)
+	{
+	case EHSRSettlementCandidateMismatchDomain::Inventory: Candidate.Inventory.TransactionId.Invalidate(); break;
+	case EHSRSettlementCandidateMismatchDomain::Profile: Candidate.Profile.TransactionId.Invalidate(); break;
+	case EHSRSettlementCandidateMismatchDomain::Reward: Candidate.Reward.TransactionId.Invalidate(); break;
+	default: break;
+	}
+#endif
+	if (Candidate.Inventory.TransactionId != Request.TransactionId
+		|| Candidate.Profile.TransactionId != Request.TransactionId
+		|| Candidate.Reward.TransactionId != Request.TransactionId
+		|| Candidate.Receipt.TransactionId != Request.TransactionId
+		|| PreparedLedgerReceipt->TransactionId != Request.TransactionId)
+	{
+		return EHSRSettlementResult::CandidateMismatch;
+	}
 	OutCandidate = MoveTemp(Candidate);
 	return EHSRSettlementResult::Success;
 }
@@ -126,8 +143,14 @@ EHSRSettlementResult UHSRSettlementAuthority::SubmitSettlement(
 	++AutomationSnapshot.AggregateInstallCount;
 #endif
 
+	Inventory->FinalizeSettlementRevisionNoFail(Candidate.Receipt.InventoryRevision);
+	Reward->FinalizeSettlementRevisionNoFail(Candidate.Receipt.RewardRevision);
+
 	Inventory->PublishSettlementCommit(Candidate.Receipt.InventoryRevision);
-	Profiles->PublishSettlementCommit(Request.PlayerCharacterId, Candidate.Receipt.ProfileRevision);
+	if (Candidate.Receipt.ProfileRevision != Request.ExpectedProfileRevision)
+	{
+		Profiles->PublishSettlementCommit(Request.PlayerCharacterId, Candidate.Receipt.ProfileRevision);
+	}
 	Reward->PublishSettlementCommit(Candidate.Receipt.RewardReceipt, Candidate.Receipt.RewardRevision);
 #if WITH_DEV_AUTOMATION_TESTS
 	++AutomationSnapshot.PublicationCount;
