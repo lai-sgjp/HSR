@@ -1,6 +1,6 @@
 # TASK-P17-PATCH-03C - Interaction to Battle Admission
 
-Status: `PLANNED / TASK GATE REVIEW REQUIRED / IMPLEMENTATION NOT AUTHORIZED`
+Status: `PLANNED / TASK GATE PASS / USER CONFIRMATION REQUIRED`
 
 ## Role Lock
 
@@ -85,8 +85,9 @@ Required regressions without editing their tests: `HSR.Exploration.Patch.Behavio
 1. Configure the neutral encounter actor with the selected Encounter DataAsset; verify F still routes through the Exploration InteractionComponent. Blueprint must not travel or resolve admission.
 2. Compile/Save/reopen the actor and Definition references.
 3. Happy PIE: approach -> prompt -> F -> Battle. Evidence must show one interaction success, one RequestId, one travel, and Battle consuming the same PlayerCharacterId/EncounterId/EnemyDefinitionId/RequestId.
-4. Failure PIE: leave overlap before F, destroy/disable the candidate before F, repeat F rapidly, and retry a resolved-victory encounter. No rejected case may enter Battle.
+4. Failure PIE uses stable fixtures only: leave overlap before F, set the encounter actor `bAvailable=false` before a separate PIE run, and retry the same actor after a victory return. No rejected case may enter Battle.
 5. Return/defeat evidence must distinguish resolved victory from retryable defeat/interruption.
+6. Destroyed-candidate and same-frame repeated-F races are Automation evidence, not manual timing exercises; no temporary Level Blueprint or Blueprint-owned admission logic may be created for them.
 
 ## Explicit non-goals and stop conditions
 
@@ -99,4 +100,4 @@ Required regressions without editing their tests: `HSR.Exploration.Patch.Behavio
 
 ## Current Gate
 
-Draft revision 2 closes feasibility review's Reward-boundary blocker and the Coordinator audit's missing player stable-ID handoff. Task Gate re-review is required. After Task Gate PASS, the implementation agent must restate task ID, sole outcome, ownership/order, exact write allowlist, TDD targets, Editor work and stop conditions, then end with: `等待用户确认执行 TASK-P17-PATCH-03C。`
+Draft revision 3 closes feasibility review's Reward-boundary blocker, the Coordinator audit's missing player stable-ID handoff, and the Editor review's unreliable timing fixtures. Independent Reviewer=`PASS`; the initial Implementation feasibility condition is closed by the frozen const Reward preflight; Editor exercise review=`PASS`. Final Task Gate=`PASS`. Implementation must first restate task ID, sole outcome, ownership/order, exact write allowlist, TDD targets, Editor work and stop conditions, then end with: `等待用户确认执行 TASK-P17-PATCH-03C。`
