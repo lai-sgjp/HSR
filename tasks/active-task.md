@@ -1,6 +1,6 @@
 # TASK-P17-PATCH-03A — Frontend Boundary Contract Reconciliation
 
-Status: `PLANNED / TASK GATE REVIEW REQUIRED / USER CONFIRMATION REQUIRED`
+Status: `TASK GATE PASS / IMPLEMENTATION READBACK AND USER CONFIRMATION REQUIRED`
 
 ## Role Lock / 角色锁定
 
@@ -14,23 +14,29 @@ P17-PATCH-03 Gate 0 已完成规划收束。P17-005 仅以 checkpoint `4ef49f7` 
 
 把 Frontend 顶层状态固定为 `ExplorationRoot -> FrontendShell`，Character、Inventory 与 placeholder module 只存在于内部 Router history。保持现有打开、跨类型切换、Back、X、pause/input/focus 与 travel teardown 可见行为，同时删除第三个全局 module ScreenStack entry 及 depth-3 契约。
 
-## 允许修改文件（Task Gate 候选）
+## 允许修改文件（Task Gate 已冻结）
 
 - `Source/HSR/UI/HSRUIManagerSubsystem.h`
 - `Source/HSR/UI/HSRUIManagerSubsystem.cpp`
-- `Source/HSR/UI/HSRScreenStack.h`
-- `Source/HSR/UI/HSRScreenStack.cpp`
-- `Source/HSR/UI/HSRScreenStackTypes.h`
-- `Source/HSR/UI/Frontend/HSRFrontendRouter.h`
-- `Source/HSR/UI/Frontend/HSRFrontendRouter.cpp`
-- `Source/HSR/UI/Frontend/HSRFrontendShellWidget.h`
-- `Source/HSR/UI/Frontend/HSRFrontendShellWidget.cpp`
-- `Source/HSR/UI/Frontend/HSRFrontendModuleRootWidget.h`
-- `Source/HSR/UI/Frontend/HSRFrontendModuleRootWidget.cpp`
 - `Source/HSR/Tests/HSRFrontendNavigationTests.cpp`
 - `tasks/execution-result.md`
 
-Task Gate 必须从候选中冻结实际最小子集。未列文件禁止修改；不授权 Content、Config、Domain、Map、Character、Inventory、Save、Git commit 或 push。
+只读审查确认 ScreenStack、Router 和 Widget 公共类型无需修改；它们可作为只读依赖。未列文件禁止修改；不授权 Content、Config、Domain、Map、Character、Inventory、Save、Git commit 或 push。
+
+## ScreenStack 迁移矩阵
+
+| 入口/事务 | 旧全局栈动作 | 新合同 | 失败恢复 |
+|---|---|---|---|
+| 首次打开 Hub | Push FrontendShell/Pause | 保留 Push，稳定 depth=2 | 恢复 exact root、policy、pause、focus、route |
+| Character open/replace | Push/Replace Character entry | 不改全局栈；candidate Widget/VM 后只提交 Router | create/attach/focus/route 失败保留旧 module/Hub，depth=2 |
+| Inventory open/replace | Push/Replace Inventory entry | 不改全局栈；candidate Widget/VM 后只提交 Router | 同上 |
+| Placeholder open/replace | Push/Replace placeholder entry | 不改全局栈；candidate Widget 后只提交 Router | 同上 |
+| Module Back | Pop module entry，再 Router Back | 不 Pop；Router Back 成功后释放旧 module 并聚焦 Hub | route/focus 失败保留旧 module/route |
+| Hub Back / X | CloseToRoot | 保留 session close；Router 与全局栈一起回 root | pause/policy/focus/route 失败恢复旧 depth=2 session |
+| Travel teardown | 循环 Pop 到 root | depth=2 时只关闭 FrontendShell；route 丢弃 | old host/token/callback 拒绝，不恢复 module route |
+| Compensation helpers | 重建 Character/Inventory entry | 删除 module Push 补偿依赖；恢复 Router/Widget ownership | 只有恢复失败才置 `Inconsistent` |
+
+测试必须把原 depth=3 断言改成 depth=2，并继续覆盖 Character/Inventory/placeholder 全排列、Back/X、直接 shortcut、create/attach/policy/pause/focus/route failure、compensation failure、external pause、duplicate binding、travel/stale host/token/callback。
 
 ## 实施合同
 
@@ -57,7 +63,7 @@ Task Gate 必须从候选中冻结实际最小子集。未列文件禁止修改�
 
 ## 当前门禁
 
-Coordinator 只创建了计划卡，没有实施授权。Task Gate Reviewer 必须检查 exact allowlist、迁移矩阵、失败补偿、测试矩阵和用户 Editor 风险；PASS 后仍需用户单独确认。
+Task Gate=`PASS`：只读审查已冻结四文件白名单、逐入口迁移矩阵、失败补偿和测试矩阵。该 PASS 不授权实施；Implementation Agent 必须先复述，并等待用户单独确认。
 
 ## Git 交付
 
