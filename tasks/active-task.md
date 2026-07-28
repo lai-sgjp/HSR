@@ -18,6 +18,8 @@ P17-PATCH-03 Gate 0 已完成规划收束。P17-005 仅以 checkpoint `4ef49f7` 
 
 - `Source/HSR/UI/HSRUIManagerSubsystem.h`
 - `Source/HSR/UI/HSRUIManagerSubsystem.cpp`
+- `Source/HSR/UI/HSRScreenWidget.h`
+- `Source/HSR/UI/HSRScreenWidget.cpp`
 - `Source/HSR/Tests/HSRFrontendNavigationTests.cpp`
 - `tasks/execution-result.md`
 
@@ -64,6 +66,8 @@ P17-PATCH-03 Gate 0 已完成规划收束。P17-005 仅以 checkpoint `4ef49f7` 
 ## 当前门禁
 
 Task Gate=`PASS`，Implementation commit=`494f700`，Code Gate=`PASS / ASSET GATE READY`。当前只等待用户完成 allowlisted WBP 检查、Save All/reopen、happy/failure PIE 与两分辨率证据；没有授权继续 PATCH-03B。
+
+Asset Gate revision: real UIOnly PIE proved X does not reach the PlayerController Enhanced Input handler. The exact allowlist is expanded to shared `HSRScreenWidget.h/.cpp` so focused Frontend widgets route X to the same UIManager close transaction. No Blueprint business logic or input-mode weakening is authorized.
 
 ## Git 交付
 
