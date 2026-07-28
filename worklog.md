@@ -11,6 +11,14 @@
 - 最终 Gate 0：Coordinator=`PASS`、Independent Reviewer=`PASS`、Teacher=`PASS`（唯一 PATCH-02 陈旧状态项已校正）、Implementation feasibility=`PASS`。该结论只允许建立 03A Task Gate，不授权实施。
 - P17-005 三件套以暂停状态归档；新活动卡为 `TASK-P17-PATCH-03A`，等待独立 Task Gate 与用户再次确认。
 
+## 2026-07-28｜TASK-P17-PATCH-03A 收口
+
+- 03A 最终为 `PASS WITH FOLLOW-UP`。全局 ScreenStack 稳定状态仅为 ExplorationRoot depth 1 或 ExplorationRoot -> FrontendShell depth 2；Character、Inventory 与 placeholder 历史仅由 FrontendRouter 拥有。
+- Development Editor Build 成功，`HSR.UI.FrontendNavigation` 11/11 Success、0 Fail；真实 PIE 记录 Frontend/Character 均为 Stack=2。
+- 用户明确确认按 X 已从 Character 返回探索；日志同时显示鼠标捕获恢复和 `IMC_Exploration` 重新加入，证据等级为 `USER PROVIDED`。
+- 缺失 module class 的旧 Character 保留行为按 `USER PROVIDED` 记录，但没有结构化拒绝日志。1920x1080 与 1280x720 经用户明确暂缓，为 `USER ACCEPTED / NOT VERIFIED`；控制器、Standalone、Packaged、Shipping 仍未验证。
+- `PartySlotEmpty` 不属于 03A，转为 03B 的首要前置事实。03A 三件套归档后仅创建 03B 计划卡；Task Gate 与用户再次确认前不得实施。
+
 ## 2026-07-27｜TASK-P17-PATCH-01C complete action-distance model archived
 
 - Implementation chain culminated in `adb11d2`; Independent Reviewer final conclusion is `PASS` in `28d3213` after preserving all intermediate `REVISE` history.

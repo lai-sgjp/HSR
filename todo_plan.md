@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：P17-005 已暂停并 checkpoint 于 `4ef49f7`；最终 PASS 不可用。P17-PATCH-03 四角色 Gate 0 已 PASS，唯一活动卡为 03A，仍需 Task Gate 和用户再次确认，尚未实施 Source/Content/Config。
+> 当前状态：P17-005 已暂停并 checkpoint 于 `4ef49f7`；最终 PASS 不可用。P17-PATCH-03 Gate 0 已 PASS，03A 已 `PASS WITH FOLLOW-UP` 并归档；唯一活动卡为 03B，仍需 Task Gate 与用户再次确认，尚未实施。
 
 ## 已完成的规划工作
 
@@ -11,8 +11,8 @@
 - [x] TASK-P17-PATCH-02：Behavior Tree/Blackboard 探索敌人迁移已完成最终复核；其用户资产改动仍按真实 provenance 隔离，不等同于 P17-005。
 - [x] P17-005 当前进度 checkpoint：commit `4ef49f7`（仅表示暂停点，不表示任务完成或最终 PASS）。
 - [x] P17-PATCH-03 Gate 0：四角色最终 PASS；已冻结八子系统所有权、稳定 ID、事务、生命周期、失败矩阵、Editor exercise 与串行包。
-- [ ] TASK-P17-PATCH-03A：Frontend Boundary Contract Reconciliation（活动卡已创建；Task Gate 与用户再次确认前禁止实施）。
-- [ ] P17-PATCH-03B：Production Bootstrap and Character Identity（解决 `PartySlotEmpty` 与 Pawn/Profile/Party/CharacterId 一致性）。
+- [x] TASK-P17-PATCH-03A：Frontend Boundary Contract Reconciliation；Build、11/11 Automation 与用户 X 返回探索 PIE 通过，双分辨率为 `USER ACCEPTED / NOT VERIFIED`。
+- [ ] TASK-P17-PATCH-03B：Production Bootstrap and Character Identity（活动卡仅规划；Task Gate 与用户再次确认前禁止实施；解决 `PartySlotEmpty` 与 Pawn/Profile/Party/CharacterId 一致性）。
 - [ ] P17-PATCH-03C～03G：按计划串行整合 Interaction/Battle admission、03D1 atomic foundation、03D2 settlement integration、Inventory/Equipment、Map travel、Save restore。
 - [ ] P17-PATCH-03H：clean-save 端到端 closeout；不得以其结果倒推 P17-005 已完成。
 
