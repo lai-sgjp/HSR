@@ -11,6 +11,8 @@ class UHSRInventoryWidget;
 class UHSRRewardSummaryWidget;
 class UHSRScreenWidget;
 class UHSRCharacterDetailWidget;
+class UHSRFrontendShellWidget;
+class UHSRFrontendModuleRootWidget;
 
 UCLASS()
 class HSR_API AHSRHUD : public AHUD
@@ -51,7 +53,10 @@ protected:
 	TObjectPtr<UHSRUserWidget> ExplorationWidgetInstance;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
-	TSubclassOf<UHSRScreenWidget> PauseWidgetClass;
+	TSubclassOf<UHSRFrontendShellWidget> FrontendShellClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
+	TSubclassOf<UHSRFrontendModuleRootWidget> FrontendModuleRootClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
 	TSubclassOf<UHSRCharacterDetailWidget> CharacterDetailWidgetClass;

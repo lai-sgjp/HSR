@@ -14,6 +14,7 @@ class HSR_API UHSRScreenWidget : public UUserWidget
 
 public:
 	void SetOwningUIManager(UHSRUIManagerSubsystem* Manager);
+	UHSRUIManagerSubsystem* GetOwningUIManager() const { return OwningUIManager.Get(); }
 
 	UFUNCTION(BlueprintCallable, Category = "HSR|UI")
 	bool RequestBack();

@@ -86,8 +86,8 @@ void AHSRHUD::ShowExplorationHUD()
 		{
 			if (UHSRUIManagerSubsystem* UIManager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
 			{
-				UIManager->RegisterExplorationHost(this, HSRPC, ExplorationWidgetInstance, PauseWidgetClass,
-					CharacterDetailWidgetClass, InventoryWidgetClass);
+				UIManager->RegisterExplorationHost(this, HSRPC, ExplorationWidgetInstance, FrontendShellClass,
+					FrontendModuleRootClass, CharacterDetailWidgetClass, InventoryWidgetClass);
 			}
 		}
 	}

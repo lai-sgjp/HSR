@@ -2,6 +2,7 @@
 #include "../UI/HSRHUD.h"
 #include "../Character/HSRExplorationCharacter.h"
 #include "EnhancedInputSubsystems.h"
+#include "EnhancedInputComponent.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "../UI/HSRScreenStackTypes.h"
@@ -15,6 +16,7 @@ AHSRPlayerController::AHSRPlayerController()
 	CurrentControlMode = EHSRPlayerControlMode::Exploration;
 	bControlModeApplied = false;
 	bExplorationContextAdded = false;
+	bFrontendNavigationContextAdded = false;
 	bInputSystemReady = false;
 	AppliedInputIntent = EHSRUIInputIntent::GameOnly;
 }
@@ -23,6 +25,23 @@ void AHSRPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 	bInputSystemReady = true;
+	AddFrontendNavigationContext();
+	if (UEnhancedInputComponent* Enhanced = Cast<UEnhancedInputComponent>(InputComponent);
+		Enhanced && ShouldBindFrontendInputComponent(FrontendBindingsInputComponent, InputComponent))
+	{
+		const auto BindStarted = [Enhanced, this](UInputAction* Action, void (AHSRPlayerController::*Handler)())
+		{
+			if (Action) Enhanced->BindAction(Action, ETriggerEvent::Started, this, Handler);
+			else UE_LOG(LogTemp, Warning, TEXT("HSRUI Frontend action is not configured; binding skipped"));
+		};
+		BindStarted(PauseBackAction, &ThisClass::HandlePauseBack);
+		BindStarted(InventoryAction, &ThisClass::HandleInventory);
+		BindStarted(PartyAction, &ThisClass::HandleParty);
+		BindStarted(MapAction, &ThisClass::HandleMap);
+		BindStarted(ChallengeAction, &ThisClass::HandleChallenge);
+		BindStarted(CloseToRootAction, &ThisClass::HandleCloseToRoot);
+		FrontendBindingsInputComponent = InputComponent;
+	}
 
 	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::SetupInputComponent - PlayerInput=%s InputComponent=%s"),
 		PlayerInput ? *PlayerInput->GetClass()->GetName() : TEXT("None"),
@@ -183,6 +202,42 @@ void AHSRPlayerController::RequestOpenPauseScreen()
 	}
 }
 
+void AHSRPlayerController::RequestCloseFrontendToRoot()
+{
+	if (ULocalPlayer* LP = GetLocalPlayer())
+		if (UHSRUIManagerSubsystem* Manager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
+			Manager->CloseFrontendToRoot();
+}
+
+void AHSRPlayerController::HandlePauseBack()
+{
+	if (ULocalPlayer* LP = GetLocalPlayer())
+		if (UHSRUIManagerSubsystem* Manager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
+		{
+			if (Manager->GetLogicalScreenCount() <= 1) Manager->OpenFrontendModule(EHSRFrontendModule::PauseHub);
+			else Manager->RequestBack();
+		}
+}
+
+void AHSRPlayerController::HandleInventory() { if (ULocalPlayer* LP = GetLocalPlayer()) if (auto* M = LP->GetSubsystem<UHSRUIManagerSubsystem>()) M->OpenFrontendModule(EHSRFrontendModule::Inventory); }
+void AHSRPlayerController::HandleParty() { if (ULocalPlayer* LP = GetLocalPlayer()) if (auto* M = LP->GetSubsystem<UHSRUIManagerSubsystem>()) M->OpenFrontendModule(EHSRFrontendModule::Party); }
+void AHSRPlayerController::HandleMap() { if (ULocalPlayer* LP = GetLocalPlayer()) if (auto* M = LP->GetSubsystem<UHSRUIManagerSubsystem>()) M->OpenFrontendModule(EHSRFrontendModule::Map); }
+void AHSRPlayerController::HandleChallenge() { if (ULocalPlayer* LP = GetLocalPlayer()) if (auto* M = LP->GetSubsystem<UHSRUIManagerSubsystem>()) M->OpenFrontendModule(EHSRFrontendModule::Challenge); }
+void AHSRPlayerController::HandleCloseToRoot() { RequestCloseFrontendToRoot(); }
+
+void AHSRPlayerController::AddFrontendNavigationContext()
+{
+	if (bFrontendNavigationContextAdded || !FrontendNavigationMappingContext) return;
+	if (ULocalPlayer* LP = GetLocalPlayer())
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+		{
+			FModifyContextOptions Options;
+			Options.bForceImmediately = true;
+			Subsystem->AddMappingContext(FrontendNavigationMappingContext, 10, Options);
+			bFrontendNavigationContextAdded = true;
+		}
+}
+
 void AHSRPlayerController::RequestBackScreen()
 {
 	if (ULocalPlayer* LP = GetLocalPlayer())
@@ -203,7 +258,7 @@ void AHSRPlayerController::RequestOpenCharacterDetailScreen()
 	{
 		if (UHSRUIManagerSubsystem* Manager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
 		{
-			const EHSRUIScreenResult Result = Manager->OpenCharacterDetailScreen();
+			const EHSRUIScreenResult Result = Manager->OpenFrontendModule(EHSRFrontendModule::Character);
 			UE_LOG(LogTemp, Log, TEXT("HSRUI P17 CharacterDetail RequestOpen Result=%d Stack=%d HasDetail=%s"),
 				static_cast<int32>(Result), Manager->GetLogicalScreenCount(),
 				Manager->HasOpenCharacterDetailScreen() ? TEXT("true") : TEXT("false"));
@@ -217,7 +272,7 @@ void AHSRPlayerController::RequestOpenInventoryScreen()
 	{
 		if (UHSRUIManagerSubsystem* Manager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
 		{
-			const EHSRUIScreenResult Result = Manager->OpenInventoryScreen();
+			const EHSRUIScreenResult Result = Manager->OpenFrontendModule(EHSRFrontendModule::Inventory);
 			UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Inventory RequestOpen Result=%d Stack=%d HasInventory=%s"),
 				static_cast<int32>(Result), Manager->GetLogicalScreenCount(),
 				Manager->HasOpenInventoryScreen() ? TEXT("true") : TEXT("false"));

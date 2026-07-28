@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/LocalPlayerSubsystem.h"
 #include "HSRScreenStackTypes.h"
+#include "Frontend/HSRFrontendRouteTypes.h"
 #include "../Map/HSRMapTypes.h"
 #include "HSRUIManagerSubsystem.generated.h"
 
@@ -13,6 +14,9 @@ class UHSRCharacterDetailWidget;
 class UHSRInventoryWidget;
 class UHSRInventoryRewardViewModel;
 class UHSRUserWidget;
+class UHSRFrontendRouter;
+class UHSRFrontendShellWidget;
+class UHSRFrontendModuleRootWidget;
 class AHSRHUD;
 class AHSRPlayerController;
 class UWidget;
@@ -33,7 +37,8 @@ public:
 	const UHSRScreenStack* GetScreenStack() const { return ScreenStack; }
 
 	EHSRUIScreenResult RegisterExplorationHost(AHSRHUD* HUD, AHSRPlayerController* PlayerController,
-		UHSRUserWidget* RootWidget, TSubclassOf<UHSRScreenWidget> InPauseWidgetClass,
+		UHSRUserWidget* RootWidget, TSubclassOf<UHSRFrontendShellWidget> InFrontendShellClass,
+		TSubclassOf<UHSRFrontendModuleRootWidget> InFrontendModuleRootClass,
 		TSubclassOf<UHSRCharacterDetailWidget> InCharacterDetailWidgetClass,
 		TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass);
 	EHSRUIScreenResult UnregisterExplorationHost(AHSRHUD* HUD, AHSRPlayerController* PlayerController);
@@ -51,8 +56,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "HSR|UI")
 	EHSRUIScreenResult RequestBack();
 
+	UFUNCTION(BlueprintCallable, Category = "HSR|UI|Frontend")
+	EHSRUIScreenResult OpenFrontendModule(EHSRFrontendModule Module);
+
+	UFUNCTION(BlueprintCallable, Category = "HSR|UI|Frontend")
+	EHSRUIScreenResult CloseFrontendToRoot();
+
 	UFUNCTION(BlueprintPure, Category = "HSR|UI")
-	bool HasOpenPauseScreen() const { return PauseWidgetInstance != nullptr; }
+	bool HasOpenPauseScreen() const { return FrontendShellInstance != nullptr; }
+	const UHSRFrontendRouter* GetFrontendRouter() const { return FrontendRouter; }
 
 	UFUNCTION(BlueprintPure, Category = "HSR|UI")
 	bool HasOpenCharacterDetailScreen() const { return CharacterDetailWidgetInstance != nullptr; }
@@ -74,6 +86,14 @@ public:
 	EHSRUIScreenResult UnregisterHostIdentityForAutomation(int32 HostIdentity);
 	void ConfigureAutomationBackend(bool bCreateSucceeds, bool bAttachSucceeds, bool bPolicySucceeds,
 		bool bPauseSucceeds, bool bFocusSucceeds, bool bInitiallyPaused = false);
+	void FailNextAutomationPolicyApply() { bAutomationFailNextPolicyApply = true; }
+	void FailNextAutomationPauseApply() { bAutomationFailNextPauseApply = true; }
+	void FailNextAutomationFocusApply() { bAutomationFailNextFocusApply = true; }
+	void FailNextAutomationRouteSubmit() { bAutomationFailNextRouteSubmit = true; }
+	void FailAutomationOldModuleFocusRestore() { bAutomationFailOldModuleFocusRestore = true; }
+	void FailAutomationPauseRestore() { bAutomationFailPauseRestore = true; }
+	void FailSecondAutomationPolicyApply() { AutomationPolicyCallsUntilFailure = 2; }
+	void FailSecondAutomationPauseApply() { AutomationPauseCallsUntilFailure = 2; }
 	void ConfigureAutomationDetailBackend(bool bHasClass, bool bCreateSucceeds, bool bAttachSucceeds,
 		bool bPolicySucceeds, bool bFocusSucceeds);
 	void FailNextAutomationDetailPolicyApply() { bAutomationFailNextDetailPolicyApply = true; }
@@ -86,6 +106,8 @@ public:
 	int32 GetLastReleasedInventoryBindCountForAutomation() const { return LastReleasedInventoryBindCount; }
 	int32 GetLastReleasedInventoryUnbindCountForAutomation() const { return LastReleasedInventoryUnbindCount; }
 	int32 GetInventoryCandidateShutdownCountForAutomation() const { return InventoryCandidateShutdownCount; }
+	bool IsPausedForAutomation() const { return bAutomationPaused; }
+	EHSRFrontendModule GetLastAutomationFocusModule() const { return LastAutomationFocusModule; }
 	EHSRUIScreenResult TeardownHostIdentityForTravelForAutomation(int32 HostIdentity);
 	void NotifyArrivalCommittedForAutomation(int64 CommitGeneration, FName MapId = TEXT("Map.Automation"));
 	bool HasPendingTravelRestoreForAutomation() const { return bTravelRestorePending; }
@@ -95,6 +117,9 @@ public:
 
 private:
 	int64 AllocateRequestToken();
+	int64 AllocateFrontendRequestToken();
+	EHSRFrontendRouteResult SubmitFrontendRoute(const FHSRFrontendRouteRequest& Request);
+	EHSRUIScreenResult ResolveCompensation(bool bRecovered, EHSRUIScreenResult OriginalFailure);
 	FHSRScreenRequest MakeRootRequest(int64 Token) const;
 	FHSRScreenRequest MakePauseRequest(int64 Token) const;
 	FHSRScreenRequest MakeCharacterDetailRequest(int64 Token) const;
@@ -104,6 +129,8 @@ private:
 		UHSRScreenWidget* CandidateWidget);
 	bool CompensatePausePush(AHSRPlayerController* PlayerController);
 	bool CompensateCharacterDetailPush(AHSRPlayerController* PlayerController);
+	EHSRUIScreenResult OpenCharacterDetailInternal();
+	EHSRUIScreenResult OpenInventoryInternal();
 	EHSRUIScreenResult CloseCharacterDetailScreen();
 	EHSRUIScreenResult CloseInventoryScreen();
 	bool CompensateInventoryPush(AHSRPlayerController* PlayerController);
@@ -119,11 +146,12 @@ private:
 	bool IsBackendHostValid(AHSRPlayerController* PlayerController, UHSRUserWidget* RootWidget, UWorld* World) const;
 	bool IsBackendExploration(AHSRPlayerController* PlayerController) const;
 	bool IsBackendPaused(UWorld* World) const;
-	UHSRScreenWidget* CreatePauseCandidate(AHSRPlayerController* PlayerController);
+	bool IsTravelPending() const;
+	UHSRFrontendShellWidget* CreatePauseCandidate(AHSRPlayerController* PlayerController);
 	UHSRCharacterDetailWidget* CreateCharacterDetailCandidate(AHSRPlayerController* PlayerController);
 	UHSRInventoryWidget* CreateInventoryCandidate(AHSRPlayerController* PlayerController);
 	UHSRInventoryRewardViewModel* CreateInventoryViewModelCandidate();
-	bool AttachPauseCandidate(UHSRScreenWidget* Candidate);
+	bool AttachPauseCandidate(UHSRFrontendShellWidget* Candidate);
 	bool AttachCharacterDetailCandidate(UHSRCharacterDetailWidget* Candidate);
 	bool AttachInventoryCandidate(UHSRInventoryWidget* Candidate);
 	bool ApplyPolicyBackend(AHSRPlayerController* PlayerController, const FHSRInputModePolicy& Policy,
@@ -145,10 +173,19 @@ private:
 	TObjectPtr<UHSRInputModeCoordinator> InputModeCoordinator;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UHSRScreenWidget> PauseWidgetInstance;
+	TObjectPtr<UHSRFrontendRouter> FrontendRouter;
 
 	UPROPERTY(Transient)
-	TSubclassOf<UHSRScreenWidget> PauseWidgetClass;
+	TObjectPtr<UHSRFrontendShellWidget> FrontendShellInstance;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UHSRFrontendShellWidget> FrontendShellClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UHSRFrontendModuleRootWidget> FrontendModuleRootInstance;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UHSRFrontendModuleRootWidget> FrontendModuleRootClass;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRCharacterDetailWidget> CharacterDetailWidgetInstance;
@@ -176,6 +213,7 @@ private:
 
 	FGuid PauseOwnerToken;
 	int64 NextRequestToken = 1;
+	int64 NextFrontendRequestToken = 1;
 	bool bInitialized = false;
 	bool bInconsistent = false;
 	int64 NextHostGeneration = 1;
@@ -201,6 +239,15 @@ private:
 	bool bAutomationPolicySucceeds = true;
 	bool bAutomationPauseSucceeds = true;
 	bool bAutomationFocusSucceeds = true;
+	bool bAutomationFailNextPolicyApply = false;
+	bool bAutomationFailNextPauseApply = false;
+	bool bAutomationFailNextFocusApply = false;
+	bool bAutomationFailNextRouteSubmit = false;
+	bool bAutomationFailOldModuleFocusRestore = false;
+	bool bAutomationFailPauseRestore = false;
+	EHSRFrontendModule LastAutomationFocusModule = EHSRFrontendModule::None;
+	int32 AutomationPolicyCallsUntilFailure = 0;
+	int32 AutomationPauseCallsUntilFailure = 0;
 	bool bAutomationPaused = false;
 	bool bAutomationHasDetailClass = true;
 	bool bAutomationDetailCreateSucceeds = true;
