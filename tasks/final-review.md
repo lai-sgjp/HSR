@@ -1,53 +1,57 @@
-# TASK-P17-PATCH-03D1 Task Gate Review
+# TASK-P17-PATCH-03D1 Final Review
 
-Status: `PASS / IMPLEMENTATION NOT AUTHORIZED`
+Status: `PASS`
 
-## Review inputs
+## Review Object
+
+- Task: `TASK-P17-PATCH-03D1`
+- Task name: Atomic Settlement Foundation
+- Reviewed commits: `773e1f6` base implementation plus `2bbcd47` revise fix
+- Reviewer role: Independent Reviewer / Codex
+- Review date: 2026-07-28
+
+## Review Inputs
 
 - `tasks/active-task.md`
-- `docs/phase-17-patch-03-execution-plan.md`
-- current Reward, Inventory and Character Profile types/subsystems
-- existing Inventory 3, Reward 6 and Progression 3 Automation declarations
-- `/Game/Data/Rewards/DA_Reward_P13_Standard`
-- `/Game/Data/Progression/DA_CharacterCatalog_P11`
+- `tasks/execution-result.md`
+- `tasks/review-template.md`
+- `docs/CODEX-NAVIGATION-GUIDE.md`
+- `.agents/agents.md`
+- `git show --stat --name-status --oneline 2bbcd47`
+- `git diff 773e1f6 2bbcd47`
+- Settlement, Reward, Inventory and Profile source around the changed seams
+- `Source/HSR/Tests/HSRSettlementAuthorityTests.cpp`
+- `Saved/Logs/HSR.log`
 
-## Independent Review
+## Findings
 
-First verdict: `REVISE`.
+No blocking findings.
 
-- Existing `SubmitReward`, `ApplyGrants`, `ApplyGrantsInternal` and `GrantExperience` combine fallible preparation, live mutation, revision and broadcast, so they cannot be aggregate commit primitives.
-- Existing `Receipts.Add` can allocate after Inventory mutation; Reward therefore needs a fully prebuilt post-commit ledger map and receipt before commit begins.
-- Duplicate TransactionId conflict for a different RewardDefinitionId, PlayerCharacterId, seed or expected revision was missing.
+The three prior REVISE findings are closed:
 
-Revision closes all three findings:
+- Publication boundary coherence is now preserved before delegate reentry. `UHSRSettlementAuthority::SubmitSettlement` installs all three containers, finalizes Inventory and Reward revisions, relies on the installed Profile snapshot revision, and only then broadcasts Inventory/Profile/Reward publication. An Inventory callback can no longer observe a new Reward receipt map with an old Reward revision. Evidence: `Source/HSR/Reward/HSRSettlementAuthority.cpp:139`, `Source/HSR/Reward/HSRSettlementAuthority.cpp:146`, `Source/HSR/Inventory/HSRInventorySubsystem.cpp:431`, `Source/HSR/Reward/HSRRewardSubsystem.cpp:461`, `Source/HSR/Tests/HSRSettlementAuthorityTests.cpp:171`.
+- Candidate `TransactionId` mismatch is rejected before install. The authority revalidates Inventory/Profile/Reward candidate IDs, aggregate receipt ID and prepared ledger receipt ID before moving the candidate into live state. The automation-only corruption seam covers Inventory, Profile and Reward mismatches and asserts zero install/publication. Evidence: `Source/HSR/Reward/HSRSettlementAuthority.cpp:102`, `Source/HSR/Reward/HSRSettlementAuthority.cpp:111`, `Source/HSR/Tests/HSRSettlementAuthorityTests.cpp:249`.
+- Zero-EXP settlement no longer publishes a Profile event or advances the Profile revision. The Profile candidate keeps the existing revision for zero EXP, and the authority skips Profile publication when the prepared revision equals the expected revision. Evidence: `Source/HSR/Progression/HSRCharacterProfileSubsystem.cpp:137`, `Source/HSR/Reward/HSRSettlementAuthority.cpp:150`, `Source/HSR/Tests/HSRSettlementAuthorityTests.cpp:262`.
 
-- each domain adds distinct private/friend prepare, no-fail install and publish seams;
-- SettlementAuthority is forbidden from using the four existing mixed APIs;
-- all three candidates own complete post-commit containers and next revisions before aggregate-ready;
-- Reward install only moves/swaps the prebuilt receipt map;
-- matching duplicates are idempotent, while mismatched duplicates return typed conflict with global zero pollution.
+## Scope Review
 
-Re-review verdict: `PASS`.
+- `2bbcd47` only changes frozen allowlist implementation/test/report files.
+- No Battle, Coordinator, Save, UI, Map, Party, Equipment, Config, Content or Blueprint implementation files are changed by the reviewed commit.
+- Existing dirty worktree changes are unrelated user/local changes and were excluded from this review.
+- The aggregate authority path contains no calls to `SubmitReward`, `ApplyGrants`, `ApplyGrantsInternal` or `GrantExperience`.
 
-## Feasibility Review
+## Evidence Review
 
-`PASS`.
-
-- Existing Inventory/Reward/Profile restore code demonstrates the required candidate-first and `MoveTemp` container-install mechanism.
-- New files stay inside the single HSR Runtime module; no Build.cs, plugin, Config, Battle, Save, UI or asset implementation edit is required.
-- The new focused test can own RED/GREEN coverage. Six existing regression files remain read-only.
-- Real process OOM is not deterministically testable; the frozen pre-aggregate failure selector proves the prepare/commit boundary without claiming allocator-failure coverage.
-
-## Teacher / Editor Review
-
-`PASS`.
-
-- The exercise uses existing Reward and Character assets only, with Compile/Save/reopen plus victory/defeat compatibility PIE.
-- The user must explain fallible prepare, no-fail install, delayed publication and why 03D1 does not yet replace the production Battle caller.
-- Blueprint cannot call settlement internals or grant items/EXP.
+- Static whitespace: `git diff --check 2bbcd47^ 2bbcd47` passed.
+- Automation log: `Saved/Logs/HSR.log` command line ran `HSR.Settlement.Foundation+HSR.Inventory+HSR.Reward+HSR.Progression`.
+- Automation result: 13 tests discovered, 13 completed with `Result={Success}`, exit code 0 at `2026.07.28-13.51.21`.
+- Test coverage now includes callback-time Reward save revision/receipt observation, three-domain candidate ID corruption, and zero-EXP no Profile event.
+- Build result is reported as fresh `HSREditor Win64 Development` UHT/compile/link PASS in `tasks/execution-result.md`; I did not find a dedicated 03D1 build log artifact separate from that report and the successful editor automation run.
+- Editor asset Save/reopen and victory/defeat PIE compatibility remain `NOT VERIFIED`, matching the task's user Editor gate.
+- Real allocator OOM remains `NOT VERIFIED`, matching the frozen task boundary.
 
 ## Verdict
 
 `PASS`
 
-The task is implementable inside the frozen allowlist and has deterministic TDD, regression and Editor boundaries. This verdict authorizes only an implementation restatement. Source, Content, Build, Automation and PIE remain unauthorized until the user explicitly confirms `TASK-P17-PATCH-03D1`.
+The revise commit closes the publication coherence, candidate identity and zero-EXP Profile event blockers inside the frozen allowlist. The implementation and focused regression evidence satisfy the 03D1 code review gate. Coordinator may proceed with the normal PASS handoff/archive steps; no implementation revision is required from this review.
