@@ -1495,6 +1495,7 @@ UHSRBattleCoordinator* AHSRBattleGameMode::CreateRepeatableBreakAutomationFixtur
 	Result->SetCharacterProgressionContext(TEXT("Player"), Context);
 	FHSREncounterRequest Request;
 	Request.RequestId = FGuid::NewGuid();
+	Request.PlayerCharacterId = Config->PlayerCharacterId;
 	Request.EncounterId = TEXT("Automation.RepeatableBreak");
 	Request.EnemyDefinitionId = Config->EnemyDefinition->EnemyDefinitionId;
 	Request.BattleMapPath = TEXT("/Game/Maps/Battle");
@@ -1547,6 +1548,13 @@ void AHSRBattleGameMode::BeginPlay()
 		return;
 	}
 
+	ActivePlayerCharacterId = ConsumeResult.ConsumedRequest.PlayerCharacterId;
+	if (ActivePlayerCharacterId.IsNone())
+	{
+		UE_LOG(LogTemp, Error, TEXT("AHSRBattleGameMode::BeginPlay - consumed encounter has no PlayerCharacterId"));
+		return;
+	}
+
 	// Submit the consumed request to the Coordinator (exactly-once validation)
 	bool bSubmitResult = Coordinator->SubmitBattleRequest(ConsumeResult.ConsumedRequest);
 	if (!bSubmitResult)
@@ -1567,23 +1575,23 @@ void AHSRBattleGameMode::BeginPlay()
 	Coordinator->SetParticipantInitializationGameplayEffect(ParticipantInitializationGameplayEffect);
 	Coordinator->SetCharacterProgressionGameplayEffect(CharacterProgressionGameplayEffect);
 	UHSRCharacterProfileSubsystem* Profiles = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRCharacterProfileSubsystem>() : nullptr;
-	if (!Profiles || !CharacterCatalog || PlayerCharacterId.IsNone()) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED MissingSubsystemCatalogOrCharacterId")); return; }
+	if (!Profiles || !CharacterCatalog) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED MissingSubsystemOrCatalog")); return; }
 	const EHSRCharacterProfileResult CatalogResult = Profiles->RegisterLoadedCatalog(CharacterCatalog);
 	if (CatalogResult != EHSRCharacterProfileResult::Success && CatalogResult != EHSRCharacterProfileResult::DefinitionAlreadyRegistered) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CatalogResult=%d"), static_cast<int32>(CatalogResult)); return; }
 #if WITH_EDITOR
 	if (P11DevelopmentStartingExperience > 0)
 	{
-		const EHSRCharacterProfileResult ExperienceResult = Profiles->GrantExperience(PlayerCharacterId, P11DevelopmentStartingExperience);
-		if (ExperienceResult != EHSRCharacterProfileResult::Success) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED DevelopmentExperience Result=%d CharacterId=%s"), static_cast<int32>(ExperienceResult), *PlayerCharacterId.ToString()); return; }
+		const EHSRCharacterProfileResult ExperienceResult = Profiles->GrantExperience(ActivePlayerCharacterId, P11DevelopmentStartingExperience);
+		if (ExperienceResult != EHSRCharacterProfileResult::Success) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED DevelopmentExperience Result=%d CharacterId=%s"), static_cast<int32>(ExperienceResult), *ActivePlayerCharacterId.ToString()); return; }
 	}
 #endif
 	FHSRCharacterProgressionContext PlayerContext; const UHSRCharacterDefinition* PlayerDefinition = nullptr;
-	if (!Profiles->GetProgressionContext(PlayerCharacterId, PlayerContext) || !Profiles->GetDefinition(PlayerCharacterId, PlayerDefinition)) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterNotRegistered Id=%s"), *PlayerCharacterId.ToString()); return; }
-	if (PlayerDefinition->CharacterClass.IsNull()) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassEmpty Id=%s"), *PlayerCharacterId.ToString()); return; }
+	if (!Profiles->GetProgressionContext(ActivePlayerCharacterId, PlayerContext) || !Profiles->GetDefinition(ActivePlayerCharacterId, PlayerDefinition)) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterNotRegistered Id=%s"), *ActivePlayerCharacterId.ToString()); return; }
+	if (PlayerDefinition->CharacterClass.IsNull()) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassEmpty Id=%s"), *ActivePlayerCharacterId.ToString()); return; }
 	UClass* PlayerClass = PlayerDefinition->CharacterClass.LoadSynchronous();
-	if (!PlayerClass) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassLoad Id=%s"), *PlayerCharacterId.ToString()); return; }
-	if (!PlayerClass->IsChildOf<AHSRCharacterBase>()) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassType Id=%s"), *PlayerCharacterId.ToString()); return; }
-	Coordinator->SetPlayerCharacterDefinition(PlayerCharacterId, PlayerClass);
+	if (!PlayerClass) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassLoad Id=%s"), *ActivePlayerCharacterId.ToString()); return; }
+	if (!PlayerClass->IsChildOf<AHSRCharacterBase>()) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassType Id=%s"), *ActivePlayerCharacterId.ToString()); return; }
+	Coordinator->SetPlayerCharacterDefinition(ActivePlayerCharacterId, PlayerClass);
 	Coordinator->SetCharacterProgressionContext(TEXT("Player"), PlayerContext);
 #if WITH_EDITOR
 	Coordinator->InitializeDevelopmentDamageRng(DevelopmentDamageSeed);
@@ -2402,7 +2410,7 @@ void AHSRBattleGameMode::HandleCharacterDetailBackInput()
 
 void AHSRBattleGameMode::HandleRestoreCommitted(const FHSRRestoreCommitInfo& Info)
 {
-	if(Info.TransactionRevision<=LastHandledRestoreTransaction||!Info.ChangedCharacterIds.Contains(PlayerCharacterId))return;PendingRestoreTransaction=Info.TransactionRevision;PendingRestoreCharacterId=PlayerCharacterId;TryConsumePendingRestore();
+	if(Info.TransactionRevision<=LastHandledRestoreTransaction||ActivePlayerCharacterId.IsNone()||!Info.ChangedCharacterIds.Contains(ActivePlayerCharacterId))return;PendingRestoreTransaction=Info.TransactionRevision;PendingRestoreCharacterId=ActivePlayerCharacterId;TryConsumePendingRestore();
 }
 
 void AHSRBattleGameMode::TryConsumePendingRestore()

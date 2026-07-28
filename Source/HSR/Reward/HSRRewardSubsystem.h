@@ -19,6 +19,8 @@ public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	EHSRRewardOperationResult RegisterDropTable(const UHSRDropTableDefinition& Definition);
 	EHSRRewardOperationResult RegisterRewardDefinition(const UHSRRewardDefinition& Definition);
+	EHSRRewardOperationResult CanRegisterBundle(const TArray<TObjectPtr<UHSRItemDefinition>>& ItemDefinitions,
+		const UHSRDropTableDefinition& DropTable, const UHSRRewardDefinition& RewardDefinition) const;
 	EHSRRewardOperationResult RegisterBundle(const TArray<TObjectPtr<UHSRItemDefinition>>& ItemDefinitions, const UHSRDropTableDefinition& DropTable, const UHSRRewardDefinition& RewardDefinition);
 	EHSRRewardOperationResult SubmitReward(const FHSRRewardRequest& Request, FHSRRewardReceipt& OutReceipt);
 	bool GetReceipt(const FGuid& ClaimId, FHSRRewardReceipt& OutReceipt) const;

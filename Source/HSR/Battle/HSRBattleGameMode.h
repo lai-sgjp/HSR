@@ -156,6 +156,7 @@ protected:
 	int64 LastHandledRestoreTransaction=0;
 	int64 PendingRestoreTransaction=0;
 	FName PendingRestoreCharacterId;
+	FName ActivePlayerCharacterId;
 	bool bCharacterDetailVisible=false;
 	void HandleCharacterDetailToggleInput();
 	void HandleCharacterDetailBackInput();

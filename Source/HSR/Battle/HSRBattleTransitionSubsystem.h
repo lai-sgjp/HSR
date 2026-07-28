@@ -28,6 +28,7 @@ struct FHSRTransitionAutomationSnapshot
 	FGuid TravelRequestId;
 	bool bResolvedMembership = false;
 	int32 AdmissionMutationCount = 0;
+	int32 TravelInitiationCount = 0;
 };
 #endif
 
@@ -42,6 +43,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Encounter")
 	FHSREncounterResult RequestEncounter(UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative);
+	FHSREncounterResult RequestEncounterForInteractor(UHSREncounterDefinition* Definition,
+		EHSREncounterInitiative Initiative, AActor* Interactor);
 
 	UFUNCTION(BlueprintCallable, Category = "Encounter")
 	FHSREncounterResult ConsumePendingEncounter();
@@ -81,10 +84,13 @@ public:
 	void SeedPendingEncounterForAutomation(const FHSREncounterRequest& InRequest);
 	void SeedResolvedEncounterForAutomation(FName EncounterId);
 	void ResetEncounterAutomationFixture();
+	void SetTravelSuppressedForAutomation(bool bSuppress) { bSuppressTravelForAutomation = bSuppress; }
 #endif
 	static bool DoesTravelFailureMatch(const FString& FailureWorldPackage, const FString& SourcePackage, const FString& TargetPackage);
 
 private:
+	FHSREncounterResult RequestEncounterInternal(UHSREncounterDefinition* Definition,
+		EHSREncounterInitiative Initiative, AActor* Interactor);
 	void StartTravelTimeout();
 	void ClearTravelTimeout();
 	bool HandleTravelTimeout(float DeltaTime);
@@ -102,5 +108,7 @@ private:
 	TSet<FName> ResolvedEncounterIds;
 #if WITH_DEV_AUTOMATION_TESTS
 	int32 AdmissionMutationCountForAutomation = 0;
+	int32 TravelInitiationCountForAutomation = 0;
+	bool bSuppressTravelForAutomation = false;
 #endif
 };

@@ -30,7 +30,8 @@ enum class EHSREncounterResultType : uint8
 	InvalidMap UMETA(DisplayName = "Invalid Battle Map"),
 	NothingPending UMETA(DisplayName = "Nothing Pending"),
 	AlreadyConsumed UMETA(DisplayName = "Already Consumed"),
-	TravelInitiationFailed UMETA(DisplayName = "Travel Initiation Failed")
+	TravelInitiationFailed UMETA(DisplayName = "Travel Initiation Failed"),
+	NoPlayerSelection UMETA(DisplayName = "No Player Selection")
 };
 
 UENUM(BlueprintType)
@@ -50,6 +51,9 @@ struct FHSREncounterRequest
 
 	UPROPERTY()
 	FGuid RequestId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
+	FName PlayerCharacterId;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
 	FName EncounterId;

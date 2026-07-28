@@ -10,6 +10,7 @@
 #include "../Inventory/HSRInventorySubsystem.h"
 #include "../Reward/HSRRewardSubsystem.h"
 #include "../Map/HSRMapSubsystem.h"
+#include "../Party/HSRPartySubsystem.h"
 
 void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -43,114 +44,122 @@ void UHSRBattleTransitionSubsystem::Deinitialize()
 }
 
 FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative)
+
 {
-	// Pre-travel validation: must not pollute Pending state
-	if (!Definition)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - FAILED InvalidDefinition (null)"));
-		return FHSREncounterResult::MakeFailure(
-			EHSREncounterResultType::InvalidDefinition,
-			FText::FromString(TEXT("EncounterDefinition is null.")));
-	}
+	UWorld* World = GetWorld();
+	APlayerController* PlayerController = World ? World->GetFirstPlayerController() : nullptr;
+	return RequestEncounterInternal(Definition, Initiative, PlayerController ? PlayerController->GetPawn() : nullptr);
+}
 
-	if (Definition->EncounterId.IsNone())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - FAILED InvalidRequest (EncounterId=None)"));
-		return FHSREncounterResult::MakeFailure(
-			EHSREncounterResultType::InvalidRequest,
-			FText::FromString(TEXT("EncounterId is not set.")));
-	}
+FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterForInteractor(
+	UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative, AActor* Interactor)
 
-	if (ResolvedEncounterIds.Contains(Definition->EncounterId))
-	{
-		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - REJECTED resolved EncounterId=%s"), *Definition->EncounterId.ToString());
-		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::AlreadyConsumed,
-			FText::FromString(TEXT("This encounter was already resolved in the current game session.")));
-	}
+{
+	return RequestEncounterInternal(Definition, Initiative, Interactor);
+}
 
-	if (Definition->EnemyDefinitionId.IsNone())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - FAILED InvalidRequest (EnemyDefinitionId=None)"));
-		return FHSREncounterResult::MakeFailure(
-			EHSREncounterResultType::InvalidRequest,
-			FText::FromString(TEXT("EnemyDefinitionId is not set.")));
-	}
-
-	if (Definition->BattleMap.IsNull())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - FAILED InvalidMap (BattleMap=null)"));
-		return FHSREncounterResult::MakeFailure(
-			EHSREncounterResultType::InvalidMap,
-			FText::FromString(TEXT("BattleMap is not set.")));
-	}
-
-	// Pre-flight: verify the map package actually exists on disk
-	FString MapPackageName = Definition->BattleMap.GetLongPackageName();
-	if (!FPackageName::DoesPackageExist(MapPackageName))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - FAILED InvalidMap (package does not exist: %s)"), *MapPackageName);
-		return FHSREncounterResult::MakeFailure(
-			EHSREncounterResultType::InvalidMap,
-			FText::FromString(TEXT("BattleMap package does not exist on disk.")));
-	}
-
-	// Reject if a transition is already in progress
+FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
+	UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative, AActor* Interactor)
+{
 	if (CurrentState == EHSREncounterState::Pending || CurrentState == EHSREncounterState::Traveling)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - FAILED AlreadyPending (state=%d, existing=%s)"),
-			static_cast<int32>(CurrentState), *PendingRequest.RequestId.ToString());
-		return FHSREncounterResult::MakeFailure(
-			EHSREncounterResultType::AlreadyPending,
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::AlreadyPending,
 			FText::FromString(TEXT("A battle transition is already pending or traveling.")));
 	}
 
-	// Build pure-data request DTO (no World object references, no pointers to runtime instances)
-	FGuid NewRequestId;
-	FPlatformMisc::CreateGuid(NewRequestId);
-
-	FTransform ReturnTransform = FTransform::Identity;
-	UWorld* World = GetWorld();
-	if (World)
+	if (!Definition)
 	{
-		APlayerController* PC = World->GetFirstPlayerController();
-		if (PC && PC->GetPawn())
-		{
-			ReturnTransform = PC->GetPawn()->GetActorTransform();
-		}
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidDefinition,
+			FText::FromString(TEXT("EncounterDefinition is null.")));
 	}
-	else
+	if (Definition->EncounterId.IsNone())
 	{
-		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::TravelInitiationFailed, FText::FromString(TEXT("Cannot resolve World for travel.")));
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
+			FText::FromString(TEXT("EncounterId is not set.")));
+	}
+	if (ResolvedEncounterIds.Contains(Definition->EncounterId))
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::AlreadyConsumed,
+			FText::FromString(TEXT("This encounter was already resolved in the current game session.")));
+	}
+	if (Definition->EnemyDefinitionId.IsNone())
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
+			FText::FromString(TEXT("EnemyDefinitionId is not set.")));
+	}
+
+	UHSRPartySubsystem* Party = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRPartySubsystem>() : nullptr;
+	FHSRPartySnapshot PartySnapshot;
+	if (!Party || !Party->GetSnapshot(PartySnapshot) || PartySnapshot.Slots.IsEmpty()
+		|| PartySnapshot.Slots[0].IsEmpty())
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::NoPlayerSelection,
+			FText::FromString(TEXT("Party slot 0 has no committed player selection.")));
+	}
+	const FName PlayerCharacterId = PartySnapshot.Slots[0].CharacterId;
+
+	if (Definition->BattleMap.IsNull())
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidMap,
+			FText::FromString(TEXT("BattleMap is not set.")));
+	}
+	const FString MapPackageName = Definition->BattleMap.GetLongPackageName();
+	if (!FPackageName::DoesPackageExist(MapPackageName))
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidMap,
+			FText::FromString(TEXT("BattleMap package does not exist on disk.")));
+	}
+
+	UWorld* World = GetWorld();
+	APawn* InteractorPawn = Cast<APawn>(Interactor);
+	if (!World || !IsValid(InteractorPawn) || InteractorPawn->GetWorld() != World)
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::NoPlayerSelection,
+			FText::FromString(TEXT("Cannot resolve the committed player Pawn.")));
+	}
+	const FTransform ReturnTransform = InteractorPawn->GetActorTransform();
+
+	UHSRRewardSubsystem* Reward = nullptr;
+	if (Definition->VictoryRewardDefinition)
+	{
+		Reward = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRRewardSubsystem>() : nullptr;
+		if (!Reward || !Definition->RewardDropTable)
+		{
+			return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidDefinition,
+				FText::FromString(TEXT("Encounter reward bundle is incomplete.")));
+		}
+		const EHSRRewardOperationResult Validation = Reward->CanRegisterBundle(Definition->RewardItemDefinitions,
+			*Definition->RewardDropTable, *Definition->VictoryRewardDefinition);
+		if (Validation != EHSRRewardOperationResult::Success && Validation != EHSRRewardOperationResult::NoOp)
+		{
+			return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidDefinition,
+				FText::FromString(TEXT("Encounter reward bundle validation failed.")));
+		}
 	}
 
 	if (Definition->VictoryRewardDefinition)
 	{
-		UHSRRewardSubsystem* Reward = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRRewardSubsystem>() : nullptr;
-		if (!Reward || !Definition->RewardDropTable)
+		const EHSRRewardOperationResult Registration = Reward->RegisterBundle(Definition->RewardItemDefinitions,
+			*Definition->RewardDropTable, *Definition->VictoryRewardDefinition);
+		if (Registration != EHSRRewardOperationResult::Success && Registration != EHSRRewardOperationResult::NoOp)
 		{
-			return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidDefinition, FText::FromString(TEXT("Encounter reward bundle is incomplete.")));
-		}
-		const EHSRRewardOperationResult BundleResult = Reward->RegisterBundle(Definition->RewardItemDefinitions, *Definition->RewardDropTable, *Definition->VictoryRewardDefinition);
-		if (BundleResult != EHSRRewardOperationResult::Success && BundleResult != EHSRRewardOperationResult::NoOp)
-		{
-			return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidDefinition, FText::FromString(TEXT("Encounter reward bundle registration failed.")));
+			return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidDefinition,
+				FText::FromString(TEXT("Encounter reward bundle registration failed.")));
 		}
 	}
 
+	FGuid NewRequestId;
+	FPlatformMisc::CreateGuid(NewRequestId);
 	FHSREncounterRequest NewRequest;
 	NewRequest.RequestId = NewRequestId;
+	NewRequest.PlayerCharacterId = PlayerCharacterId;
 	NewRequest.EncounterId = Definition->EncounterId;
 	NewRequest.EnemyDefinitionId = Definition->EnemyDefinitionId;
 	NewRequest.Initiative = Initiative;
 	NewRequest.BattleMapPath = FName(*Definition->BattleMap.GetLongPackageName());
 	NewRequest.ReturnTransform = ReturnTransform;
 
-	// Record the exploration map soft path (strip PIE prefix for pure data path)
-	if (World)
-	{
-		FString WorldPath = World->GetOutermost()->GetPathName();
-		NewRequest.ExplorationMapPath = FName(*UWorld::RemovePIEPrefix(WorldPath));
-	}
+	NewRequest.ExplorationMapPath = FName(*UWorld::RemovePIEPrefix(World->GetOutermost()->GetPathName()));
 	if (Definition->VictoryRewardDefinition)
 	{
 		NewRequest.RewardDefinitionId = Definition->VictoryRewardDefinition->RewardDefinitionId;
@@ -170,31 +179,18 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 		*Definition->BattleMap.GetLongPackageName(),
 		*ReturnTransform.GetLocation().ToString());
 
-	// Initiate level travel. OpenLevel returns void, so synchronous success check is not available.
-	if (World)
+	CurrentState = EHSREncounterState::Traveling;
+	TravelKind = EHSRTravelKind::Encounter;
+	TravelRequestId = NewRequestId;
+	TravelSourceMap = NewRequest.ExplorationMapPath;
+	TravelTargetMap = FName(*Definition->BattleMap.GetLongPackageName());
+	StartTravelTimeout();
+#if WITH_DEV_AUTOMATION_TESTS
+	++TravelInitiationCountForAutomation;
+	if (!bSuppressTravelForAutomation)
+#endif
 	{
-		CurrentState = EHSREncounterState::Traveling;
-		TravelKind = EHSRTravelKind::Encounter;
-		TravelRequestId = NewRequestId;
-		TravelSourceMap = NewRequest.ExplorationMapPath;
-		TravelTargetMap = FName(*Definition->BattleMap.GetLongPackageName());
-		StartTravelTimeout();
-		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - Traveling to %s (kind=Encounter, map=%s)"),
-			*Definition->BattleMap.GetLongPackageName(), *TravelTargetMap.ToString());
-
 		UGameplayStatics::OpenLevel(World, FName(*Definition->BattleMap.GetLongPackageName()), true);
-
-		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - OpenLevel issued for %s"),
-			*Definition->BattleMap.GetLongPackageName());
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - FAILED TravelInitiationFailed (no World)"));
-		CurrentState = EHSREncounterState::Empty;
-		PendingRequest = FHSREncounterRequest();
-		return FHSREncounterResult::MakeFailure(
-			EHSREncounterResultType::TravelInitiationFailed,
-			FText::FromString(TEXT("Cannot resolve World for travel.")));
 	}
 
 	return FHSREncounterResult::MakeSuccess(NewRequestId);
@@ -210,6 +206,7 @@ FHSRTransitionAutomationSnapshot UHSRBattleTransitionSubsystem::GetAutomationSna
 	Snapshot.TravelRequestId = TravelRequestId;
 	Snapshot.bResolvedMembership = ResolvedEncounterIds.Contains(EncounterId);
 	Snapshot.AdmissionMutationCount = AdmissionMutationCountForAutomation;
+	Snapshot.TravelInitiationCount = TravelInitiationCountForAutomation;
 	return Snapshot;
 }
 
@@ -240,6 +237,7 @@ void UHSRBattleTransitionSubsystem::ResetEncounterAutomationFixture()
 	TravelCompletedEncounterId = NAME_None;
 	ResolvedEncounterIds.Reset();
 	AdmissionMutationCountForAutomation = 0;
+	TravelInitiationCountForAutomation = 0;
 }
 #endif
 
@@ -347,6 +345,11 @@ void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravel
 		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - IGNORED (no active transaction, type=%d)"), static_cast<int32>(FailureType));
 		return;
 	}
+	if (!InWorld)
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - IGNORED (null World cannot be correlated)"));
+		return;
+	}
 
 	// 2. Attempt to match InWorld's package path against stored TravelTargetMap
 	FString FailureWorldPath;
@@ -354,8 +357,7 @@ void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravel
 	{
 		FailureWorldPath = UWorld::RemovePIEPrefix(InWorld->GetOutermost()->GetPathName());
 	}
-	bool bWorldIsNull = (InWorld == nullptr);
-	bool bMatchesOurTransaction = bWorldIsNull || DoesTravelFailureMatch(
+	bool bMatchesOurTransaction = DoesTravelFailureMatch(
 		FailureWorldPath, TravelSourceMap.ToString(), TravelTargetMap.ToString());
 
 	UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - MatchCheck: WorldPath=%s TargetMap=%s RequestId=%s bMatch=%d"),

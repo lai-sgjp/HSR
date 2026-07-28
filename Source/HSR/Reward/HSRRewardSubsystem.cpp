@@ -134,7 +134,10 @@ EHSRRewardOperationResult UHSRRewardSubsystem::CanRegisterRewardDefinition(const
 	return EHSRRewardOperationResult::Success;
 }
 
-EHSRRewardOperationResult UHSRRewardSubsystem::RegisterBundle(const TArray<TObjectPtr<UHSRItemDefinition>>& ItemDefinitions, const UHSRDropTableDefinition& DropTable, const UHSRRewardDefinition& RewardDefinition)
+EHSRRewardOperationResult UHSRRewardSubsystem::CanRegisterBundle(
+	const TArray<TObjectPtr<UHSRItemDefinition>>& ItemDefinitions,
+	const UHSRDropTableDefinition& DropTable,
+	const UHSRRewardDefinition& RewardDefinition) const
 {
 	UHSRInventorySubsystem* InventorySubsystem = Inventory.Get();
 	if (!InventorySubsystem)
@@ -200,14 +203,30 @@ EHSRRewardOperationResult UHSRRewardSubsystem::RegisterBundle(const TArray<TObje
 		return RewardValidation;
 	}
 
+	bAnyChange |= DropValidation == EHSRRewardOperationResult::Success || RewardValidation == EHSRRewardOperationResult::Success;
+	return bAnyChange ? EHSRRewardOperationResult::Success : EHSRRewardOperationResult::NoOp;
+}
+
+EHSRRewardOperationResult UHSRRewardSubsystem::RegisterBundle(
+	const TArray<TObjectPtr<UHSRItemDefinition>>& ItemDefinitions,
+	const UHSRDropTableDefinition& DropTable,
+	const UHSRRewardDefinition& RewardDefinition)
+{
+	const EHSRRewardOperationResult Validation = CanRegisterBundle(ItemDefinitions, DropTable, RewardDefinition);
+	if (Validation != EHSRRewardOperationResult::Success && Validation != EHSRRewardOperationResult::NoOp)
+	{
+		return Validation;
+	}
+
+	UHSRInventorySubsystem* InventorySubsystem = Inventory.Get();
+	check(InventorySubsystem);
 	for (const UHSRItemDefinition* ItemDefinition : ItemDefinitions)
 	{
 		InventorySubsystem->RegisterDefinition(*ItemDefinition);
 	}
 	RegisterDropTable(DropTable);
 	RegisterRewardDefinition(RewardDefinition);
-	bAnyChange |= DropValidation == EHSRRewardOperationResult::Success || RewardValidation == EHSRRewardOperationResult::Success;
-	return bAnyChange ? EHSRRewardOperationResult::Success : EHSRRewardOperationResult::NoOp;
+	return Validation;
 }
 
 EHSRRewardOperationResult UHSRRewardSubsystem::SubmitReward(const FHSRRewardRequest& Request, FHSRRewardReceipt& OutReceipt)
