@@ -1,6 +1,6 @@
 # TASK-P17-PATCH-03A — Frontend Boundary Contract Reconciliation
 
-Status: `TASK GATE PASS / IMPLEMENTATION READBACK AND USER CONFIRMATION REQUIRED`
+Status: `ASSET GATE READY / CODE GATE PASS / USER EDITOR EVIDENCE REQUIRED`
 
 ## Role Lock / 角色锁定
 
@@ -63,7 +63,7 @@ P17-PATCH-03 Gate 0 已完成规划收束。P17-005 仅以 checkpoint `4ef49f7` 
 
 ## 当前门禁
 
-Task Gate=`PASS`：只读审查已冻结四文件白名单、逐入口迁移矩阵、失败补偿和测试矩阵。该 PASS 不授权实施；Implementation Agent 必须先复述，并等待用户单独确认。
+Task Gate=`PASS`，Implementation commit=`494f700`，Code Gate=`PASS / ASSET GATE READY`。当前只等待用户完成 allowlisted WBP 检查、Save All/reopen、happy/failure PIE 与两分辨率证据；没有授权继续 PATCH-03B。
 
 ## Git 交付
 
