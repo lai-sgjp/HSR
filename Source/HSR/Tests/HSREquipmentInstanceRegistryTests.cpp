@@ -82,6 +82,10 @@ bool FHSREquipmentRegistryPlacementTest::RunTest(const FString& Parameters)
 
 	TestEqual(TEXT("Place by id"), Subsystem->EquipById(CharacterA, First.InstanceId), EHSREquipmentOperationResult::Success);
 	TestEqual(TEXT("Same instance cannot have second placement"), Subsystem->EquipById(CharacterB, First.InstanceId), EHSREquipmentOperationResult::InstanceAlreadyEquipped);
+	const FHSREquipmentInstance Rejected = MakeWeapon(450, 3);
+	TestEqual(TEXT("Legacy equip rejects occupied slot"), Subsystem->Equip(CharacterA, Rejected), EHSREquipmentOperationResult::SlotOccupied);
+	FHSREquipmentInstance RejectedLookup;
+	TestFalse(TEXT("Failed legacy equip rolls back registration"), Subsystem->FindRegisteredInstance(Rejected.InstanceId, RejectedLookup));
 
 	FHSREquipmentLoadout Loadout;
 	int32 Revision = 0;

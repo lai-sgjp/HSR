@@ -282,7 +282,7 @@ EHSRSaveResult UHSRSaveSubsystem::LoadFromSlot(const FString& SlotName,int32 Use
 		TArray<uint8> PrimaryBytes;FHSRSaveData PrimaryData;if(UGameplayStatics::LoadDataFromSlot(PrimaryBytes,SlotName,UserIndex))
 		{
 			const EHSRSaveDecodeResult Reason=HSRSaveVersion::DecodeEnvelope(PrimaryBytes,SlotName,UserIndex,PrimaryData,&PrimaryHeader);LastLoadResult.PrimaryReason=static_cast<uint8>(Reason);bPrimaryTrusted=PrimaryHeader.SaveId.IsValid();LastLoadResult.bPrimaryHeaderTrusted=bPrimaryTrusted;
-			if(Reason==EHSRSaveDecodeResult::Success){PrimaryData.SchemaVersion=5;if(CanPrepareSnapshot(PrimaryData)){Selected=MoveTemp(PrimaryData);bHaveSelected=true;LastLoadResult.Source=EHSRSaveLoadSource::Primary;LastLoadResult.SaveId=PrimaryHeader.SaveId;LastLoadResult.Generation=PrimaryHeader.Generation;}else LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::PrepareFailed;}
+			if(Reason==EHSRSaveDecodeResult::Success){if(CanPrepareSnapshot(PrimaryData)){Selected=MoveTemp(PrimaryData);bHaveSelected=true;LastLoadResult.Source=EHSRSaveLoadSource::Primary;LastLoadResult.SaveId=PrimaryHeader.SaveId;LastLoadResult.Generation=PrimaryHeader.Generation;}else LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::PrepareFailed;}
 			else if(Reason==EHSRSaveDecodeResult::BadMagic)
 			{
 				USaveGame* LegacyObject=UGameplayStatics::LoadGameFromSlot(SlotName,UserIndex);const UHSRSaveGame* Legacy=Cast<UHSRSaveGame>(LegacyObject);const bool bSupportedLegacy=Legacy&&(Legacy->Data.SchemaVersion<=5||Legacy->Data.SchemaVersion==HSRSaveVersion::CurrentSchema);if(bSupportedLegacy&&CanPrepareSnapshot(Legacy->Data)){Selected=Legacy->Data;bHaveSelected=true;LastLoadResult.Source=EHSRSaveLoadSource::LegacyPrimary;}else{LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::LegacyInvalid;PrimaryFailureResult=!LegacyObject?EHSRSaveResult::LoadFailed:!Legacy?EHSRSaveResult::ClassMismatch:!bSupportedLegacy?EHSRSaveResult::UnsupportedSchema:EHSRSaveResult::InvalidData;}
@@ -298,7 +298,7 @@ EHSRSaveResult UHSRSaveSubsystem::LoadFromSlot(const FString& SlotName,int32 Use
 		if(Reason==EHSRSaveDecodeResult::Success)
 		{
 			bool bLineageValid=true;if(bPrimaryTrusted){if(BackupHeader.SaveId!=PrimaryHeader.SaveId){bLineageValid=false;LastLoadResult.BackupStageReason=EHSRSaveLoadReason::LineageMismatch;}else if(BackupHeader.Generation>=PrimaryHeader.Generation){bLineageValid=false;LastLoadResult.BackupStageReason=EHSRSaveLoadReason::InvalidGeneration;}}
-			BackupData.SchemaVersion=5;if(bLineageValid&&CanPrepareSnapshot(BackupData)){Selected=MoveTemp(BackupData);bHaveSelected=true;LastLoadResult.Source=EHSRSaveLoadSource::Backup;LastLoadResult.SaveId=BackupHeader.SaveId;LastLoadResult.Generation=BackupHeader.Generation;LastLoadResult.bRecoveredFromBackup=true;LastLoadResult.bPrimaryUntrusted=!bPrimaryTrusted;}else if(bLineageValid)LastLoadResult.BackupStageReason=EHSRSaveLoadReason::PrepareFailed;
+			if(bLineageValid&&CanPrepareSnapshot(BackupData)){Selected=MoveTemp(BackupData);bHaveSelected=true;LastLoadResult.Source=EHSRSaveLoadSource::Backup;LastLoadResult.SaveId=BackupHeader.SaveId;LastLoadResult.Generation=BackupHeader.Generation;LastLoadResult.bRecoveredFromBackup=true;LastLoadResult.bPrimaryUntrusted=!bPrimaryTrusted;}else if(bLineageValid)LastLoadResult.BackupStageReason=EHSRSaveLoadReason::PrepareFailed;
 		}
 		else LastLoadResult.BackupStageReason=EHSRSaveLoadReason::DecodeFailure;
 	}

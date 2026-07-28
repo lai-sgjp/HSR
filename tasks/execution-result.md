@@ -35,3 +35,9 @@ Status: `IMPLEMENTATION GREEN / REVIEW REQUIRED`
 - `HSR.UI.EquipmentDetail.ViewModel`: 1/1 succeeded.
 - `git diff --check`: clean for every 03E1 implementation, test and evidence path.
 - Editor/PIE compatibility observation remains a post-review user boundary; 03E1 requires no Content mutation.
+
+### Supplemental audit correction
+
+- Removed legacy `SchemaVersion=5` coercion after successful primary/backup envelope decoding; disk restore now preserves migrated schema 7 Registry data.
+- Legacy `Equip/Replace` now rolls back a newly registered instance when placement fails.
+- Rebuilt successfully; Registry 3/3 and Save 16/16 reran successfully with zero failure lines.

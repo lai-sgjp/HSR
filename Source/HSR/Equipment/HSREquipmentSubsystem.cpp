@@ -145,7 +145,9 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::Equip(const FGuid& Characte
 {
 	const EHSREquipmentOperationResult Registration = RegisterInstance(Instance);
 	if (Registration != EHSREquipmentOperationResult::Success && Registration != EHSREquipmentOperationResult::NoOp) return Registration;
-	return EquipById(CharacterId, Instance.InstanceId);
+	const EHSREquipmentOperationResult Result = EquipById(CharacterId, Instance.InstanceId);
+	if (Registration == EHSREquipmentOperationResult::Success && Result != EHSREquipmentOperationResult::Success) InstanceRegistry.Remove(Instance.InstanceId);
+	return Result;
 }
 
 EHSREquipmentOperationResult UHSREquipmentSubsystem::EquipById(const FGuid& CharacterId, const FGuid& InstanceId)
@@ -169,7 +171,9 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::Replace(const FGuid& Charac
 {
 	const EHSREquipmentOperationResult Registration = RegisterInstance(Instance);
 	if (Registration != EHSREquipmentOperationResult::Success && Registration != EHSREquipmentOperationResult::NoOp) return Registration;
-	return ReplaceById(CharacterId, Instance.InstanceId);
+	const EHSREquipmentOperationResult Result = ReplaceById(CharacterId, Instance.InstanceId);
+	if (Registration == EHSREquipmentOperationResult::Success && Result != EHSREquipmentOperationResult::Success) InstanceRegistry.Remove(Instance.InstanceId);
+	return Result;
 }
 
 EHSREquipmentOperationResult UHSREquipmentSubsystem::ReplaceById(const FGuid& CharacterId, const FGuid& InstanceId)
