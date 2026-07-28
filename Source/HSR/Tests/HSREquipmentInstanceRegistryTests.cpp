@@ -2,6 +2,8 @@
 
 #include "../Data/Definitions/HSREquipmentDefinition.h"
 #include "../Equipment/HSREquipmentSubsystem.h"
+#include "../Save/HSRSaveTypes.h"
+#include "../Save/HSRSaveVersion.h"
 #include "Engine/GameInstance.h"
 #include "Misc/AutomationTest.h"
 
@@ -101,6 +103,60 @@ bool FHSREquipmentRegistryPlacementTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Resolved enhancement updated"), Loadout.Equipment[EHSREquipmentSlot::Weapon].EnhancementLevel, 4);
 	TestTrue(TEXT("Registry resolves enhanced instance"), Subsystem->FindRegisteredInstance(Second.InstanceId, Retained));
 	TestEqual(TEXT("Registry enhancement updated once"), Retained.EnhancementLevel, 4);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FHSREquipmentRegistryPersistenceTest,
+	"HSR.Equipment.Registry.Persistence",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSREquipmentRegistryPersistenceTest::RunTest(const FString& Parameters)
+{
+	using namespace HSR::Equipment::RegistryTests;
+	UHSREquipmentSubsystem* Source = MakeSubsystem();
+	const FGuid Character = Id(600);
+	const FHSREquipmentInstance Placed = MakeWeapon(700, 2);
+	const FHSREquipmentInstance Unplaced = MakeWeapon(800, 3);
+	Source->RegisterInstance(Placed);
+	Source->RegisterInstance(Unplaced);
+	Source->EquipById(Character, Placed.InstanceId);
+
+	TArray<FHSREquipmentRegistryDto> Registry;
+	TArray<FHSREquipmentPlacementDto> Placements;
+	Source->ExportSaveData(Registry, Placements);
+	TestEqual(TEXT("Both registry records export"), Registry.Num(), 2);
+	TestEqual(TEXT("Only equipped instance has placement"), Placements.Num(), 1);
+
+	UHSREquipmentSubsystem* Restored = MakeSubsystem();
+	FHSREquipmentRegistryRestoreState Candidate;
+	TestTrue(TEXT("Schema 7 rows prepare"), Restored->PrepareRestore(Registry, Placements, Candidate));
+	Restored->CommitRestore(Candidate);
+	FHSREquipmentInstance RoundTripped;
+	TestTrue(TEXT("Unplaced payload survives restore"), Restored->FindRegisteredInstance(Unplaced.InstanceId, RoundTripped));
+	TestEqual(TEXT("Unplaced enhancement survives"), RoundTripped.EnhancementLevel, 3);
+
+	FHSRSaveData Schema6;
+	Schema6.SchemaVersion = 6;
+	FHSREquipmentSaveDto Legacy;
+	Legacy.DefinitionId = Placed.DefinitionId;
+	Legacy.InstanceId = Placed.InstanceId;
+	Legacy.CharacterId = Character;
+	Legacy.Kind = 0;
+	Legacy.Slot = static_cast<int32>(EHSREquipmentSlot::Weapon);
+	Legacy.EnhancementLevel = Placed.EnhancementLevel;
+	Legacy.Modifiers = Placed.Modifiers;
+	Legacy.AuthorityRevision = 1;
+	Schema6.Equipment.Add(Legacy);
+	FHSRItemInstance InventoryOnly;
+	InventoryOnly.InstanceId = Id(900);
+	InventoryOnly.DefinitionId = TEXT("Inventory.Unique");
+	Schema6.Inventory.UniqueItems.Add(InventoryOnly);
+	TestEqual(TEXT("Schema 6 migrates"), HSRSaveVersion::MigrateToCurrent(Schema6), EHSRSaveDecodeResult::Success);
+	TestEqual(TEXT("Migration creates one registry row"), Schema6.EquipmentRegistry.Num(), 1);
+	TestEqual(TEXT("Migration creates one placement row"), Schema6.EquipmentPlacements.Num(), 1);
+	TestEqual(TEXT("Inventory unique item remains inventory only"), Schema6.Inventory.UniqueItems.Num(), 1);
+	TestEqual(TEXT("Inventory id is not invented in registry"), Schema6.EquipmentRegistry[0].InstanceId, Placed.InstanceId);
 	return true;
 }
 

@@ -24,6 +24,11 @@ struct FHSRRelicSetSnapshot
 	bool bActive = false;
 };
 using FHSREquipmentRestoreMap = TMap<FGuid,FHSREquipmentRestoreState>;
+struct FHSREquipmentRegistryRestoreState
+{
+	TMap<FGuid, FHSREquipmentInstance> Registry;
+	FHSREquipmentRestoreMap Loadouts;
+};
 DECLARE_DELEGATE_RetVal_OneParam(bool, FHSREquipmentRestoreProjection, const FHSREquipmentRestoreMap&);
 
 DECLARE_MULTICAST_DELEGATE_TwoParams(FHSREquipmentLoadoutChanged, const FGuid& /* CharacterId */, int32 /* Revision */);
@@ -35,14 +40,21 @@ class HSR_API UHSREquipmentSubsystem : public UGameInstanceSubsystem
 
 public:
 	void ExportSaveData(TArray<struct FHSREquipmentSaveDto>& Out) const;
+	void ExportSaveData(TArray<struct FHSREquipmentRegistryDto>& OutRegistry, TArray<struct FHSREquipmentPlacementDto>& OutPlacements) const;
 	bool PrepareRestore(const TArray<struct FHSREquipmentSaveDto>& In, FHSREquipmentRestoreMap& Out) const;
+	bool PrepareRestore(const TArray<struct FHSREquipmentRegistryDto>& Registry, const TArray<struct FHSREquipmentPlacementDto>& Placements, FHSREquipmentRegistryRestoreState& Out) const;
 	void CommitRestore(const FHSREquipmentRestoreMap& Candidate);
+	void CommitRestore(const FHSREquipmentRegistryRestoreState& Candidate);
 	void NotifyRestored(const TSet<FGuid>& Changed);
 	void SetRestoreProjection(FHSREquipmentRestoreProjection InProjection) { RestoreProjection=MoveTemp(InProjection); }
 	bool ProjectRestore(const FHSREquipmentRestoreMap& Candidate) const { return !RestoreProjection.IsBound() || RestoreProjection.Execute(Candidate); }
 	EHSREquipmentOperationResult RegisterDefinition(const UHSREquipmentDefinition& Definition);
 	EHSREquipmentOperationResult RegisterDefinition(const UHSRRelicDefinition& Definition);
 	bool HasDefinition(FName DefinitionId) const { return Definitions.Contains(DefinitionId); }
+	EHSREquipmentOperationResult RegisterInstance(const FHSREquipmentInstance& Instance);
+	bool FindRegisteredInstance(const FGuid& InstanceId, FHSREquipmentInstance& OutInstance) const;
+	EHSREquipmentOperationResult EquipById(const FGuid& CharacterId, const FGuid& InstanceId);
+	EHSREquipmentOperationResult ReplaceById(const FGuid& CharacterId, const FGuid& InstanceId);
 
 	EHSREquipmentOperationResult Equip(const FGuid& CharacterId, const FHSREquipmentInstance& Instance);
 	EHSREquipmentOperationResult Replace(const FGuid& CharacterId, const FHSREquipmentInstance& Instance);
@@ -65,7 +77,8 @@ private:
 
 	struct FLoadoutState
 	{
-		FHSREquipmentLoadout Loadout;
+		TMap<EHSREquipmentSlot, FGuid> Equipment;
+		TMap<EHSRRelicSlot, FGuid> Relics;
 		int32 Revision = 0;
 	};
 
@@ -73,12 +86,14 @@ private:
 	bool IsValidModifiers(const TArray<FHSREquipmentModifier>& Modifiers) const;
 	const FDefinitionRule* FindDefinition(const FHSREquipmentInstance& Instance) const;
 	bool IsSlotValid(EHSREquipmentKind Kind, int32 Slot) const;
-	bool IsSlotOccupied(const FHSREquipmentLoadout& Loadout, EHSREquipmentKind Kind, int32 Slot) const;
-	FHSREquipmentInstance* FindInstance(FHSREquipmentLoadout& Loadout, EHSREquipmentKind Kind, int32 Slot);
-	const FHSREquipmentInstance* FindInstance(const FHSREquipmentLoadout& Loadout, EHSREquipmentKind Kind, int32 Slot) const;
-	void CommitLoadout(const FGuid& CharacterId, const FHSREquipmentLoadout& Candidate);
+	bool IsSlotOccupied(const FLoadoutState& Loadout, EHSREquipmentKind Kind, int32 Slot) const;
+	const FGuid* FindPlacedInstance(const FLoadoutState& Loadout, EHSREquipmentKind Kind, int32 Slot) const;
+	void CommitLoadout(const FGuid& CharacterId, FLoadoutState Candidate);
+	bool ResolveLoadout(const FLoadoutState& State, FHSREquipmentLoadout& OutLoadout) const;
+	static bool IsSamePayload(const FHSREquipmentInstance& A, const FHSREquipmentInstance& B);
 
 	TMap<FName, FDefinitionRule> Definitions;
+	TMap<FGuid, FHSREquipmentInstance> InstanceRegistry;
 	TMap<FGuid, FLoadoutState> Loadouts;
 	TMap<FGuid, FGuid> InstanceOwners;
 	FHSREquipmentLoadoutChanged LoadoutChanged;

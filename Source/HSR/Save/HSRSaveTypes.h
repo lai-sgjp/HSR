@@ -53,12 +53,33 @@ struct HSR_API FHSREquipmentSaveDto { GENERATED_BODY()
 };
 
 USTRUCT(BlueprintType)
+struct HSR_API FHSREquipmentRegistryDto { GENERATED_BODY()
+	UPROPERTY(BlueprintReadWrite) FName DefinitionId;
+	UPROPERTY(BlueprintReadWrite) FGuid InstanceId;
+	UPROPERTY(BlueprintReadWrite) int32 Kind = 0;
+	UPROPERTY(BlueprintReadWrite) int32 EnhancementLevel = 0;
+	UPROPERTY(BlueprintReadWrite) TArray<FHSREquipmentModifier> Modifiers;
+	UPROPERTY(BlueprintReadWrite) FName SetId;
+};
+
+USTRUCT(BlueprintType)
+struct HSR_API FHSREquipmentPlacementDto { GENERATED_BODY()
+	UPROPERTY(BlueprintReadWrite) FGuid InstanceId;
+	UPROPERTY(BlueprintReadWrite) FGuid CharacterId;
+	UPROPERTY(BlueprintReadWrite) int32 Kind = 0;
+	UPROPERTY(BlueprintReadWrite) int32 Slot = 0;
+	UPROPERTY(BlueprintReadWrite) int32 AuthorityRevision = 0;
+};
+
+USTRUCT(BlueprintType)
 struct HSR_API FHSRSaveData { GENERATED_BODY()
-	UPROPERTY(BlueprintReadWrite) int32 SchemaVersion = 5;
+	UPROPERTY(BlueprintReadWrite) int32 SchemaVersion = 7;
 	UPROPERTY(BlueprintReadWrite) TArray<FHSRSaveProfileDto> Profiles;
 	UPROPERTY(BlueprintReadWrite) TArray<FHSRPartySlot> PartySlots;
 	UPROPERTY(BlueprintReadWrite) int64 PartyRevision = 0;
 	UPROPERTY(BlueprintReadWrite) TArray<FHSREquipmentSaveDto> Equipment;
+	UPROPERTY(BlueprintReadWrite) TArray<FHSREquipmentRegistryDto> EquipmentRegistry;
+	UPROPERTY(BlueprintReadWrite) TArray<FHSREquipmentPlacementDto> EquipmentPlacements;
 	UPROPERTY(BlueprintReadWrite) FHSRInventorySaveData Inventory;
 	UPROPERTY(BlueprintReadWrite) FHSRRewardSaveData Rewards;
 	UPROPERTY(BlueprintReadWrite) FHSRQuestSaveData Quests;

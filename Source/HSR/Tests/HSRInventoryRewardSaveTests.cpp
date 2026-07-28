@@ -98,7 +98,7 @@ bool FHSRInventoryRewardSaveV3Test::RunTest(const FString&)
 	TestEqual(TEXT("claim source reward"), Source.Reward->SubmitReward({Claim, TEXT("Reward.P13.Save"), 777}, Receipt), EHSRRewardOperationResult::Success);
 	FHSRSaveData Captured;
 	TestEqual(TEXT("capture v3"), Source.Save->SaveSnapshot(Captured), EHSRSaveResult::Success);
-	TestEqual(TEXT("schema v5"), Captured.SchemaVersion, 5);
+	TestEqual(TEXT("schema v7"), Captured.SchemaVersion, 7);
 	TestEqual(TEXT("saved stack"), Captured.Inventory.Stacks.Num(), 1);
 	TestEqual(TEXT("saved unique"), Captured.Inventory.UniqueItems.Num(), 1);
 	TestEqual(TEXT("saved receipt"), Captured.Rewards.Receipts.Num(), 1);

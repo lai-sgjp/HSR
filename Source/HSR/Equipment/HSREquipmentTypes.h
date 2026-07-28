@@ -65,6 +65,7 @@ enum class EHSREquipmentOperationResult : uint8
 	InvalidSlot,
 	SlotOccupied,
 	InstanceAlreadyEquipped,
+	InstancePayloadConflict,
 	TargetNotFound,
 	InstanceMismatch,
 	InvalidModifier,

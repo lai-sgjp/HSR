@@ -8,3 +8,30 @@ Status: `TASK GATE PASS / IMPLEMENTATION NOT AUTHORIZED`
 - Inventory unique rows cannot safely be inferred as equipment and remain unchanged during migration.
 - 03E1 excludes Inventory transactions, ASC live changes and UI routing; those remain 03E2.
 - No Source, Content, Config, Build, Automation or PIE mutation was performed during this gate.
+
+## 2026-07-29 implementation checkpoint
+
+Status: `BLOCKED AT REGRESSION ALLOWLIST`
+
+- Gate commit: `4510bcd`.
+- RED commit: `fccfad1`; first UBT failure was the missing Registry API surface.
+- `HSREditor Win64 Development` builds successfully.
+- Registry Ownership, Placement, Persistence and all `HSR.Equipment` Automation tests pass.
+- Save Validation Preflight, DiskFailures and EnvelopeV1 pass.
+- Full `HSR.Save` remains red only where old tests hard-code schema 5 or treat schema 7 as future.
+- Required updates touch `HSRMapSaveIntegrationTests.cpp`, `HSRQuestDialogueTests.cpp` and `HSRSaveRecoveryTests.cpp`, which are outside the frozen allowlist.
+- No GREEN commit or completion claim has been made.
+
+## 2026-07-29 GREEN result
+
+Status: `IMPLEMENTATION GREEN / REVIEW REQUIRED`
+
+- The user expanded the regression allowlist for Map, Quest and Recovery schema assertions.
+- `HSREditor Win64 Development`: succeeded.
+- `HSR.Equipment.Registry`: 3/3 succeeded.
+- `HSR.Equipment`: 8/8 succeeded.
+- `HSR.Save`: 16/16 succeeded.
+- `HSR.Inventory`: 3/3 succeeded.
+- `HSR.UI.EquipmentDetail.ViewModel`: 1/1 succeeded.
+- `git diff --check`: clean for every 03E1 implementation, test and evidence path.
+- Editor/PIE compatibility observation remains a post-review user boundary; 03E1 requires no Content mutation.

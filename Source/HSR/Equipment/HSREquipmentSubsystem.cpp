@@ -11,16 +11,32 @@ void UHSREquipmentSubsystem::ExportSaveData(TArray<FHSREquipmentSaveDto>& Out) c
 	Out.Reset();
 	for (const auto& L : Loadouts)
 	{
-		for (const auto& P : L.Value.Loadout.Equipment)
+		for (const auto& P : L.Value.Equipment)
 		{
-			FHSREquipmentSaveDto D; D.CharacterId=L.Key; D.DefinitionId=P.Value.DefinitionId; D.InstanceId=P.Value.InstanceId; D.Kind=0; D.Slot=(int32)P.Key; D.EnhancementLevel=P.Value.EnhancementLevel; D.Modifiers=P.Value.Modifiers; D.AuthorityRevision=L.Value.Revision; Out.Add(D);
+			const FHSREquipmentInstance* I=InstanceRegistry.Find(P.Value); if(!I)continue; FHSREquipmentSaveDto D; D.CharacterId=L.Key; D.DefinitionId=I->DefinitionId; D.InstanceId=I->InstanceId; D.Kind=0; D.Slot=(int32)P.Key; D.EnhancementLevel=I->EnhancementLevel; D.Modifiers=I->Modifiers; D.AuthorityRevision=L.Value.Revision; Out.Add(D);
 		}
-		for (const auto& P : L.Value.Loadout.Relics)
+		for (const auto& P : L.Value.Relics)
 		{
-			FHSREquipmentSaveDto D; D.CharacterId=L.Key; D.DefinitionId=P.Value.DefinitionId; D.InstanceId=P.Value.InstanceId; D.Kind=1; D.Slot=(int32)P.Key; D.EnhancementLevel=P.Value.EnhancementLevel; D.Modifiers=P.Value.Modifiers; D.AuthorityRevision=L.Value.Revision; if(const FDefinitionRule* Rule=Definitions.Find(D.DefinitionId))D.SetId=Rule->SetId; Out.Add(D);
+			const FHSREquipmentInstance* I=InstanceRegistry.Find(P.Value); if(!I)continue; FHSREquipmentSaveDto D; D.CharacterId=L.Key; D.DefinitionId=I->DefinitionId; D.InstanceId=I->InstanceId; D.Kind=1; D.Slot=(int32)P.Key; D.EnhancementLevel=I->EnhancementLevel; D.Modifiers=I->Modifiers; D.AuthorityRevision=L.Value.Revision; if(const FDefinitionRule* Rule=Definitions.Find(D.DefinitionId))D.SetId=Rule->SetId; Out.Add(D);
 		}
 	}
 	Out.Sort([](const FHSREquipmentSaveDto& A,const FHSREquipmentSaveDto& B){if(A.CharacterId!=B.CharacterId)return A.CharacterId<B.CharacterId;if(A.Kind!=B.Kind)return A.Kind<B.Kind;if(A.Slot!=B.Slot)return A.Slot<B.Slot;return A.InstanceId<B.InstanceId;});
+}
+
+void UHSREquipmentSubsystem::ExportSaveData(TArray<FHSREquipmentRegistryDto>& OutRegistry, TArray<FHSREquipmentPlacementDto>& OutPlacements) const
+{
+	OutRegistry.Reset(); OutPlacements.Reset();
+	for (const auto& Pair : InstanceRegistry)
+	{
+		FHSREquipmentRegistryDto Row; Row.InstanceId=Pair.Key; Row.DefinitionId=Pair.Value.DefinitionId; Row.Kind=static_cast<int32>(Pair.Value.Kind); Row.EnhancementLevel=Pair.Value.EnhancementLevel; Row.Modifiers=Pair.Value.Modifiers; if(const FDefinitionRule* Rule=Definitions.Find(Row.DefinitionId))Row.SetId=Rule->SetId; OutRegistry.Add(MoveTemp(Row));
+	}
+	for (const auto& Owner : Loadouts)
+	{
+		for(const auto& Pair:Owner.Value.Equipment){FHSREquipmentPlacementDto Row;Row.InstanceId=Pair.Value;Row.CharacterId=Owner.Key;Row.Kind=0;Row.Slot=static_cast<int32>(Pair.Key);Row.AuthorityRevision=Owner.Value.Revision;OutPlacements.Add(Row);}
+		for(const auto& Pair:Owner.Value.Relics){FHSREquipmentPlacementDto Row;Row.InstanceId=Pair.Value;Row.CharacterId=Owner.Key;Row.Kind=1;Row.Slot=static_cast<int32>(Pair.Key);Row.AuthorityRevision=Owner.Value.Revision;OutPlacements.Add(Row);}
+	}
+	OutRegistry.Sort([](const auto& A,const auto& B){return A.InstanceId<B.InstanceId;});
+	OutPlacements.Sort([](const auto& A,const auto& B){if(A.CharacterId!=B.CharacterId)return A.CharacterId<B.CharacterId;if(A.Kind!=B.Kind)return A.Kind<B.Kind;if(A.Slot!=B.Slot)return A.Slot<B.Slot;return A.InstanceId<B.InstanceId;});
 }
 
 bool UHSREquipmentSubsystem::PrepareRestore(const TArray<FHSREquipmentSaveDto>& In, FHSREquipmentRestoreMap& Out) const
@@ -36,9 +52,18 @@ bool UHSREquipmentSubsystem::PrepareRestore(const TArray<FHSREquipmentSaveDto>& 
 	return true;
 }
 
+bool UHSREquipmentSubsystem::PrepareRestore(const TArray<FHSREquipmentRegistryDto>& Registry, const TArray<FHSREquipmentPlacementDto>& Placements, FHSREquipmentRegistryRestoreState& Out) const
+{
+	Out = FHSREquipmentRegistryRestoreState();
+	for(const auto& D:Registry){FHSREquipmentInstance I;I.InstanceId=D.InstanceId;I.DefinitionId=D.DefinitionId;I.Kind=static_cast<EHSREquipmentKind>(D.Kind);I.EnhancementLevel=D.EnhancementLevel;I.Modifiers=D.Modifiers;const FDefinitionRule* Rule=Definitions.Find(I.DefinitionId);if(!I.InstanceId.IsValid()||Out.Registry.Contains(I.InstanceId)||!Rule||Rule->Kind!=I.Kind||D.EnhancementLevel<0||D.EnhancementLevel>Rule->EnhancementCap||!IsValidModifiers(I.Modifiers)||(I.Kind==EHSREquipmentKind::Relic&&D.SetId!=Rule->SetId))return false;Out.Registry.Add(I.InstanceId,MoveTemp(I));}
+	TSet<FGuid> Seen;
+	for(const auto& D:Placements){const FHSREquipmentInstance* I=Out.Registry.Find(D.InstanceId);if(!I||!D.CharacterId.IsValid()||Seen.Contains(D.InstanceId)||D.AuthorityRevision<0||D.Kind!=static_cast<int32>(I->Kind)||!IsSlotValid(I->Kind,D.Slot))return false;const FDefinitionRule* Rule=FindDefinition(*I);if(!Rule||Rule->Slot!=D.Slot)return false;Seen.Add(D.InstanceId);const bool bExisting=Out.Loadouts.Contains(D.CharacterId);FHSREquipmentRestoreState& S=Out.Loadouts.FindOrAdd(D.CharacterId);if(bExisting&&S.Revision!=D.AuthorityRevision)return false;S.Revision=D.AuthorityRevision;if(I->Kind==EHSREquipmentKind::Equipment){if(S.Loadout.Equipment.Contains(static_cast<EHSREquipmentSlot>(D.Slot)))return false;S.Loadout.Equipment.Add(static_cast<EHSREquipmentSlot>(D.Slot),*I);}else{if(S.Loadout.Relics.Contains(static_cast<EHSRRelicSlot>(D.Slot)))return false;S.Loadout.Relics.Add(static_cast<EHSRRelicSlot>(D.Slot),*I);++S.RelicSetCounts.FindOrAdd(Rule->SetId);}}
+	return true;
+}
+
 void UHSREquipmentSubsystem::CommitRestore(const FHSREquipmentRestoreMap& Candidate)
 {
-	Loadouts.Reset(); InstanceOwners.Reset(); for(const auto& P:Candidate){FLoadoutState& S=Loadouts.Add(P.Key); S.Loadout=P.Value.Loadout; S.Revision=P.Value.Revision; for(const auto& E:S.Loadout.Equipment) InstanceOwners.Add(E.Value.InstanceId,P.Key); for(const auto& R:S.Loadout.Relics) InstanceOwners.Add(R.Value.InstanceId,P.Key);} }
+	Loadouts.Reset(); InstanceOwners.Reset(); InstanceRegistry.Reset(); for(const auto& P:Candidate){FLoadoutState& S=Loadouts.Add(P.Key); S.Revision=P.Value.Revision; for(const auto& E:P.Value.Loadout.Equipment){InstanceRegistry.Add(E.Value.InstanceId,E.Value);S.Equipment.Add(E.Key,E.Value.InstanceId);InstanceOwners.Add(E.Value.InstanceId,P.Key);} for(const auto& R:P.Value.Loadout.Relics){InstanceRegistry.Add(R.Value.InstanceId,R.Value);S.Relics.Add(R.Key,R.Value.InstanceId);InstanceOwners.Add(R.Value.InstanceId,P.Key);}} }
 void UHSREquipmentSubsystem::NotifyRestored(const TSet<FGuid>& Changed){for(const FGuid& Id:Changed){int32 Rev=Loadouts.FindRef(Id).Revision; LoadoutChanged.Broadcast(Id,Rev);}}
 
 EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UHSREquipmentDefinition& Definition)
@@ -62,6 +87,10 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UH
 	Rule.EnhancementCap = Definition.EnhancementCap;
 	Definitions.Add(Definition.DefinitionId, Rule);
 	return EHSREquipmentOperationResult::Success;
+}
+void UHSREquipmentSubsystem::CommitRestore(const FHSREquipmentRegistryRestoreState& Candidate)
+{
+	InstanceRegistry=Candidate.Registry;Loadouts.Reset();InstanceOwners.Reset();for(const auto& P:Candidate.Loadouts){FLoadoutState& S=Loadouts.Add(P.Key);S.Revision=P.Value.Revision;for(const auto& E:P.Value.Loadout.Equipment){S.Equipment.Add(E.Key,E.Value.InstanceId);InstanceOwners.Add(E.Value.InstanceId,P.Key);}for(const auto& R:P.Value.Loadout.Relics){S.Relics.Add(R.Key,R.Value.InstanceId);InstanceOwners.Add(R.Value.InstanceId,P.Key);}}
 }
 
 EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UHSRRelicDefinition& Definition)
@@ -88,42 +117,76 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UH
 	return EHSREquipmentOperationResult::Success;
 }
 
-EHSREquipmentOperationResult UHSREquipmentSubsystem::Equip(const FGuid& CharacterId, const FHSREquipmentInstance& Instance)
+EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterInstance(const FHSREquipmentInstance& Instance)
 {
-	if (!CharacterId.IsValid()) return EHSREquipmentOperationResult::InvalidCharacterId;
 	if (!Instance.InstanceId.IsValid()) return EHSREquipmentOperationResult::InvalidInstanceId;
 	if (!IsValidInstance(Instance)) return EHSREquipmentOperationResult::InvalidModifier;
 	const FDefinitionRule* Rule = FindDefinition(Instance);
-	if (Rule == nullptr) return EHSREquipmentOperationResult::UnknownDefinition;
+	if (!Rule) return EHSREquipmentOperationResult::UnknownDefinition;
 	if (Rule->Kind != Instance.Kind || !IsSlotValid(Rule->Kind, Rule->Slot)) return EHSREquipmentOperationResult::InvalidSlot;
 	if (Instance.EnhancementLevel < 0 || Instance.EnhancementLevel > Rule->EnhancementCap) return EHSREquipmentOperationResult::InvalidEnhancementLevel;
-	if (InstanceOwners.Contains(Instance.InstanceId)) return EHSREquipmentOperationResult::InstanceAlreadyEquipped;
+	if (const FHSREquipmentInstance* Existing = InstanceRegistry.Find(Instance.InstanceId))
+	{
+		return IsSamePayload(*Existing, Instance) ? EHSREquipmentOperationResult::NoOp : EHSREquipmentOperationResult::InstancePayloadConflict;
+	}
+	InstanceRegistry.Add(Instance.InstanceId, Instance);
+	return EHSREquipmentOperationResult::Success;
+}
 
-	FHSREquipmentLoadout Candidate = Loadouts.FindRef(CharacterId).Loadout;
+bool UHSREquipmentSubsystem::FindRegisteredInstance(const FGuid& InstanceId, FHSREquipmentInstance& OutInstance) const
+{
+	const FHSREquipmentInstance* Instance = InstanceRegistry.Find(InstanceId);
+	if (!Instance) return false;
+	OutInstance = *Instance;
+	return true;
+}
+
+EHSREquipmentOperationResult UHSREquipmentSubsystem::Equip(const FGuid& CharacterId, const FHSREquipmentInstance& Instance)
+{
+	const EHSREquipmentOperationResult Registration = RegisterInstance(Instance);
+	if (Registration != EHSREquipmentOperationResult::Success && Registration != EHSREquipmentOperationResult::NoOp) return Registration;
+	return EquipById(CharacterId, Instance.InstanceId);
+}
+
+EHSREquipmentOperationResult UHSREquipmentSubsystem::EquipById(const FGuid& CharacterId, const FGuid& InstanceId)
+{
+	if (!CharacterId.IsValid()) return EHSREquipmentOperationResult::InvalidCharacterId;
+	if (!InstanceId.IsValid()) return EHSREquipmentOperationResult::InvalidInstanceId;
+	const FHSREquipmentInstance* Instance = InstanceRegistry.Find(InstanceId);
+	if (!Instance) return EHSREquipmentOperationResult::TargetNotFound;
+	const FDefinitionRule* Rule = FindDefinition(*Instance);
+	if (!Rule || Rule->Kind != Instance->Kind || !IsSlotValid(Rule->Kind, Rule->Slot)) return EHSREquipmentOperationResult::InvalidSlot;
+	if (InstanceOwners.Contains(InstanceId)) return EHSREquipmentOperationResult::InstanceAlreadyEquipped;
+	FLoadoutState Candidate = Loadouts.FindRef(CharacterId);
 	if (IsSlotOccupied(Candidate, Rule->Kind, Rule->Slot)) return EHSREquipmentOperationResult::SlotOccupied;
-	if (Rule->Kind == EHSREquipmentKind::Equipment) Candidate.Equipment.Add(static_cast<EHSREquipmentSlot>(Rule->Slot), Instance);
-	else Candidate.Relics.Add(static_cast<EHSRRelicSlot>(Rule->Slot), Instance);
-	CommitLoadout(CharacterId, Candidate);
+	if (Rule->Kind == EHSREquipmentKind::Equipment) Candidate.Equipment.Add(static_cast<EHSREquipmentSlot>(Rule->Slot), InstanceId);
+	else Candidate.Relics.Add(static_cast<EHSRRelicSlot>(Rule->Slot), InstanceId);
+	CommitLoadout(CharacterId, MoveTemp(Candidate));
 	return EHSREquipmentOperationResult::Success;
 }
 
 EHSREquipmentOperationResult UHSREquipmentSubsystem::Replace(const FGuid& CharacterId, const FHSREquipmentInstance& Instance)
 {
-	if (!CharacterId.IsValid()) return EHSREquipmentOperationResult::InvalidCharacterId;
-	if (!Instance.InstanceId.IsValid()) return EHSREquipmentOperationResult::InvalidInstanceId;
-	if (!IsValidInstance(Instance)) return EHSREquipmentOperationResult::InvalidModifier;
-	const FDefinitionRule* Rule = FindDefinition(Instance);
-	if (Rule == nullptr) return EHSREquipmentOperationResult::UnknownDefinition;
-	if (Rule->Kind != Instance.Kind || !IsSlotValid(Rule->Kind, Rule->Slot)) return EHSREquipmentOperationResult::InvalidSlot;
-	if (Instance.EnhancementLevel < 0 || Instance.EnhancementLevel > Rule->EnhancementCap) return EHSREquipmentOperationResult::InvalidEnhancementLevel;
-	if (InstanceOwners.Contains(Instance.InstanceId)) return EHSREquipmentOperationResult::InstanceAlreadyEquipped;
+	const EHSREquipmentOperationResult Registration = RegisterInstance(Instance);
+	if (Registration != EHSREquipmentOperationResult::Success && Registration != EHSREquipmentOperationResult::NoOp) return Registration;
+	return ReplaceById(CharacterId, Instance.InstanceId);
+}
 
+EHSREquipmentOperationResult UHSREquipmentSubsystem::ReplaceById(const FGuid& CharacterId, const FGuid& InstanceId)
+{
+	if (!CharacterId.IsValid()) return EHSREquipmentOperationResult::InvalidCharacterId;
+	if (!InstanceId.IsValid()) return EHSREquipmentOperationResult::InvalidInstanceId;
+	const FHSREquipmentInstance* Instance = InstanceRegistry.Find(InstanceId);
+	if (!Instance) return EHSREquipmentOperationResult::TargetNotFound;
+	const FDefinitionRule* Rule = FindDefinition(*Instance);
+	if (!Rule || Rule->Kind != Instance->Kind || !IsSlotValid(Rule->Kind, Rule->Slot)) return EHSREquipmentOperationResult::InvalidSlot;
+	if (InstanceOwners.Contains(InstanceId)) return EHSREquipmentOperationResult::InstanceAlreadyEquipped;
 	const FLoadoutState* Existing = Loadouts.Find(CharacterId);
-	if (Existing == nullptr || !IsSlotOccupied(Existing->Loadout, Rule->Kind, Rule->Slot)) return EHSREquipmentOperationResult::TargetNotFound;
-	FHSREquipmentLoadout Candidate = Existing->Loadout;
-	if (Rule->Kind == EHSREquipmentKind::Equipment) Candidate.Equipment.Add(static_cast<EHSREquipmentSlot>(Rule->Slot), Instance);
-	else Candidate.Relics.Add(static_cast<EHSRRelicSlot>(Rule->Slot), Instance);
-	CommitLoadout(CharacterId, Candidate);
+	if (!Existing || !IsSlotOccupied(*Existing, Rule->Kind, Rule->Slot)) return EHSREquipmentOperationResult::TargetNotFound;
+	FLoadoutState Candidate = *Existing;
+	if (Rule->Kind == EHSREquipmentKind::Equipment) Candidate.Equipment.Add(static_cast<EHSREquipmentSlot>(Rule->Slot), InstanceId);
+	else Candidate.Relics.Add(static_cast<EHSRRelicSlot>(Rule->Slot), InstanceId);
+	CommitLoadout(CharacterId, MoveTemp(Candidate));
 	return EHSREquipmentOperationResult::Success;
 }
 
@@ -134,14 +197,14 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::Unequip(const FGuid& Charac
 	if (!IsSlotValid(Kind, Slot)) return EHSREquipmentOperationResult::InvalidSlot;
 	const FLoadoutState* Existing = Loadouts.Find(CharacterId);
 	if (Existing == nullptr) return EHSREquipmentOperationResult::TargetNotFound;
-	const FHSREquipmentInstance* Current = FindInstance(Existing->Loadout, Kind, Slot);
+	const FGuid* Current = FindPlacedInstance(*Existing, Kind, Slot);
 	if (Current == nullptr) return EHSREquipmentOperationResult::TargetNotFound;
-	if (Current->InstanceId != ExpectedInstanceId) return EHSREquipmentOperationResult::InstanceMismatch;
+	if (*Current != ExpectedInstanceId) return EHSREquipmentOperationResult::InstanceMismatch;
 
-	FHSREquipmentLoadout Candidate = Existing->Loadout;
+	FLoadoutState Candidate = *Existing;
 	if (Kind == EHSREquipmentKind::Equipment) Candidate.Equipment.Remove(static_cast<EHSREquipmentSlot>(Slot));
 	else Candidate.Relics.Remove(static_cast<EHSRRelicSlot>(Slot));
-	CommitLoadout(CharacterId, Candidate);
+	CommitLoadout(CharacterId, MoveTemp(Candidate));
 	return EHSREquipmentOperationResult::Success;
 }
 
@@ -154,26 +217,14 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::SetEnhancementLevel(const F
 	if (*Owner != CharacterId) return EHSREquipmentOperationResult::InstanceMismatch;
 	FLoadoutState* Existing = Loadouts.Find(CharacterId);
 	check(Existing != nullptr);
-
-	FHSREquipmentLoadout Candidate = Existing->Loadout;
-	FHSREquipmentInstance* Instance = nullptr;
-	for (TPair<EHSREquipmentSlot, FHSREquipmentInstance>& Pair : Candidate.Equipment)
-	{
-		if (Pair.Value.InstanceId == InstanceId) { Instance = &Pair.Value; break; }
-	}
-	if (Instance == nullptr)
-	{
-		for (TPair<EHSRRelicSlot, FHSREquipmentInstance>& Pair : Candidate.Relics)
-		{
-			if (Pair.Value.InstanceId == InstanceId) { Instance = &Pair.Value; break; }
-		}
-	}
+	FHSREquipmentInstance* Instance = InstanceRegistry.Find(InstanceId);
 	if (Instance == nullptr) return EHSREquipmentOperationResult::TargetNotFound;
 	const FDefinitionRule* Rule = FindDefinition(*Instance);
 	if (Rule == nullptr || NewLevel < 0 || NewLevel > Rule->EnhancementCap) return EHSREquipmentOperationResult::InvalidEnhancementLevel;
 	if (Instance->EnhancementLevel == NewLevel) return EHSREquipmentOperationResult::NoOp;
 	Instance->EnhancementLevel = NewLevel;
-	CommitLoadout(CharacterId, Candidate);
+	FLoadoutState Candidate = *Existing;
+	CommitLoadout(CharacterId, MoveTemp(Candidate));
 	return EHSREquipmentOperationResult::Success;
 }
 
@@ -181,7 +232,7 @@ bool UHSREquipmentSubsystem::GetLoadout(const FGuid& CharacterId, FHSREquipmentL
 {
 	const FLoadoutState* State = Loadouts.Find(CharacterId);
 	if (State == nullptr) return false;
-	OutLoadout = State->Loadout;
+	if (!ResolveLoadout(*State, OutLoadout)) return false;
 	OutRevision = State->Revision;
 	return true;
 }
@@ -192,7 +243,7 @@ void UHSREquipmentSubsystem::GetRelicSetSnapshots(const FGuid& CharacterId, TArr
 	const FLoadoutState* State=Loadouts.Find(CharacterId);
 	if(!State)return;
 	TMap<FName,int32> Counts;
-	for(const auto& Pair:State->Loadout.Relics)if(const FDefinitionRule* Rule=Definitions.Find(Pair.Value.DefinitionId))if(!Rule->SetId.IsNone())++Counts.FindOrAdd(Rule->SetId);
+	for(const auto& Pair:State->Relics)if(const FHSREquipmentInstance* Instance=InstanceRegistry.Find(Pair.Value))if(const FDefinitionRule* Rule=Definitions.Find(Instance->DefinitionId))if(!Rule->SetId.IsNone())++Counts.FindOrAdd(Rule->SetId);
 	for(const auto& Pair:Counts){FHSRRelicSetSnapshot Row;Row.SetId=Pair.Key;Row.EquippedCount=Pair.Value;Row.bActive=Row.EquippedCount>=Row.Threshold;Row.SetSourceId=Row.bActive?Row.SetId:NAME_None;Out.Add(Row);}
 	Out.Sort([](const FHSRRelicSetSnapshot& A,const FHSRRelicSetSnapshot& B){return A.SetId.LexicalLess(B.SetId);});
 }
@@ -225,29 +276,42 @@ bool UHSREquipmentSubsystem::IsSlotValid(EHSREquipmentKind Kind, int32 Slot) con
 	return Slot >= 0 && Slot < (Kind == EHSREquipmentKind::Equipment ? static_cast<int32>(EHSREquipmentSlot::Feet) + 1 : static_cast<int32>(EHSRRelicSlot::LinkRope) + 1);
 }
 
-bool UHSREquipmentSubsystem::IsSlotOccupied(const FHSREquipmentLoadout& Loadout, EHSREquipmentKind Kind, int32 Slot) const
+bool UHSREquipmentSubsystem::IsSlotOccupied(const FLoadoutState& Loadout, EHSREquipmentKind Kind, int32 Slot) const
 {
-	return FindInstance(Loadout, Kind, Slot) != nullptr;
+	return FindPlacedInstance(Loadout, Kind, Slot) != nullptr;
 }
 
-FHSREquipmentInstance* UHSREquipmentSubsystem::FindInstance(FHSREquipmentLoadout& Loadout, EHSREquipmentKind Kind, int32 Slot)
-{
-	return Kind == EHSREquipmentKind::Equipment ? Loadout.Equipment.Find(static_cast<EHSREquipmentSlot>(Slot)) : Loadout.Relics.Find(static_cast<EHSRRelicSlot>(Slot));
-}
-
-const FHSREquipmentInstance* UHSREquipmentSubsystem::FindInstance(const FHSREquipmentLoadout& Loadout, EHSREquipmentKind Kind, int32 Slot) const
+const FGuid* UHSREquipmentSubsystem::FindPlacedInstance(const FLoadoutState& Loadout, EHSREquipmentKind Kind, int32 Slot) const
 {
 	return Kind == EHSREquipmentKind::Equipment ? Loadout.Equipment.Find(static_cast<EHSREquipmentSlot>(Slot)) : Loadout.Relics.Find(static_cast<EHSRRelicSlot>(Slot));
 }
 
-void UHSREquipmentSubsystem::CommitLoadout(const FGuid& CharacterId, const FHSREquipmentLoadout& Candidate)
+bool UHSREquipmentSubsystem::ResolveLoadout(const FLoadoutState& State, FHSREquipmentLoadout& OutLoadout) const
+{
+	OutLoadout = FHSREquipmentLoadout();
+	for (const auto& Pair : State.Equipment) { const FHSREquipmentInstance* Instance = InstanceRegistry.Find(Pair.Value); if (!Instance) return false; OutLoadout.Equipment.Add(Pair.Key, *Instance); }
+	for (const auto& Pair : State.Relics) { const FHSREquipmentInstance* Instance = InstanceRegistry.Find(Pair.Value); if (!Instance) return false; OutLoadout.Relics.Add(Pair.Key, *Instance); }
+	return true;
+}
+
+void UHSREquipmentSubsystem::CommitLoadout(const FGuid& CharacterId, FLoadoutState Candidate)
 {
 	FLoadoutState& State = Loadouts.FindOrAdd(CharacterId);
-	for (const TPair<EHSREquipmentSlot, FHSREquipmentInstance>& Pair : State.Loadout.Equipment) InstanceOwners.Remove(Pair.Value.InstanceId);
-	for (const TPair<EHSRRelicSlot, FHSREquipmentInstance>& Pair : State.Loadout.Relics) InstanceOwners.Remove(Pair.Value.InstanceId);
-	State.Loadout = Candidate;
-	for (const TPair<EHSREquipmentSlot, FHSREquipmentInstance>& Pair : State.Loadout.Equipment) InstanceOwners.Add(Pair.Value.InstanceId, CharacterId);
-	for (const TPair<EHSRRelicSlot, FHSREquipmentInstance>& Pair : State.Loadout.Relics) InstanceOwners.Add(Pair.Value.InstanceId, CharacterId);
-	++State.Revision;
+	for (const auto& Pair : State.Equipment) InstanceOwners.Remove(Pair.Value);
+	for (const auto& Pair : State.Relics) InstanceOwners.Remove(Pair.Value);
+	Candidate.Revision = State.Revision + 1;
+	State = MoveTemp(Candidate);
+	for (const auto& Pair : State.Equipment) InstanceOwners.Add(Pair.Value, CharacterId);
+	for (const auto& Pair : State.Relics) InstanceOwners.Add(Pair.Value, CharacterId);
 	LoadoutChanged.Broadcast(CharacterId, State.Revision);
+}
+
+bool UHSREquipmentSubsystem::IsSamePayload(const FHSREquipmentInstance& A, const FHSREquipmentInstance& B)
+{
+	if (A.InstanceId != B.InstanceId || A.DefinitionId != B.DefinitionId || A.Kind != B.Kind || A.EnhancementLevel != B.EnhancementLevel || A.Modifiers.Num() != B.Modifiers.Num()) return false;
+	for (int32 Index = 0; Index < A.Modifiers.Num(); ++Index)
+	{
+		if (A.Modifiers[Index].Stat != B.Modifiers[Index].Stat || A.Modifiers[Index].Value != B.Modifiers[Index].Value) return false;
+	}
+	return true;
 }
