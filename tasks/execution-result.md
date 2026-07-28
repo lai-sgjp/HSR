@@ -1,6 +1,6 @@
 # TASK-P17-PATCH-03B Execution Result
 
-Status: `IMPLEMENTED / TDD GREEN / CODE GATE READY`
+Status: `PASS / TDD GREEN / CODE GATE PASS / USER ASSET GATE PASS`
 
 The user explicitly authorized `TASK-P17-PATCH-03B` after Task Gate PASS on 2026-07-28. TDD starts with `HSR.ProductionBootstrap.CharacterIdentity`; production files remain untouched until the intended RED is compiled and recorded.
 
@@ -69,3 +69,9 @@ The user explicitly authorized `TASK-P17-PATCH-03B` after Task Gate PASS on 2026
 - Character Detail reported `DetailWidgetInit Result=FAIL SelectionResult=6` (`PartySlotEmpty`) while the Character route itself opened normally; no fallback `Character.A` snapshot was manufactured.
 - The focused Automation test supplies the corresponding zero-mutation proof for Party slots/revision and Pawn projection. Together with this PIE result, the controlled unavailable path passes.
 - Final Asset Gate closure still requires restoring `BP_HSRGameMode` to `NewGameDefaults`, then Compile/Save/reopen confirmation.
+
+## Final Asset Gate closure
+
+- The user restored `BP_HSRGameMode` bootstrap mode to `NewGameDefaults`, compiled/saved the Blueprint, reopened it and confirmed the final value persisted.
+- Happy path, controlled unavailable path, final asset persistence, focused Automation, regressions and Code Gate are complete. `TASK-P17-PATCH-03B` is `PASS`.
+- PATCH-03C has not started.
