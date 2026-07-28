@@ -1,6 +1,6 @@
 # TASK-P17-PATCH-03D2 - Battle Result Settlement Integration
 
-Status: `REVISED / TASK GATE REREVIEW REQUIRED / IMPLEMENTATION NOT AUTHORIZED`
+Status: `PLANNED / TASK GATE PASS / USER CONFIRMATION REQUIRED`
 
 ## Sole outcome
 
@@ -85,4 +85,4 @@ This is a candidate list, not an implementation grant. Task Gate must reduce it 
 
 ## Current gate
 
-Initial Coordinator evidence audit returned `REVISE`: the draft had no authoritative EXP source and did not preserve the original expected revisions across post-settlement return retry. The revised contract closes both gaps and removes unnecessary Reward/UI/Coordinator/Transition-header files from the candidate write set. Independent Reviewer, feasibility and Editor-boundary rereview must still pass before the implementation role restates the frozen contract. Source, Content, Build, Automation and PIE remain unauthorized until the user separately confirms `TASK-P17-PATCH-03D2`.
+Initial Coordinator evidence audit returned `REVISE`: the draft had no authoritative EXP source and did not preserve the original expected revisions across post-settlement return retry. The revised contract closes both gaps and removes unnecessary Reward/UI/Coordinator/Transition-header files from the candidate write set. Independent Reviewer rereview commit `6e42517` returned `PASS` and confirmed implementation feasibility, the minimum allowlist, TDD sufficiency and Editor boundaries. Source, Content, Build, Automation and PIE remain unauthorized until the implementation role restates this frozen contract and the user separately confirms `TASK-P17-PATCH-03D2`.

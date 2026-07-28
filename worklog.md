@@ -2204,3 +2204,10 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - User confirmed `DA_Reward_P13_Standard` and `DA_CharacterCatalog_P11` Save All/reopen with stable `Character.A`.
 - User PIE log proves defeat `Outcome=2` emitted no BattleReward and returned to Exploration; victory `Outcome=1` emitted one `P13-003 BattleReward Result=SUCCESS Revision=1` and returned to Exploration. Both return contexts were consumed once and duplicate consumption returned `AlreadyConsumed`.
 - 03D1 is complete. The adjacent next task is 03D2 Task Gate only; production settlement integration remains unauthorized until separate confirmation.
+
+# 2026-07-28 | TASK-P17-PATCH-03D2 Task Gate
+
+- Initial Coordinator evidence audit returned REVISE because no authoritative victory EXP crossed the World boundary and rebuilding expected revisions after settlement-success/return-failure would conflict with the same TransactionId.
+- The revised card freezes data-driven `VictoryExperience` on EncounterDefinition/EncounterRequest, exact Battle RequestId reuse, first-request/receipt/BattleResult caching, defeat zero-settlement, post-settlement return retry and canonical `/Game/UI/WBP_RewardSummary_P13` ownership.
+- The implementation write set was reduced to BattleGameMode, EncounterTypes, BattleTransition cpp, EncounterDefinition header, one new integration test and execution evidence. Reward/Inventory/Profile/UI/Coordinator implementations remain read-only.
+- Independent Reviewer commit `6e42517` returned PASS and confirmed feasibility, TDD sufficiency, exact minimum allowlist and Editor boundaries. 03D2 implementation remains separately user-confirmation gated.

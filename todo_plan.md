@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：P17-005 已暂停并 checkpoint 于 `4ef49f7`；最终 PASS 不可用。P17-PATCH-03 Gate 0 已 PASS，03A～03D1 已完成；唯一活动卡为 03D2，仅进入 Task Gate，尚未授权实施。
+> 当前状态：P17-005 已暂停并 checkpoint 于 `4ef49f7`；最终 PASS 不可用。P17-PATCH-03 Gate 0 已 PASS，03A～03D1 已完成；03D2 Task Gate 经修订后 PASS，等待用户单独确认实施。
 
 ## 已完成的规划工作
 
