@@ -47,16 +47,24 @@ This card is a planning artifact. No Source, Content, Config, Build, Automation,
 - `Source/HSR/Progression/HSRCharacterProfileSubsystem.cpp`
 - `Source/HSR/Progression/HSRCharacterProfileTypes.h`
 - new `Source/HSR/Tests/HSRSettlementAuthorityTests.cpp`
-- exact affected existing Reward/Inventory/Profile focused tests identified and frozen by Task Gate review
 - `tasks/execution-result.md`
 
-Battle, BattleTransition, Coordinator, Interaction, Party, Equipment, Save, Map and UI sources are read-only. The implementation may use fewer files; it may not widen this list itself. Existing test files are read-only until the Task Gate records their exact paths and why new focused coverage cannot replace edits.
+Battle, BattleTransition, Coordinator, Interaction, Party, Equipment, Save, Map and UI sources are read-only. The implementation may use fewer files; it may not widen this list itself.
+
+The following existing tests are read-only regressions; 03D1 may not weaken or edit them:
+
+- `Source/HSR/Tests/HSRInventorySubsystemTests.cpp`
+- `Source/HSR/Tests/HSRRewardSubsystemTests.cpp`
+- `Source/HSR/Tests/HSRRewardIntegrationTests.cpp`
+- `Source/HSR/Tests/HSRCharacterProfileSubsystemTests.cpp`
+- `Source/HSR/Tests/HSRCharacterProgressionTests.cpp`
+- `Source/HSR/Tests/HSRProgressionEffectContractTests.cpp`
 
 ## Candidate Asset Gate - compatibility evidence only
 
 - No new asset or business binding.
-- Existing authorized RewardDefinition fixture selected by Task Gate.
-- Existing CharacterId fixture selected by Task Gate.
+- `/Game/Data/Rewards/DA_Reward_P13_Standard` and its existing item/drop references.
+- `/Game/Data/Progression/DA_CharacterCatalog_P11`, using stable `Character.A`.
 - Blueprint may not call prepare/install/publish seams or grant items/EXP.
 
 ## TDD and acceptance matrix
@@ -66,18 +74,20 @@ Create `HSR.Settlement.Foundation` before production edits and prove an intended
 - pure prepare: Reward, Inventory and Profile candidates match expected values while all live snapshots/revisions/events/receipts remain unchanged;
 - aggregate success: one valid immutable request prepares all candidates, installs Inventory -> Profile -> Reward, then publishes exactly one coherent revision/event/receipt set;
 - invalid RewardDefinition, CharacterId, item Definition, amount, EXP, capacity, overflow or expected revision: typed failure with zero mutation in every domain;
-- allocation/Definition failure is injected during prepare and cannot occur after commit begins;
+- Definition/candidate preparation failure is injected before aggregate-ready and cannot occur after commit begins;
 - duplicate TransactionId: identical committed result, no second revision/event/receipt;
 - stale expected revision and mismatched candidate TransactionId are rejected before install;
 - install primitives are inaccessible to Blueprint and callers other than SettlementAuthority;
 - existing `SubmitReward`, Inventory mutation and `GrantExperience` public behavior remains regression-compatible because production flow is not switched;
 - no ASC projection, GE application, Save capture, UI refresh or Battle caller change is introduced.
 
-Required regressions must be discovered during Task Gate and frozen by exact Automation filter/count. At minimum include focused `HSR.Reward`, `HSR.Inventory` and `HSR.Progression` suites without weakening existing assertions.
+One narrow `WITH_DEV_AUTOMATION_TESTS` failure selector may stop after a selected domain builds its local candidate but before the aggregate becomes ready. It may not mutate live state, bypass production validation, simulate a successful install, or inject failure after commit begins. Real process OOM is `NOT VERIFIED`; the deterministic seam proves the architectural boundary, not allocator behavior.
+
+Required read-only regressions are `HSR.Inventory` (currently 3 tests), `HSR.Reward` (currently 6 tests including Integration) and `HSR.Progression` (currently 3 tests). Exact discovered counts must be reported from the final run rather than assumed from source declarations.
 
 ## User Editor exercise and evidence
 
-1. Open the Task-Gate-selected existing RewardDefinition and verify its item/drop references; open the selected Character fixture and verify the stable CharacterId.
+1. Open `/Game/Data/Rewards/DA_Reward_P13_Standard` and verify its existing item/drop references; open `/Game/Data/Progression/DA_CharacterCatalog_P11` and verify stable `Character.A`.
 2. Save All, close and reopen those assets. No new asset and no Blueprint settlement node may be created.
 3. PIE one ordinary victory/return through the existing production path as a compatibility check. This does not prove the new authority is used.
 4. PIE one defeat and confirm the existing no-reward behavior remains unchanged.
