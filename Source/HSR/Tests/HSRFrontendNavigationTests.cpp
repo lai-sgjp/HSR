@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "../UI/Frontend/HSRFrontendRouter.h"
+#include "../UI/HSRScreenWidget.h"
 #include "../UI/HSRUIManagerSubsystem.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/Engine.h"
@@ -245,6 +246,25 @@ bool FHSRFrontendInputBindingGuardTest::RunTest(const FString&)
 	TestTrue(TEXT("first setup binds"), AHSRPlayerController::ShouldBindFrontendInputComponent(nullptr, First));
 	TestFalse(TEXT("repeated setup on same component is idempotent"), AHSRPlayerController::ShouldBindFrontendInputComponent(First, First));
 	TestTrue(TEXT("recreated input component receives one new binding set"), AHSRPlayerController::ShouldBindFrontendInputComponent(First, Replacement));
+	UHSRScreenWidget* Widget = NewObject<UHSRScreenWidget>();
+	TestFalse(TEXT("unowned widget cannot consume X"), Widget->ShouldConsumeCloseToRootKeyForAutomation(EKeys::X));
+	ULocalPlayer* LocalPlayer = NewObject<ULocalPlayer>(GEngine);
+	UHSRUIManagerSubsystem* Manager = NewObject<UHSRUIManagerSubsystem>(LocalPlayer);
+	Manager->InitializeForAutomation(); Manager->RegisterHostForAutomation(true, true);
+	Manager->ConfigureAutomationBackend(true, true, true, true, true, false);
+	Manager->ConfigureAutomationDetailBackend(true, true, true, true, true);
+	Widget->SetOwningUIManager(Manager);
+	TestTrue(TEXT("owned UIOnly widget consumes X for close-to-root"),
+		Widget->ShouldConsumeCloseToRootKeyForAutomation(EKeys::X));
+	TestFalse(TEXT("Escape remains back rather than close-to-root"),
+		Widget->ShouldConsumeCloseToRootKeyForAutomation(EKeys::Escape));
+	TestEqual(TEXT("UIOnly X fixture opens character"),
+		Manager->OpenFrontendModule(EHSRFrontendModule::Character), EHSRUIScreenResult::Success);
+	TestTrue(TEXT("UIOnly X routes the close transaction"), Widget->RouteCloseToRootKeyForAutomation(EKeys::X));
+	TestEqual(TEXT("UIOnly X closes to exact root"), Manager->GetLogicalScreenCount(), 1);
+	TestFalse(TEXT("UIOnly X closes Router history"), Manager->GetFrontendRouter()->GetSnapshot().IsOpen());
+	TestFalse(TEXT("UIOnly X releases pause"), Manager->IsPausedForAutomation());
+	Manager->DeinitializeForAutomation();
 	return true;
 }
 

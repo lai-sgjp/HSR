@@ -29,3 +29,23 @@ Status: `IMPLEMENTED / CODE GATE EVIDENCE READY / USER EDITOR GATE NOT VERIFIED`
 
 - 未修改 Content、Config、Domain、ScreenStack、Router 或 Widget 类。
 - 未 commit、未 push。用户既有 Character/Enemy/Map/AI/`.claude`/学习文件保持隔离。
+
+## 2026-07-28 USER PROVIDED PIE evidence
+
+- Selected Viewport PIE successfully logged `OpenPause Success Stack=2`、`CharacterDetail Open Success Stack=2`、`Inventory Open Success Stack=2` and `Inventory Close Success Stack=2`. This dynamically proves the happy navigation path uses the corrected two-entry global ScreenStack.
+- Exploration input context was re-added after close and the user reported the navigation itself was normal.
+- The returned viewport screenshot was in Wireframe. The same log proves `Set new viewmode: Wireframe` occurred before `OpenPause Success`, so this is an Editor ViewMode change rather than Frontend close/input restoration corruption. User was instructed to restore Lit with `Alt+4` or the View Mode menu.
+- Character initialization still logs `SelectionResult=6 / PartySlotEmpty`; this remains PATCH-03B and does not invalidate 03A navigation evidence.
+- Exact 1920x1080/1280x720 labels、Editor reopen persistence and the controlled missing-module-class failure remain `NOT VERIFIED`.
+- User explicitly deferred the 1920x1080 and 1280x720 checks. They remain `USER ACCEPTED / NOT VERIFIED` follow-ups rather than task PASS evidence.
+- A later supplied log contains only `OpenPause Success Stack=2` followed by return to Exploration. It has no Character open、Map request or structured missing-class result, so it does not prove the controlled missing-module-class matrix. It also again records `Set new viewmode: Wireframe` before opening the Hub.
+
+## Asset Gate X-key revision
+
+- User screenshot proves `IMC_FrontendNavigation` correctly maps Escape only to `IA_UI_PauseBack` and X only to `IA_UI_CloseToRoot`; the earlier duplicate-mapping diagnosis was withdrawn.
+- Repeated real PIE showed Character remained after the missing Map module attempt, but X did not close to Exploration. The log only showed a later `CharacterDetail Close Success`, consistent with Escape/Back.
+- Root cause: Frontend uses `FInputModeUIOnly`, so the focused UMG receives keyboard events while the PlayerController Enhanced Input close handler is not a reliable X path. Shared `UHSRScreenWidget::NativeOnKeyDown` handled only Escape/Gamepad Back and ignored X.
+- The exact task allowlist was expanded to `HSRScreenWidget.h/.cpp`. Owned ScreenWidgets now consume X and submit the existing UIManager `CloseFrontendToRoot` transaction; Esc behavior and child Blueprint close functions remain unchanged.
+- First revision Build failed in UHT because adding a base `RequestCloseToRoot` UFUNCTION conflicted with existing Shell/ModuleRoot UFUNCTIONs. The base helper was renamed to a private non-UFUNCTION `SubmitCloseToRoot`; final UHT and build then succeeded.
+- Final focused Automation exercises the full UIOnly X transaction: open Character at global depth 2, route X through an owned ScreenWidget, assert exact root depth 1、closed Router history and released pause. Final `HSR.UI.FrontendNavigation` remains 11/11 Success, 0 Fail; final Development Editor Build compiled ScreenWidget/tests, linked lib/dll and wrote metadata successfully.
+- Corrected real PIE after this revision is still required. The modified `Content/Input/IMC_FrontendNavigation.uasset` is user-owned Editor provenance and is not staged by Implementation.
