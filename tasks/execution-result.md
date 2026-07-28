@@ -53,3 +53,11 @@ The user explicitly authorized `TASK-P17-PATCH-03B` after Task Gate PASS on 2026
 - `/Game/UI/WBP_CharacterDetail_P11`: optionally implement `OnDetailUnavailable` for the controlled empty-Party presentation; it must not create Profile/Party data or invent an ID.
 - PIE evidence must show bootstrap Success/NoOp with the same CharacterId in GameMode log, Party slot 0, Pawn projection and Character Detail. A separate intentionally empty-Party fixture must report unavailable without mutation.
 - Physical controller, Standalone, Packaged and Shipping remain `NOT VERIFIED`.
+
+## User Asset Gate evidence - happy path
+
+- User PIE log on 2026-07-28 loaded `BP_HSRGameMode_C` and reported no Blueprint recompilation requirement.
+- Production bootstrap reported `Result=0` (`Success`) with `CharacterId=Character.A` after player possession.
+- Character Detail reported `DetailRefresh Character=Character.A ... Valid=1`, followed by `DetailWidgetInit Result=SUCCESS SelectionResult=0` and successful Character screen opening.
+- Returning from Character restored the Exploration input context; PIE teardown completed without a bootstrap or Character Detail error.
+- This closes the configured new-game happy path. The intentionally empty-Party/unavailable zero-mutation fixture is still `NOT VERIFIED`, so the overall User Asset Gate remains open.
