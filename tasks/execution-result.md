@@ -61,3 +61,11 @@ The user explicitly authorized `TASK-P17-PATCH-03B` after Task Gate PASS on 2026
 - Character Detail reported `DetailRefresh Character=Character.A ... Valid=1`, followed by `DetailWidgetInit Result=SUCCESS SelectionResult=0` and successful Character screen opening.
 - Returning from Character restored the Exploration input context; PIE teardown completed without a bootstrap or Character Detail error.
 - This closes the configured new-game happy path. The intentionally empty-Party/unavailable zero-mutation fixture is still `NOT VERIFIED`, so the overall User Asset Gate remains open.
+
+## User Asset Gate evidence - controlled unavailable path
+
+- User PIE log on 2026-07-28 at 18:21:50 ran `BP_HSRGameMode_C` with the committed-runtime fixture and an empty Party.
+- Bootstrap reported `Result=7` (`NoCommittedSelection`) and `CharacterId=None`.
+- Character Detail reported `DetailWidgetInit Result=FAIL SelectionResult=6` (`PartySlotEmpty`) while the Character route itself opened normally; no fallback `Character.A` snapshot was manufactured.
+- The focused Automation test supplies the corresponding zero-mutation proof for Party slots/revision and Pawn projection. Together with this PIE result, the controlled unavailable path passes.
+- Final Asset Gate closure still requires restoring `BP_HSRGameMode` to `NewGameDefaults`, then Compile/Save/reopen confirmation.
