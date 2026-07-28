@@ -32,6 +32,14 @@ The user explicitly authorized `TASK-P17-PATCH-03B` after Task Gate PASS on 2026
 - `HSR.Save`: 16/16 Success, exit 0.
 - `git diff --check`: passed; line-ending notices only.
 
+### Adversarial RED -> GREEN follow-up
+
+- Code Gate review found a missing boundary: Party slot 0 could be empty while another fixed slot already contained a committed character. `NewGameDefaults` incorrectly treated that Party as empty, inserted the initial character into slot 0, incremented Party revision and projected the new ID onto the Pawn.
+- RED checkpoint `6529a7d` added the non-primary-slot reproducer. Before the fix, `HSR.ProductionBootstrap.CharacterIdentity` failed with result mismatch, changed Party slots, revision `1 -> 2` and a non-empty Pawn projection.
+- The minimal fix now rejects any Party that has a committed member but no slot-0 selection with `NoCommittedSelection`, before Party or Pawn mutation.
+- The same focused target was rerun after the fix: `HSR.ProductionBootstrap.CharacterIdentity`, 1 found, `Result={Success}`, exit code 0.
+- Post-fix regression rerun: `HSR.UI.FrontendNavigation` 11/11, `HSR.Party.FixedSlots` 1/1, `HSR.Progression.Profile.Authority` 1/1 and `HSR.Save` 16/16 all passed with exit code 0.
+
 ## Truthful inherited failures
 
 - Broad `HSR.UI` exposed stale `HSR.UI.ScreenLifecycle` assertions that still require pre-03A module ScreenStack entries/depth. `HSR.UI.FrontendNavigation` is the current router-only contract and passed 11/11; 03B did not edit the stale test file.

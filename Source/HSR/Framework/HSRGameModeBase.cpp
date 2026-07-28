@@ -96,6 +96,12 @@ EHSRCharacterBootstrapResult AHSRGameModeBase::BootstrapCharacterIdentity(const 
 	bool bSeededParty = false;
 	if (PartySnapshot.Slots[0].IsEmpty())
 	{
+		const bool bHasCommittedPartyMember = PartySnapshot.Slots.ContainsByPredicate(
+			[](const FHSRPartySlot& Slot) { return !Slot.IsEmpty(); });
+		if (bHasCommittedPartyMember)
+		{
+			return FinishBootstrap(EHSRCharacterBootstrapResult::NoCommittedSelection);
+		}
 		if (Mode == EHSRCharacterBootstrapMode::UseCommittedRuntime)
 		{
 			return FinishBootstrap(EHSRCharacterBootstrapResult::NoCommittedSelection);
