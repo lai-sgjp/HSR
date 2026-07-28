@@ -1,10 +1,10 @@
 # TASK-P17-PATCH-03B - Production Bootstrap and Character Identity
 
-Status: `TASK GATE PASS / USER CONFIRMATION REQUIRED`
+Status: `TASK GATE PASS / IMPLEMENTATION AUTHORIZED 2026-07-28`
 
 ## Role Lock
 
-This card does not authorize implementation. The next action is Task Gate review only. Source, Content, Config, Build, Automation, Editor work and implementation Git commits remain prohibited until the reviewed card is presented and the user explicitly confirms execution of `TASK-P17-PATCH-03B`. Task Gate Markdown review commits remain allowed.
+The user explicitly confirmed execution of `TASK-P17-PATCH-03B` after Task Gate PASS on 2026-07-28. Implementation is authorized only for the frozen Source/test/report allowlist. Content, Config and all unlisted files remain prohibited; Editor Asset Gate follows Code Gate.
 
 ## Current Evidence
 
