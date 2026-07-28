@@ -104,7 +104,7 @@ bool FHSRFrontendSharedSessionTest::RunTest(const FString&)
 	TestEqual(TEXT("direct inventory opens shared shell and module"),
 		Manager->OpenFrontendModule(EHSRFrontendModule::Inventory), EHSRUIScreenResult::Success);
 	TestTrue(TEXT("frontend owns one pause"), Manager->IsPausedForAutomation());
-	TestEqual(TEXT("root shell module stack"), Manager->GetLogicalScreenCount(), 3);
+	TestEqual(TEXT("global stack remains root plus shell"), Manager->GetLogicalScreenCount(), 2);
 	TestEqual(TEXT("inventory route active"), Manager->GetFrontendRouter()->GetSnapshot().GetActiveRoute().Module,
 		EHSRFrontendModule::Inventory);
 	TestEqual(TEXT("back returns to hub"), Manager->RequestBack(), EHSRUIScreenResult::Success);
@@ -129,7 +129,7 @@ bool FHSRFrontendPlaceholderReplaceTest::RunTest(const FString&)
 	Manager->ConfigureAutomationBackend(true, true, true, true, true, false);
 	TestEqual(TEXT("party placeholder opens"), Manager->OpenFrontendModule(EHSRFrontendModule::Party), EHSRUIScreenResult::Success);
 	TestEqual(TEXT("map atomically replaces party"), Manager->OpenFrontendModule(EHSRFrontendModule::Map), EHSRUIScreenResult::Success);
-	TestEqual(TEXT("replace preserves fixed depth"), Manager->GetLogicalScreenCount(), 3);
+	TestEqual(TEXT("replace preserves root plus shell depth"), Manager->GetLogicalScreenCount(), 2);
 	TestEqual(TEXT("map route active"), Manager->GetFrontendRouter()->GetSnapshot().GetActiveRoute().Module, EHSRFrontendModule::Map);
 	TestEqual(TEXT("close reaches exact root"), Manager->CloseFrontendToRoot(), EHSRUIScreenResult::Success);
 	Manager->DeinitializeForAutomation();
@@ -148,9 +148,18 @@ bool FHSRFrontendCrossTypeReplaceTest::RunTest(const FString&)
 	Manager->ConfigureAutomationInventoryBackend(true, true, true, true, true, true);
 	TestEqual(TEXT("placeholder opens"), Manager->OpenFrontendModule(EHSRFrontendModule::Party), EHSRUIScreenResult::Success);
 	TestEqual(TEXT("placeholder to character replaces"), Manager->OpenFrontendModule(EHSRFrontendModule::Character), EHSRUIScreenResult::Success);
+	Manager->FailNextAutomationRouteSubmit();
+	TestEqual(TEXT("failed character to inventory route is controlled"),
+		Manager->OpenFrontendModule(EHSRFrontendModule::Inventory), EHSRUIScreenResult::StackRejected);
+	TestEqual(TEXT("failed replace preserves character route"),
+		Manager->GetFrontendRouter()->GetSnapshot().GetActiveRoute().Module, EHSRFrontendModule::Character);
+	TestTrue(TEXT("failed replace preserves character ownership"), Manager->HasOpenCharacterDetailScreen());
+	TestEqual(TEXT("failed replace restores character focus"), Manager->GetLastAutomationFocusModule(),
+		EHSRFrontendModule::Character);
+	TestEqual(TEXT("failed replace preserves root plus shell depth"), Manager->GetLogicalScreenCount(), 2);
 	TestEqual(TEXT("character to inventory replaces"), Manager->OpenFrontendModule(EHSRFrontendModule::Inventory), EHSRUIScreenResult::Success);
 	TestEqual(TEXT("inventory to map replaces"), Manager->OpenFrontendModule(EHSRFrontendModule::Map), EHSRUIScreenResult::Success);
-	TestEqual(TEXT("fixed root shell module depth"), Manager->GetLogicalScreenCount(), 3);
+	TestEqual(TEXT("fixed global root shell depth"), Manager->GetLogicalScreenCount(), 2);
 	TestEqual(TEXT("router follows map"), Manager->GetFrontendRouter()->GetSnapshot().GetActiveRoute().Module, EHSRFrontendModule::Map);
 	TestEqual(TEXT("cross type close"), Manager->CloseFrontendToRoot(), EHSRUIScreenResult::Success);
 	Manager->DeinitializeForAutomation(); return true;
@@ -194,14 +203,14 @@ bool FHSRFrontendFailureCompensationTest::RunTest(const FString&)
 	Manager->ConfigureAutomationBackend(true, true, true, true, true, true);
 	Manager->FailNextAutomationPolicyApply();
 	TestEqual(TEXT("close policy failure controlled"), Manager->CloseFrontendToRoot(), EHSRUIScreenResult::PolicyApplyFailed);
-	TestEqual(TEXT("close policy failure preserves module depth"), Manager->GetLogicalScreenCount(), 3);
+	TestEqual(TEXT("close policy failure preserves frontend depth"), Manager->GetLogicalScreenCount(), 2);
 	Manager->ConfigureAutomationBackend(true, true, true, true, true, true);
 	Manager->FailNextAutomationPauseApply();
 	TestEqual(TEXT("close unpause failure controlled"), Manager->CloseFrontendToRoot(), EHSRUIScreenResult::PauseApplyFailed);
-	TestEqual(TEXT("close unpause failure preserves module depth"), Manager->GetLogicalScreenCount(), 3);
+	TestEqual(TEXT("close unpause failure preserves frontend depth"), Manager->GetLogicalScreenCount(), 2);
 	Manager->ConfigureAutomationBackend(true, true, true, true, false, true);
 	TestEqual(TEXT("close focus failure controlled"), Manager->CloseFrontendToRoot(), EHSRUIScreenResult::FocusApplyFailed);
-	TestEqual(TEXT("close focus failure preserves module depth"), Manager->GetLogicalScreenCount(), 3);
+	TestEqual(TEXT("close focus failure preserves frontend depth"), Manager->GetLogicalScreenCount(), 2);
 	Manager->ConfigureAutomationBackend(true, true, true, true, true, true);
 	TestEqual(TEXT("close succeeds after failures"), Manager->CloseFrontendToRoot(), EHSRUIScreenResult::Success);
 	Manager->DeinitializeForAutomation(); return true;
@@ -256,11 +265,11 @@ bool FHSRFrontendDirectAndBackFailureTest::RunTest(const FString&)
 	TestEqual(TEXT("detail opens"), Manager->OpenFrontendModule(EHSRFrontendModule::Character), EHSRUIScreenResult::Success);
 	Manager->ConfigureAutomationDetailBackend(true, true, true, true, false);
 	TestEqual(TEXT("detail back focus failure"), Manager->RequestBack(), EHSRUIScreenResult::FocusApplyFailed);
-	TestEqual(TEXT("focus failure preserves module"), Manager->GetLogicalScreenCount(), 3);
+	TestEqual(TEXT("focus failure preserves frontend depth"), Manager->GetLogicalScreenCount(), 2);
 	Manager->ConfigureAutomationDetailBackend(true, true, true, true, true);
 	Manager->FailNextAutomationRouteSubmit();
 	TestEqual(TEXT("detail back route failure"), Manager->RequestBack(), EHSRUIScreenResult::StackRejected);
-	TestEqual(TEXT("route failure preserves module"), Manager->GetLogicalScreenCount(), 3);
+	TestEqual(TEXT("route failure preserves frontend depth"), Manager->GetLogicalScreenCount(), 2);
 	TestTrue(TEXT("route failure preserves detail ownership"), Manager->HasOpenCharacterDetailScreen());
 	TestEqual(TEXT("route failure preserves character route"), Manager->GetFrontendRouter()->GetSnapshot().GetActiveRoute().Module, EHSRFrontendModule::Character);
 	TestEqual(TEXT("route failure restores character focus"), Manager->GetLastAutomationFocusModule(), EHSRFrontendModule::Character);

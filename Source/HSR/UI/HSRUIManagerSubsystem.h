@@ -122,18 +122,14 @@ private:
 	EHSRUIScreenResult ResolveCompensation(bool bRecovered, EHSRUIScreenResult OriginalFailure);
 	FHSRScreenRequest MakeRootRequest(int64 Token) const;
 	FHSRScreenRequest MakePauseRequest(int64 Token) const;
-	FHSRScreenRequest MakeCharacterDetailRequest(int64 Token) const;
-	FHSRScreenRequest MakeInventoryRequest(int64 Token) const;
 	FHSRScreenRequest MakePopRequest(int64 Token) const;
 	bool CompensatePop(const FHSRInputModePolicy& RestorePolicy, AHSRPlayerController* PlayerController,
 		UHSRScreenWidget* CandidateWidget);
 	bool CompensatePausePush(AHSRPlayerController* PlayerController);
-	bool CompensateCharacterDetailPush(AHSRPlayerController* PlayerController);
 	EHSRUIScreenResult OpenCharacterDetailInternal();
 	EHSRUIScreenResult OpenInventoryInternal();
 	EHSRUIScreenResult CloseCharacterDetailScreen();
 	EHSRUIScreenResult CloseInventoryScreen();
-	bool CompensateInventoryPush(AHSRPlayerController* PlayerController);
 	void ReleaseInventoryCandidates(UHSRInventoryWidget*& Widget, UHSRInventoryRewardViewModel*& ViewModel);
 	void ShutdownInventoryViewModelCandidate(UHSRInventoryRewardViewModel*& ViewModel);
 	bool HasInventoryOwnershipMismatch() const;
@@ -166,6 +162,7 @@ private:
 		EHSRPlayerControlMode SemanticMode);
 	EHSRFocusApplyResult ApplyInventoryFocusBackend(AHSRPlayerController* PlayerController,
 		UWidget* Preferred, UWidget* Fallback);
+	bool RestoreFrontendModuleFocus(AHSRPlayerController* PlayerController, EHSRFrontendModule Module);
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRScreenStack> ScreenStack;
 
