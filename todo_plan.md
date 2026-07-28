@@ -318,7 +318,8 @@
 - [x] P17-002～004：探索 Pause/Input/Focus、Character/Inventory 接入、Travel teardown/rebuild 与用户 PIE Gate 已完成。
 - [x] PATCH-01A：ActiveStatus 通用化；Build、真实 runtime Automation、P9-001/002/003 用户 PIE 与 Independent Reviewer `PASS`。
 - [x] PATCH-01B：移除终身 Break 闩锁；恢复后再次 Break、Replay/Reset/death/Finished、同帧致死、Automation 与用户 P9-003 PIE 全部通过。
-- [ ] PATCH-01C：统一行动距离模型，接入 Speed/Slow/Advance/Delay/Break Delay；等待 Task Gate 审查。
+- [x] PATCH-01C～01D：统一行动距离模型与回归收尾完成；Speed/Slow/Advance/Delay/Break Delay 已通过 Build、Automation 与独立复核。
+- [x] PATCH-02：Behavior Tree/Blackboard 探索敌人迁移完成；巡逻、追击、丢失返回、Encounter admission、teardown、半径数据驱动及用户 PIE 返回 Gate 已通过最终复核。
 - [ ] 完成主菜单、暂停、角色、队伍、背包、任务、地图和设置界面。
 - [ ] 建立 Screen Stack、统一 InputMode 和导航。
 - [ ] 验证地图旅行后的 UI 重建。

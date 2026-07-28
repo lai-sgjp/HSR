@@ -2151,3 +2151,11 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Fresh `HSREditor Win64 Development -Rebuild -NoHotReload -WaitMutex` passed: 17 actions, HSR compile, lib/dll link and `WriteMetadata`, exit 0. The first sandbox-only UBT user-cache permission stop was rerun with approval and is retained as environment setup history, not a source failure.
 - Headless `HSR.Battle` Automation passed 9/9 (six ActionDistance cases, RepeatableBreak, StatusGeneric and BattleReturn MapContract); `HSR.Progression` passed 3/3 (Transaction, Effect Contract, Profile Authority); both command-line runs exited 0. `git diff --check` passed.
 - No Source/Config/Content or test-source change was made. `learn/SaveSystem.md` and `.claude/**` remain user-local and unstaged. 01A/01B remain USER PROVIDED PIE evidence; 01C PIE remains NOT VERIFIED. Waiting for Independent Review and Coordinator archive; Behavior Tree Patch 02 and P17-005 have not started.
+
+# 2026-07-28｜TASK-P17-PATCH-02 Behavior Tree migration closeout
+
+- Enemy exploration AI migrated to the user-authored Blackboard/Behavior Tree contract. C++ owns authoritative state, epoch, transient key lifecycle and Encounter admission; stock BT nodes exclusively own movement requests, with no Tick-driven polling Service.
+- Build, `HSR.Exploration.Patch.BehaviorTreeAdapter`, and `HSR.BattleReturn.MapContract` passed. Reviewer revisions strengthened real Blackboard teardown, recovery, intentional branch-abort filtering, Transition Pending/Resolved zero-mutation, and component-level radius configuration tests.
+- User PIE established the final return gate: chase, sight loss `4 -> 7 -> 8`, one `ReturnComplete` at distance `41.38` with no active request, `8 -> 2` patrol resume, rejection of overlap while Returning, and a later single admitted/consumed Encounter. Evidence remains `USER PROVIDED`; Reviewer inspected but did not rerun PIE.
+- `UHSREnemyDefinition` now data-drives Sight/LoseSight/Encounter radii with compatible `1000 / 1500 / 200` defaults and tested normalization/fallback. User-owned Blueprint, DataAsset, map and `Content/AI/**` changes were not staged by agents.
+- Overall Independent Review `ff8f213` is `PASS WITH FOLLOW-UP`; radius addendum review `990d95d` is closed. The task triplet is archived; P17-005 remains not started.

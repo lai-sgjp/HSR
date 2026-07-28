@@ -577,3 +577,12 @@
 - Phase 16 未验证 graphical Editor、Packaged/Shipping、真实断电/磁盘故障、跨平台、云和多人；这些边界不外推。
 - Phase 17 Gate 0=`PASS`。P17-001 已完成并获 Independent Reviewer=`PASS WITH FOLLOW-UP`；P17-002 Task Gate=`PASS`，等待用户单独确认，尚未实施 Source/Content。
 - 当前工作树中的 `learn/CppEngineDepth.md`、`learn/AI.md`、`.claude/settings.local.json`、`Content/UI/WBP_Reward_Summary_P13.uasset` 为用户既有改动，Phase 17 不认领、不回退。
+
+# 2026-07-28 TASK-P17-PATCH-02 归档
+
+- 改进方向 4 的 Behavior Tree/Blackboard 迁移完成：C++ Controller 保留状态、epoch、Blackboard 写入与 Encounter admission 权威；stock BT `Move To`/`Wait` 是唯一移动请求所有者，无 Tick/polling Service。
+- Development Editor Build、`HSR.Exploration.Patch.BehaviorTreeAdapter` 与 `HSR.BattleReturn.MapContract` 通过；感知、丢失目标、Move failure/abort、target destruction、teardown、Pending/Resolved rejection 与返回恢复均有自动化或明确证据。
+- 用户提供的 PIE 证据记录为 `USER PROVIDED / REVIEWER LOG INSPECTED`：追击后丢失目标 `4 -> 7 -> 8`，`ReturnComplete` 距出生点 `41.38`、零 RequestId，随后 `8 -> 2` 恢复巡逻；Returning overlap 被拒绝，后续正常追击仅提交并消费一次 Encounter。
+- `SightRadius`、`LoseSightRadius`、`EncounterRadius` 已移入 `UHSREnemyDefinition`，兼容默认值为 `1000 / 1500 / 200`，并验证 LoseSight 归一、无 Definition fallback、负值 clamp 与配置零副作用。
+- Independent Reviewer 最终 commit `ff8f213`：`PASS WITH FOLLOW-UP`；半径 Addendum Reviewer commit `990d95d`。三件套归档至 `tasks/archive/TASK-P17-PATCH-02-*`。
+- 非阻断 follow-up：用户 `.uasset` 继续按 provenance 独立处理；未来调整三个半径后执行一次探索 smoke；历史失败日志继续保留。当前无活动任务，P17-005 尚未开始。
