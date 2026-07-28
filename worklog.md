@@ -2186,3 +2186,13 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Source audit found the Gate-0 candidate list omitted the actual neutral encounter adapter `AHSRGrayboxInteractable`; the draft freezes it while keeping Enemy/Behavior Tree and BattleGameMode/Coordinator read-only.
 - The draft freezes candidate observation, adapter intent, BattleTransition admission/travel authority, pure-value request DTO, duplicate/resolved/lost-target rejection, cross-World single consumption, exact TDD and User Asset Gate evidence.
 - 03C Task Gate revisions added a const Reward bundle preflight, Party-owned PlayerCharacterId in the cross-World request, consumed-ID use in BattleGameMode, null-World stale-failure handling and deterministic Editor evidence. Independent Reviewer returned PASS; final Task Gate is PASS and implementation remains user-confirmation gated.
+
+# 2026-07-28 | TASK-P17-PATCH-03C final closeout
+
+- Implementation commit `2988e11` established Interaction -> Battle admission through one pure-value request carrying Party slot-0 `PlayerCharacterId`; BattleGameMode rebuilds `Character.A` from the consumed request, while Reward admission remains metadata-only with no settlement.
+- Fresh Build passed. Focused/regression Automation passed: Admission 1/1, Exploration/BT 1/1, Battle 9/9, Map 5/5, Reward 6/6, FrontendNavigation 11/11 and CharacterIdentity 1/1.
+- User victory PIE preserved RequestId `73E3CA114E061EE8D2C32DAA16DA8205` through admission/consume/return and rejected resolved replay. Out-of-overlap returned `NoCandidate`; unavailable returned `Unavailable`; neither traveled.
+- User defeat PIE resolved RequestId `4B5E7C584592346472D88394F8120B4D` with `Defeated=Player Outcome=2`, then admitted fresh RequestId `0F26AE034F768F2C7AA05FB8C092C55B` for the same Encounter and consumed it with `PlayerDefId=Character.A`.
+- Asset Gate commit `6942b9a` contains only the user-configured neutral Encounter Blueprint and execution evidence. Unrelated Content/map/learning/ECC changes remain excluded.
+- Independent Reviewer found no code blocker; two stale execution-report statements were corrected. Final verdict is `PASS`. Physical controller, Standalone, Packaged and Shipping remain `NOT VERIFIED`.
+- 03C three-file task packet is archived. The only adjacent next task is 03D1 Atomic Settlement Foundation Task Gate; no 03D1 Source or production-flow change is authorized.

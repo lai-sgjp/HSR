@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：P17-005 已暂停并 checkpoint 于 `4ef49f7`；最终 PASS 不可用。P17-PATCH-03 Gate 0 已 PASS，03A 已 `PASS WITH FOLLOW-UP` 并归档；唯一活动卡为 03B，仍需 Task Gate 与用户再次确认，尚未实施。
+> 当前状态：P17-005 已暂停并 checkpoint 于 `4ef49f7`；最终 PASS 不可用。P17-PATCH-03 Gate 0 已 PASS，03A～03C 已完成；唯一活动卡为 03D1，仅进入 Task Gate，尚未授权实施。
 
 ## 已完成的规划工作
 
@@ -13,7 +13,7 @@
 - [x] P17-PATCH-03 Gate 0：四角色最终 PASS；已冻结八子系统所有权、稳定 ID、事务、生命周期、失败矩阵、Editor exercise 与串行包。
 - [x] TASK-P17-PATCH-03A：Frontend Boundary Contract Reconciliation；Build、11/11 Automation 与用户 X 返回探索 PIE 通过，双分辨率为 `USER ACCEPTED / NOT VERIFIED`。
 - [x] TASK-P17-PATCH-03B：Production Bootstrap and Character Identity（Code Gate、Automation、happy/unavailable PIE 与最终 Blueprint Save/reopen 均 PASS，已归档）。
-- [ ] TASK-P17-PATCH-03C：Interaction -> Encounter -> Battle Admission（当前唯一活动卡；Task Gate PASS，等待用户明确确认实施）。
+- [x] TASK-P17-PATCH-03C：Interaction -> Encounter -> Battle Admission（Build、Automation、胜利/失败 PIE、resolved replay 与 defeat retry 均通过；最终 Reviewer `PASS`，已归档）。
 - [ ] P17-PATCH-03D1～03G：按计划串行整合 atomic foundation、settlement integration、Inventory/Equipment、Map travel、Save restore。
 - [ ] P17-PATCH-03H：clean-save 端到端 closeout；不得以其结果倒推 P17-005 已完成。
 

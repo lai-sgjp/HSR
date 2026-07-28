@@ -1,103 +1,107 @@
-# TASK-P17-PATCH-03C - Interaction to Battle Admission
+# TASK-P17-PATCH-03D1 - Atomic Settlement Foundation
 
-Status: `PLANNED / TASK GATE PASS / USER CONFIRMATION REQUIRED`
+Status: `PLANNED / TASK GATE REVIEW REQUIRED / IMPLEMENTATION NOT AUTHORIZED`
 
 ## Role Lock
 
-This card is a planning artifact. No Source, Content, Config, Build, Automation, PIE or implementation commit is authorized until Task Gate PASS, an implementation restatement, and a separate explicit user confirmation for `TASK-P17-PATCH-03C`.
+This card is a planning artifact. No Source, Content, Config, Build, Automation, PIE or implementation commit is authorized until Independent Reviewer and feasibility review pass the Task Gate, the implementation role restates the frozen contract, and the user separately confirms `TASK-P17-PATCH-03D1`.
 
 ## Prerequisite and sole outcome
 
-- `TASK-P17-PATCH-03B` is archived as PASS; stable player CharacterId bootstrap is available.
-- One valid Exploration interaction admits exactly one pure-value `FHSREncounterRequest`, travels once, and the Battle World consumes that same request once. Lost, destroyed, unavailable, duplicate, pending/traveling or resolved candidates do not create a second admission or corrupt the existing transaction.
+- `TASK-P17-PATCH-03C` is archived as `PASS`; Battle admission and stable player identity are available.
+- Reward, Inventory and Character Profile can each prepare a pure-value candidate without live mutation, and one bounded SettlementAuthority can install one fully validated aggregate through non-failing internal primitives.
+- Production Battle settlement is not switched in 03D1. Existing callers remain behavior-compatible until 03D2.
 
 ## Ownership contract
 
-1. `UHSRInteractionComponent` owns observation of the current weak candidate and revalidates the exact candidate at intent time. It does not own encounter state or travel.
-2. `AHSRGrayboxInteractable` is the encounter interaction adapter. It validates its live overlap and configured Definition, then submits one intent to `UHSRBattleTransitionSubsystem`; Blueprint cannot call `OpenLevel`, manufacture request IDs or mark an encounter resolved.
-3. `UHSRBattleTransitionSubsystem` is the sole admission/travel authority. It validates all Definition-derived fields and runtime prerequisites before publishing Pending/Traveling state, owns the request ID and rejects duplicate/resolved admission without changing the existing snapshot.
-4. `FHSREncounterRequest` remains a pure-value cross-World DTO: selected PlayerCharacterId, EncounterId, EnemyDefinitionId, map package names, initiative, return transform and reward identity/seed only. It contains no Actor, Widget, subsystem, DataAsset or other live UObject reference.
-5. BattleTransition captures PlayerCharacterId from committed Party slot 0; an empty/invalid selection rejects before admission. Actor name, GameMode defaults and Blueprint cannot invent the player identity.
-6. The Battle World consumes the stored DTO exactly once through `ConsumePendingEncounter`. `AHSRBattleGameMode` uses the consumed PlayerCharacterId for Profile/Definition/Class resolution and participant setup instead of its configured fallback. `UHSRBattleCoordinator` remains read-only because the existing GameMode setup seam is sufficient.
-7. Resolution remains tied to the existing battle-return outcome: only victory marks an EncounterId resolved; defeat/interruption remains retryable. Settlement/reward granting remains PATCH-03D.
+1. `UHSRRewardSubsystem` remains the reward-definition, idempotency-ledger and receipt authority. It prepares the reward-ledger candidate and publishes only after all domain states are installed.
+2. `UHSRInventorySubsystem` remains item ownership/count authority. It prepares a complete post-transaction inventory candidate without changing live stacks, revisions or events.
+3. `UHSRCharacterProfileSubsystem` remains progression authority. It prepares the complete target Profile/EXP candidate without changing live profiles, ASC projection, revisions or events.
+4. New `UHSRSettlementAuthority` is the only aggregate coordinator permitted to invoke all three private/internal install seams. It does not become the owner of Inventory, Profile or Reward state.
+5. Candidate DTOs contain values only. They may contain stable IDs, copied entries, expected revisions and deterministic transaction metadata; they contain no Actor, Widget, World, subsystem, ASC, GE handle or mutable UObject reference.
+6. Prepare may fail and must be side-effect free. Install may not fail: it may only move/swap already allocated candidate state into its owning subsystem.
+7. Fixed installation order is Inventory -> Profile -> Reward ledger. Revisions, delegates, receipts and presentation become visible only after all three installs complete at one publication boundary.
 
-## Admission transaction contract
+## Atomicity contract
 
-1. Preflight order: candidate validity/interface -> availability -> live overlap/interactor -> pending/resolved conflict -> Definition presence -> committed Party slot-0 PlayerCharacterId -> stable EncounterId/EnemyDefinitionId -> battle map package -> optional reward-bundle const preflight -> World/player/return context.
-2. No preflight rejection may modify candidate ownership, PendingRequest, state, travel tracking, resolved membership, Reward state or issue `OpenLevel`.
-3. After every fallible admission check passes, optional Definition metadata registration may commit through the existing atomic Reward bundle registration seam. It may register item/drop/reward definitions only; it cannot grant inventory, create a receipt or publish settlement. The authority then creates one RequestId and immutable request snapshot, publishes Pending/Traveling once, and issues one travel request.
-4. Same-frame repeated F, repeated adapter execution, and a second target while Pending/Traveling return typed failure and preserve the first request byte-for-byte.
-5. Candidate lost through unregister returns `NoCandidate`; candidate destroyed while registered returns `TargetInvalid`; unavailable/out-of-range remains distinct. None invokes admission.
-6. A resolved EncounterId returns `AlreadyConsumed` with no new RequestId or travel. Defeat/interrupt does not add resolved membership.
-7. Travel failure/timeout clears only the matching transaction and permits a fresh retry; stale/mismatched failure callbacks cannot clear a newer request. A null-World failure callback is uncorrelatable and must not clear admission state; the bounded timeout remains its recovery path.
+1. SettlementAuthority validates TransactionId, RewardDefinition, PlayerCharacterId and all expected revisions before prepare.
+2. Each domain prepares independently from one immutable aggregate input. Definition resolution, arithmetic/overflow checks, capacity checks, allocation and duplicate detection occur before install.
+3. A prepare failure leaves all three live states, revisions, events, receipts and projections byte-for-byte unchanged.
+4. After all candidates are complete, install primitives cannot allocate, resolve Definitions, apply GameplayEffects, broadcast, increment revisions or return a business failure.
+5. Only after the three installs succeed does one publication step advance the relevant revisions and emit committed domain events plus one receipt.
+6. Duplicate TransactionId is idempotent: it returns the existing committed result/receipt and creates no new candidate, revision or event.
+7. Compensation, rollback-by-opposite-command and an `Inconsistent` terminal state cannot satisfy 03D1. If non-failing install cannot be proven inside the frozen boundaries, stop and request redesign.
 
 ## Frozen Source write allowlist
 
-- `Source/HSR/Interaction/HSRInteractionTypes.h`
-- `Source/HSR/Interaction/HSRInteractionComponent.h`
-- `Source/HSR/Interaction/HSRInteractionComponent.cpp`
-- `Source/HSR/Exploration/HSRGrayboxInteractable.h`
-- `Source/HSR/Exploration/HSRGrayboxInteractable.cpp`
-- `Source/HSR/Battle/HSREncounterTypes.h`
-- `Source/HSR/Battle/HSRBattleTransitionSubsystem.h`
-- `Source/HSR/Battle/HSRBattleTransitionSubsystem.cpp`
-- `Source/HSR/Battle/HSRBattleGameMode.h`
-- `Source/HSR/Battle/HSRBattleGameMode.cpp`
-- `Source/HSR/Data/Definitions/HSREncounterDefinition.h`
-- `Source/HSR/Data/Definitions/HSREncounterDefinition.cpp`
+- new `Source/HSR/Reward/HSRSettlementTypes.h`
+- new `Source/HSR/Reward/HSRSettlementAuthority.h`
+- new `Source/HSR/Reward/HSRSettlementAuthority.cpp`
 - `Source/HSR/Reward/HSRRewardSubsystem.h`
 - `Source/HSR/Reward/HSRRewardSubsystem.cpp`
-- new `Source/HSR/Tests/HSRInteractionBattleAdmissionTests.cpp`
+- `Source/HSR/Reward/HSRRewardTypes.h`
+- `Source/HSR/Inventory/HSRInventorySubsystem.h`
+- `Source/HSR/Inventory/HSRInventorySubsystem.cpp`
+- `Source/HSR/Inventory/HSRItemTypes.h`
+- `Source/HSR/Progression/HSRCharacterProfileSubsystem.h`
+- `Source/HSR/Progression/HSRCharacterProfileSubsystem.cpp`
+- `Source/HSR/Progression/HSRCharacterProfileTypes.h`
+- new `Source/HSR/Tests/HSRSettlementAuthorityTests.cpp`
+- exact affected existing Reward/Inventory/Profile focused tests identified and frozen by Task Gate review
 - `tasks/execution-result.md`
 
-`HSRInteractableInterface`, BattleCoordinator, Party, Inventory, Profile, Save, Map and UI sources are read-only. BattleGameMode changes are limited to consuming the request's PlayerCharacterId and replacing production use of the configured fallback for this encounter. Reward changes are limited to extracting/reusing a public const `CanRegisterBundle` preflight and preserving existing atomic metadata registration behavior; SubmitReward, receipts, revisions/events and settlement are prohibited. Enemy/Behavior Tree sources remain read-only. An implementation may use fewer allowlisted files; it may not widen this list itself.
+Battle, BattleTransition, Coordinator, Interaction, Party, Equipment, Save, Map and UI sources are read-only. The implementation may use fewer files; it may not widen this list itself. Existing test files are read-only until the Task Gate records their exact paths and why new focused coverage cannot replace edits.
 
-## Candidate Asset Gate - separate user work
+## Candidate Asset Gate - compatibility evidence only
 
-- `/Game/Blueprints/Exploration/BP_HSRNeutralEncounterTest`
-- one exact existing `/Game/Data/Encounters/DA_Encounter_*` selected during the Asset Gate
-- `/Game/Maps/Map_Battle`
-- existing Interaction input binding only
-
-No Behavior Tree, Enemy, battle-rules, Reward, map-layout or UI asset change is authorized. The user owns Compile/Save/reopen and PIE asset evidence.
+- No new asset or business binding.
+- Existing authorized RewardDefinition fixture selected by Task Gate.
+- Existing CharacterId fixture selected by Task Gate.
+- Blueprint may not call prepare/install/publish seams or grant items/EXP.
 
 ## TDD and acceptance matrix
 
-Create `HSR.InteractionBattle.Admission` before production edits and prove an intended RED.
+Create `HSR.Settlement.Foundation` before production edits and prove an intended RED.
 
-A narrow `WITH_DEV_AUTOMATION_TESTS` travel dispatcher/counter may suppress real `OpenLevel` while exercising the complete production preflight and state publication path. It may observe/redirect travel only and cannot bypass validation, manufacture request content or mutate authority state directly.
+- pure prepare: Reward, Inventory and Profile candidates match expected values while all live snapshots/revisions/events/receipts remain unchanged;
+- aggregate success: one valid immutable request prepares all candidates, installs Inventory -> Profile -> Reward, then publishes exactly one coherent revision/event/receipt set;
+- invalid RewardDefinition, CharacterId, item Definition, amount, EXP, capacity, overflow or expected revision: typed failure with zero mutation in every domain;
+- allocation/Definition failure is injected during prepare and cannot occur after commit begins;
+- duplicate TransactionId: identical committed result, no second revision/event/receipt;
+- stale expected revision and mismatched candidate TransactionId are rejected before install;
+- install primitives are inaccessible to Blueprint and callers other than SettlementAuthority;
+- existing `SubmitReward`, Inventory mutation and `GrantExperience` public behavior remains regression-compatible because production flow is not switched;
+- no ASC projection, GE application, Save capture, UI refresh or Battle caller change is introduced.
 
-- valid candidate: one interaction result Success, one request ID, one admission mutation, pure DTO fields match committed Party PlayerCharacterId, the Definition and origin context;
-- empty Party slot 0: typed admission rejection, no request/travel/reward metadata mutation; configured GameMode/Blueprint CharacterId cannot act as fallback;
-- no candidate / proper unregister / destroyed weak candidate / unavailable / out-of-range: distinct typed failures and zero admission mutation;
-- missing or invalid Definition, enemy ID, map or reward bundle: const preflight rejection with zero Transition, Inventory and Reward pollution;
-- valid optional reward bundle: metadata registration succeeds only after all other admission preflight, with no item grant, receipt or settlement event;
-- repeated F and direct duplicate submission while Pending/Traveling: first request preserved, no second ID/mutation/travel;
-- resolved replay: `AlreadyConsumed`, zero mutation; defeat/interruption remains retryable;
-- consume: Battle receives the identical DTO once; second consume is `AlreadyConsumed`; BattleGameMode resolves the consumed PlayerCharacterId and does not replace it with its configured default;
-- matching travel failure/timeout permits retry; stale, mismatched and null-World callbacks preserve the active transaction until a matching failure or timeout;
-- teardown clears candidate observation/delegates without clearing unrelated GameInstance admission state.
-
-Required regressions without editing their tests: `HSR.Exploration.Patch.BehaviorTreeAdapter`, relevant `HSR.Battle`, `HSR.Map`, `HSR.Reward`, `HSR.UI.FrontendNavigation`, and `HSR.ProductionBootstrap.CharacterIdentity`. Exact discovered counts and inherited failures must be reported truthfully.
+Required regressions must be discovered during Task Gate and frozen by exact Automation filter/count. At minimum include focused `HSR.Reward`, `HSR.Inventory` and `HSR.Progression` suites without weakening existing assertions.
 
 ## User Editor exercise and evidence
 
-1. Configure the neutral encounter actor with the selected Encounter DataAsset; verify F still routes through the Exploration InteractionComponent. Blueprint must not travel or resolve admission.
-2. Compile/Save/reopen the actor and Definition references.
-3. Happy PIE: approach -> prompt -> F -> Battle. Evidence must show one interaction success, one RequestId, one travel, and Battle consuming the same PlayerCharacterId/EncounterId/EnemyDefinitionId/RequestId.
-4. Failure PIE uses stable fixtures only: leave overlap before F, set the encounter actor `bAvailable=false` before a separate PIE run, and retry the same actor after a victory return. No rejected case may enter Battle.
-5. Return/defeat evidence must distinguish resolved victory from retryable defeat/interruption.
-6. Destroyed-candidate and same-frame repeated-F races are Automation evidence, not manual timing exercises; no temporary Level Blueprint or Blueprint-owned admission logic may be created for them.
+1. Open the Task-Gate-selected existing RewardDefinition and verify its item/drop references; open the selected Character fixture and verify the stable CharacterId.
+2. Save All, close and reopen those assets. No new asset and no Blueprint settlement node may be created.
+3. PIE one ordinary victory/return through the existing production path as a compatibility check. This does not prove the new authority is used.
+4. PIE one defeat and confirm the existing no-reward behavior remains unchanged.
+5. Explain the separation between fallible prepare, non-failing install and delayed publication, and why production switching is deferred to 03D2.
+
+## Evidence required
+
+- intended RED and matching GREEN for `HSR.Settlement.Foundation`;
+- HSREditor fresh Build with UHT/compile/link evidence;
+- exact focused and regression Automation counts;
+- snapshots proving prepare and every rejected case are zero-pollution across all three domains;
+- event/revision/receipt ordering evidence from one aggregate success;
+- user Compile/Save/reopen plus victory/defeat compatibility PIE logs;
+- `git diff --check`, exact allowlist audit and isolated role commit.
 
 ## Explicit non-goals and stop conditions
 
-- No settlement, reward grant, inventory/profile mutation, Equipment, Save schema/load, map frontend, UI redesign, network, new module/plugin or third-party asset.
-- Do not refactor enemy-initiated encounters; existing Behavior Tree/AI admission is regression-only in 03C.
-- Do not move travel authority into Interaction, Blueprint, Level Blueprint or Widget.
-- If exactly-once Battle consumption or consumed PlayerCharacterId use requires Coordinator changes beyond its existing setup seam, stop and request a reviewed allowlist amendment.
-- If const Reward bundle validation cannot be extracted without changing Inventory or reward settlement semantics, stop and request a reviewed allowlist amendment.
-- Do not begin PATCH-03D1 or later packages.
+- No Battle/Coordinator caller switch; that is 03D2.
+- No reward grant integration, result-screen redesign, Equipment, Save schema/load, Map, UI, network, plugin, module or third-party asset work.
+- No public Blueprint prepare/install API and no live UObject in a candidate.
+- Stop if install requires allocation, Definition lookup, GE application, delegate broadcast, revision increment or a fallible return.
+- Stop if atomic publication requires edits outside the frozen allowlist.
+- Do not begin 03D2, 03E or later packages.
 
 ## Current Gate
 
-Draft revision 3 closes feasibility review's Reward-boundary blocker, the Coordinator audit's missing player stable-ID handoff, and the Editor review's unreliable timing fixtures. Independent Reviewer=`PASS`; the initial Implementation feasibility condition is closed by the frozen const Reward preflight; Editor exercise review=`PASS`. Final Task Gate=`PASS`. Implementation must first restate task ID, sole outcome, ownership/order, exact write allowlist, TDD targets, Editor work and stop conditions, then end with: `等待用户确认执行 TASK-P17-PATCH-03C。`
+Draft created from the accepted PATCH-03 execution plan after 03C PASS. Independent ownership, feasibility, exact regression-file and Editor-exercise review are pending. Implementation is not authorized.
