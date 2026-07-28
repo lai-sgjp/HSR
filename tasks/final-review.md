@@ -1,6 +1,6 @@
 # TASK-P17-PATCH-03B Independent Review
 
-Status: `TASK GATE REVISE / REVISION 2 NARROW RE-REVIEW REQUIRED`
+Status: `TASK GATE PASS / IMPLEMENTATION NOT AUTHORIZED`
 
 ## First Task Gate Review
 
@@ -21,3 +21,34 @@ Status: `TASK GATE REVISE / REVISION 2 NARROW RE-REVIEW REQUIRED`
 - Equipment aggregation is explicitly deferred to 03E and the test/run matrix is exact.
 
 Revision 2 is awaiting narrow Reviewer, Teacher and Implementation feasibility re-review. This file does not authorize implementation.
+
+## Dual-review iteration 1
+
+`REVISE`
+
+- `UseCommittedRuntime` lacked a distinct no-selection outcome.
+- Repeated bootstrap did not define all-empty, all-matching and partial/conflicting Catalog registration states.
+
+The activity card now adds `NoCommittedSelection` and `CatalogConflict`, freezes the three-way Catalog rule and records the exact public API shape. Dual review must restart against this revision.
+
+## Dual-review iteration 2
+
+`REVISE`
+
+- Pawn identity mutation needed a narrower ownership boundary than a general Character setter.
+- The production lifecycle trigger was not frozen, leaving Pawn availability timing ambiguous.
+
+The card now makes the setter private/non-UFUNCTION and GameMode-only, and freezes bootstrap after `Super::RestartPlayer` creates the possessed Pawn. Dual review restarts against this revision.
+
+## Dual-review iteration 3
+
+Santa-method sequential fallback Reviewer B=`PASS`; Reviewer C=`PASS`. These were two separate rubric passes in the primary session because fresh subagent dispatch was unavailable; they are semantic Task Gate review, not Build/Automation evidence.
+
+- Exact write allowlist, new test path and read-only dependencies are frozen.
+- Catalog all-empty/all-matching/partial-conflict behavior is deterministic and zero-mutation on rejection.
+- Existing committed runtime and new-game defaults are mutually exclusive; disk loading and Equipment aggregation remain out of scope.
+- Pawn type is preflighted before Domain mutation; Party selection commits/validates before the private GameMode-only Pawn projection write.
+- Character Widget can only select Party slot 0 and exposes a typed unavailable result without inventing a valid snapshot.
+- New and regression Automation plus user happy/failure PIE evidence are exact and observable.
+
+Final Task Gate=`PASS`. This approves only an Implementation read-only restatement. Source, Content, Build and Automation remain unauthorized until the user confirms execution against this PASS version.
