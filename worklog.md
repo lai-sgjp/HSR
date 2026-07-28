@@ -2211,3 +2211,11 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - The revised card freezes data-driven `VictoryExperience` on EncounterDefinition/EncounterRequest, exact Battle RequestId reuse, first-request/receipt/BattleResult caching, defeat zero-settlement, post-settlement return retry and canonical `/Game/UI/WBP_RewardSummary_P13` ownership.
 - The implementation write set was reduced to BattleGameMode, EncounterTypes, BattleTransition cpp, EncounterDefinition header, one new integration test and execution evidence. Reward/Inventory/Profile/UI/Coordinator implementations remain read-only.
 - Independent Reviewer commit `6e42517` returned PASS and confirmed feasibility, TDD sufficiency, exact minimum allowlist and Editor boundaries. 03D2 implementation remains separately user-confirmation gated.
+
+# 2026-07-28 | TASK-P17-PATCH-03D2 final closeout
+
+- User authorized implementation. TDD RED `3036609` failed on the intended missing `VictoryExperience` and GameMode settlement seam; GREEN implementation `05c0549` replaced the BattleGameMode legacy reward call with the immutable SettlementAuthority transaction.
+- HSREditor Development build passed. `HSR.BattleSettlement.Integration` passed, followed by 29/29 frozen Battle/Settlement/Inventory/Reward/Progression/Map/UI regressions.
+- User configured and saved `DA_Encounter_Phase5Test` with `VictoryExperience=100`; evidence commit `998ed6e` records the asset and PIE results.
+- PIE verified defeat zero-settlement, victory `Revision=0/EXP=0 -> Revision=1/EXP=100`, duplicate confirmation without a second mutation/consume/return, exactly-once return commit and `AlreadyConsumed` on the second context read.
+- Final review is `PASS`. 03D2 is ready for archive; the only adjacent next action is 03E Task Gate, not implementation.
