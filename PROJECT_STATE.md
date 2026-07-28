@@ -1,6 +1,14 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-07-27
+> 最后更新：2026-07-28
+
+## 2026-07-28 最新权威摘要
+
+- P17-005 已暂停并形成 checkpoint commit `4ef49f7`：代码 Gate 与 11/11 窄域 Automation 通过，Input/WBP 资产存在，用户 PIE 已证明 Character route 可打开/返回；但 Character read model 返回 `PartySlotEmpty`，所以 P17-005 最终 PASS 不可用。
+- 用户要求把八子系统整合作为全新阶段 `P17-PATCH-03`。四角色 Gate 0 已在修订后收束为 PASS，尚未开始任何 PATCH-03 Source、Content 或 Config 实施。
+- Patch 03 已拆成串行 03A、03B、03C、03D1、03D2、03E～03H；当前唯一活动卡是 `TASK-P17-PATCH-03A`，状态为 Task Gate/用户再次确认前禁止实施。
+- P17-005 checkpoint 不代表 P17-005 完成；`PartySlotEmpty` 与 Exploration Pawn/Party/Profile/CharacterId 未统一是 03B 的前置事实。
+- 当前未授权 push。Enemy/Player Character、Enemy DataAsset、`Map_Phase1_Exploration`、`Content/AI/**`、`.claude/**`、`learn/SaveSystem.md` 与 Phase 20 存档演进改动继续按用户既有修改隔离。
 
 ## 2026-07-27 最新权威摘要
 

@@ -1,5 +1,16 @@
 ﻿# HSR Worklog
 
+## 2026-07-28｜P17-005 checkpoint 与 P17-PATCH-03 Gate 0
+
+- 按用户要求暂停 P17-005，并以 commit `4ef49f7` 精确提交 32 个 Frontend C++、测试、Input/WBP 与任务证据文件；未 push，未夹带 Enemy/Player Character、Enemy DataAsset、Map、`Content/AI/**`、`.claude/**`、学习文档或 Phase 20 存档演进改动。
+- P17-005 当前证据为代码 Gate 与 11/11 窄域 Automation 通过、Input/WBP 存在、Character route 用户 PIE 可打开/返回；Character read model 仍报 `PartySlotEmpty`，因此任务暂停且没有最终 PASS。
+- 新建 `P17-PATCH-03` 总系统整合草案与总操作流程，覆盖 Battle、Interaction、Character Progression、Equipment、Inventory、Map、Save、UI，拆为串行 03A～03H。
+- Gate 0 当前仍在四角色复审和修订中，PATCH-03 实施尚未开始。首先处理 03A ScreenStack/Router 重复导航权威，再在 03B 统一 Exploration Pawn 与稳定 CharacterId/Profile/Party。
+- 跨 Reward/Inventory/Profile 结算冻结为单一 SettlementAuthority 聚合候选、非失败安装与单一发布点；各 Domain 仍保留数据权威。每个 03A～03G 包均要求独立 Editor happy/failure exercise，03H 从可丢弃 clean-save fixture 完成端到端证据。
+- Implementation feasibility 复审根据现有直接 mutation API 要求继续拆分 03D：03D1 先建立并测试三域 candidate/private install seam 与 SettlementAuthority，03D2 才切换 Battle production caller；Map/Save 新 ViewModel/Widget 也已冻结候选文件路径。
+- 最终 Gate 0：Coordinator=`PASS`、Independent Reviewer=`PASS`、Teacher=`PASS`（唯一 PATCH-02 陈旧状态项已校正）、Implementation feasibility=`PASS`。该结论只允许建立 03A Task Gate，不授权实施。
+- P17-005 三件套以暂停状态归档；新活动卡为 `TASK-P17-PATCH-03A`，等待独立 Task Gate 与用户再次确认。
+
 ## 2026-07-27｜TASK-P17-PATCH-01C complete action-distance model archived
 
 - Implementation chain culminated in `adb11d2`; Independent Reviewer final conclusion is `PASS` in `28d3213` after preserving all intermediate `REVISE` history.

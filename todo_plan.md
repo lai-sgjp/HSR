@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：Phase 16 已由 commit `2c11415` 收尾并通过独立复审；Phase 17 四角色 Gate 0 最终复核中，尚未实施 Source/Content/Config。
+> 当前状态：P17-005 已暂停并 checkpoint 于 `4ef49f7`；最终 PASS 不可用。P17-PATCH-03 四角色 Gate 0 已 PASS，唯一活动卡为 03A，仍需 Task Gate 和用户再次确认，尚未实施 Source/Content/Config。
 
 ## 已完成的规划工作
 
@@ -8,7 +8,13 @@
 - [x] TASK-P17-PATCH-01B：可重复 Break（Reviewer `PASS`，已归档）。
 - [x] TASK-P17-PATCH-01C：完整行动距离模型（Reviewer `PASS`=`28d3213`；Build、9 项 Battle Automation、diff-check 通过，已归档）。
 - [x] TASK-P17-PATCH-01D：Patch 01 最终回归、证据汇总与归档（Reviewer `PASS WITH FOLLOW-UP`=`56380dc`，已归档）。
-- [ ] TASK-P17-PATCH-02：Behavior Tree AI 独立规划与迁移（新活动卡等待 Task Gate；不等同于 P17-005）。
+- [x] TASK-P17-PATCH-02：Behavior Tree/Blackboard 探索敌人迁移已完成最终复核；其用户资产改动仍按真实 provenance 隔离，不等同于 P17-005。
+- [x] P17-005 当前进度 checkpoint：commit `4ef49f7`（仅表示暂停点，不表示任务完成或最终 PASS）。
+- [x] P17-PATCH-03 Gate 0：四角色最终 PASS；已冻结八子系统所有权、稳定 ID、事务、生命周期、失败矩阵、Editor exercise 与串行包。
+- [ ] TASK-P17-PATCH-03A：Frontend Boundary Contract Reconciliation（活动卡已创建；Task Gate 与用户再次确认前禁止实施）。
+- [ ] P17-PATCH-03B：Production Bootstrap and Character Identity（解决 `PartySlotEmpty` 与 Pawn/Profile/Party/CharacterId 一致性）。
+- [ ] P17-PATCH-03C～03G：按计划串行整合 Interaction/Battle admission、03D1 atomic foundation、03D2 settlement integration、Inventory/Equipment、Map travel、Save restore。
+- [ ] P17-PATCH-03H：clean-save 端到端 closeout；不得以其结果倒推 P17-005 已完成。
 
 - [x] P7-000：只读校准 Phase 6→7 门禁，冻结 CoreAttributeSet 原位扩展、原创公式、CritDamage/Capture/RNG/单一伤害入口和结构化失败协议。
 - [x] P7-001：战斗属性、原创规则与初始化基线（Reviewer `PASS WITH FOLLOW-UP`，已归档，follow-up 保留）。
@@ -343,6 +349,15 @@
 - [ ] 完成技能、击破、状态、装备、遗器、背包、奖励和 Save/Load。
 - [ ] 完成从主菜单到任务结束的可重复演示流程。
 - [ ] 完成授权清单、README、架构图、视频、截图、测试和个人贡献说明。
+
+## Phase 20 完成后的可选存档演进
+
+- [ ] 设计并迁移 `EHSRSyncDomain`：Global、LocalOnly、PlayerBound；冻结旧档默认、玩家身份、校验和云冲突策略。
+- [ ] 评估 Inventory/Equipment 独立 Revision、写入队列和 immutable generation；以 manifest/commit marker 保证主档引用与背包数据一致。
+- [ ] 为未来 Cloud Save 设计四级 Slot 自动降级：Slot 1 最新、Slot 2/3 历史、Slot 4 手动恢复；失败上传不得覆盖最后已知良好版本。
+- [ ] 在真实云提供方确定后补齐离线/双设备冲突、ETag、配额、取消、部分失败、隐私/加密和删除 tombstone 的设计与自动化证据。
+- [ ] 上述项目不属于 Phase 17-20 Gate；实施前必须建立独立任务卡、迁移方案、失败矩阵和平台证据。
+
 # Phase 11 closeout（2026-07-25）
 
 - [x] P11-001～004：Character Definition/EXP、Profile authority、唯一 Progression GE 与双角色 Party 主链完成。

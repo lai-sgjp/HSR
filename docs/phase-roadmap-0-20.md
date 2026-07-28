@@ -533,6 +533,9 @@ SkillDefinition → 可用技能列表 → 合法目标 → Command → Turn/ASC
 2. **Break 可重复触发**：移除 `bBreakResultPublished` 对单个角色终身只发布一次 Break 的限制。Break 应以 Toughness 从大于零到零的边沿、恢复后的再次归零和独立 Break 事务为依据；同一归零事件幂等，但韧性恢复后允许再次 Break。
 3. **速度变更与拉条重排**：TurnManager 不能只在初始化时读取一次 Speed。速度变化、Advance Action、Delay、拉条和减速应触发可控的排序重建，并保持当前行动事务、Tie-break 和回合预算一致。
 4. **探索敌人 AI 迁移至 Behavior Tree**：在 Phase 0-20 全部完成后，将探索敌人当前的手写 Controller 状态机迁移到 Unreal Behavior Tree/Blackboard。迁移必须保留现有感知、巡逻/追击、Encounter 请求幂等、已解决 Encounter 拒绝和无 Tick 所有权契约；这是收尾改进，不阻塞当前或后续单阶段 Gate。
+5. **存档 Sync Domain 分类**：为全局云同步、仅本地持久化和玩家绑定数据建立显式 `EHSRSyncDomain` 合同，并冻结旧存档默认值、玩家身份、校验、迁移和冲突策略。瞬时 Runtime 状态仍不得进入 Save。
+6. **背包/装备独立 Revision 流**：把高频 Inventory/Equipment 数据评估为独立校验、独立写入队列和不可变 generation；主存档只引用已验证 Revision。必须通过 manifest/commit marker 或等价协议保证跨文件原子发布，不能用两个互不协调的 `.sav` 覆盖代替事务。
+7. **Cloud Slot 自动降级**：未来云适配器采用 Slot 1 新版本、Slot 2/3 历史轮转、Slot 4 手动恢复历史的有界策略；只有上传确认及校验成功后才能轮转，失败必须保留最后已知良好的 Slot 1，重试保持幂等。
 
 ### 延后改进的统一测试要求
 
@@ -540,6 +543,7 @@ SkillDefinition → 可用技能列表 → 合法目标 → Command → Turn/ASC
 - **Break**：测试 `Toughness > 0 -> 0` 只发布一次；恢复到大于零后再次降为零再次发布；同一伤害事务重复回调不重复发布；死亡、清场和跨地图重建不会伪造 Break。
 - **速度/拉条**：角色行动队列为 A/B/C 时，运行中修改 Speed、增加/减少 Action Advance、Delay 和 Slow，验证下一行动者和后续顺序按新值重排；当前已锁定行动不被重排取消；相同速度使用稳定 Tie-break；重排不重复执行行动、不丢失或重复回合。
 - **Behavior Tree AI**：使用与现有手写状态机相同的感知、失去目标、返回出生点、Encounter 请求和已解决 Encounter 场景做对照回归；验证 Blackboard 不保存 Actor 跨地图引用、同一目标不重复请求 Encounter、AI 无逐帧轮询，且迁移前后的可观察行为一致。
+- **存档演进**：覆盖无 Sync Domain 的旧档迁移、错误玩家/未知 Domain 拒绝、Inventory generation 与 manifest 每个崩溃边界、高频写入合并、主档与背包 Revision 不匹配、四级 Cloud Slot 上传/轮转/失败重试和 Slot 4 手动恢复。云服务、双设备和打包平台没有真实证据时必须保持 `NOT VERIFIED`。
 - **回归**：运行对应 Automation（状态、Break、TurnSystem）及完整 `HSR.Progression`/Battle 回归；再做两轮冷启动 PIE，记录状态快照、TurnOrder、Break 事件 ID 和 UI 事件计数。
 
 这些改进完成前，Phase 11 的 Party/Progression 结论不因上述遗留问题降级；它们只在 Phase 20 收尾改进 Gate 中统一关闭。
