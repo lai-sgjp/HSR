@@ -106,6 +106,12 @@ Verdict: `REVISE`
 - `Saved/Logs/03E2-FailureMatrix-DomainPreflight-RED.log`: valid runtime RED with one failing assertion. Wrong expected placement did not return `EquipmentRejected`; the current Unequip path prepares Inventory addition first and collapses the duplicate membership into `InventoryRejected`. All later zero-pollution assertions remained GREEN.
 - No production code changed before this RED was confirmed.
 
+## Domain preflight failure matrix GREEN
+
+- Unequip now validates Character ownership and exact expected placement before preparing the Inventory addition candidate, preserving `EquipmentRejected` diagnostics for wrong-owner/placement requests.
+- `HSREditor Win64 Development` passed (6/6 actions, exit 0).
+- `Saved/Logs/03E2-FailureMatrix-DomainPreflight-GREEN.log`: `HSR.Equipment.Movement.FailureMatrix.DomainPreflight` passed 1/1. The matrix proves stable Inventory/Equipment revisions, membership, placement, Registry payload and zero delegates for every covered rejection; the corrected capacity request with the same OperationId then committed and published each domain once.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.

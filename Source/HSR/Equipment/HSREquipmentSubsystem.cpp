@@ -295,6 +295,16 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 		}
 		DisplacedInstanceId = *Current;
 	}
+	else if (Request.Intent == EHSREquipmentMovementIntent::Unequip)
+	{
+		const FGuid* Owner = InstanceOwners.Find(Request.InstanceId);
+		const FGuid* Placed = ExistingLoadout ? FindPlacedInstance(*ExistingLoadout, Request.Kind, Request.Slot) : nullptr;
+		if (!Owner || *Owner != Request.CharacterId || !Placed || *Placed != Request.InstanceId)
+		{
+			Result.Code = EHSREquipmentMovementResultCode::EquipmentRejected;
+			return Result;
+		}
+	}
 
 	FHSRInventoryMovementCandidate InventoryCandidate;
 	EHSRInventoryOperationResult InventoryResult = EHSRInventoryOperationResult::InvalidDefinition;
