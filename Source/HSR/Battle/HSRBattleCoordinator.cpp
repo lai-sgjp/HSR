@@ -1957,6 +1957,11 @@ bool UHSRBattleCoordinator::CanProjectEquipmentMovement(const FHSREquipmentMovem
 }
 void UHSRBattleCoordinator::CommitEquipmentMovementProjection(const FHSREquipmentMovementRequest& Request,const FHSREquipmentLoadout& Candidate)
 {
+	if(Request.Intent==EHSREquipmentMovementIntent::Unequip)
+	{
+		RemoveEquipmentSource(TEXT("Player"),Request.InstanceId);
+		return;
+	}
 	FHSREquipmentAggregate Aggregate;
 	if(!UHSREquipmentStatAggregator::Aggregate(Candidate,Request.ExpectedEquipmentRevision+1,Aggregate))return;
 	ApplyEquipmentSource(TEXT("Player"),Request.InstanceId,Aggregate,Aggregate.Revision);
