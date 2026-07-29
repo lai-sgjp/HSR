@@ -360,6 +360,20 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 		else EquipmentCandidate.Relics.Add(static_cast<EHSRRelicSlot>(Request.Slot), Request.InstanceId);
 	}
 	EquipmentCandidate.Revision = Result.OldEquipmentRevision + 1;
+	FHSREquipmentLoadout ProjectionLoadout;
+	if (!ResolveLoadout(EquipmentCandidate, ProjectionLoadout))
+	{
+		Result.Code = EHSREquipmentMovementResultCode::EquipmentRejected;
+		return Result;
+	}
+	const bool bHasProjectionPreflight = MovementProjectionPreflight.IsBound();
+	const bool bHasProjectionCommit = MovementProjectionCommit.IsBound();
+	if (bHasProjectionPreflight != bHasProjectionCommit
+		|| (bHasProjectionPreflight && !MovementProjectionPreflight.Execute(Request, ProjectionLoadout)))
+	{
+		Result.Code = EHSREquipmentMovementResultCode::ProjectionRejected;
+		return Result;
+	}
 
 	const int64 NewInventoryRevision = InventoryCandidate.NextRevision;
 	Inventory.InstallEquipmentMovementCandidateNoFail(MoveTemp(InventoryCandidate));
@@ -373,6 +387,10 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 	Result.NewEquipmentRevision = InstalledLoadout.Revision;
 	Inventory.PublishEquipmentMovementCommit(NewInventoryRevision);
 	LoadoutChanged.Broadcast(Request.CharacterId, InstalledLoadout.Revision);
+	if (bHasProjectionCommit)
+	{
+		MovementProjectionCommit.Execute(Request, ProjectionLoadout);
+	}
 	Result.Code = EHSREquipmentMovementResultCode::Success;
 	Result.bCommitted = true;
 	MovementLedger.Add(Request.OperationId, {Request, Result});

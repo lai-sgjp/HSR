@@ -118,6 +118,13 @@ Verdict: `REVISE`
 - `HSREditor Win64 Development` produced the intended compile RED (exit 6): `SetMovementProjection`, `FMovementProjectionPreflight`, `FMovementProjectionCommit` and `ProjectionRejected` do not exist. The new test is the first reported failure source; no unrelated regression precedes it.
 - No production code changed before this RED was confirmed.
 
+## Projection preflight GREEN
+
+- Added an optional paired movement projection contract. A missing half or rejected resolved candidate returns `ProjectionRejected` before either domain installs state; an unbound pair preserves existing movement behavior.
+- The post-commit callback is non-fallible and executes only after Inventory and Equipment publication, so movement does not introduce a fallible compensation path after installation.
+- `HSREditor Win64 Development` passed with UHT, compile, lib/dll link and metadata (15/15 actions, exit 0).
+- `Saved/Logs/03E2-ProjectionPreflight-GREEN.log`: the same `BagToEquip` test passed 1/1, proving rejection zero pollution, failed-OperationId reuse and ordered `Inventory -> Equipment -> Projection` publication.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.

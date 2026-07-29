@@ -41,6 +41,11 @@ class HSR_API UHSREquipmentSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
+	DECLARE_DELEGATE_RetVal_TwoParams(bool, FMovementProjectionPreflight,
+		const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&);
+	DECLARE_DELEGATE_TwoParams(FMovementProjectionCommit,
+		const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&);
+
 	void ExportSaveData(TArray<struct FHSREquipmentSaveDto>& Out) const;
 	void ExportSaveData(TArray<struct FHSREquipmentRegistryDto>& OutRegistry, TArray<struct FHSREquipmentPlacementDto>& OutPlacements) const;
 	bool PrepareRestore(const TArray<struct FHSREquipmentSaveDto>& In, FHSREquipmentRestoreMap& Out) const;
@@ -59,6 +64,11 @@ public:
 	EHSREquipmentOperationResult ReplaceById(const FGuid& CharacterId, const FGuid& InstanceId);
 	FHSREquipmentMovementResult ExecuteMovement(const FHSREquipmentMovementRequest& Request,
 		UHSRInventorySubsystem& Inventory, const UHSRItemEquipmentMappingCatalog& MappingCatalog);
+	void SetMovementProjection(FMovementProjectionPreflight InPreflight, FMovementProjectionCommit InCommit)
+	{
+		MovementProjectionPreflight = MoveTemp(InPreflight);
+		MovementProjectionCommit = MoveTemp(InCommit);
+	}
 
 	EHSREquipmentOperationResult Equip(const FGuid& CharacterId, const FHSREquipmentInstance& Instance);
 	EHSREquipmentOperationResult Replace(const FGuid& CharacterId, const FHSREquipmentInstance& Instance);
@@ -110,4 +120,6 @@ private:
 	FHSREquipmentRestoreProjection RestoreProjection;
 	TMap<FGuid, FMovementLedgerEntry> MovementLedger;
 	TArray<FGuid> MovementLedgerOrder;
+	FMovementProjectionPreflight MovementProjectionPreflight;
+	FMovementProjectionCommit MovementProjectionCommit;
 };

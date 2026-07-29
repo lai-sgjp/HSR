@@ -90,6 +90,7 @@ enum class EHSREquipmentMovementResultCode : uint8
 	MappingRejected,
 	InventoryRejected,
 	EquipmentRejected,
+	ProjectionRejected,
 	OperationIdConflict
 };
 
