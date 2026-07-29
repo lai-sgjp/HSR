@@ -10,11 +10,11 @@ Status: `TASK GATE PREPARATION ONLY / INDEPENDENT REVIEW REQUIRED / IMPLEMENTATI
 
 - A pure-value request carries OperationId, CharacterId, InstanceId, source membership intent, target kind/slot and expected Inventory/Equipment revisions.
 - Inventory remains authoritative for bag membership/capacity; Equipment remains authoritative for complete payload and placement.
-- A coordinator-owned candidate validates both revisions, instance identity, source membership, target slot, capacity and ownership before mutating either subsystem.
+- A bounded command/transaction boundary owned by the Equipment/Inventory integration surface validates both revisions, instance identity, source membership, target slot, capacity and ownership before mutating either subsystem. It may own only OperationId, step and pure candidates; it is not a new global data authority.
 - Commit order is candidate-first and publication is delayed until both domains commit. Any pre-commit failure leaves both domains and both revisions unchanged.
 - OperationId replay returns the cached result and produces no second membership, placement, revision, delegate or ASC effect mutation. A reused OperationId with a different request is rejected.
 - Replacing an occupied slot explicitly returns the displaced InstanceId to Inventory in the same transaction; capacity is checked against the net candidate, not sequential intermediate state.
-- ASC/EffectBridge receives a post-commit resolved aggregate only. Projection failure invokes the frozen compensation policy; it must not become a second authority or partially publish a placement.
+- ASC/EffectBridge receives a post-commit resolved aggregate only. Projection validity and required source-effect handles must be preflighted before commit; if the projection cannot be proven ready, the transaction is rejected with zero domain mutation. Commit must not depend on a fallible post-commit compensation path.
 
 ## Required failure matrix
 
@@ -23,7 +23,7 @@ Status: `TASK GATE PREPARATION ONLY / INDEPENDENT REVIEW REQUIRED / IMPLEMENTATI
 - invalid CharacterId, kind, slot, definition or occupied slot;
 - insufficient capacity for unequip/replace net result;
 - duplicate OperationId replay and same OperationId with changed request;
-- Inventory commit failure, Equipment commit failure, delegate publication failure and ASC projection failure;
+- Inventory candidate/installation failure, Equipment candidate/installation failure, delegate publication failure and ASC projection preflight failure;
 - save/restore boundary while a candidate is pending; no half-committed aggregate may be serialized.
 
 ## Required TDD matrix
@@ -34,14 +34,14 @@ Status: `TASK GATE PREPARATION ONLY / INDEPENDENT REVIEW REQUIRED / IMPLEMENTATI
 - stale revisions and invalid requests produce zero mutation and zero publication;
 - replayed OperationId is cached/no-op; changed payload under the same OperationId is rejected;
 - every successful commit publishes one Inventory revision and one Equipment revision, then one derived ASC projection;
-- injected domain/projection failure leaves a recoverable, observable result with no split authority;
+- injected domain/projection preflight failure leaves a recoverable, observable result with no split authority;
 - save/restore after each successful transaction round-trips membership, Registry payload and placement.
 
 ## Proposed implementation allowlist for Gate review only
 
 - `Source/HSR/Inventory/HSRInventorySubsystem.h/.cpp` and `HSRItemTypes.h` only for the minimum candidate/commit seam;
 - `Source/HSR/Equipment/HSREquipmentSubsystem.h/.cpp` and `HSREquipmentTypes.h` only for the minimum candidate/commit seam;
-- one new aggregate coordinator/request type in the owning subsystem boundary;
+- one bounded integration command/request/result type in the owning subsystem boundary; no global manager or new runtime module;
 - `Source/HSR/Equipment/HSREquipmentEffectBridge.*` only for post-commit projection/compensation integration;
 - exact new regression tests for the matrix above;
 - task evidence Markdown only.
