@@ -389,6 +389,11 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 		Result.Code = EHSREquipmentMovementResultCode::ProjectionRejected;
 		return Result;
 	}
+	if(MovementProjectionApply.IsBound()&&!MovementProjectionApply.Execute(Request,ProjectionLoadout))
+	{
+		Result.Code=EHSREquipmentMovementResultCode::ProjectionRejected;
+		return Result;
+	}
 
 	const int64 NewInventoryRevision = InventoryCandidate.NextRevision;
 	Inventory.InstallEquipmentMovementCandidateNoFail(MoveTemp(InventoryCandidate));

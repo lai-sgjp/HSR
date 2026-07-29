@@ -1943,6 +1943,7 @@ void UHSRBattleCoordinator::BindEquipmentMovementProjection(UHSREquipmentSubsyst
 	if(!EquipmentEffectBridge)EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
 	Equipment.SetMovementProjection(
 		UHSREquipmentSubsystem::FMovementProjectionPreflight::CreateUObject(this,&ThisClass::CanProjectEquipmentMovement),
+		UHSREquipmentSubsystem::FMovementProjectionApply::CreateUObject(this,&ThisClass::ApplyEquipmentMovementProjection),
 		UHSREquipmentSubsystem::FMovementProjectionCommit::CreateUObject(this,&ThisClass::CommitEquipmentMovementProjection));
 }
 bool UHSRBattleCoordinator::CanProjectEquipmentMovement(const FHSREquipmentMovementRequest& Request,const FHSREquipmentLoadout& Candidate) const
@@ -1964,32 +1965,33 @@ void UHSRBattleCoordinator::SetEquipmentMovementProjectionFailureForDevelopmentT
 	if(!EquipmentEffectBridge)EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
 	EquipmentEffectBridge->SetPreflightFailureForDevelopmentTest(bApply,bRemove);
 }
+void UHSRBattleCoordinator::SetEquipmentMovementProjectionCommitFailureForDevelopmentTest(bool bApply,bool bRemove)
+{
+	if(!EquipmentEffectBridge)EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
+	EquipmentEffectBridge->SetCommitFailureForDevelopmentTest(bApply,bRemove);
+}
 #endif
-void UHSRBattleCoordinator::CommitEquipmentMovementProjection(const FHSREquipmentMovementRequest& Request,const FHSREquipmentLoadout& Candidate)
+bool UHSRBattleCoordinator::ApplyEquipmentMovementProjection(const FHSREquipmentMovementRequest& Request,const FHSREquipmentLoadout& Candidate)
 {
 	if(Request.Intent==EHSREquipmentMovementIntent::Unequip)
 	{
-		RemoveEquipmentSource(TEXT("Player"),Request.InstanceId);
+		if(!RemoveEquipmentSource(TEXT("Player"),Request.InstanceId))return false;
 		EquipmentProjectionStates.Remove(Request.InstanceId);
 		EquipmentProjectionParticipants.Remove(Request.InstanceId);
-		return;
+		return true;
 	}
 	TSet<FGuid> DesiredIds;
 	for(const auto& Pair:Candidate.Equipment)DesiredIds.Add(Pair.Value.InstanceId);
 	for(const auto& Pair:Candidate.Relics)DesiredIds.Add(Pair.Value.InstanceId);
-	if(Request.Intent==EHSREquipmentMovementIntent::Replace)
-	{
-		TArray<FGuid> RemovedIds;
-		for(const auto& Existing:EquipmentProjectionStates)if(!DesiredIds.Contains(Existing.Key))RemovedIds.Add(Existing.Key);
-		for(const FGuid& RemovedId:RemovedIds){RemoveEquipmentSource(TEXT("Player"),RemovedId);EquipmentProjectionStates.Remove(RemovedId);EquipmentProjectionParticipants.Remove(RemovedId);}
-	}
 	FHSREquipmentAggregate Aggregate;
-	if(!UHSREquipmentStatAggregator::Aggregate(Candidate,Request.ExpectedEquipmentRevision+1,Aggregate))return;
-	if(ApplyEquipmentSource(TEXT("Player"),Request.InstanceId,Aggregate,Aggregate.Revision))
-	{
-		EquipmentProjectionStates.Add(Request.InstanceId,Aggregate);
-		EquipmentProjectionParticipants.Add(Request.InstanceId,TEXT("Player"));
-	}
+	if(!UHSREquipmentStatAggregator::Aggregate(Candidate,Request.ExpectedEquipmentRevision+1,Aggregate)||!ApplyEquipmentSource(TEXT("Player"),Request.InstanceId,Aggregate,Aggregate.Revision))return false;
+	TArray<FGuid> RemovedIds;
+	if(Request.Intent==EHSREquipmentMovementIntent::Replace)for(const auto& Existing:EquipmentProjectionStates)if(!DesiredIds.Contains(Existing.Key))RemovedIds.Add(Existing.Key);
+	for(const FGuid& RemovedId:RemovedIds)if(!RemoveEquipmentSource(TEXT("Player"),RemovedId)){RemoveEquipmentSource(TEXT("Player"),Request.InstanceId);return false;}
+	for(const FGuid& RemovedId:RemovedIds){EquipmentProjectionStates.Remove(RemovedId);EquipmentProjectionParticipants.Remove(RemovedId);}
+	EquipmentProjectionStates.Add(Request.InstanceId,Aggregate);
+	EquipmentProjectionParticipants.Add(Request.InstanceId,TEXT("Player"));
+	return true;
 }
 bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipmentRestoreState>& Candidate)
 {

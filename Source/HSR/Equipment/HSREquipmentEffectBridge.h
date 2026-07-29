@@ -21,6 +21,7 @@ public:
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
  FActiveGameplayEffectHandle GetSourceHandleForDevelopmentTest(const FGuid& InstanceId) const { const FSource* Source=Sources.Find(InstanceId); return Source?Source->Handle:FActiveGameplayEffectHandle(); }
  void SetPreflightFailureForDevelopmentTest(bool bApply,bool bRemove) { bForceCanApplyFailure=bApply;bForceCanRemoveFailure=bRemove; }
+ void SetCommitFailureForDevelopmentTest(bool bApply,bool bRemove) { bForceApplyFailure=bApply;bForceRemoveFailure=bRemove; }
 #endif
 private:
  struct FSource { TWeakObjectPtr<UAbilitySystemComponent> ASC; TSubclassOf<UGameplayEffect> Class; FHSREquipmentAggregate Fingerprint; FActiveGameplayEffectHandle Handle; };
@@ -29,5 +30,7 @@ private:
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
  bool bForceCanApplyFailure=false;
  bool bForceCanRemoveFailure=false;
+ bool bForceApplyFailure=false;
+ bool bForceRemoveFailure=false;
 #endif
 };

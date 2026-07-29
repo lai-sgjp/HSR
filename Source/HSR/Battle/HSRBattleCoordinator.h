@@ -120,6 +120,7 @@ public:
 	void SetEquipmentRestoreProjectionFailureForDevelopmentTest(bool bForce) { bForceEquipmentRestoreProjectionFailure=bForce; }
 	void SetEquipmentRestoreProjectionFailureAfterOperationsForDevelopmentTest(int32 Count) { EquipmentRestoreFailureAfterOperations=Count; }
 	void SetEquipmentMovementProjectionFailureForDevelopmentTest(bool bApply,bool bRemove);
+	void SetEquipmentMovementProjectionCommitFailureForDevelopmentTest(bool bApply,bool bRemove);
 	void SetParticipantsForEquipmentProjectionDevelopmentTest(const TArray<FHSRBattleParticipant>& InParticipants) { Participants=InParticipants; }
 	int32 GetEquipmentProjectionSourceCountForDevelopmentTest() const { return EquipmentEffectBridge?EquipmentEffectBridge->GetActiveSourceCount():0; }
 	EHSRStatusOperationResult AddStatusForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId);
@@ -295,7 +296,8 @@ private:
 	bool InitParticipantASC(AActor* TargetActor);
 	bool ApplyParticipantInitializationGameplayEffect(const FHSRBattleParticipant& Participant);
 	bool CanProjectEquipmentMovement(const FHSREquipmentMovementRequest& Request, const FHSREquipmentLoadout& Candidate) const;
-	void CommitEquipmentMovementProjection(const FHSREquipmentMovementRequest& Request, const FHSREquipmentLoadout& Candidate);
+	bool ApplyEquipmentMovementProjection(const FHSREquipmentMovementRequest& Request, const FHSREquipmentLoadout& Candidate);
+	void CommitEquipmentMovementProjection(const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&) {}
 	bool ApplyCharacterProgressionGameplayEffect(const FHSRBattleParticipant& Participant);
 	bool ClearProgressionGameplayEffects();
 	bool GrantBasicAttackAbility(const FHSRBattleParticipant& Participant);

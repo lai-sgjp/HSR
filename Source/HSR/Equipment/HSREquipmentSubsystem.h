@@ -45,6 +45,8 @@ public:
 		const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&);
 	DECLARE_DELEGATE_TwoParams(FMovementProjectionCommit,
 		const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&);
+	DECLARE_DELEGATE_RetVal_TwoParams(bool, FMovementProjectionApply,
+		const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&);
 
 	void ExportSaveData(TArray<struct FHSREquipmentSaveDto>& Out) const;
 	void ExportSaveData(TArray<struct FHSREquipmentRegistryDto>& OutRegistry, TArray<struct FHSREquipmentPlacementDto>& OutPlacements) const;
@@ -68,7 +70,12 @@ public:
 	void SetMovementProjection(FMovementProjectionPreflight InPreflight, FMovementProjectionCommit InCommit)
 	{
 		MovementProjectionPreflight = MoveTemp(InPreflight);
+		MovementProjectionApply.Unbind();
 		MovementProjectionCommit = MoveTemp(InCommit);
+	}
+	void SetMovementProjection(FMovementProjectionPreflight InPreflight,FMovementProjectionApply InApply,FMovementProjectionCommit InCommit)
+	{
+		MovementProjectionPreflight=MoveTemp(InPreflight);MovementProjectionApply=MoveTemp(InApply);MovementProjectionCommit=MoveTemp(InCommit);
 	}
 
 	EHSREquipmentOperationResult Equip(const FGuid& CharacterId, const FHSREquipmentInstance& Instance);
@@ -122,5 +129,6 @@ private:
 	TMap<FGuid, FMovementLedgerEntry> MovementLedger;
 	TArray<FGuid> MovementLedgerOrder;
 	FMovementProjectionPreflight MovementProjectionPreflight;
+	FMovementProjectionApply MovementProjectionApply;
 	FMovementProjectionCommit MovementProjectionCommit;
 };
