@@ -112,6 +112,12 @@ Verdict: `REVISE`
 - `HSREditor Win64 Development` passed (6/6 actions, exit 0).
 - `Saved/Logs/03E2-FailureMatrix-DomainPreflight-GREEN.log`: `HSR.Equipment.Movement.FailureMatrix.DomainPreflight` passed 1/1. The matrix proves stable Inventory/Equipment revisions, membership, placement, Registry payload and zero delegates for every covered rejection; the corrected capacity request with the same OperationId then committed and published each domain once.
 
+## Projection preflight TDD RED
+
+- Extended the bag/equip journey to require a resolved candidate-loadout preflight, typed `ProjectionRejected`, zero mutation/publication on rejection, failed-OperationId reuse and ordered `Inventory -> Equipment -> Projection` publication after a successful retry.
+- `HSREditor Win64 Development` produced the intended compile RED (exit 6): `SetMovementProjection`, `FMovementProjectionPreflight`, `FMovementProjectionCommit` and `ProjectionRejected` do not exist. The new test is the first reported failure source; no unrelated regression precedes it.
+- No production code changed before this RED was confirmed.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.

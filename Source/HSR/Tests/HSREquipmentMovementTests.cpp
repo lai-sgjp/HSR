@@ -148,6 +148,51 @@ bool FHSREquipmentMovementBagToEquipTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Unequip equipment revision advances once"), EquipmentRevision, Result.NewEquipmentRevision + 1);
 	TestTrue(TEXT("Unequip retains Registry payload"), Equipment->FindRegisteredInstance(InstanceId, ResolvedRegistry));
 	TestEqual(TEXT("Unequip retains enhancement"), ResolvedRegistry.EnhancementLevel, 3);
+
+	InventoryEvents = 0;
+	EquipmentEvents = 0;
+	TArray<FName> PublicationOrder;
+	Inventory->OnInventoryChanged().AddLambda([&PublicationOrder](int64) { PublicationOrder.Add(TEXT("Inventory")); });
+	Equipment->OnLoadoutChanged().AddLambda([&PublicationOrder](const FGuid&, int32) { PublicationOrder.Add(TEXT("Equipment")); });
+	Equipment->SetMovementProjection(
+		UHSREquipmentSubsystem::FMovementProjectionPreflight::CreateLambda(
+			[](const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&) { return false; }),
+		UHSREquipmentSubsystem::FMovementProjectionCommit::CreateLambda(
+			[&PublicationOrder](const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&) { PublicationOrder.Add(TEXT("Projection")); }));
+	FHSREquipmentMovementRequest ProjectionRequest = Request;
+	ProjectionRequest.OperationId = FGuid::NewGuid();
+	ProjectionRequest.ExpectedInventoryRevision = UnequipResult.NewInventoryRevision;
+	ProjectionRequest.ExpectedEquipmentRevision = UnequipResult.NewEquipmentRevision;
+	const FHSREquipmentMovementResult ProjectionRejected = Equipment->ExecuteMovement(ProjectionRequest, *Inventory, *Catalog);
+	TestEqual(TEXT("Projection preflight rejection is typed"), ProjectionRejected.Code, EHSREquipmentMovementResultCode::ProjectionRejected);
+	TestFalse(TEXT("Projection rejection does not commit"), ProjectionRejected.bCommitted);
+	Inventory->GetSnapshot(InventoryAfter);
+	Equipment->GetLoadout(CharacterId, Loadout, EquipmentRevision);
+	TestEqual(TEXT("Projection rejection keeps Inventory revision"), InventoryAfter.Revision, UnequipResult.NewInventoryRevision);
+	TestEqual(TEXT("Projection rejection keeps Equipment revision"), EquipmentRevision, UnequipResult.NewEquipmentRevision);
+	TestEqual(TEXT("Projection rejection keeps bag membership"), InventoryAfter.UniqueItems.Num(), 1);
+	TestEqual(TEXT("Projection rejection keeps placement empty"), Loadout.Equipment.Num(), 0);
+	TestEqual(TEXT("Projection rejection publishes no Inventory delegate"), InventoryEvents, 0);
+	TestEqual(TEXT("Projection rejection publishes no Equipment delegate"), EquipmentEvents, 0);
+	TestEqual(TEXT("Projection rejection publishes no callback"), PublicationOrder.Num(), 0);
+
+	Equipment->SetMovementProjection(
+		UHSREquipmentSubsystem::FMovementProjectionPreflight::CreateLambda(
+			[](const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&) { return true; }),
+		UHSREquipmentSubsystem::FMovementProjectionCommit::CreateLambda(
+			[&PublicationOrder](const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&) { PublicationOrder.Add(TEXT("Projection")); }));
+	const FHSREquipmentMovementResult ProjectionCommitted = Equipment->ExecuteMovement(ProjectionRequest, *Inventory, *Catalog);
+	TestEqual(TEXT("Projection-ready retry commits"), ProjectionCommitted.Code, EHSREquipmentMovementResultCode::Success);
+	TestTrue(TEXT("Projection-ready retry marks commit"), ProjectionCommitted.bCommitted);
+	TestEqual(TEXT("Projection-ready retry publishes Inventory once"), InventoryEvents, 1);
+	TestEqual(TEXT("Projection-ready retry publishes Equipment once"), EquipmentEvents, 1);
+	TestEqual(TEXT("Projection-ready publication count"), PublicationOrder.Num(), 3);
+	if (PublicationOrder.Num() == 3)
+	{
+		TestEqual(TEXT("Inventory publishes first"), PublicationOrder[0], FName(TEXT("Inventory")));
+		TestEqual(TEXT("Equipment publishes second"), PublicationOrder[1], FName(TEXT("Equipment")));
+		TestEqual(TEXT("Projection publishes last"), PublicationOrder[2], FName(TEXT("Projection")));
+	}
 	return true;
 }
 
