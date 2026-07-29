@@ -36,6 +36,21 @@ bool FHSRSaveValidationPreflightTest::RunTest(const FString&)
 	FHSRSaveData MissingTeleport=Baseline;MissingTeleport.Map.UnlockedTeleportIds.Add(TEXT("missing.teleport"));Reject(TEXT("missing teleport definition"),MissingTeleport);
 	auto* EquipmentDef=NewObject<UHSREquipmentDefinition>();EquipmentDef->DefinitionId=TEXT("equipment.valid");EquipmentDef->Slot=EHSREquipmentSlot::Weapon;Equipment->RegisterDefinition(*EquipmentDef);auto* UniqueDef=NewObject<UHSRItemDefinition>();UniqueDef->ItemId=TEXT("item.unique.valid");UniqueDef->StorageKind=EHSRItemStorageKind::Unique;UniqueDef->MaxStack=1;Inventory->RegisterDefinition(*UniqueDef);
 	FHSRSaveData DuplicateOwnership=Baseline;const FGuid SharedId(9,8,7,6);FHSREquipmentSaveDto OwnedEquipment;OwnedEquipment.DefinitionId=EquipmentDef->DefinitionId;OwnedEquipment.InstanceId=SharedId;OwnedEquipment.CharacterId=HSRCharacterGuidFromProfileName(TEXT("character.a"));OwnedEquipment.Kind=static_cast<int32>(EHSREquipmentKind::Equipment);OwnedEquipment.Slot=static_cast<int32>(EHSREquipmentSlot::Weapon);DuplicateOwnership.Equipment.Add(OwnedEquipment);FHSRItemInstance OwnedInventory;OwnedInventory.InstanceId=SharedId;OwnedInventory.DefinitionId=UniqueDef->ItemId;DuplicateOwnership.Inventory.UniqueItems.Add(OwnedInventory);Reject(TEXT("equipment inventory duplicate ownership"),DuplicateOwnership);
+	FHSRSaveData BaggedEquipment=Baseline;
+	FHSREquipmentRegistryDto RegistryPayload;
+	RegistryPayload.DefinitionId=EquipmentDef->DefinitionId;RegistryPayload.InstanceId=SharedId;
+	RegistryPayload.Kind=static_cast<int32>(EHSREquipmentKind::Equipment);
+	BaggedEquipment.EquipmentRegistry.Add(RegistryPayload);
+	BaggedEquipment.Inventory.UniqueItems.Add(OwnedInventory);
+	TestEqual(TEXT("schema7 bag membership may reference Registry payload"),Save->LoadSnapshot(BaggedEquipment),EHSRSaveResult::Success);
+	FHSRSaveData BaggedRoundTrip;
+	TestEqual(TEXT("schema7 bagged equipment recaptures"),Save->SaveSnapshot(BaggedRoundTrip),EHSRSaveResult::Success);
+	TestEqual(TEXT("schema7 bagged Registry payload retained"),BaggedRoundTrip.EquipmentRegistry.Num(),1);
+	TestEqual(TEXT("schema7 bagged Inventory membership retained"),BaggedRoundTrip.Inventory.UniqueItems.Num(),1);
+	if(BaggedRoundTrip.EquipmentRegistry.Num()==1&&BaggedRoundTrip.Inventory.UniqueItems.Num()==1)
+	{
+		TestEqual(TEXT("schema7 Registry and membership share InstanceId"),BaggedRoundTrip.EquipmentRegistry[0].InstanceId,BaggedRoundTrip.Inventory.UniqueItems[0].InstanceId);
+	}
 	return true;
 }
 #endif

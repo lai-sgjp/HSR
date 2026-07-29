@@ -152,6 +152,13 @@ Verdict: `REVISE`
 - The characterization passed immediately; no production UI or Content change was needed.
 - `HSREditor Win64 Development` passed (6/6 actions, exit 0). `Saved/Logs/03E2-ViewModel-MovementRefresh.log`: `HSR.UI.EquipmentDetail` passed 2/2, exit 0.
 
+## Schema-7 bagged equipment Save TDD RED
+
+- After explicit user authorization to expand Save scope, extended `HSR.Save.Validation.Preflight` with a schema-7 Registry payload and Inventory membership sharing the same InstanceId while no Placement exists. Legacy schema-6 duplicate ownership remains required to reject.
+- `HSREditor Win64 Development` passed (6/6 actions, exit 0).
+- `Saved/Logs/03E2-Schema7-BaggedSave-RED.log`: valid runtime RED. `LoadSnapshot` returned `InvalidData`, and the bagged Registry/Inventory records did not round-trip.
+- No production Save code changed before this RED was confirmed.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.
