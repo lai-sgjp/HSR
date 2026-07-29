@@ -51,3 +51,10 @@ Verdict: `REVISE`
 - `Saved/Logs/03E2-Mapping-Checkpoint.log`: `HSR.Equipment.Movement.MappingContract` completed 1/1 Success, exit 0.
 - The committed catalog checkpoint is GREEN, not the remaining transaction RED. The next TDD RED must cover the authorized bag/equip/unequip/replace aggregate, dual revisions, replay, capacity and zero-mutation failure contract.
 - No 03E2 production transaction, Content, Config, Save schema, SettlementAuthority or UI asset change is claimed by this checkpoint.
+
+## Atomic movement TDD RED
+
+- Added `HSR.Equipment.Movement.Transaction.BagToEquip` to require the pure-value movement request/result and aggregate execution boundary.
+- `Saved/Logs/03E2-Transaction-RED-Build.log`: `HSREditor Win64 Development` exited 6 because `FHSREquipmentMovementRequest`, `EHSREquipmentMovementIntent`, `FHSREquipmentMovementResult`, `EHSREquipmentMovementResultCode`, and `UHSREquipmentSubsystem::ExecuteMovement` do not yet exist.
+- The RED is intentional and target-specific: the new test compiled far enough to exercise the missing API contract; no unrelated source failure precedes it.
+- Production code remains unchanged at this RED checkpoint.
