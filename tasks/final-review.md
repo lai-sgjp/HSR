@@ -20,3 +20,5 @@ The user subsequently confirmed the dedicated static Item-to-Equipment/Relic map
 ## Build boundary update
 
 UE5.6 elevated Build reached C++ compilation but failed on existing test/API mismatches outside the 03E2 allowlist (`HSRSaveValidationTests.cpp`, `HSRCharacterDetailViewModelTests.cpp`). The new mapping files were not reported as the failure source. Verdict remains blocked until an explicit regression allowlist decision is made; no implementation GREEN is claimed.
+
+Subsequent log audit found the same mismatch across Battle, Status, EquipmentEffect and EquipmentSaveProjection test seams. This confirms a pre-existing compile-guard/regression-surface issue, not a mapping implementation failure.

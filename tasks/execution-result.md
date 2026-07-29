@@ -30,6 +30,12 @@ Status: `PASS WITH PLANNING FOLLOW-UP`
 - No mapping-catalog compiler error was reported before the unrelated failures. No GREEN or Automation claim is made.
 - Required next authorization is either a narrow regression-test allowlist expansion for those existing API mismatches or an alternate focused target that excludes them; no unrelated source or Content files were changed.
 
+### Regression-surface audit
+
+- Follow-up log inspection shows the failure is broader than the first two files: existing Battle, Status, EquipmentEffect, EquipmentSaveProjection and Save tests also reference development seams absent from current headers.
+- Several seams are guarded by `#if WITH_EDITOR` while Automation tests compile under `WITH_DEV_AUTOMATION_TESTS`, so this is a historical test/compile-guard contract mismatch rather than a 03E2 mapping failure.
+- Restoring that surface requires a separate, explicitly scoped regression-compatibility task or allowlist. 03E2 implementation remains paused after the mapping catalog checkpoint.
+
 ## Role handoff: Independent Reviewer
 
 Verdict: `REVISE`
