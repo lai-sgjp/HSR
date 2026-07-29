@@ -203,7 +203,7 @@ bool FHSREquipmentMovementBagToEquipTest::RunTest(const FString& Parameters)
 	Equipment->CommitRestore(RestoreCandidate);
 	const FHSREquipmentMovementResult PostRestoreRequest = Equipment->ExecuteMovement(ProjectionRequest, *Inventory, *Catalog);
 	TestEqual(TEXT("Restore clears transient ledger and revalidates authority"),
-		PostRestoreRequest.Code, EHSREquipmentMovementResultCode::InventoryRejected);
+		PostRestoreRequest.Code, EHSREquipmentMovementResultCode::InventoryRevisionConflict);
 	TestFalse(TEXT("Post-restore request is not historical replay"), PostRestoreRequest.bReplay);
 	TestFalse(TEXT("Post-restore rejected request does not commit"), PostRestoreRequest.bCommitted);
 	return true;

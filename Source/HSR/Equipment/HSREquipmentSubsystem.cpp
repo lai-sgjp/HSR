@@ -65,7 +65,9 @@ bool UHSREquipmentSubsystem::PrepareRestore(const TArray<FHSREquipmentRegistryDt
 
 void UHSREquipmentSubsystem::CommitRestore(const FHSREquipmentRestoreMap& Candidate)
 {
-	Loadouts.Reset(); InstanceOwners.Reset(); InstanceRegistry.Reset(); for(const auto& P:Candidate){FLoadoutState& S=Loadouts.Add(P.Key); S.Revision=P.Value.Revision; for(const auto& E:P.Value.Loadout.Equipment){InstanceRegistry.Add(E.Value.InstanceId,E.Value);S.Equipment.Add(E.Key,E.Value.InstanceId);InstanceOwners.Add(E.Value.InstanceId,P.Key);} for(const auto& R:P.Value.Loadout.Relics){InstanceRegistry.Add(R.Value.InstanceId,R.Value);S.Relics.Add(R.Key,R.Value.InstanceId);InstanceOwners.Add(R.Value.InstanceId,P.Key);}} }
+	Loadouts.Reset(); InstanceOwners.Reset(); InstanceRegistry.Reset(); for(const auto& P:Candidate){FLoadoutState& S=Loadouts.Add(P.Key); S.Revision=P.Value.Revision; for(const auto& E:P.Value.Loadout.Equipment){InstanceRegistry.Add(E.Value.InstanceId,E.Value);S.Equipment.Add(E.Key,E.Value.InstanceId);InstanceOwners.Add(E.Value.InstanceId,P.Key);} for(const auto& R:P.Value.Loadout.Relics){InstanceRegistry.Add(R.Value.InstanceId,R.Value);S.Relics.Add(R.Key,R.Value.InstanceId);InstanceOwners.Add(R.Value.InstanceId,P.Key);}}
+	MovementLedger.Reset(); MovementLedgerOrder.Reset();
+}
 void UHSREquipmentSubsystem::NotifyRestored(const TSet<FGuid>& Changed){for(const FGuid& Id:Changed){int32 Rev=Loadouts.FindRef(Id).Revision; LoadoutChanged.Broadcast(Id,Rev);}}
 
 EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UHSREquipmentDefinition& Definition)
@@ -93,6 +95,7 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UH
 void UHSREquipmentSubsystem::CommitRestore(const FHSREquipmentRegistryRestoreState& Candidate)
 {
 	InstanceRegistry=Candidate.Registry;Loadouts.Reset();InstanceOwners.Reset();for(const auto& P:Candidate.Loadouts){FLoadoutState& S=Loadouts.Add(P.Key);S.Revision=P.Value.Revision;for(const auto& E:P.Value.Loadout.Equipment){S.Equipment.Add(E.Key,E.Value.InstanceId);InstanceOwners.Add(E.Value.InstanceId,P.Key);}for(const auto& R:P.Value.Loadout.Relics){S.Relics.Add(R.Key,R.Value.InstanceId);InstanceOwners.Add(R.Value.InstanceId,P.Key);}}
+	MovementLedger.Reset();MovementLedgerOrder.Reset();
 }
 
 EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UHSRRelicDefinition& Definition)

@@ -132,6 +132,12 @@ Verdict: `REVISE`
 - `Saved/Logs/03E2-RestoreLedger-RED.log`: valid runtime RED. `CommitRestore` retained the transient ledger, so the old OperationId returned cached success with `bReplay=true` instead of revalidating the restored Inventory/Equipment authority.
 - No production code changed before this RED was confirmed.
 
+## Restore ledger lifecycle GREEN
+
+- Both legacy and schema-7 `CommitRestore` paths now clear `MovementLedger` and `MovementLedgerOrder` after installing restored authority. Projection wiring and Save schema remain unchanged.
+- `HSREditor Win64 Development` passed (5/5 actions after the exact expectation correction, exit 0).
+- `Saved/Logs/03E2-RestoreLedger-GREEN-02.log`: the same `BagToEquip` test passed 1/1. The old OperationId is no longer replayed and is rejected by current Inventory revision validation.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.
