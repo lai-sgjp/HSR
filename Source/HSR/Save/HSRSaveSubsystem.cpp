@@ -157,9 +157,11 @@ bool UHSRSaveSubsystem::Validate(const FHSRSaveData& C) const {
 		|| !C.Map.UnlockedRegionIds.IsEmpty() || !C.Map.UnlockedTeleportIds.IsEmpty()
 		|| !C.Map.ExplorationFlags.IsEmpty() || C.Map.Revision!=0))return false;
 	TSet<FGuid> OwnedInstances;
-	if(C.SchemaVersion>=7){for(const auto& D:C.EquipmentRegistry){if(!D.InstanceId.IsValid()||OwnedInstances.Contains(D.InstanceId))return false;OwnedInstances.Add(D.InstanceId);}TSet<FGuid> Placed;TSet<FString> Slots;for(const auto& D:C.EquipmentPlacements){const FName* Owner=GuidOwners.Find(D.CharacterId);const FString Slot=FString::Printf(TEXT("%s:%d:%d"),*D.CharacterId.ToString(),D.Kind,D.Slot);if(!Owner||HSRCharacterGuidFromProfileName(*Owner)!=D.CharacterId||!OwnedInstances.Contains(D.InstanceId)||Placed.Contains(D.InstanceId)||Slots.Contains(Slot))return false;Placed.Add(D.InstanceId);Slots.Add(Slot);}}
+	TSet<FGuid> PlacedInstances;
+	if(C.SchemaVersion>=7){for(const auto& D:C.EquipmentRegistry){if(!D.InstanceId.IsValid()||OwnedInstances.Contains(D.InstanceId))return false;OwnedInstances.Add(D.InstanceId);}TSet<FString> Slots;for(const auto& D:C.EquipmentPlacements){const FName* Owner=GuidOwners.Find(D.CharacterId);const FString Slot=FString::Printf(TEXT("%s:%d:%d"),*D.CharacterId.ToString(),D.Kind,D.Slot);if(!Owner||HSRCharacterGuidFromProfileName(*Owner)!=D.CharacterId||!OwnedInstances.Contains(D.InstanceId)||PlacedInstances.Contains(D.InstanceId)||Slots.Contains(Slot))return false;PlacedInstances.Add(D.InstanceId);Slots.Add(Slot);}}
 	else for(const FHSREquipmentSaveDto& D:C.Equipment){const FName* Owner=GuidOwners.Find(D.CharacterId);if(!Owner||HSRCharacterGuidFromProfileName(*Owner)!=D.CharacterId||!D.InstanceId.IsValid()||OwnedInstances.Contains(D.InstanceId))return false;OwnedInstances.Add(D.InstanceId);}
-	for(const FHSRItemInstance& I:C.Inventory.UniqueItems){if(!I.InstanceId.IsValid()||OwnedInstances.Contains(I.InstanceId))return false;OwnedInstances.Add(I.InstanceId);}
+	TSet<FGuid> InventoryInstances;
+	for(const FHSRItemInstance& I:C.Inventory.UniqueItems){if(!I.InstanceId.IsValid()||InventoryInstances.Contains(I.InstanceId)||(C.SchemaVersion>=7?PlacedInstances.Contains(I.InstanceId):OwnedInstances.Contains(I.InstanceId)))return false;InventoryInstances.Add(I.InstanceId);}
 	// Read-only cross-domain preflight: this must complete before any domain PrepareRestore or equipment projection.
 	if(!Profiles.IsValid()||!Equipment.IsValid()||!Inventory.IsValid()||!Reward.IsValid()||!Quest.IsValid()||!Map.IsValid())return false;
 	for(const FHSRSaveProfileDto& P:C.Profiles)if(!Profiles->HasDefinition(P.State.CharacterId))return false;

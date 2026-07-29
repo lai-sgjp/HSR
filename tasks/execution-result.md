@@ -159,6 +159,12 @@ Verdict: `REVISE`
 - `Saved/Logs/03E2-Schema7-BaggedSave-RED.log`: valid runtime RED. `LoadSnapshot` returned `InvalidData`, and the bagged Registry/Inventory records did not round-trip.
 - No production Save code changed before this RED was confirmed.
 
+## Schema-7 bagged equipment Save GREEN
+
+- Schema-7 validation now separates Registry payload identity, equipped Placement identity and Inventory membership identity. Inventory membership may reference a Registry payload only while it has no Placement; duplicate Inventory IDs and any Placement/Inventory overlap still reject. Legacy schema ownership rules are unchanged.
+- `HSREditor Win64 Development` passed (6/6 actions, exit 0).
+- `Saved/Logs/03E2-Schema7-BaggedSave-GREEN.log`: `HSR.Save.Validation.Preflight` passed 1/1. The bagged Registry payload and Inventory membership now Load/Save round-trip with the same InstanceId.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.
