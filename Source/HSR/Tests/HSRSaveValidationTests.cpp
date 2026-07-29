@@ -48,6 +48,7 @@ bool FHSRSaveValidationPreflightTest::RunTest(const FString&)
 	MismatchedBaggedEquipment.Inventory.UniqueItems[0].DefinitionId=TEXT("item.unique.other");
 	auto* OtherUniqueDef=NewObject<UHSRItemDefinition>();OtherUniqueDef->ItemId=TEXT("item.unique.other");OtherUniqueDef->StorageKind=EHSRItemStorageKind::Unique;OtherUniqueDef->MaxStack=1;Inventory->RegisterDefinition(*OtherUniqueDef);
 	Reject(TEXT("schema7 bag membership must match Registry mapping"),MismatchedBaggedEquipment);
+	auto* WrongSlotCatalog=NewObject<UHSRItemEquipmentMappingCatalog>();FHSRItemEquipmentMappingEntry WrongSlotMapping=ValidMapping;WrongSlotMapping.Slot=static_cast<int32>(EHSREquipmentSlot::Head);TestTrue(TEXT("wrong slot mapping authored"),WrongSlotCatalog->AddMapping(WrongSlotMapping));Save->InitializeForDevelopmentTest(Profiles,Party,Equipment,Inventory,Reward,Quest,Map,WrongSlotCatalog);Reject(TEXT("schema7 bag mapping slot must match Equipment definition"),BaggedEquipment);Save->InitializeForDevelopmentTest(Profiles,Party,Equipment,Inventory,Reward,Quest,Map,Mapping);
 	TestEqual(TEXT("schema7 bag membership may reference Registry payload"),Save->LoadSnapshot(BaggedEquipment),EHSRSaveResult::Success);
 	FHSRSaveData BaggedRoundTrip;
 	TestEqual(TEXT("schema7 bagged equipment recaptures"),Save->SaveSnapshot(BaggedRoundTrip),EHSRSaveResult::Success);
