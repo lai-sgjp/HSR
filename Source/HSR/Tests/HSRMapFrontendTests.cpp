@@ -10,7 +10,7 @@
 
 namespace
 {
-UHSRMapDefinition* MakeMap(const TCHAR* MapId, const TCHAR* WorldPath, const TCHAR* RegionId, const TCHAR* ArrivalId)
+UHSRMapDefinition* MakeFrontendMap(const TCHAR* MapId, const TCHAR* WorldPath, const TCHAR* RegionId, const TCHAR* ArrivalId)
 {
 	auto* Definition = NewObject<UHSRMapDefinition>();
 	Definition->MapId = FName(MapId);
@@ -20,7 +20,7 @@ UHSRMapDefinition* MakeMap(const TCHAR* MapId, const TCHAR* WorldPath, const TCH
 	return Definition;
 }
 
-UHSRTeleportDefinition* MakeTeleport()
+UHSRTeleportDefinition* MakeFrontendTeleport()
 {
 	auto* Definition = NewObject<UHSRTeleportDefinition>();
 	Definition->TeleportId = TEXT("Teleport.AB");
@@ -37,9 +37,9 @@ bool FHSRMapFrontendViewModelTest::RunTest(const FString&)
 {
 	auto* GameInstance = NewObject<UGameInstance>();
 	auto* Maps = NewObject<UHSRMapSubsystem>(GameInstance);
-	TestEqual(TEXT("register map A"), Maps->RegisterMapDefinition(*MakeMap(TEXT("Map.A"), TEXT("/Game/Maps/Map_A.Map_A"), TEXT("Region.A"), TEXT("Arrival.A"))), EHSRMapOperationResult::Success);
-	TestEqual(TEXT("register map B"), Maps->RegisterMapDefinition(*MakeMap(TEXT("Map.B"), TEXT("/Game/Maps/Map_B.Map_B"), TEXT("Region.B"), TEXT("Arrival.B"))), EHSRMapOperationResult::Success);
-	TestEqual(TEXT("register teleport"), Maps->RegisterTeleportDefinition(*MakeTeleport()), EHSRMapOperationResult::Success);
+	TestEqual(TEXT("register map A"), Maps->RegisterMapDefinition(*MakeFrontendMap(TEXT("Map.A"), TEXT("/Game/Maps/Map_A.Map_A"), TEXT("Region.A"), TEXT("Arrival.A"))), EHSRMapOperationResult::Success);
+	TestEqual(TEXT("register map B"), Maps->RegisterMapDefinition(*MakeFrontendMap(TEXT("Map.B"), TEXT("/Game/Maps/Map_B.Map_B"), TEXT("Region.B"), TEXT("Arrival.B"))), EHSRMapOperationResult::Success);
+	TestEqual(TEXT("register teleport"), Maps->RegisterTeleportDefinition(*MakeFrontendTeleport()), EHSRMapOperationResult::Success);
 	TestEqual(TEXT("set current location"), Maps->SetCurrentLocation(TEXT("Map.A")), EHSRMapOperationResult::Success);
 
 	auto* ViewModel = NewObject<UHSRMapViewModel>();
