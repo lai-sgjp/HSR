@@ -3,6 +3,9 @@
 #include "HSREquipmentSubsystem.h"
 #include "../Data/Definitions/HSREquipmentDefinition.h"
 #include "../Data/Definitions/HSRRelicDefinition.h"
+#include "../Data/Definitions/HSRItemDefinition.h"
+#include "../Data/Definitions/HSRItemEquipmentMappingCatalog.h"
+#include "../Inventory/HSRInventorySubsystem.h"
 #include "../Save/HSRSaveSubsystem.h"
 #include "../UI/HSREquipmentDetailViewModel.h"
 #include "../UI/HSREquipmentDetailWidget.h"
@@ -85,6 +88,7 @@ namespace
 	void RunSave(){UGameInstance* GI=FindPIEGameInstance();LogResult(TEXT("Save"),FHSREquipmentDevelopmentHarness::Save(GI));}
 	void RunLoad(){UGameInstance* GI=FindPIEGameInstance();LogResult(TEXT("Load"),FHSREquipmentDevelopmentHarness::Load(GI));}
 	void RunCleanup(){LogResult(TEXT("Cleanup"),FHSREquipmentDevelopmentHarness::CleanupSave());}
+	void RunP17Audit(){UGameInstance* GI=FindPIEGameInstance();LogResult(TEXT("P17MovementAudit"),FHSREquipmentDevelopmentHarness::RunP17MovementAudit(GI));}
 	void RunHide(){if(DetailWidget.IsValid()){DetailWidget->RemoveFromParent();DetailWidget.Reset();}LogResult(TEXT("HideDetail"),true);}
 	void RunShow()
 	{
@@ -104,6 +108,7 @@ namespace
 	FAutoConsoleCommand SaveCommand(TEXT("HSR.Equipment.Save"),TEXT("Save the Phase 12 development slot."),FConsoleCommandDelegate::CreateStatic(&RunSave));
 	FAutoConsoleCommand LoadCommand(TEXT("HSR.Equipment.Load"),TEXT("Load the Phase 12 development slot."),FConsoleCommandDelegate::CreateStatic(&RunLoad));
 	FAutoConsoleCommand CleanupCommand(TEXT("HSR.Equipment.Cleanup"),TEXT("Delete the Phase 12 development slot."),FConsoleCommandDelegate::CreateStatic(&RunCleanup));
+	FAutoConsoleCommand P17AuditCommand(TEXT("HSR.Equipment.P17Audit"),TEXT("Run the P17 equip, replace, and unequip transaction audit."),FConsoleCommandDelegate::CreateStatic(&RunP17Audit));
 }
 
 bool FHSREquipmentDevelopmentHarness::SetupFixedLoadout(UGameInstance* GI){UHSREquipmentSubsystem* E=GI?GI->GetSubsystem<UHSREquipmentSubsystem>():nullptr;if(!E)return false;const FHSREquipmentRestoreState State=BuildFixedState(E,true);return !State.Loadout.Relics.IsEmpty()&&Commit(GI,&State);}
@@ -116,3 +121,16 @@ bool FHSREquipmentDevelopmentHarness::CleanupSave(){return !UGameplayStatics::Do
 bool FHSREquipmentDevelopmentHarness::SetupFixedLoadoutForTest(UHSREquipmentSubsystem* E){if(!E)return false;const FHSREquipmentRestoreState State=BuildFixedState(E,true);return !State.Loadout.Relics.IsEmpty()&&Commit(E,&State);}
 bool FHSREquipmentDevelopmentHarness::RemoveSecondRelicForTest(UHSREquipmentSubsystem* E){if(!E)return false;const FHSREquipmentRestoreState State=BuildFixedState(E,false);return !State.Loadout.Relics.IsEmpty()&&Commit(E,&State);}
 bool FHSREquipmentDevelopmentHarness::ClearLoadoutForTest(UHSREquipmentSubsystem* E){if(!E)return false;FHSREquipmentLoadout Existing;int32 Revision=0;E->GetLoadout(HSRCharacterGuidFromProfileName(CharacterName),Existing,Revision);const int32 ClearRevision=FMath::Max(FMath::Max(Revision,LastHarnessRevisions.FindRef(E))+1,1);if(!Commit(E,nullptr))return false;LastHarnessRevisions.Add(E,ClearRevision);return true;}
+bool FHSREquipmentDevelopmentHarness::RunP17MovementAudit(UGameInstance* GI){return RunP17MovementAuditForTest(GI?GI->GetSubsystem<UHSREquipmentSubsystem>():nullptr,GI?GI->GetSubsystem<UHSRInventorySubsystem>():nullptr);}
+bool FHSREquipmentDevelopmentHarness::RunP17MovementAuditForTest(UHSREquipmentSubsystem* E,UHSRInventorySubsystem* I)
+{
+	if(!E||!I)return false;
+	auto* Item=NewObject<UHSRItemDefinition>(GetTransientPackage());Item->ItemId=TEXT("Item.P17.Console");Item->StorageKind=EHSRItemStorageKind::Unique;Item->MaxStack=1;
+	const EHSRInventoryOperationResult ItemResult=I->RegisterDefinition(*Item);if(ItemResult!=EHSRInventoryOperationResult::Success&&ItemResult!=EHSRInventoryOperationResult::DuplicateDefinitionId)return false;
+	auto* Definition=NewObject<UHSREquipmentDefinition>(GetTransientPackage());Definition->DefinitionId=TEXT("Equipment.P17.Console");Definition->Slot=EHSREquipmentSlot::Body;Definition->EnhancementCap=1;
+	const EHSREquipmentOperationResult DefinitionResult=E->RegisterDefinition(*Definition);if(DefinitionResult!=EHSREquipmentOperationResult::Success&&DefinitionResult!=EHSREquipmentOperationResult::DuplicateDefinitionId)return false;
+	auto* Catalog=NewObject<UHSRItemEquipmentMappingCatalog>(GetTransientPackage());FHSRItemEquipmentMappingEntry Mapping;Mapping.ItemId=Item->ItemId;Mapping.EquipmentDefinitionId=Definition->DefinitionId;Mapping.Kind=EHSREquipmentKind::Equipment;Mapping.Slot=static_cast<int32>(EHSREquipmentSlot::Body);if(!Catalog->AddMapping(Mapping))return false;
+	const FGuid CharacterId=HSRCharacterGuidFromProfileName(CharacterName);const FGuid First(0x17003001,0,0,1),Second(0x17003002,0,0,1);for(const FGuid Id:{First,Second}){FHSRItemInstance Bag;Bag.InstanceId=Id;Bag.DefinitionId=Item->ItemId;if(I->AddUnique(Bag)!=EHSRInventoryOperationResult::Success)return false;FHSREquipmentInstance Registry;Registry.InstanceId=Id;Registry.DefinitionId=Definition->DefinitionId;Registry.Kind=EHSREquipmentKind::Equipment;if(E->RegisterInstance(Registry)!=EHSREquipmentOperationResult::Success)return false;}
+	auto Execute=[&](FGuid OperationId,FGuid InstanceId,EHSREquipmentMovementIntent Intent,int64 InventoryRevision,int64 EquipmentRevision){FHSREquipmentMovementRequest Request;Request.OperationId=OperationId;Request.CharacterId=CharacterId;Request.InstanceId=InstanceId;Request.Intent=Intent;Request.Kind=EHSREquipmentKind::Equipment;Request.Slot=static_cast<int32>(EHSREquipmentSlot::Body);Request.ExpectedInventoryRevision=InventoryRevision;Request.ExpectedEquipmentRevision=EquipmentRevision;return E->ExecuteMovement(Request,*I,*Catalog);};
+	FHSRInventorySnapshot Inventory;FHSREquipmentLoadout InitialLoadout;int32 InitialEquipmentRevision=0;E->GetLoadout(CharacterId,InitialLoadout,InitialEquipmentRevision);I->GetSnapshot(Inventory);const FHSREquipmentMovementResult Equip=Execute(FGuid(0x17004001,0,0,1),First,EHSREquipmentMovementIntent::Equip,Inventory.Revision,InitialEquipmentRevision);if(Equip.Code!=EHSREquipmentMovementResultCode::Success)return false;I->GetSnapshot(Inventory);const FHSREquipmentMovementResult Replace=Execute(FGuid(0x17004002,0,0,1),Second,EHSREquipmentMovementIntent::Replace,Inventory.Revision,Equip.NewEquipmentRevision);if(Replace.Code!=EHSREquipmentMovementResultCode::Success)return false;I->GetSnapshot(Inventory);const FHSREquipmentMovementResult Unequip=Execute(FGuid(0x17004003,0,0,1),Second,EHSREquipmentMovementIntent::Unequip,Inventory.Revision,Replace.NewEquipmentRevision);FHSREquipmentLoadout FinalLoadout;int32 FinalRevision=0;E->GetLoadout(CharacterId,FinalLoadout,FinalRevision);return Unequip.Code==EHSREquipmentMovementResultCode::Success&&FinalLoadout.Equipment.Num()==InitialLoadout.Equipment.Num();
+}
