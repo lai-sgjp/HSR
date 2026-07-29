@@ -68,3 +68,9 @@ Verdict: `REVISE`
 - `Saved/Logs/03E2-BagToEquip-GREEN-Build-02.log`: `HSREditor Win64 Development` succeeded, 5 actions, exit 0.
 - `Saved/Logs/03E2-BagToEquip-GREEN-Automation-02.log`: `HSR.Equipment.Movement` 2/2 Success, exit 0.
 - This checkpoint covers only bag-to-equip and mapping. Unequip, replace, OperationId replay, projection preflight, capacity/failure injection, Save round-trip and UI intent remain pending and are not claimed.
+
+## OperationId TDD RED
+
+- Extended the movement transaction test to require cached same-request replay, zero second publication/revision, and changed-request rejection under the same OperationId.
+- `Saved/Logs/03E2-OperationId-RED-Build.log`: intentional compile RED on missing `FHSREquipmentMovementResult::bReplay` and `EHSREquipmentMovementResultCode::OperationIdConflict`; exit 6.
+- No production code changed before this RED was confirmed.

@@ -101,6 +101,27 @@ bool FHSREquipmentMovementBagToEquipTest::RunTest(const FString& Parameters)
 	FHSREquipmentInstance ResolvedRegistry;
 	TestTrue(TEXT("Registry payload retained"), Equipment->FindRegisteredInstance(InstanceId, ResolvedRegistry));
 	TestEqual(TEXT("Enhancement retained"), ResolvedRegistry.EnhancementLevel, 3);
+
+	int32 InventoryEvents = 0;
+	int32 EquipmentEvents = 0;
+	Inventory->OnInventoryChanged().AddLambda([&InventoryEvents](int64) { ++InventoryEvents; });
+	Equipment->OnLoadoutChanged().AddLambda([&EquipmentEvents](const FGuid&, int32) { ++EquipmentEvents; });
+	const FHSREquipmentMovementResult Replay = Equipment->ExecuteMovement(Request, *Inventory, *Catalog);
+	TestEqual(TEXT("Replay returns cached success"), Replay.Code, EHSREquipmentMovementResultCode::Success);
+	TestTrue(TEXT("Replay is identified"), Replay.bReplay);
+	TestFalse(TEXT("Replay does not commit again"), Replay.bCommitted);
+	Inventory->GetSnapshot(InventoryAfter);
+	Equipment->GetLoadout(CharacterId, Loadout, EquipmentRevision);
+	TestEqual(TEXT("Replay inventory revision stable"), InventoryAfter.Revision, Result.NewInventoryRevision);
+	TestEqual(TEXT("Replay equipment revision stable"), EquipmentRevision, Result.NewEquipmentRevision);
+	TestEqual(TEXT("Replay inventory publication count"), InventoryEvents, 0);
+	TestEqual(TEXT("Replay equipment publication count"), EquipmentEvents, 0);
+
+	FHSREquipmentMovementRequest ConflictingRequest = Request;
+	ConflictingRequest.Slot = static_cast<int32>(EHSREquipmentSlot::Head);
+	const FHSREquipmentMovementResult Conflict = Equipment->ExecuteMovement(ConflictingRequest, *Inventory, *Catalog);
+	TestEqual(TEXT("Changed request under same OperationId rejected"), Conflict.Code, EHSREquipmentMovementResultCode::OperationIdConflict);
+	TestFalse(TEXT("Conflict does not commit"), Conflict.bCommitted);
 	return true;
 }
 
