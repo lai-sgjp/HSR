@@ -41,7 +41,7 @@ public:
 	void InitializeForAutomation(UHSRInventorySubsystem* InInventory);
 	void SetCommitFailureForAutomation(bool bValue) { bInjectCommitFailure = bValue; }
 #endif
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	void InitializeForDevelopmentTest(UHSRInventorySubsystem* InInventory);
 #endif
 

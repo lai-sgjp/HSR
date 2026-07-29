@@ -16,7 +16,7 @@ public:
  bool Remove(const FGuid& InstanceId);
  bool RemoveAll();
  int32 GetActiveSourceCount() const { return Sources.Num(); }
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
  FActiveGameplayEffectHandle GetSourceHandleForDevelopmentTest(const FGuid& InstanceId) const { const FSource* Source=Sources.Find(InstanceId); return Source?Source->Handle:FActiveGameplayEffectHandle(); }
 #endif
 private:

@@ -18,7 +18,7 @@ public:
 	EHSRPartyResult SwapSlots(int32 FirstSlot, int32 SecondSlot);
 	bool GetSnapshot(FHSRPartySnapshot& OutSnapshot) const;
 	FHSRPartyChanged& OnPartyChanged() { return PartyChanged; }
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	void InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles) { Slots.SetNum(Capacity); Profiles = InProfiles; }
 #endif
 

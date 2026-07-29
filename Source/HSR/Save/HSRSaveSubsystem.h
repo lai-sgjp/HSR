@@ -32,7 +32,7 @@ public:
 	void SetOperationBusyForAutomation(bool bBusy) { bOperationInProgress=bBusy; }
 	void SetRestoreBlockedForAutomation(bool bMapTravel, bool bBattleReturn) { bInjectMapTravelPending=bMapTravel;bInjectBattleReturnPending=bBattleReturn; }
 #endif
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	void InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles, UHSRPartySubsystem* InParty, UHSREquipmentSubsystem* InEquipment=nullptr, UHSRInventorySubsystem* InInventory=nullptr, UHSRRewardSubsystem* InReward=nullptr, UHSRQuestSubsystem* InQuest=nullptr, UHSRMapSubsystem* InMap=nullptr);
 	int64 GetRestoreTransactionRevisionForDevelopmentTest() const { return RestoreTransactionRevision; }
 #endif
@@ -47,7 +47,7 @@ private:
 	TWeakObjectPtr<UHSRRewardSubsystem> Reward;
 	TWeakObjectPtr<UHSRQuestSubsystem> Quest;
 	TWeakObjectPtr<UHSRMapSubsystem> Map;
-#if WITH_EDITORONLY_DATA
+#if WITH_EDITORONLY_DATA || WITH_DEV_AUTOMATION_TESTS
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRInventorySubsystem> DevelopmentInventory;
 	UPROPERTY(Transient)

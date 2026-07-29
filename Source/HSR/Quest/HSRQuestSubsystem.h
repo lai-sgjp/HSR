@@ -33,7 +33,7 @@ public:
 #if WITH_DEV_AUTOMATION_TESTS
 	void InitializeForAutomation(UHSRRewardSubsystem* InReward);
 #endif
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	void InitializeForDevelopmentTest(UHSRRewardSubsystem* InReward);
 #endif
 

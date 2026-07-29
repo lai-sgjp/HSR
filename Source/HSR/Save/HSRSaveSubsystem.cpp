@@ -123,7 +123,7 @@ FAutoConsoleCommand P15MapCleanupCommand(TEXT("HSR.P15MapCleanup"), TEXT("Delete
 
 void UHSRSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection) { Super::Initialize(Collection); Profiles=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSRCharacterProfileSubsystem>():nullptr; Party=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSRPartySubsystem>():nullptr; Equipment=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSREquipmentSubsystem>():nullptr; Inventory=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSRInventorySubsystem>():nullptr; Reward=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSRRewardSubsystem>():nullptr; Quest=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSRQuestSubsystem>():nullptr; Map=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSRMapSubsystem>():nullptr; }
 
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 void UHSRSaveSubsystem::InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles, UHSRPartySubsystem* InParty, UHSREquipmentSubsystem* InEquipment, UHSRInventorySubsystem* InInventory, UHSRRewardSubsystem* InReward, UHSRQuestSubsystem* InQuest, UHSRMapSubsystem* InMap)
 {
 	Profiles = InProfiles;

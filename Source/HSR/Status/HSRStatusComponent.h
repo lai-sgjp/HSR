@@ -38,7 +38,7 @@ public:
 	const FHSRStatusPublicOperationEvent& GetLastPublicOperation() const { return LastPublicOperation; }
 	FHSRStatusChangedDelegate& OnStatusChanged() { return StatusChanged; }
 
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	void SetForceApplyFailureForDevelopmentTest(bool bInForce) { bForceApplyFailure = bInForce; }
 	void SetForceOldRemoveFailureForDevelopmentTest(bool bInForce) { bForceOldRemoveFailure = bInForce; }
 	void SetForceDispelRemoveFailureForDevelopmentTest(bool bInForce) { bForceDispelRemoveFailure = bInForce; }
@@ -76,7 +76,7 @@ private:
 	FHSRStatusChangedDelegate StatusChanged;
 	FHSRStatusPublicOperationEvent LastPublicOperation;
 	uint64 PublicOperationSequence = 0;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	bool bForceApplyFailure = false;
 	bool bForceOldRemoveFailure = false;
 	bool bForceDispelRemoveFailure = false;

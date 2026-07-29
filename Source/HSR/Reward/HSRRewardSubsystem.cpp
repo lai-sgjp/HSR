@@ -44,7 +44,7 @@ void UHSRRewardSubsystem::InitializeForAutomation(UHSRInventorySubsystem* InInve
 }
 #endif
 
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 void UHSRRewardSubsystem::InitializeForDevelopmentTest(UHSRInventorySubsystem* InInventory)
 {
 	Inventory = InInventory;
