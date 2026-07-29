@@ -275,10 +275,22 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 		}
 		const FGuid* Current = FindPlacedInstance(*ExistingLoadout, Request.Kind, Request.Slot);
 		if (!Current || !InstanceOwners.Contains(*Current) || InstanceOwners.FindRef(*Current) != Request.CharacterId
-			|| !FindRegisteredInstance(*Current, DisplacedRegistryInstance)
-			|| !MappingCatalog.ResolveEquipmentDefinition(DisplacedRegistryInstance.DefinitionId, DisplacedMapping))
+			|| !FindRegisteredInstance(*Current, DisplacedRegistryInstance))
 		{
 			Result.Code = EHSREquipmentMovementResultCode::EquipmentRejected;
+			return Result;
+		}
+		if (!MappingCatalog.ResolveEquipmentDefinition(DisplacedRegistryInstance.DefinitionId, DisplacedMapping)
+			|| !MappingCatalog.Validate(DisplacedMapping.ItemId, EHSRItemStorageKind::Unique,
+				[this, &Request, &DisplacedRegistryInstance](const FName DefinitionId, const EHSREquipmentKind Kind, const int32 Slot)
+				{
+					const FDefinitionRule* Rule = Definitions.Find(DefinitionId);
+					return Rule && DefinitionId == DisplacedRegistryInstance.DefinitionId
+						&& Kind == DisplacedRegistryInstance.Kind && Kind == Request.Kind && Slot == Request.Slot
+						&& Rule->Kind == Kind && Rule->Slot == Slot;
+				}, DisplacedMapping))
+		{
+			Result.Code = EHSREquipmentMovementResultCode::MappingRejected;
 			return Result;
 		}
 		DisplacedInstanceId = *Current;

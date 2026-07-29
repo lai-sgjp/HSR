@@ -92,6 +92,13 @@ Verdict: `REVISE`
 - `HSREditor Win64 Development` compiled and linked the test successfully (6/6 actions, exit 0).
 - `Saved/Logs/03E2-FailureMatrix-DisplacedMapping-RED.log`: valid runtime RED. The test executed and failed because the conflicting mapping committed, advanced both revisions, changed placement and published both delegates. No production code changed before this RED was confirmed.
 
+## Failure matrix: displaced mapping GREEN
+
+- Replace now validates the displaced reverse mapping against the Registry payload, request kind/slot and registered Equipment definition before preparing either domain candidate.
+- Missing or incompatible displaced mappings return `MappingRejected`; placement/owner/Registry failures remain `EquipmentRejected`.
+- `HSREditor Win64 Development` passed (6/6 actions, exit 0).
+- `Saved/Logs/03E2-FailureMatrix-DisplacedMapping-GREEN.log`: the same `ReplaceNetCapacity` test passed 1/1, including zero publication on rejection and successful same-OperationId retry with the canonical catalog.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.
