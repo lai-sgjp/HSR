@@ -145,6 +145,13 @@ Verdict: `REVISE`
 - These characterization assertions passed immediately; no RED was manufactured and no production change was needed.
 - `HSREditor Win64 Development` passed (4/4 actions, exit 0). `Saved/Logs/03E2-Movement-Persistence-Coverage.log`: `HSR.Equipment.Movement` passed 4/4, exit 0.
 
+## ViewModel committed snapshot characterization coverage
+
+- Added `HSR.UI.EquipmentDetail.MovementRefresh` using the aggregate movement API rather than legacy direct Equipment mutation.
+- Successful equip and unequip each rebuild exactly one committed snapshot with the Movement result revision; OperationId replay emits no second ViewModel refresh.
+- The characterization passed immediately; no production UI or Content change was needed.
+- `HSREditor Win64 Development` passed (6/6 actions, exit 0). `Saved/Logs/03E2-ViewModel-MovementRefresh.log`: `HSR.UI.EquipmentDetail` passed 2/2, exit 0.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.
