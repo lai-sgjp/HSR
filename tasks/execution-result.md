@@ -90,3 +90,12 @@ Verdict: `REVISE`
 - The first run crashed only because the test indexed the expected membership after the unimplemented operation returned an empty array; assertion access was guarded and rerun without production changes.
 - `Saved/Logs/03E2-Unequip-RED-Automation-02.log`: valid runtime RED, exit 255. Unequip was not committed, membership stayed absent, placement stayed present, and both revisions stayed unchanged; Registry retention remained intact.
 - No production code changed before the valid runtime RED was confirmed.
+
+## Unequip GREEN checkpoint
+
+- Added an explicit catalog reverse lookup by exact `EquipmentDefinitionId`; it returns the unique configured mapping and performs no name/prefix/similarity inference.
+- Added an Inventory addition candidate with definition/storage/capacity validation and no mutation/publication during preparation.
+- Unequip validates Registry mapping, expected revisions, owner, exact placement and capacity before installing either candidate; successful commit removes placement, returns membership, retains Registry payload, advances both revisions once and publishes once per domain.
+- `Saved/Logs/03E2-Unequip-GREEN-Build.log`: `HSREditor Win64 Development` succeeded, 13 actions, exit 0.
+- `Saved/Logs/03E2-Unequip-GREEN-Automation.log`: `HSR.Equipment.Movement` 2/2 Success, exit 0.
+- Replace and its net-capacity semantics remain pending.

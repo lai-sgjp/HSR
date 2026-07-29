@@ -454,6 +454,24 @@ EHSRInventoryOperationResult UHSRInventorySubsystem::PrepareEquipmentRemovalCand
 	return EHSRInventoryOperationResult::Success;
 }
 
+EHSRInventoryOperationResult UHSRInventorySubsystem::PrepareEquipmentAdditionCandidate(const FGuid& InstanceId,
+	const FName ItemId, const int64 ExpectedRevision, FHSRInventoryMovementCandidate& OutCandidate) const
+{
+	if (ExpectedRevision != Revision) return EHSRInventoryOperationResult::RevisionConflict;
+	const FDefinitionRule* Rule = Definitions.Find(ItemId);
+	if (!Rule) return EHSRInventoryOperationResult::UnknownDefinition;
+	if (Rule->StorageKind != EHSRItemStorageKind::Unique) return EHSRInventoryOperationResult::StorageKindMismatch;
+	if (UniqueItems.Contains(InstanceId)) return EHSRInventoryOperationResult::DuplicateInstanceId;
+	FHSRInventoryMovementCandidate Candidate;
+	Candidate.Stacks = Stacks;
+	Candidate.UniqueItems = UniqueItems;
+	Candidate.UniqueItems.Add(InstanceId, {InstanceId, ItemId});
+	if (GetUsedSlots(Candidate.Stacks, Candidate.UniqueItems) > Capacity) return EHSRInventoryOperationResult::CapacityExceeded;
+	Candidate.NextRevision = Revision + 1;
+	OutCandidate = MoveTemp(Candidate);
+	return EHSRInventoryOperationResult::Success;
+}
+
 void UHSRInventorySubsystem::InstallEquipmentMovementCandidateNoFail(FHSRInventoryMovementCandidate&& Candidate)
 {
 	Stacks = MoveTemp(Candidate.Stacks);

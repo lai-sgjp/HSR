@@ -27,6 +27,18 @@ bool UHSRItemEquipmentMappingCatalog::Resolve(const FName ItemId, FHSRItemEquipm
 	return true;
 }
 
+bool UHSRItemEquipmentMappingCatalog::ResolveEquipmentDefinition(const FName EquipmentDefinitionId,
+	FHSRItemEquipmentMappingEntry& OutEntry) const
+{
+	const FHSRItemEquipmentMappingEntry* Found = Mappings.FindByPredicate([EquipmentDefinitionId](const FHSRItemEquipmentMappingEntry& Entry)
+	{
+		return Entry.EquipmentDefinitionId == EquipmentDefinitionId;
+	});
+	if (!Found) return false;
+	OutEntry = *Found;
+	return true;
+}
+
 bool UHSRItemEquipmentMappingCatalog::Validate(const FName ItemId, const EHSRItemStorageKind StorageKind, const TFunctionRef<bool(FName, EHSREquipmentKind, int32)>& DefinitionValidator, FHSRItemEquipmentMappingEntry& OutEntry) const
 {
 	if (StorageKind != EHSRItemStorageKind::Unique || !Resolve(ItemId, OutEntry))

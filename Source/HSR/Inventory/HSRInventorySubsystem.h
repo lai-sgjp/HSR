@@ -59,6 +59,8 @@ private:
 	void PublishSettlementCommit(int64 PreparedRevision);
 	EHSRInventoryOperationResult PrepareEquipmentRemovalCandidate(const FGuid& InstanceId, FName ExpectedItemId,
 		int64 ExpectedRevision, FHSRInventoryMovementCandidate& OutCandidate) const;
+	EHSRInventoryOperationResult PrepareEquipmentAdditionCandidate(const FGuid& InstanceId, FName ItemId,
+		int64 ExpectedRevision, FHSRInventoryMovementCandidate& OutCandidate) const;
 	void InstallEquipmentMovementCandidateNoFail(FHSRInventoryMovementCandidate&& Candidate);
 	void FinalizeEquipmentMovementRevisionNoFail(int64 PreparedRevision);
 	void PublishEquipmentMovementCommit(int64 PreparedRevision);

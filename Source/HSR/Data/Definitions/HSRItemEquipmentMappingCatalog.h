@@ -35,5 +35,6 @@ public:
 
 	bool AddMapping(const FHSRItemEquipmentMappingEntry& Entry);
 	bool Resolve(FName ItemId, FHSRItemEquipmentMappingEntry& OutEntry) const;
+	bool ResolveEquipmentDefinition(FName EquipmentDefinitionId, FHSRItemEquipmentMappingEntry& OutEntry) const;
 	bool Validate(FName ItemId, EHSRItemStorageKind StorageKind, const TFunctionRef<bool(FName, EHSREquipmentKind, int32)>& DefinitionValidator, FHSRItemEquipmentMappingEntry& OutEntry) const;
 };
