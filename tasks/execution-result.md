@@ -13,6 +13,13 @@ The authorized 03F scope is Map Frontend read projection and typed travel intent
 - Build: `Saved/Logs/03F-MapFrontend-GREEN-Build.log` succeeded with UHT, compile, link and metadata.
 - Automation: initial relative-project invocation failed before test discovery because `UnrealEditor-Cmd` could not resolve `HSR.uproject`; rerun with the absolute project path passed `HSR.UI.MapFrontend.ViewModel` 1/1, exit 0. Evidence: `Saved/Logs/03F-MapFrontend-GREEN-Automation-Rerun.log`.
 
+## Second GREEN slice: Map Widget
+
+- Added `UHSRMapWidget`, a Blueprintable presentation widget. Its runtime-created ViewModel reads only the owning GameInstance MapSubsystem; an externally supplied ViewModel remains externally owned. The widget can expose the snapshot and forward a TeleportId, but cannot call `OpenLevel` or mutate Map state.
+- `Saved/Logs/03F-MapWidget-Final-Build.log` succeeded with UHT, compile, link and metadata.
+- `Saved/Logs/03F-MapWidget-Final-Automation.log` reports `HSR.UI.MapFrontend.ViewModel` Success, exit 0, including Widget snapshot consumption and locked intent forwarding.
+
 ## Not verified
 
-- No Map Widget, UIManager/Frontend Router registration, Content asset, Editor Save All/reopen, PIE A -> B -> A or failure-PIE evidence has been produced yet.
+- Existing `EHSRFrontendModule::Map` routing already mounts the user-selected generic Frontend module root, so no Router/UIManager code change was required for this slice.
+- Editor work is now required: create or update the task-selected Map WBP to derive from `UHSRMapWidget` (or contain one), bind `OnMapSnapshotChanged`, call `RequestTeleport` from destination controls, and ensure the existing Frontend Map module hosts it. Save All/reopen and provide A -> B -> A plus locked/invalid destination PIE log evidence.

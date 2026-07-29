@@ -6,6 +6,7 @@
 #include "../Data/Definitions/HSRTeleportDefinition.h"
 #include "../Map/HSRMapSubsystem.h"
 #include "../UI/HSRMapViewModel.h"
+#include "../UI/HSRMapWidget.h"
 
 namespace
 {
@@ -56,6 +57,11 @@ bool FHSRMapFrontendViewModelTest::RunTest(const FString&)
 	ViewModel->OnChanged().AddLambda([&Broadcasts](const FHSRMapRuntimeSnapshot&) { ++Broadcasts; });
 	TestEqual(TEXT("unlock region A"), Maps->UnlockRegion(TEXT("Region.A")), EHSRMapOperationResult::Success);
 	TestEqual(TEXT("one committed map change refreshes once"), Broadcasts, 1);
+	auto* Widget = NewObject<UHSRMapWidget>();
+	Widget->SetViewModel(ViewModel);
+	TestTrue(TEXT("widget receives committed snapshot"), Widget->GetCurrentSnapshot(Snapshot));
+	TestEqual(TEXT("widget projects latest map revision"), Snapshot.Revision, Maps->GetSnapshot().Revision);
+	TestEqual(TEXT("widget forwards locked intent"), Widget->RequestTeleport(TEXT("Teleport.AB")), EHSRMapOperationResult::Locked);
 	ViewModel->Shutdown();
 	TestEqual(TEXT("post-shutdown map mutation"), Maps->UnlockRegion(TEXT("Region.B")), EHSRMapOperationResult::Success);
 	TestEqual(TEXT("shutdown removes subscription"), Broadcasts, 1);
