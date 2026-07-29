@@ -61,6 +61,9 @@ private:
 		int64 ExpectedRevision, FHSRInventoryMovementCandidate& OutCandidate) const;
 	EHSRInventoryOperationResult PrepareEquipmentAdditionCandidate(const FGuid& InstanceId, FName ItemId,
 		int64 ExpectedRevision, FHSRInventoryMovementCandidate& OutCandidate) const;
+	EHSRInventoryOperationResult PrepareEquipmentSwapCandidate(const FGuid& IncomingInstanceId, FName IncomingItemId,
+		const FGuid& DisplacedInstanceId, FName DisplacedItemId, int64 ExpectedRevision,
+		FHSRInventoryMovementCandidate& OutCandidate) const;
 	void InstallEquipmentMovementCandidateNoFail(FHSRInventoryMovementCandidate&& Candidate);
 	void FinalizeEquipmentMovementRevisionNoFail(int64 PreparedRevision);
 	void PublishEquipmentMovementCommit(int64 PreparedRevision);

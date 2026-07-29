@@ -75,6 +75,15 @@ Verdict: `REVISE`
 - `Saved/Logs/03E2-OperationId-RED-Build.log`: intentional compile RED on missing `FHSREquipmentMovementResult::bReplay` and `EHSREquipmentMovementResultCode::OperationIdConflict`; exit 6.
 - No production code changed before this RED was confirmed.
 
+## Replace GREEN checkpoint
+
+- Added a dedicated Inventory swap candidate that removes the incoming membership and adds the displaced membership in one copied state, then validates only final net capacity.
+- Replace validates incoming and displaced Registry payloads, both exact static mappings, expected revisions, owner and target placement before either domain installs state.
+- Successful replace reports `DisplacedInstanceId`, returns the old mapped membership, places the new InstanceId, preserves both Registry payloads and advances/publishes both revisions exactly once.
+- `Saved/Logs/03E2-Replace-GREEN-Build.log`: `HSREditor Win64 Development` succeeded, 11 actions, exit 0.
+- The first Automation invocation produced no process/log because permission approval timed out; the identical command was retried once.
+- `Saved/Logs/03E2-Replace-GREEN-Automation.log`: `HSR.Equipment.Movement` 3/3 Success, exit 0.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.

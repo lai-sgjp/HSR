@@ -221,8 +221,7 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 	Result.OldEquipmentRevision = ExistingLoadout ? ExistingLoadout->Revision : 0;
 	Result.NewEquipmentRevision = Result.OldEquipmentRevision;
 
-	if (!Request.OperationId.IsValid() || !Request.CharacterId.IsValid() || !Request.InstanceId.IsValid()
-		|| Request.Intent == EHSREquipmentMovementIntent::Replace)
+	if (!Request.OperationId.IsValid() || !Request.CharacterId.IsValid() || !Request.InstanceId.IsValid())
 	{
 		return Result;
 	}
@@ -244,11 +243,14 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 		return Result;
 	}
 	FHSRItemEquipmentMappingEntry Mapping;
+	FGuid DisplacedInstanceId;
+	FHSREquipmentInstance DisplacedRegistryInstance;
+	FHSRItemEquipmentMappingEntry DisplacedMapping;
 	const FHSRItemInstance* InventoryMembership = InventorySnapshot.UniqueItems.FindByPredicate([&Request](const FHSRItemInstance& Item)
 	{
 		return Item.InstanceId == Request.InstanceId;
 	});
-	const bool bResolvedMapping = Request.Intent == EHSREquipmentMovementIntent::Equip
+	const bool bResolvedMapping = Request.Intent != EHSREquipmentMovementIntent::Unequip
 		? InventoryMembership && MappingCatalog.Resolve(InventoryMembership->DefinitionId, Mapping)
 		: MappingCatalog.ResolveEquipmentDefinition(RegistryInstance.DefinitionId, Mapping);
 	const bool bMappingValid = bResolvedMapping && MappingCatalog.Validate(
@@ -264,11 +266,39 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 		Result.Code = EHSREquipmentMovementResultCode::MappingRejected;
 		return Result;
 	}
+	if (Request.Intent == EHSREquipmentMovementIntent::Replace)
+	{
+		if (!ExistingLoadout)
+		{
+			Result.Code = EHSREquipmentMovementResultCode::EquipmentRejected;
+			return Result;
+		}
+		const FGuid* Current = FindPlacedInstance(*ExistingLoadout, Request.Kind, Request.Slot);
+		if (!Current || !InstanceOwners.Contains(*Current) || InstanceOwners.FindRef(*Current) != Request.CharacterId
+			|| !FindRegisteredInstance(*Current, DisplacedRegistryInstance)
+			|| !MappingCatalog.ResolveEquipmentDefinition(DisplacedRegistryInstance.DefinitionId, DisplacedMapping))
+		{
+			Result.Code = EHSREquipmentMovementResultCode::EquipmentRejected;
+			return Result;
+		}
+		DisplacedInstanceId = *Current;
+	}
 
 	FHSRInventoryMovementCandidate InventoryCandidate;
-	const EHSRInventoryOperationResult InventoryResult = Request.Intent == EHSREquipmentMovementIntent::Equip
-		? Inventory.PrepareEquipmentRemovalCandidate(Request.InstanceId, Mapping.ItemId, Request.ExpectedInventoryRevision, InventoryCandidate)
-		: Inventory.PrepareEquipmentAdditionCandidate(Request.InstanceId, Mapping.ItemId, Request.ExpectedInventoryRevision, InventoryCandidate);
+	EHSRInventoryOperationResult InventoryResult = EHSRInventoryOperationResult::InvalidDefinition;
+	if (Request.Intent == EHSREquipmentMovementIntent::Equip)
+	{
+		InventoryResult = Inventory.PrepareEquipmentRemovalCandidate(Request.InstanceId, Mapping.ItemId, Request.ExpectedInventoryRevision, InventoryCandidate);
+	}
+	else if (Request.Intent == EHSREquipmentMovementIntent::Unequip)
+	{
+		InventoryResult = Inventory.PrepareEquipmentAdditionCandidate(Request.InstanceId, Mapping.ItemId, Request.ExpectedInventoryRevision, InventoryCandidate);
+	}
+	else
+	{
+		InventoryResult = Inventory.PrepareEquipmentSwapCandidate(Request.InstanceId, Mapping.ItemId,
+			DisplacedInstanceId, DisplacedMapping.ItemId, Request.ExpectedInventoryRevision, InventoryCandidate);
+	}
 	if (InventoryResult != EHSRInventoryOperationResult::Success)
 	{
 		Result.Code = EHSREquipmentMovementResultCode::InventoryRejected;
@@ -285,7 +315,7 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 		if (Request.Kind == EHSREquipmentKind::Equipment) EquipmentCandidate.Equipment.Add(static_cast<EHSREquipmentSlot>(Request.Slot), Request.InstanceId);
 		else EquipmentCandidate.Relics.Add(static_cast<EHSRRelicSlot>(Request.Slot), Request.InstanceId);
 	}
-	else
+	else if (Request.Intent == EHSREquipmentMovementIntent::Unequip)
 	{
 		const FGuid* Owner = InstanceOwners.Find(Request.InstanceId);
 		const FGuid* Placed = FindPlacedInstance(EquipmentCandidate, Request.Kind, Request.Slot);
@@ -297,6 +327,16 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 		if (Request.Kind == EHSREquipmentKind::Equipment) EquipmentCandidate.Equipment.Remove(static_cast<EHSREquipmentSlot>(Request.Slot));
 		else EquipmentCandidate.Relics.Remove(static_cast<EHSRRelicSlot>(Request.Slot));
 	}
+	else
+	{
+		if (InstanceOwners.Contains(Request.InstanceId))
+		{
+			Result.Code = EHSREquipmentMovementResultCode::EquipmentRejected;
+			return Result;
+		}
+		if (Request.Kind == EHSREquipmentKind::Equipment) EquipmentCandidate.Equipment.Add(static_cast<EHSREquipmentSlot>(Request.Slot), Request.InstanceId);
+		else EquipmentCandidate.Relics.Add(static_cast<EHSRRelicSlot>(Request.Slot), Request.InstanceId);
+	}
 	EquipmentCandidate.Revision = Result.OldEquipmentRevision + 1;
 
 	const int64 NewInventoryRevision = InventoryCandidate.NextRevision;
@@ -304,7 +344,8 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 	FLoadoutState& InstalledLoadout = Loadouts.FindOrAdd(Request.CharacterId);
 	InstalledLoadout = MoveTemp(EquipmentCandidate);
 	if (Request.Intent == EHSREquipmentMovementIntent::Equip) InstanceOwners.Add(Request.InstanceId, Request.CharacterId);
-	else InstanceOwners.Remove(Request.InstanceId);
+	else if (Request.Intent == EHSREquipmentMovementIntent::Unequip) InstanceOwners.Remove(Request.InstanceId);
+	else { InstanceOwners.Remove(DisplacedInstanceId); InstanceOwners.Add(Request.InstanceId, Request.CharacterId); Result.DisplacedInstanceId = DisplacedInstanceId; }
 	Inventory.FinalizeEquipmentMovementRevisionNoFail(NewInventoryRevision);
 	Result.NewInventoryRevision = NewInventoryRevision;
 	Result.NewEquipmentRevision = InstalledLoadout.Revision;
