@@ -1,6 +1,13 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-07-28
+> 最后更新：2026-07-29
+
+## 2026-07-29 最新权威摘要
+
+- `TASK-P17-PATCH-03E1` 已完成并准备归档：Equipment Registry 永久拥有完整实例 payload，loadout 仅保存 InstanceId placement，Save schema 7 分离 Registry/Placement，schema 6 保守迁移且不推断 Inventory unique item。
+- Build、`HSR.Equipment.Registry` 3/3、`HSR.Equipment` 8/8、`HSR.Save` 16/16、`HSR.Inventory` 3/3、`HSR.UI.EquipmentDetail.ViewModel` 1/1 与最终 Independent Review 均 `PASS`。
+- 用户提供的 Editor/PIE 日志确认探索启动、Character possession、Enhanced Input 和正常 teardown。当前 Character/Inventory/Equipment 与 Save/Load UI 未完成，因此 UI 驱动的装备 payload 检查和 PIE save/load 对比为 `NOT APPLICABLE / NOT VERIFIED`，不外推为已验证。
+- 03E2 只允许准备 Task Gate；Inventory/Equipment 原子移动、OperationId、容量交换、ASC 动态投影和 UI 操作均未实施、未授权。
 
 ## 2026-07-28 最新权威摘要
 

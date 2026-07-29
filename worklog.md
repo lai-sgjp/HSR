@@ -2233,3 +2233,11 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - 03E is split into 03E1 ownership/persistence foundation and 03E2 aggregate movement/projection. 03E1 excludes Inventory mutation, live ASC changes and UI routing.
 - 03E1 freezes Save schema 7 with separate registry/placement DTOs. Schema 6 equipped rows migrate losslessly; Inventory unique rows are not guessed into equipment records.
 - Exact Equipment/Save allowlist and registry/migration/restore TDD matrix are frozen. Task Gate review is `PASS`; implementation awaits separate user confirmation.
+
+# 2026-07-29 | TASK-P17-PATCH-03E1 final closeout
+
+- Commits `473f46c`, `7eaa388` and `6fe6268` establish Registry-owned payloads, schema-7 Registry/Placement persistence, disk-restore preservation, failed-placement registration rollback and strict canonical placement decoding; Independent Review `786a202` is `PASS`.
+- HSREditor Development Build passed. Registry 3/3, Equipment 8/8, Save 16/16, Inventory 3/3 and Equipment Detail ViewModel 1/1 Automation passed; `git diff --check` passed.
+- User-provided Editor/PIE evidence confirms `Map_Exploration_P15_B` startup, `BP_HSRExplorationCharacter_C_0` possession, Enhanced Input bindings, `Character.A` bootstrap and normal teardown. The existing GameplayCue path fallback warning is unrelated and non-blocking.
+- Character/Inventory/Equipment and Save/Load UI are not complete, so UI-driven equipment payload inspection and PIE save/load comparison remain `NOT APPLICABLE / NOT VERIFIED`; no temporary Content or debug entry was created.
+- 03E1 is complete and archived. 03E2 may proceed only to Task Gate preparation; no 03E2 implementation is authorized.
