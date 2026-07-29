@@ -15,6 +15,7 @@ Status: `TASK GATE PREPARATION ONLY / INDEPENDENT REVIEW REQUIRED / IMPLEMENTATI
 - OperationId replay returns the cached result and produces no second membership, placement, revision, delegate or ASC effect mutation. A reused OperationId with a different request is rejected.
 - Replacing an occupied slot explicitly returns the displaced InstanceId to Inventory in the same transaction; capacity is checked against the net candidate, not sequential intermediate state.
 - ASC/EffectBridge receives a post-commit resolved aggregate only. Projection validity and required source-effect handles must be preflighted before commit; if the projection cannot be proven ready, the transaction is rejected with zero domain mutation. Commit must not depend on a fallible post-commit compensation path.
+- Equipment Detail ViewModel/Widget remains a read/intent presentation layer: it may subscribe to the single committed revision and rebuild one resolved snapshot, but it cannot own OperationId, mutate Inventory/Equipment, apply/remove GE or serialize Save data.
 
 ## Required failure matrix
 
@@ -42,7 +43,9 @@ Status: `TASK GATE PREPARATION ONLY / INDEPENDENT REVIEW REQUIRED / IMPLEMENTATI
 - `Source/HSR/Inventory/HSRInventorySubsystem.h/.cpp` and `HSRItemTypes.h` only for the minimum candidate/commit seam;
 - `Source/HSR/Equipment/HSREquipmentSubsystem.h/.cpp` and `HSREquipmentTypes.h` only for the minimum candidate/commit seam;
 - one bounded integration command/request/result type in the owning subsystem boundary; no global manager or new runtime module;
-- `Source/HSR/Equipment/HSREquipmentEffectBridge.*` only for post-commit projection/compensation integration;
+- `Source/HSR/Equipment/HSREquipmentEffectBridge.h/.cpp` only for derived source-effect projection with preflightable failure behavior;
+- `Source/HSR/Equipment/HSREquipmentStatAggregator.h/.cpp` and `HSRRelicSetResolver.h/.cpp` only for deterministic candidate/read-model aggregation;
+- `Source/HSR/UI/HSREquipmentDetailViewModel.h/.cpp`, `HSREquipmentDetailTypes.h`, `HSREquipmentDetailWidget.h/.cpp` only for one committed-snapshot refresh and typed presentation events;
 - exact new regression tests for the matrix above;
 - task evidence Markdown only.
 
@@ -64,6 +67,10 @@ Inventory, Equipment, Save, Battle, SettlementAuthority, UI and Content changes 
 - No ASC dynamic equipment effects.
 - No equipment UI operation or new/modified Content asset.
 - No 03F or resumed P17 Editor work.
+
+## Editor boundary for the Gate
+
+The candidate asset set is limited to existing `/Game/Data/Relics/DA_Relic_*`, `/Game/Data/RelicSets/DA_RelicSet_P12_A`, `GE_Equipment_P12`, `GE_Relic_P12`, `GE_RelicSet_P12_A`, `/Game/UI/WBP_Inventory_P13` and `/Game/UI/WBP_EquipmentDetail_P12`. User work, if those assets are available, is Compile/Save All/reopen and PIE observation of equip -> replace -> unequip plus wrong-owner/incompatible/stale failures. Blueprint may bind selection, intents and committed snapshots only; it may not create ownership, mutate slots, apply/remove GE or save/load.
 
 ## Next gate
 
