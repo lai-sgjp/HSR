@@ -125,6 +125,13 @@ Verdict: `REVISE`
 - `HSREditor Win64 Development` passed with UHT, compile, lib/dll link and metadata (15/15 actions, exit 0).
 - `Saved/Logs/03E2-ProjectionPreflight-GREEN.log`: the same `BagToEquip` test passed 1/1, proving rejection zero pollution, failed-OperationId reuse and ordered `Inventory -> Equipment -> Projection` publication.
 
+## Restore ledger lifecycle TDD RED
+
+- Extended the successful movement journey to export and commit the same schema-7 Registry/Placement candidate, then issue the pre-restore request again.
+- `HSREditor Win64 Development` passed (6/6 actions, exit 0).
+- `Saved/Logs/03E2-RestoreLedger-RED.log`: valid runtime RED. `CommitRestore` retained the transient ledger, so the old OperationId returned cached success with `bReplay=true` instead of revalidating the restored Inventory/Equipment authority.
+- No production code changed before this RED was confirmed.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.

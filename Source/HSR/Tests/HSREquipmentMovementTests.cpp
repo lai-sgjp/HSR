@@ -5,6 +5,7 @@
 #include "../Data/Definitions/HSREquipmentDefinition.h"
 #include "../Equipment/HSREquipmentSubsystem.h"
 #include "../Inventory/HSRInventorySubsystem.h"
+#include "../Save/HSRSaveTypes.h"
 #include "Engine/GameInstance.h"
 #include "Misc/AutomationTest.h"
 
@@ -193,6 +194,18 @@ bool FHSREquipmentMovementBagToEquipTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Equipment publishes second"), PublicationOrder[1], FName(TEXT("Equipment")));
 		TestEqual(TEXT("Projection publishes last"), PublicationOrder[2], FName(TEXT("Projection")));
 	}
+	TArray<FHSREquipmentRegistryDto> SavedRegistry;
+	TArray<FHSREquipmentPlacementDto> SavedPlacements;
+	Equipment->ExportSaveData(SavedRegistry, SavedPlacements);
+	FHSREquipmentRegistryRestoreState RestoreCandidate;
+	TestTrue(TEXT("Committed movement state prepares for restore"),
+		Equipment->PrepareRestore(SavedRegistry, SavedPlacements, RestoreCandidate));
+	Equipment->CommitRestore(RestoreCandidate);
+	const FHSREquipmentMovementResult PostRestoreRequest = Equipment->ExecuteMovement(ProjectionRequest, *Inventory, *Catalog);
+	TestEqual(TEXT("Restore clears transient ledger and revalidates authority"),
+		PostRestoreRequest.Code, EHSREquipmentMovementResultCode::InventoryRejected);
+	TestFalse(TEXT("Post-restore request is not historical replay"), PostRestoreRequest.bReplay);
+	TestFalse(TEXT("Post-restore rejected request does not commit"), PostRestoreRequest.bCommitted);
 	return true;
 }
 
