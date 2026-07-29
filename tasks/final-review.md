@@ -57,3 +57,12 @@ Post-authorization evidence:
 - `HSREditor Win64 Development`: PASS.
 - `HSR.Equipment`: 12/12 PASS; `HSR.Save`: 16/16 PASS after the authorized fixes.
 - These broad suite logs predate the last small mapping/reentrant commits; the focused GREEN logs cover those checkpoints, but a final full-suite rerun remains required once the two P1 findings are resolved.
+
+## Final Independent Review
+
+Verdict: `PASS`
+
+- The production Mapping Catalog is strongly retained, loads from the committed DataAsset, and schema-7 shared Registry/Inventory identities validate ItemId, EquipmentDefinitionId, Kind, and Slot compatibility.
+- `ExecuteMovement` runs the fallible runtime projection apply stage before Inventory/Equipment installation. Actual Apply/Remove failure returns `ProjectionRejected` before any domain mutation; only the notification callback remains after domain publication.
+- Runtime tests cover successful equip/replace/unequip, actual Apply/Remove injected failure, source preservation, and zero domain pollution. Final Automation regression is GREEN: Equipment 13/13, Inventory 3/3, Save 16/16, EquipmentDetail 2/2.
+- Independent review at `1d2c0ce` found no remaining P0/P1 issue. Editor/PIE observation remains a manual validation gap only; it is not a code gate failure.

@@ -222,3 +222,11 @@ Verdict: `REVISE`
 - The required successful final state swaps bag membership and placement atomically, returns `DisplacedInstanceId`, retains both Registry payloads/enhancement levels and advances each revision once.
 - `Saved/Logs/03E2-Replace-RED-Automation.log`: valid runtime RED, exit 255. Replace remained uncommitted; the new instance stayed in Inventory, the old instance stayed placed, revisions stayed unchanged, and Registry payload checks continued to pass.
 - No production code changed before this RED was confirmed.
+
+## Runtime Projection Atomicity Closeout
+
+- Production Save now strongly retains `/Game/Data/Items/DA_ItemEquipmentMappingCatalog_P17` and rejects schema-7 Registry/Inventory shared identities unless ItemId, EquipmentDefinitionId, Kind, and the mapped Slot all match the registered Equipment definition.
+- Runtime Battle binds movement preflight, a fallible actual projection-apply stage, and a notification-only post-publication callback. Actual EffectBridge Apply/Remove now completes before the prepared Inventory/Equipment candidates install; failure returns `ProjectionRejected` with no domain mutation or publication.
+- Runtime coverage proves source cleanup on unequip, a single replacement source, and injected actual Apply/Remove failures with preserved source and unmodified domain authority.
+- RED evidence: `03E2-ActualProjectionFailure-RED-Build.log` fails only because the actual-commit failure contract did not exist. GREEN evidence: `03E2-ActualProjectionFailure-GREEN-Build.log` succeeded and `03E2-ActualProjectionFailure-GREEN.log` reports `HSR.Equipment.Movement.RuntimeProjection` Success.
+- Final closeout logs: `03E2-AtomicProjection-HSR-Equipment.log` 13/13, `03E2-AtomicProjection-HSR-Inventory.log` 3/3, `03E2-AtomicProjection-HSR-Save.log` 16/16, and `03E2-AtomicProjection-HSR-UI-EquipmentDetail.log` 2/2; each exits 0.
