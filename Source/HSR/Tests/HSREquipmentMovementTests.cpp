@@ -26,6 +26,12 @@ bool FHSRItemEquipmentMappingContractTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Duplicate ItemId rejected"), Catalog->AddMapping(Entry));
 	TestTrue(TEXT("Mapping resolves by explicit ItemId"), Catalog->Resolve(TEXT("Item.Equipment.Test"), Entry));
 	TestEqual(TEXT("Resolved target is explicit"), Entry.EquipmentDefinitionId, FName(TEXT("Equipment.Test")));
+	FHSRItemEquipmentMappingEntry ConflictingEntry = Entry;
+	ConflictingEntry.EquipmentDefinitionId = TEXT("Equipment.Conflicting");
+	Catalog->Mappings.Add(ConflictingEntry);
+	TestFalse(TEXT("Authored duplicate ItemId is rejected at resolve"), Catalog->Resolve(Entry.ItemId, ConflictingEntry));
+	TestFalse(TEXT("Authored duplicate Equipment definition is rejected at reverse resolve"),
+		Catalog->ResolveEquipmentDefinition(Entry.EquipmentDefinitionId, ConflictingEntry));
 	return true;
 }
 
@@ -353,6 +359,12 @@ bool FHSREquipmentMovementDomainFailureMatrixTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Missing Registry instance rejected"), Equipment->ExecuteMovement(Request, *Inventory, *Catalog).Code,
 		EHSREquipmentMovementResultCode::EquipmentRejected);
 	VerifyUnchanged(TEXT("MissingRegistry"), StableInventoryRevision, StableEquipmentRevision, StableMembershipCount);
+
+	Request = MakeUnequip(StableInventoryRevision, StableEquipmentRevision);
+	Request.Intent = static_cast<EHSREquipmentMovementIntent>(255);
+	TestEqual(TEXT("Invalid movement intent rejected"), Equipment->ExecuteMovement(Request, *Inventory, *Catalog).Code,
+		EHSREquipmentMovementResultCode::InvalidRequest);
+	VerifyUnchanged(TEXT("InvalidIntent"), StableInventoryRevision, StableEquipmentRevision, StableMembershipCount);
 
 	UHSRItemEquipmentMappingCatalog* EmptyCatalog = NewObject<UHSRItemEquipmentMappingCatalog>();
 	Request = MakeUnequip(StableInventoryRevision, StableEquipmentRevision);

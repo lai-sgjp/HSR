@@ -165,6 +165,13 @@ Verdict: `REVISE`
 - `HSREditor Win64 Development` passed (6/6 actions, exit 0).
 - `Saved/Logs/03E2-Schema7-BaggedSave-GREEN.log`: `HSR.Save.Validation.Preflight` passed 1/1. The bagged Registry payload and Inventory membership now Load/Save round-trip with the same InstanceId.
 
+## Mapping conflict and invalid intent TDD RED
+
+- Added direct authored duplicate mapping coverage, bypassing `AddMapping`, plus an invalid Blueprint-supplied movement intent to the domain preflight matrix.
+- `HSREditor Win64 Development` passed (6/6 actions, exit 0).
+- `Saved/Logs/03E2-MappingIntent-RED.log`: valid runtime RED. Mapping forward/reverse lookup selected the first duplicate; invalid intent did not return `InvalidRequest`. The other Movement tests remained GREEN.
+- No production code changed before this RED was confirmed.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.
