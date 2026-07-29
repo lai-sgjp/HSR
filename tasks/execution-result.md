@@ -99,3 +99,10 @@ Verdict: `REVISE`
 - `Saved/Logs/03E2-Unequip-GREEN-Build.log`: `HSREditor Win64 Development` succeeded, 13 actions, exit 0.
 - `Saved/Logs/03E2-Unequip-GREEN-Automation.log`: `HSR.Equipment.Movement` 2/2 Success, exit 0.
 - Replace and its net-capacity semantics remain pending.
+
+## Replace TDD RED
+
+- Added `HSR.Equipment.Movement.Transaction.ReplaceNetCapacity` with Inventory capacity fixed at one: the new instance fills the bag, while the old instance occupies the target slot.
+- The required successful final state swaps bag membership and placement atomically, returns `DisplacedInstanceId`, retains both Registry payloads/enhancement levels and advances each revision once.
+- `Saved/Logs/03E2-Replace-RED-Automation.log`: valid runtime RED, exit 255. Replace remained uncommitted; the new instance stayed in Inventory, the old instance stayed placed, revisions stayed unchanged, and Registry payload checks continued to pass.
+- No production code changed before this RED was confirmed.

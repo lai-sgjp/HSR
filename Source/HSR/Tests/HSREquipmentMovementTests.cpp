@@ -151,4 +151,67 @@ bool FHSREquipmentMovementBagToEquipTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FHSREquipmentMovementReplaceTest,
+	"HSR.Equipment.Movement.Transaction.ReplaceNetCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSREquipmentMovementReplaceTest::RunTest(const FString& Parameters)
+{
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GetTransientPackage());
+	UHSRInventorySubsystem* Inventory = NewObject<UHSRInventorySubsystem>(GameInstance);
+	UHSREquipmentSubsystem* Equipment = NewObject<UHSREquipmentSubsystem>(GameInstance);
+	UHSRItemEquipmentMappingCatalog* Catalog = NewObject<UHSRItemEquipmentMappingCatalog>();
+	TestTrue(TEXT("Capacity one configured"), Inventory->SetCapacityForAutomation(1));
+
+	auto RegisterPair = [this, Inventory, Equipment, Catalog](FName ItemId, FName EquipmentId)
+	{
+		UHSRItemDefinition* Item = NewObject<UHSRItemDefinition>();
+		Item->ItemId = ItemId; Item->StorageKind = EHSRItemStorageKind::Unique; Item->MaxStack = 1;
+		TestEqual(TEXT("Inventory definition registered"), Inventory->RegisterDefinition(*Item), EHSRInventoryOperationResult::Success);
+		UHSREquipmentDefinition* Definition = NewObject<UHSREquipmentDefinition>();
+		Definition->DefinitionId = EquipmentId; Definition->Slot = EHSREquipmentSlot::Weapon; Definition->EnhancementCap = 10;
+		TestEqual(TEXT("Equipment definition registered"), Equipment->RegisterDefinition(*Definition), EHSREquipmentOperationResult::Success);
+		FHSRItemEquipmentMappingEntry Mapping;
+		Mapping.ItemId = ItemId; Mapping.EquipmentDefinitionId = EquipmentId; Mapping.Kind = EHSREquipmentKind::Equipment; Mapping.Slot = 0;
+		TestTrue(TEXT("Mapping registered"), Catalog->AddMapping(Mapping));
+	};
+	RegisterPair(TEXT("Item.Weapon.Old"), TEXT("Equipment.Weapon.Old"));
+	RegisterPair(TEXT("Item.Weapon.New"), TEXT("Equipment.Weapon.New"));
+
+	const FGuid CharacterId = FGuid::NewGuid();
+	const FGuid OldId = FGuid::NewGuid();
+	const FGuid NewId = FGuid::NewGuid();
+	FHSREquipmentInstance OldPayload; OldPayload.InstanceId = OldId; OldPayload.DefinitionId = TEXT("Equipment.Weapon.Old"); OldPayload.EnhancementLevel = 4;
+	FHSREquipmentInstance NewPayload; NewPayload.InstanceId = NewId; NewPayload.DefinitionId = TEXT("Equipment.Weapon.New"); NewPayload.EnhancementLevel = 7;
+	TestEqual(TEXT("Old Registry payload"), Equipment->RegisterInstance(OldPayload), EHSREquipmentOperationResult::Success);
+	TestEqual(TEXT("New Registry payload"), Equipment->RegisterInstance(NewPayload), EHSREquipmentOperationResult::Success);
+	FHSRItemInstance OldMembership{OldId, TEXT("Item.Weapon.Old")};
+	TestEqual(TEXT("Old membership seeded"), Inventory->AddUnique(OldMembership), EHSRInventoryOperationResult::Success);
+	FHSRInventorySnapshot Snapshot; Inventory->GetSnapshot(Snapshot);
+	FHSREquipmentMovementRequest EquipRequest;
+	EquipRequest.OperationId=FGuid::NewGuid();EquipRequest.CharacterId=CharacterId;EquipRequest.InstanceId=OldId;EquipRequest.Intent=EHSREquipmentMovementIntent::Equip;EquipRequest.Kind=EHSREquipmentKind::Equipment;EquipRequest.Slot=0;EquipRequest.ExpectedInventoryRevision=Snapshot.Revision;EquipRequest.ExpectedEquipmentRevision=0;
+	const FHSREquipmentMovementResult EquipResult=Equipment->ExecuteMovement(EquipRequest,*Inventory,*Catalog);
+	TestEqual(TEXT("Old equipped"),EquipResult.Code,EHSREquipmentMovementResultCode::Success);
+	FHSRItemInstance NewMembership{NewId, TEXT("Item.Weapon.New")};
+	TestEqual(TEXT("New membership fills capacity"), Inventory->AddUnique(NewMembership), EHSRInventoryOperationResult::Success);
+	Inventory->GetSnapshot(Snapshot);
+	FHSREquipmentMovementRequest ReplaceRequest;
+	ReplaceRequest.OperationId=FGuid::NewGuid();ReplaceRequest.CharacterId=CharacterId;ReplaceRequest.InstanceId=NewId;ReplaceRequest.Intent=EHSREquipmentMovementIntent::Replace;ReplaceRequest.Kind=EHSREquipmentKind::Equipment;ReplaceRequest.Slot=0;ReplaceRequest.ExpectedInventoryRevision=Snapshot.Revision;ReplaceRequest.ExpectedEquipmentRevision=EquipResult.NewEquipmentRevision;
+	const FHSREquipmentMovementResult ReplaceResult=Equipment->ExecuteMovement(ReplaceRequest,*Inventory,*Catalog);
+	TestEqual(TEXT("Replace commits at net capacity"),ReplaceResult.Code,EHSREquipmentMovementResultCode::Success);
+	TestTrue(TEXT("Replace committed"),ReplaceResult.bCommitted);
+	TestEqual(TEXT("Displaced InstanceId returned"),ReplaceResult.DisplacedInstanceId,OldId);
+	Inventory->GetSnapshot(Snapshot);
+	TestEqual(TEXT("Bag remains at one slot"),Snapshot.UniqueItems.Num(),1);
+	if(Snapshot.UniqueItems.Num()==1){TestEqual(TEXT("Old membership returned"),Snapshot.UniqueItems[0].InstanceId,OldId);TestEqual(TEXT("Old ItemId returned"),Snapshot.UniqueItems[0].DefinitionId,FName(TEXT("Item.Weapon.Old")));}
+	FHSREquipmentLoadout Loadout;int32 Revision=0;TestTrue(TEXT("Loadout resolves after replace"),Equipment->GetLoadout(CharacterId,Loadout,Revision));
+	TestEqual(TEXT("New instance placed"),Loadout.Equipment.FindChecked(EHSREquipmentSlot::Weapon).InstanceId,NewId);
+	TestEqual(TEXT("Inventory revision advances once"),Snapshot.Revision,ReplaceRequest.ExpectedInventoryRevision+1);
+	TestEqual(TEXT("Equipment revision advances once"),Revision,ReplaceRequest.ExpectedEquipmentRevision+1);
+	FHSREquipmentInstance Resolved;TestTrue(TEXT("Old Registry retained"),Equipment->FindRegisteredInstance(OldId,Resolved));TestEqual(TEXT("Old enhancement retained"),Resolved.EnhancementLevel,4);
+	TestTrue(TEXT("New Registry retained"),Equipment->FindRegisteredInstance(NewId,Resolved));TestEqual(TEXT("New enhancement retained"),Resolved.EnhancementLevel,7);
+	return true;
+}
+
 #endif
