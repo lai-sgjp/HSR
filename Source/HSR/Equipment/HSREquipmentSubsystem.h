@@ -7,6 +7,8 @@
 
 class UHSREquipmentDefinition;
 class UHSRRelicDefinition;
+class UHSRInventorySubsystem;
+class UHSRItemEquipmentMappingCatalog;
 struct FHSREquipmentSaveDto;
 
 struct FHSREquipmentRestoreState
@@ -55,6 +57,8 @@ public:
 	bool FindRegisteredInstance(const FGuid& InstanceId, FHSREquipmentInstance& OutInstance) const;
 	EHSREquipmentOperationResult EquipById(const FGuid& CharacterId, const FGuid& InstanceId);
 	EHSREquipmentOperationResult ReplaceById(const FGuid& CharacterId, const FGuid& InstanceId);
+	FHSREquipmentMovementResult ExecuteMovement(const FHSREquipmentMovementRequest& Request,
+		UHSRInventorySubsystem& Inventory, const UHSRItemEquipmentMappingCatalog& MappingCatalog);
 
 	EHSREquipmentOperationResult Equip(const FGuid& CharacterId, const FHSREquipmentInstance& Instance);
 	EHSREquipmentOperationResult Replace(const FGuid& CharacterId, const FHSREquipmentInstance& Instance);

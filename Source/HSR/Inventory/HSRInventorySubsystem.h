@@ -8,6 +8,7 @@
 class UHSRItemDefinition;
 class UHSRRewardSubsystem;
 class UHSRSettlementAuthority;
+class UHSREquipmentSubsystem;
 struct FHSRInventorySettlementCandidate;
 
 UCLASS()
@@ -39,6 +40,7 @@ public:
 private:
 	friend class UHSRRewardSubsystem;
 	friend class UHSRSettlementAuthority;
+	friend class UHSREquipmentSubsystem;
 	struct FDefinitionRule
 	{
 		EHSRItemStorageKind StorageKind = EHSRItemStorageKind::Stackable;
@@ -55,6 +57,11 @@ private:
 	void InstallSettlementCandidateNoFail(FHSRInventorySettlementCandidate&& Candidate);
 	void FinalizeSettlementRevisionNoFail(int64 PreparedRevision);
 	void PublishSettlementCommit(int64 PreparedRevision);
+	EHSRInventoryOperationResult PrepareEquipmentRemovalCandidate(const FGuid& InstanceId, FName ExpectedItemId,
+		int64 ExpectedRevision, FHSRInventoryMovementCandidate& OutCandidate) const;
+	void InstallEquipmentMovementCandidateNoFail(FHSRInventoryMovementCandidate&& Candidate);
+	void FinalizeEquipmentMovementRevisionNoFail(int64 PreparedRevision);
+	void PublishEquipmentMovementCommit(int64 PreparedRevision);
 
 	TMap<FName, FDefinitionRule> Definitions;
 	TMap<FName, int32> Stacks;

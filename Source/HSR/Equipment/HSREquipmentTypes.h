@@ -72,6 +72,56 @@ enum class EHSREquipmentOperationResult : uint8
 	InvalidEnhancementLevel
 };
 
+UENUM(BlueprintType)
+enum class EHSREquipmentMovementIntent : uint8
+{
+	Equip,
+	Unequip,
+	Replace
+};
+
+UENUM(BlueprintType)
+enum class EHSREquipmentMovementResultCode : uint8
+{
+	Success,
+	InvalidRequest,
+	InventoryRevisionConflict,
+	EquipmentRevisionConflict,
+	MappingRejected,
+	InventoryRejected,
+	EquipmentRejected
+};
+
+USTRUCT(BlueprintType)
+struct FHSREquipmentMovementRequest
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite) FGuid OperationId;
+	UPROPERTY(BlueprintReadWrite) FGuid CharacterId;
+	UPROPERTY(BlueprintReadWrite) FGuid InstanceId;
+	UPROPERTY(BlueprintReadWrite) EHSREquipmentMovementIntent Intent = EHSREquipmentMovementIntent::Equip;
+	UPROPERTY(BlueprintReadWrite) EHSREquipmentKind Kind = EHSREquipmentKind::Equipment;
+	UPROPERTY(BlueprintReadWrite) int32 Slot = 0;
+	UPROPERTY(BlueprintReadWrite) int64 ExpectedInventoryRevision = 0;
+	UPROPERTY(BlueprintReadWrite) int32 ExpectedEquipmentRevision = 0;
+};
+
+USTRUCT(BlueprintType)
+struct FHSREquipmentMovementResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly) FGuid OperationId;
+	UPROPERTY(BlueprintReadOnly) EHSREquipmentMovementResultCode Code = EHSREquipmentMovementResultCode::InvalidRequest;
+	UPROPERTY(BlueprintReadOnly) bool bCommitted = false;
+	UPROPERTY(BlueprintReadOnly) int64 OldInventoryRevision = 0;
+	UPROPERTY(BlueprintReadOnly) int64 NewInventoryRevision = 0;
+	UPROPERTY(BlueprintReadOnly) int32 OldEquipmentRevision = 0;
+	UPROPERTY(BlueprintReadOnly) int32 NewEquipmentRevision = 0;
+	UPROPERTY(BlueprintReadOnly) FGuid DisplacedInstanceId;
+};
+
 USTRUCT(BlueprintType)
 struct FHSREquipmentModifier
 {

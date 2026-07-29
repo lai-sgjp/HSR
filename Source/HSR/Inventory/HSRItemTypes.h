@@ -113,4 +113,11 @@ struct FHSRInventoryRestoreState
 	int64 Revision = 0;
 };
 
+struct FHSRInventoryMovementCandidate
+{
+	TMap<FName, int32> Stacks;
+	TMap<FGuid, FHSRItemInstance> UniqueItems;
+	int64 NextRevision = 0;
+};
+
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRInventoryChanged, int64 /* Revision */);

@@ -5,6 +5,7 @@
 #include "../Data/Definitions/HSREquipmentDefinition.h"
 #include "../Equipment/HSREquipmentSubsystem.h"
 #include "../Inventory/HSRInventorySubsystem.h"
+#include "Engine/GameInstance.h"
 #include "Misc/AutomationTest.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -34,8 +35,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FHSREquipmentMovementBagToEquipTest::RunTest(const FString& Parameters)
 {
-	UHSRInventorySubsystem* Inventory = NewObject<UHSRInventorySubsystem>();
-	UHSREquipmentSubsystem* Equipment = NewObject<UHSREquipmentSubsystem>();
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GetTransientPackage());
+	UHSRInventorySubsystem* Inventory = NewObject<UHSRInventorySubsystem>(GameInstance);
+	UHSREquipmentSubsystem* Equipment = NewObject<UHSREquipmentSubsystem>(GameInstance);
 	UHSRItemEquipmentMappingCatalog* Catalog = NewObject<UHSRItemEquipmentMappingCatalog>();
 
 	UHSRItemDefinition* ItemDefinition = NewObject<UHSRItemDefinition>();

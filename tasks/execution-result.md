@@ -58,3 +58,13 @@ Verdict: `REVISE`
 - `Saved/Logs/03E2-Transaction-RED-Build.log`: `HSREditor Win64 Development` exited 6 because `FHSREquipmentMovementRequest`, `EHSREquipmentMovementIntent`, `FHSREquipmentMovementResult`, `EHSREquipmentMovementResultCode`, and `UHSREquipmentSubsystem::ExecuteMovement` do not yet exist.
 - The RED is intentional and target-specific: the new test compiled far enough to exercise the missing API contract; no unrelated source failure precedes it.
 - Production code remains unchanged at this RED checkpoint.
+
+## Bag-to-equip GREEN checkpoint
+
+- Added the minimum candidate-first Inventory removal seam and Equipment aggregate `ExecuteMovement` entry for the authorized bag-to-equip slice.
+- Both revisions are validated before mutation; explicit ItemId mapping, Registry definition/kind and target slot must agree.
+- Candidate state is installed in both domains before revisions and delegates are published. Existing public `RemoveUnique`/`EquipById` mutation paths are not composed, avoiding an early one-domain broadcast.
+- First runtime attempt was invalid test-fixture evidence: subsystem objects were created without a `UGameInstance` Outer and UE reported a handled ensure. The fixture was corrected without changing production behavior.
+- `Saved/Logs/03E2-BagToEquip-GREEN-Build-02.log`: `HSREditor Win64 Development` succeeded, 5 actions, exit 0.
+- `Saved/Logs/03E2-BagToEquip-GREEN-Automation-02.log`: `HSR.Equipment.Movement` 2/2 Success, exit 0.
+- This checkpoint covers only bag-to-equip and mapping. Unequip, replace, OperationId replay, projection preflight, capacity/failure injection, Save round-trip and UI intent remain pending and are not claimed.

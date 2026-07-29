@@ -438,6 +438,39 @@ void UHSRInventorySubsystem::PublishSettlementCommit(int64 PreparedRevision)
 	BroadcastRevision(Revision);
 }
 
+EHSRInventoryOperationResult UHSRInventorySubsystem::PrepareEquipmentRemovalCandidate(const FGuid& InstanceId,
+	const FName ExpectedItemId, const int64 ExpectedRevision, FHSRInventoryMovementCandidate& OutCandidate) const
+{
+	if (ExpectedRevision != Revision) return EHSRInventoryOperationResult::RevisionConflict;
+	const FHSRItemInstance* Existing = UniqueItems.Find(InstanceId);
+	if (!Existing) return EHSRInventoryOperationResult::InstanceNotFound;
+	if (Existing->DefinitionId != ExpectedItemId) return EHSRInventoryOperationResult::StorageKindMismatch;
+	FHSRInventoryMovementCandidate Candidate;
+	Candidate.Stacks = Stacks;
+	Candidate.UniqueItems = UniqueItems;
+	Candidate.UniqueItems.Remove(InstanceId);
+	Candidate.NextRevision = Revision + 1;
+	OutCandidate = MoveTemp(Candidate);
+	return EHSRInventoryOperationResult::Success;
+}
+
+void UHSRInventorySubsystem::InstallEquipmentMovementCandidateNoFail(FHSRInventoryMovementCandidate&& Candidate)
+{
+	Stacks = MoveTemp(Candidate.Stacks);
+	UniqueItems = MoveTemp(Candidate.UniqueItems);
+}
+
+void UHSRInventorySubsystem::FinalizeEquipmentMovementRevisionNoFail(const int64 PreparedRevision)
+{
+	Revision = PreparedRevision;
+}
+
+void UHSRInventorySubsystem::PublishEquipmentMovementCommit(const int64 PreparedRevision)
+{
+	check(Revision == PreparedRevision);
+	BroadcastRevision(PreparedRevision);
+}
+
 #if WITH_DEV_AUTOMATION_TESTS
 bool UHSRInventorySubsystem::SetCapacityForAutomation(int32 NewCapacity)
 {
