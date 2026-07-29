@@ -228,6 +228,12 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 	{
 		return Result;
 	}
+	if (Request.Intent != EHSREquipmentMovementIntent::Equip
+		&& Request.Intent != EHSREquipmentMovementIntent::Unequip
+		&& Request.Intent != EHSREquipmentMovementIntent::Replace)
+	{
+		return Result;
+	}
 	if (Request.ExpectedInventoryRevision != InventorySnapshot.Revision)
 	{
 		Result.Code = EHSREquipmentMovementResultCode::InventoryRevisionConflict;

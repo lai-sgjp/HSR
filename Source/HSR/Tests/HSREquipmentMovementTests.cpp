@@ -29,6 +29,9 @@ bool FHSRItemEquipmentMappingContractTest::RunTest(const FString& Parameters)
 	FHSRItemEquipmentMappingEntry ConflictingEntry = Entry;
 	ConflictingEntry.EquipmentDefinitionId = TEXT("Equipment.Conflicting");
 	Catalog->Mappings.Add(ConflictingEntry);
+	FHSRItemEquipmentMappingEntry ReverseConflictingEntry = Entry;
+	ReverseConflictingEntry.ItemId = TEXT("Item.Equipment.Conflicting");
+	Catalog->Mappings.Add(ReverseConflictingEntry);
 	TestFalse(TEXT("Authored duplicate ItemId is rejected at resolve"), Catalog->Resolve(Entry.ItemId, ConflictingEntry));
 	TestFalse(TEXT("Authored duplicate Equipment definition is rejected at reverse resolve"),
 		Catalog->ResolveEquipmentDefinition(Entry.EquipmentDefinitionId, ConflictingEntry));

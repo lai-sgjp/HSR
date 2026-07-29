@@ -15,14 +15,14 @@ bool UHSRItemEquipmentMappingCatalog::AddMapping(const FHSRItemEquipmentMappingE
 
 bool UHSRItemEquipmentMappingCatalog::Resolve(const FName ItemId, FHSRItemEquipmentMappingEntry& OutEntry) const
 {
-	const FHSRItemEquipmentMappingEntry* Found = Mappings.FindByPredicate([ItemId](const FHSRItemEquipmentMappingEntry& Entry)
-		{
-			return Entry.ItemId == ItemId;
-		});
-	if (!Found)
+	const FHSRItemEquipmentMappingEntry* Found = nullptr;
+	for (const FHSRItemEquipmentMappingEntry& Entry : Mappings)
 	{
-		return false;
+		if (Entry.ItemId != ItemId) continue;
+		if (Found != nullptr) return false;
+		Found = &Entry;
 	}
+	if (!Found) return false;
 	OutEntry = *Found;
 	return true;
 }
@@ -30,10 +30,13 @@ bool UHSRItemEquipmentMappingCatalog::Resolve(const FName ItemId, FHSRItemEquipm
 bool UHSRItemEquipmentMappingCatalog::ResolveEquipmentDefinition(const FName EquipmentDefinitionId,
 	FHSRItemEquipmentMappingEntry& OutEntry) const
 {
-	const FHSRItemEquipmentMappingEntry* Found = Mappings.FindByPredicate([EquipmentDefinitionId](const FHSRItemEquipmentMappingEntry& Entry)
+	const FHSRItemEquipmentMappingEntry* Found = nullptr;
+	for (const FHSRItemEquipmentMappingEntry& Entry : Mappings)
 	{
-		return Entry.EquipmentDefinitionId == EquipmentDefinitionId;
-	});
+		if (Entry.EquipmentDefinitionId != EquipmentDefinitionId) continue;
+		if (Found != nullptr) return false;
+		Found = &Entry;
+	}
 	if (!Found) return false;
 	OutEntry = *Found;
 	return true;

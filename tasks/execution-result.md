@@ -172,6 +172,12 @@ Verdict: `REVISE`
 - `Saved/Logs/03E2-MappingIntent-RED.log`: valid runtime RED. Mapping forward/reverse lookup selected the first duplicate; invalid intent did not return `InvalidRequest`. The other Movement tests remained GREEN.
 - No production code changed before this RED was confirmed.
 
+## Mapping conflict and invalid intent GREEN
+
+- Forward and reverse mapping resolution now reject any directly authored duplicate key instead of selecting a first row. `ExecuteMovement` rejects enum values outside Equip/Unequip/Replace as `InvalidRequest` before candidate preparation.
+- `HSREditor Win64 Development` passed (5/5 actions, exit 0).
+- `Saved/Logs/03E2-MappingIntent-GREEN-02.log`: `HSR.Equipment.Movement` passed 4/4, including direct duplicate mapping and invalid intent coverage.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.
