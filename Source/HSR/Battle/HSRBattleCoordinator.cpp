@@ -1960,11 +1960,26 @@ void UHSRBattleCoordinator::CommitEquipmentMovementProjection(const FHSREquipmen
 	if(Request.Intent==EHSREquipmentMovementIntent::Unequip)
 	{
 		RemoveEquipmentSource(TEXT("Player"),Request.InstanceId);
+		EquipmentProjectionStates.Remove(Request.InstanceId);
+		EquipmentProjectionParticipants.Remove(Request.InstanceId);
 		return;
+	}
+	TSet<FGuid> DesiredIds;
+	for(const auto& Pair:Candidate.Equipment)DesiredIds.Add(Pair.Value.InstanceId);
+	for(const auto& Pair:Candidate.Relics)DesiredIds.Add(Pair.Value.InstanceId);
+	if(Request.Intent==EHSREquipmentMovementIntent::Replace)
+	{
+		TArray<FGuid> RemovedIds;
+		for(const auto& Existing:EquipmentProjectionStates)if(!DesiredIds.Contains(Existing.Key))RemovedIds.Add(Existing.Key);
+		for(const FGuid& RemovedId:RemovedIds){RemoveEquipmentSource(TEXT("Player"),RemovedId);EquipmentProjectionStates.Remove(RemovedId);EquipmentProjectionParticipants.Remove(RemovedId);}
 	}
 	FHSREquipmentAggregate Aggregate;
 	if(!UHSREquipmentStatAggregator::Aggregate(Candidate,Request.ExpectedEquipmentRevision+1,Aggregate))return;
-	ApplyEquipmentSource(TEXT("Player"),Request.InstanceId,Aggregate,Aggregate.Revision);
+	if(ApplyEquipmentSource(TEXT("Player"),Request.InstanceId,Aggregate,Aggregate.Revision))
+	{
+		EquipmentProjectionStates.Add(Request.InstanceId,Aggregate);
+		EquipmentProjectionParticipants.Add(Request.InstanceId,TEXT("Player"));
+	}
 }
 bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipmentRestoreState>& Candidate)
 {
