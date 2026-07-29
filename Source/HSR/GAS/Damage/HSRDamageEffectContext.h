@@ -14,7 +14,7 @@ struct HSR_API FHSRDamageEffectContext : public FGameplayEffectContext
 	float DefenseCoefficient = 0.5f;
 	float MinDamage = 1.0f;
 	FHSRDamageResult DamageResult;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	EHSRDamageTestInjection TestInjection = EHSRDamageTestInjection::None;
 #endif
 

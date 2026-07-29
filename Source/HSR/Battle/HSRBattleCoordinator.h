@@ -84,7 +84,7 @@ public:
 	const FHSRTeamResourceState& GetTeamResourceState() const { return TeamResourceState; }
 	bool WasLastBreakDelayRegistered() const { return bLastBreakDelayRegistered; }
 	FGuid GetLastBreakDelayActionId() const { return LastBreakDelayActionId; }
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	/** Controlled-runtime counters for repeatable Break transaction audits. */
 	int32 GetBreakStatusRequestCountForDevelopmentTest() const { return BreakStatusRequestCountForTest; }
 	int32 GetBreakDelayRegistrationCountForDevelopmentTest() const { return BreakDelayRegistrationCountForTest; }
@@ -105,7 +105,7 @@ public:
 	bool RemoveEquipmentSetSource(FName ParticipantId, FName SetSourceId);
 	bool ProjectEquipmentRestore(const TMap<FGuid,FHSREquipmentRestoreState>& Candidate);
 	bool SetEquipmentSource(FName ParticipantId,const FGuid& InstanceId,const FHSREquipmentAggregate& Aggregate,int64 Revision) { return ApplyEquipmentSource(ParticipantId,InstanceId,Aggregate,Revision); }
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	bool HasProgressionPrimaryHandleForDevelopmentTest(FName Id) const;
 	FString GetProgressionPrimaryHandleForDevelopmentTest(FName Id) const;
 	int32 GetProgressionSecondaryCountForDevelopmentTest(FName Id) const;
@@ -184,7 +184,7 @@ private:
 	TSet<FString> ConsumedEnemyTurnKeys;
 	int32 RequestActionDispatchDepth = 0;
 	bool bDrainingEnemyTurns = false;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	int32 PublicRequestActionDepth = 0;
 	int32 MaxPublicRequestActionDepth = 0;
 	int32 CoreExecutionDepth = 0;
@@ -218,7 +218,7 @@ private:
 	FHSRTeamResourceState TeamResourceState;
 	bool bLastBreakDelayRegistered = false;
 	FGuid LastBreakDelayActionId;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	int32 BreakStatusRequestCountForTest = 0;
 	int32 BreakDelayRegistrationCountForTest = 0;
 	EHSRStatusOperationResult LastBreakStatusResultForTest = EHSRStatusOperationResult::UnknownStatus;
@@ -250,14 +250,14 @@ private:
 	TMap<FGuid,FName> EquipmentProjectionParticipants;
 	TMap<FName,FHSREquipmentAggregate> EquipmentSetProjectionStates;
 	TMap<FName,FName> EquipmentSetProjectionParticipants;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	bool bForceEquipmentRestoreProjectionFailure=false;
 	int32 EquipmentRestoreFailureAfterOperations=-1;
 #endif
 	FName PlayerCharacterId;
 	TSubclassOf<APawn> PlayerCharacterClass;
 	uint64 ProgressionEpoch = 0;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	int32 ProgressionRefreshCountForTest=0;
 	bool bLastProgressionRefreshResultForTest=false;
 	bool bForceProgressionApplyFailureForTest=false;
@@ -269,7 +269,7 @@ private:
 	int32 DevelopmentDamageSeed = 1337;
 	int32 DevelopmentDamageConsumeCount = 0;
 	TMap<FGuid, FHSRDamageResult> DevelopmentDamageResults;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	EHSRDamageTestInjection NextDamageTestInjection = EHSRDamageTestInjection::None;
 	FGuid DamageTestInjectionActionId;
 	FHSRFormalDamageExecutionResult LastDevelopmentFormalExecutionResult;

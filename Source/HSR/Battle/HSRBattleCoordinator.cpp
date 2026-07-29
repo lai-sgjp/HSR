@@ -78,7 +78,7 @@ bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRe
 	CurrentRewardSeed = InRequest.RewardSeed;
 	ReturnContext = RetCtx;
 	CurrentState = EHSRBattleCoordinatorState::Consuming;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	LastSubmittedRequestForDevelopment = InRequest;
 #endif
 
@@ -250,7 +250,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 	DevelopmentDamageRandomStream.Initialize(DevelopmentDamageSeed);
 	DevelopmentDamageConsumeCount = 0;
 	DevelopmentDamageResults.Empty();
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	ClearDamageTestInjection();
 	LastDevelopmentFormalExecutionResult = FHSRFormalDamageExecutionResult();
 #endif
@@ -281,14 +281,14 @@ bool UHSRBattleCoordinator::RequestBasicAttack(FName AttackerParticipantId, FNam
 FHSRAbilityResolution UHSRBattleCoordinator::RequestAction(const FHSRBattleActionCommand& Command)
 {
 	++RequestActionDispatchDepth;
-	#if WITH_EDITOR
+	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	++PublicRequestActionDepth;
 	MaxPublicRequestActionDepth = FMath::Max(MaxPublicRequestActionDepth, PublicRequestActionDepth);
 	++CoreExecutionDepth;
 	MaxCoreExecutionDepth = FMath::Max(MaxCoreExecutionDepth, CoreExecutionDepth);
 	#endif
 	const FHSRAbilityResolution Resolution = RequestActionCore(Command);
-	#if WITH_EDITOR
+	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	check(CoreExecutionDepth > 0);
 	--CoreExecutionDepth;
 	check(PublicRequestActionDepth > 0);
@@ -468,7 +468,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		DamageContext->DamageContext.ActionId = Request.ActionId; DamageContext->DamageContext.DamageType = Request.DamageType;
 		DamageContext->DamageContext.AbilityMultiplier = Request.AbilityMultiplier; DamageContext->DamageContext.CritRoll = Request.CritRoll;
 		DamageContext->DefenseCoefficient = Request.DefenseCoefficient; DamageContext->MinDamage = Request.MinDamage;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		DamageContext->TestInjection = DamageTestInjectionActionId == Command.ActionId ? NextDamageTestInjection : EHSRDamageTestInjection::None;
 		UE_LOG(LogTemp, Log, TEXT("P7-004 InjectionBind ActionId=%s BoundActionId=%s Requested=%d Applied=%d"), *Command.ActionId.ToString(), *DamageTestInjectionActionId.ToString(), static_cast<int32>(NextDamageTestInjection), static_cast<int32>(DamageContext->TestInjection));
 		if (DamageTestInjectionActionId == Command.ActionId) { ClearDamageTestInjection(); }
@@ -497,7 +497,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		PendingDefeatedParticipantId = NAME_None;
 		const bool bActivated = Attacker->AbilitySystemComponent->TryActivateAbility(AbilitySpec->Handle);
 		const FHSRFormalDamageExecutionResult ExecutionResult = Ability->GetLastFormalDamageExecutionResult();
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		LastDevelopmentFormalExecutionResult = ExecutionResult;
 #endif
 		bFormalDamageTransactionOpen = false;
@@ -628,7 +628,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 				&& PendingDefeatedParticipantId == Target->ParticipantId;
 			const EHSRStatusOperationResult BreakStatusResult = RequestBreakStatus(
 				Command.ActorParticipantId, BreakResult.TargetParticipantId, BreakResult.ActionId, bAllowPendingDeferredDefeat);
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 			LastBreakStatusResultForTest = BreakStatusResult;
 			if (BreakStatusResult == EHSRStatusOperationResult::Success)
 			{
@@ -643,7 +643,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 			bLastBreakDelayRegistered = bAllowPendingDeferredDefeat
 				? TurnManager->ConsumeAdmittedBreakDelay(DelayRequest)
 				: TurnManager->ConsumeBreakDelay(DelayRequest);
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 			bLastBreakDelayAcceptedForTest = bLastBreakDelayRegistered;
 			if (bLastBreakDelayRegistered)
 			{
@@ -766,7 +766,7 @@ void UHSRBattleCoordinator::BindEnemyTurnManager(UHSRTurnManager* InManager)
 	});
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 bool UHSRBattleCoordinator::BeginEnemyTurnAutomationAuditForDevelopmentTest(UHSRTurnManager* IsolatedManager)
 {
 	if (!IsolatedManager || bEnemyTurnAutomationAuditActive || RequestActionDispatchDepth != 0 || bDrainingEnemyTurns)
@@ -826,7 +826,7 @@ void UHSRBattleCoordinator::RecordEnemyTurnIfCurrent(UHSRTurnManager* SourceMana
 	if (!ConsumedEnemyTurnKeys.Contains(Key) && (!PendingEnemyTurnKey.IsSet() || PendingEnemyTurnKey.GetValue() != Key))
 	{
 		PendingEnemyTurnKey = Key;
-	#if WITH_EDITOR
+	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		++EnemyTurnQueueCount;
 	#endif
 		UE_LOG(LogTemp, Log, TEXT("P10-001A EnemyTurn Queue Key=%s"), *Key);
@@ -887,21 +887,21 @@ void UHSRBattleCoordinator::DrainPendingEnemyTurns()
 		Command.SkillId = BasicAttackDefinition->SkillId;
 		Command.TargetParticipantIds.Add(Targets[0]);
 		UE_LOG(LogTemp, Log, TEXT("P10-001A EnemyTurn Dispatch Key=%s ActionId=%s"), *QueuedKey, *Command.ActionId.ToString());
-	#if WITH_EDITOR
+	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		++EnemyTurnDispatchCount;
 	#endif
 		// This is the explicit non-public dispatch scope.  A TurnStarted raised
 		// by the core can only queue; the loop observes it after this scope ends.
 		++RequestActionDispatchDepth;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		++CoreExecutionDepth;
 		MaxCoreExecutionDepth = FMath::Max(MaxCoreExecutionDepth, CoreExecutionDepth);
 #endif
 		const FHSRAbilityResolution EnemyResolution = RequestActionCore(Command);
-	#if WITH_EDITOR
+	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		if (!EnemyResolution.Succeeded()) ++EnemyTurnRejectedCount;
 	#endif
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		check(CoreExecutionDepth > 0);
 		--CoreExecutionDepth;
 #endif
@@ -1224,13 +1224,13 @@ void UHSRBattleCoordinator::Reset()
 	DevelopmentDamageResults.Empty();
 	DevelopmentDamageRandomStream.Initialize(DevelopmentDamageSeed);
 	DevelopmentDamageConsumeCount = 0;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	ClearDamageTestInjection();
 	LastDevelopmentFormalExecutionResult = FHSRFormalDamageExecutionResult();
 #endif
 	LastActionResolution = FHSRAbilityResolution();
 	PresentationEvents.Empty();
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	PublicRequestActionDepth = 0;
 	MaxPublicRequestActionDepth = 0;
 	CoreExecutionDepth = 0;
@@ -1243,7 +1243,7 @@ void UHSRBattleCoordinator::Reset()
 	TeamResourceState = FHSRTeamResourceState();
 	bLastBreakDelayRegistered = false;
 	LastBreakDelayActionId.Invalidate();
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	BreakStatusRequestCountForTest = 0;
 	BreakDelayRegistrationCountForTest = 0;
 	LastBreakStatusResultForTest = EHSRStatusOperationResult::UnknownStatus;
@@ -1287,7 +1287,7 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticip
 	Spec.Data->SetSetByCallerMagnitude(AbilityMultiplierTag, Definition->DamageAbilityMultiplier); Spec.Data->SetSetByCallerMagnitude(DefenseCoefficientTag, Rule->DefenseCoefficient); Spec.Data->SetSetByCallerMagnitude(MinDamageTag, Rule->MinDamage); Spec.Data->SetSetByCallerMagnitude(CritRollTag, DamageContext->DamageContext.CritRoll);
 	const float HealthBefore = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
 	bFormalDamageTransactionOpen = true; PendingDefeatedParticipantId = NAME_None;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	if (bForceStatusDamageApplyFailure)
 	{
 		DevelopmentDamageRandomStream = RandomStreamBeforeApply; bFormalDamageTransactionOpen = false; Failure.Result = EHSRDamageResultType::EffectApplicationFailed; return Failure;
@@ -1302,7 +1302,7 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticip
 		bFormalDamageTransactionOpen = false;
 		PendingDefeatedParticipantId = NAME_None;
 	}
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	else { ++StatusDamageCommitCount; }
 #endif
 	return Result;
@@ -1313,7 +1313,7 @@ void UHSRBattleCoordinator::FinalizeStatusDamage()
 	if (!PendingDefeatedParticipantId.IsNone()) { const FName Defeated = PendingDefeatedParticipantId; PendingDefeatedParticipantId = NAME_None; bFormalDamageTransactionOpen = false; ResolveDefeat(Defeated); }
 	else { bFormalDamageTransactionOpen = false; }
 }
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 FHSRBattleInitResult UHSRBattleCoordinator::ResetAndRebuildForDevelopmentTest(UWorld* BattleWorld)
 {
 	if (!BattleWorld || !LastSubmittedRequestForDevelopment.IsSet())
@@ -1433,12 +1433,12 @@ void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
 	}
 
 	Defeated->bDefeated = true;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	LastSourceInvalidRemovedCount = RouteSourceInvalid(DefeatedParticipantId);
 #else
 	RouteSourceInvalid(DefeatedParticipantId);
 #endif
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	++DefeatCount;
 #endif
 	if (UHSRStatusComponent* StatusComponent = GetStatusComponent(DefeatedParticipantId))
@@ -1460,7 +1460,7 @@ void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
 	ClearStatusComponents();
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::ResolveDefeat - SUCCESS RequestId=%s Defeated=%s Outcome=%d"), *BattleResult.RequestId.ToString(), *DefeatedParticipantId.ToString(), static_cast<int32>(BattleResult.Outcome));
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	++BattleResultBroadcastCount;
 #endif
 	BattleResultReady.Broadcast(BattleResult);
@@ -1505,7 +1505,9 @@ AActor* UHSRBattleCoordinator::SpawnParticipantActor(UWorld* World, const FHSRBa
 
 	if (AActor* SpawnedActor = Cast<AActor>(Pawn))
 	{
+#if WITH_EDITOR
 		SpawnedActor->SetActorLabel(Definition.Team == EHSRBattleParticipantTeam::Player ? TEXT("BattlePlayerPawn") : TEXT("BattleEnemyPawn"));
+#endif
 	}
 
 	UE_LOG(LogTemp, Log,
@@ -1607,7 +1609,7 @@ void UHSRBattleCoordinator::ClearStatusComponents()
 		{
 			if (const FDelegateHandle* Handle = StatusChangedHandles.Find(Pair.Key)) Pair.Value->OnStatusChanged().Remove(*Handle);
 			Pair.Value->ClearStatus();
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 			LastClearedStatusSnapshots.Add(Pair.Key, Pair.Value->GetSnapshot());
 #endif
 			Pair.Value->UnbindTurnManager();
@@ -1649,7 +1651,7 @@ int32 UHSRBattleCoordinator::RouteSourceInvalid(FName SourceParticipantId)
 	return Removed;
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 EHSRStatusOperationResult UHSRBattleCoordinator::AddStatusForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId)
 {
 	const FHSRBattleParticipant* Source = Participants.FindByPredicate([SourceParticipantId](const FHSRBattleParticipant& Participant)
@@ -1841,7 +1843,7 @@ bool UHSRBattleCoordinator::ApplyCharacterProgressionGameplayEffect(const FHSRBa
 	Spec.Data->SetSetByCallerMagnitude(HSRProgressionTags::BonusDefense, Context.ProgressionBonuses.Defense);
 	Spec.Data->SetSetByCallerMagnitude(HSRProgressionTags::BonusSpeed, Context.ProgressionBonuses.Speed);
 	const float OldHealth = ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	if (bForceProgressionApplyFailureForTest) return false;
 #endif
 	const FActiveGameplayEffectHandle NewHandle = ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
@@ -1851,11 +1853,11 @@ bool UHSRBattleCoordinator::ApplyCharacterProgressionGameplayEffect(const FHSRBa
 		if (Existing->AbilitySystemComponent.IsValid() && Existing->ActiveHandle.IsValid()
 			&& Existing->AbilitySystemComponent->GetActiveGameplayEffect(Existing->ActiveHandle)
 			&&
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 			(bForceProgressionOldRemoveFailureForTest ||
 #endif
 			!Existing->AbilitySystemComponent->RemoveActiveGameplayEffect(Existing->ActiveHandle)
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 			)
 #endif
 			)
@@ -1894,12 +1896,12 @@ bool UHSRBattleCoordinator::ValidateCharacterProgressionEffectContract(const UGa
 
 bool UHSRBattleCoordinator::RefreshCharacterProgression(FName ParticipantId,const FHSRCharacterProgressionContext& Context)
 {
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	++ProgressionRefreshCountForTest;bLastProgressionRefreshResultForTest=false;
 #endif
 	const FHSRBattleParticipant* Participant=Participants.FindByPredicate([ParticipantId](const FHSRBattleParticipant& P){return P.ParticipantId==ParticipantId;});if(!Participant||Participant->Team==EHSRBattleParticipantTeam::Enemy)return false;
 	const FHSRCharacterProgressionContext* Existing=CharacterProgressionContexts.Find(ParticipantId);const TOptional<FHSRCharacterProgressionContext> Previous=Existing?TOptional<FHSRCharacterProgressionContext>(*Existing):TOptional<FHSRCharacterProgressionContext>();CharacterProgressionContexts.Add(ParticipantId,Context);if(ApplyCharacterProgressionGameplayEffect(*Participant)){
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	bLastProgressionRefreshResultForTest=true;
 #endif
 	return true;}if(Previous.IsSet())CharacterProgressionContexts.Add(ParticipantId,Previous.GetValue());else CharacterProgressionContexts.Remove(ParticipantId);return false;
@@ -1937,7 +1939,7 @@ bool UHSRBattleCoordinator::RemoveEquipmentSetSource(FName ParticipantId,FName S
 }
 bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipmentRestoreState>& Candidate)
 {
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	if (bForceEquipmentRestoreProjectionFailure) return false;
 #endif
 	if (!EquipmentGameplayEffect || !RelicSetGameplayEffect) return false;
@@ -1964,7 +1966,7 @@ bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipme
 	const auto RestoreOld=[&](){for(const auto& Old:OldStates)ApplyEquipmentSource(OldParticipants.FindRef(Old.Key),Old.Key,Old.Value,Old.Value.Revision);for(const auto& Old:OldSetStates)ApplyEquipmentSetSource(OldSetParticipants.FindRef(Old.Key),Old.Key,Old.Value,Old.Value.Revision);for(const auto& Desired:DesiredStates)if(!OldStates.Contains(Desired.Key))RemoveEquipmentSource(DesiredParticipants.FindRef(Desired.Key),Desired.Key);for(const auto& Desired:DesiredSetStates)if(!OldSetStates.Contains(Desired.Key))RemoveEquipmentSetSource(DesiredSetParticipants.FindRef(Desired.Key),Desired.Key);};
 	int32 CompletedOperations=0;
 	const auto InjectFailure=[&](){
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		return EquipmentRestoreFailureAfterOperations>=0&&CompletedOperations>=EquipmentRestoreFailureAfterOperations;
 #else
 		return false;
@@ -1979,7 +1981,7 @@ bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipme
 	return true;
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 bool UHSRBattleCoordinator::HasProgressionPrimaryHandleForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S&&S->ActiveHandle.IsValid();}
 FString UHSRBattleCoordinator::GetProgressionPrimaryHandleForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S?S->ActiveHandle.ToString():FString();}
 int32 UHSRBattleCoordinator::GetProgressionSecondaryCountForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S?S->SecondaryOwnedHandles.Num():0;}
