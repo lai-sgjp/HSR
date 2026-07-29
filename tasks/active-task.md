@@ -1,85 +1,56 @@
-# TASK-P17-PATCH-03E2 - Atomic Equipment Movement and Runtime Projection
+# TASK-P17-PATCH-03F - Map Frontend and Travel Rebuild
 
-Status: `IMPLEMENTATION IN PROGRESS / TDD RED-GREEN / USER AUTHORIZED`
+Status: `IMPLEMENTATION AUTHORIZED / TDD REQUIRED`
 
-## Gate boundary
+## Sole outcome
 
-03E1 is archived. This card freezes the evidence-driven 03E2 Task Gate scope. Before any Source, test, Content, Build, Automation or PIE work, the Gate must freeze one aggregate transaction across the existing Inventory `AddUnique/RemoveUnique` boundary, Equipment Registry/placement, expected Inventory and Equipment revisions, OperationId replay behavior, capacity/replace semantics, delayed publication, ASC runtime projection and UI intent boundaries.
+The Map Frontend reads the authoritative MapSubsystem snapshot and submits one typed teleport intent. Legal A <-> B travel rebuilds the UI host exactly once after its matching arrival; rejection or travel failure preserves the committed map state and a usable exploration host.
 
-## Proposed authority contract
+## Authority contract
 
-- A pure-value request carries OperationId, CharacterId, InstanceId, source membership intent, target kind/slot and expected Inventory/Equipment revisions.
-- Inventory remains authoritative for bag membership/capacity; Equipment remains authoritative for complete payload and placement.
-- A bagged equipment instance is linked by the same `InstanceId` plus an explicit validated Definition mapping; Registry `Kind`/payload and Inventory storage kind must agree. DefinitionId similarity alone is never sufficient, and a missing or conflicting mapping rejects the request.
-- A bounded command/transaction boundary owned by the Equipment/Inventory integration surface validates both revisions, instance identity, source membership, target slot, capacity and ownership before mutating either subsystem. It may own only OperationId, step and pure candidates; it is not a new global data authority.
-- Commit order is candidate-first and publication is delayed until both domains commit. Any pre-commit failure leaves both domains and both revisions unchanged.
-- OperationId replay returns the cached result and produces no second membership, placement, revision, delegate or ASC effect mutation. A reused OperationId with a different request is rejected.
-- The integration boundary returns a typed pure-value result containing OperationId, result code, committed/no-op status, old/new Inventory revision, old/new Equipment revision, displaced InstanceId when applicable and a diagnostic step. Existing domain result enums remain domain-local and are not overloaded for cross-domain outcomes.
-- Replacing an occupied slot explicitly returns the displaced InstanceId to Inventory in the same transaction; capacity is checked against the net candidate, not sequential intermediate state.
-- ASC/EffectBridge receives a post-commit resolved aggregate only. Projection validity and required source-effect handles must be preflighted before commit; if the projection cannot be proven ready, the transaction is rejected with zero domain mutation. Commit must not depend on a fallible post-commit compensation path.
-- Equipment Detail ViewModel/Widget remains a read/intent presentation layer: it may subscribe to the single committed revision and rebuild one resolved snapshot, but it cannot own OperationId, mutate Inventory/Equipment, apply/remove GE or serialize Save data.
+- `UHSRMapSubsystem` owns definitions, unlocks, current location, travel validation, `OpenLevel`, pending requests, arrival commit and failure cleanup.
+- A Map ViewModel is a read projection of committed Map state. A Map Widget submits only a TeleportId intent and presents the result.
+- Widgets must not call `OpenLevel`, set map location, unlock destinations, consume arrivals or write Save data.
+- `UHSRUIManagerSubsystem` owns host teardown/rebuild, input/focus restoration and stale-host rejection. It restores only after the matching arrival generation and a valid new host.
+- Locked/unknown/wrong-source/pending/invalid-package requests, failed travel, arrival mismatch/ambiguity and stale host callbacks must not change committed map state.
 
-## Frozen mapping decision
+## Frozen write allowlist
 
-The user confirmed a dedicated static Item-to-Equipment/Relic mapping catalog. `ItemId` is the lookup key; `EquipmentDefinitionId`, Kind and Slot are explicit mapped values. The catalog is static editor data, not per-instance Save data. It rejects missing, duplicate, conflicting, wrong-storage-kind, missing-target and incompatible mappings before domain mutation. Save schema 7 remains Registry payload plus Placement. Name, prefix, display text and DefinitionId similarity inference remain prohibited.
+- `Source/HSR/Map/HSRMapSubsystem.h`
+- `Source/HSR/Map/HSRMapSubsystem.cpp`
+- `Source/HSR/Map/HSRMapTypes.h`
+- `Source/HSR/Map/HSRMapArrivalConsumer.h`
+- `Source/HSR/Map/HSRMapArrivalConsumer.cpp`
+- `Source/HSR/Map/HSRMapArrivalPoint.h`
+- `Source/HSR/Map/HSRMapArrivalPoint.cpp`
+- `Source/HSR/Data/Definitions/HSRMapDefinition.h`
+- new `Source/HSR/UI/HSRMapViewModel.h/.cpp`
+- new `Source/HSR/UI/HSRMapWidget.h/.cpp`
+- `Source/HSR/UI/HSRUIManagerSubsystem.h`
+- `Source/HSR/UI/HSRUIManagerSubsystem.cpp`
+- `Source/HSR/Tests/HSRMapSubsystemTests.cpp`
+- `Source/HSR/Tests/HSRMapSaveIntegrationTests.cpp`
+- one new focused UI/travel Automation test
+- `tasks/execution-result.md`
 
-## Required failure matrix
+Everything else is read-only. Save schema, Battle travel implementation, Inventory/Equipment, Config, Blueprint, map and Content files are excluded.
 
-- stale Inventory revision; stale Equipment revision; mismatched pair;
-- missing/foreign/duplicate InstanceId; Inventory unique item versus Registry payload collision;
-- invalid CharacterId, kind, slot, definition or occupied slot;
-- insufficient capacity for unequip/replace net result;
-- duplicate OperationId replay and same OperationId with changed request;
-- OperationId cache scope, bounded retention/restore policy and stale callback rejection;
-- Inventory candidate/installation failure, Equipment candidate/installation failure, delegate publication failure and ASC projection preflight failure;
-- save/restore boundary while a candidate is pending; no half-committed aggregate may be serialized.
+## Required TDD coverage
 
-## Required TDD matrix
+- Snapshot maps unlock/location state into one read model with no duplicate subscriptions after host replacement.
+- A legal A -> B -> A intent invokes MapSubsystem once per travel and consumes one matching arrival.
+- Locked, unknown, invalid-source and no-op intents have no travel, location or UI-host mutation.
+- Pending ordinary travel and pending Battle return reject the request without overwriting transition context.
+- Travel failure preserves the prior snapshot and restores a usable host exactly once.
+- Wrong map, missing/duplicate arrival and stale arrival generation cannot commit location or restore a stale host.
+- Existing `HSR.Map`, affected `HSR.Save` and affected `HSR.UI` regressions stay green.
 
-- bag -> equip moves membership and placement exactly once;
-- equip -> unequip returns the same InstanceId to Inventory while Registry payload remains byte-equivalent;
-- replace atomically displaces the old InstanceId and places the new one with net capacity validation;
-- stale revisions and invalid requests produce zero mutation and zero publication;
-- replayed OperationId is cached/no-op; changed payload under the same OperationId is rejected;
-- every successful commit publishes one Inventory revision and one Equipment revision, then one derived ASC projection;
-- injected domain/projection preflight failure leaves a recoverable, observable result with no split authority;
-- save/restore after each successful transaction round-trips membership, Registry payload and placement.
+## User Editor boundary
 
-## Proposed implementation allowlist for Gate review only
+User-owned assets are limited to the exact Map WBP and existing A/B map, teleport and arrival references. Blueprint may bind read-only destinations, submit the typed intent and present the result. It may not call `OpenLevel`, commit map state, unlock a destination or consume arrivals. `Map_Phase1_Exploration` remains excluded.
 
-- `Source/HSR/Inventory/HSRInventorySubsystem.h/.cpp` and `HSRItemTypes.h` only for the minimum candidate/commit seam;
-- `Source/HSR/Data/Definitions/HSRItemEquipmentMappingCatalog.h/.cpp` for the explicit static mapping contract;
-- `Source/HSR/Equipment/HSREquipmentSubsystem.h/.cpp` and `HSREquipmentTypes.h` only for the minimum candidate/commit seam;
-- one bounded integration command/request/result type in the owning subsystem boundary; no global manager or new runtime module;
-- `Source/HSR/Equipment/HSREquipmentEffectBridge.h/.cpp` only for derived source-effect projection with preflightable failure behavior;
-- `Source/HSR/Equipment/HSREquipmentStatAggregator.h/.cpp` and `HSRRelicSetResolver.h/.cpp` only for deterministic candidate/read-model aggregation;
-- `Source/HSR/UI/HSREquipmentDetailViewModel.h/.cpp`, `HSREquipmentDetailTypes.h`, `HSREquipmentDetailWidget.h/.cpp` only for one committed-snapshot refresh and typed presentation events;
-- exact new regression tests for the matrix above;
-- task evidence Markdown only.
+After C++ GREEN: Save All/reopen, PIE A -> B -> A and one locked or invalid destination. Return Output Log lines containing request ID, arrival commit, host generation and result.
 
-Inventory, Equipment, Save, Battle, SettlementAuthority, UI and Content changes remain unauthorized until the Gate is independently reviewed and the user separately confirms implementation.
+## Non-goals and stops
 
-## Frozen inheritance
-
-- Equipment Registry permanently owns complete equipment/relic instance payloads.
-- Inventory owns bag membership and capacity only.
-- Loadout owns InstanceId placement only.
-- ASC is a derived runtime projection.
-- Save schema 7 keeps Registry and Placement separate.
-- `03D2 SettlementAuthority` remains unchanged and must not be weakened or repurposed.
-
-## Prohibited until separate user confirmation
-
-- No Inventory or Equipment production mutation.
-- No OperationId ledger, capacity exchange or atomic movement implementation.
-- No ASC dynamic equipment effects.
-- No equipment UI operation or new/modified Content asset.
-- No 03F or resumed P17 Editor work.
-
-## Editor boundary for the Gate
-
-The candidate asset set is limited to existing `/Game/Data/Relics/DA_Relic_*`, `/Game/Data/RelicSets/DA_RelicSet_P12_A`, `GE_Equipment_P12`, `GE_Relic_P12`, `GE_RelicSet_P12_A`, `/Game/UI/WBP_Inventory_P13` and `/Game/UI/WBP_EquipmentDetail_P12`. User work, if those assets are available, is Compile/Save All/reopen and PIE observation of equip -> replace -> unequip plus wrong-owner/incompatible/stale failures. Blueprint may bind selection, intents and committed snapshots only; it may not create ownership, mutate slots, apply/remove GE or save/load.
-
-## Next gate
-
-Prepare and independently review the exact 03E2 ownership, failure, TDD, allowlist and Editor contracts. A Gate `PASS` does not authorize implementation; implementation requires a separate user confirmation.
+No new Map authority, retry loop, Save schema change, Battle-return rewrite, frontend redesign, Config update, asset creation, map mutation or Blueprint implementation. Stop for any needed file outside this allowlist, including a task-selected Map WBP or DataAsset modification.
