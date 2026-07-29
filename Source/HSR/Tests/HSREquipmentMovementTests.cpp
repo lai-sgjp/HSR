@@ -95,9 +95,23 @@ bool FHSREquipmentMovementBagToEquipTest::RunTest(const FString& Parameters)
 	Request.ExpectedInventoryRevision = InventoryBefore.Revision;
 	Request.ExpectedEquipmentRevision = 0;
 
+	int32 ReentrantCalls = 0;
+	bool bHandlingReentrantCall = false;
+	FHSREquipmentMovementResult ReentrantResult;
+	Inventory->OnInventoryChanged().AddLambda([&](int64)
+	{
+		if (bHandlingReentrantCall) return;
+		bHandlingReentrantCall = true;
+		++ReentrantCalls;
+		ReentrantResult = Equipment->ExecuteMovement(Request, *Inventory, *Catalog);
+	});
 	const FHSREquipmentMovementResult Result = Equipment->ExecuteMovement(Request, *Inventory, *Catalog);
 	TestEqual(TEXT("Aggregate committed"), Result.Code, EHSREquipmentMovementResultCode::Success);
 	TestTrue(TEXT("Result marks commit"), Result.bCommitted);
+	TestEqual(TEXT("Reentrant same OperationId handled once"), ReentrantCalls, 1);
+	TestEqual(TEXT("Reentrant same OperationId returns cached success"), ReentrantResult.Code, EHSREquipmentMovementResultCode::Success);
+	TestTrue(TEXT("Reentrant same OperationId is replay"), ReentrantResult.bReplay);
+	TestFalse(TEXT("Reentrant same OperationId does not commit"), ReentrantResult.bCommitted);
 	TestEqual(TEXT("Inventory revision advanced once"), Result.NewInventoryRevision, InventoryBefore.Revision + 1);
 	TestEqual(TEXT("Equipment revision advanced once"), Result.NewEquipmentRevision, 1);
 

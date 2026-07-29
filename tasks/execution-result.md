@@ -178,6 +178,13 @@ Verdict: `REVISE`
 - `HSREditor Win64 Development` passed (5/5 actions, exit 0).
 - `Saved/Logs/03E2-MappingIntent-GREEN-02.log`: `HSR.Equipment.Movement` passed 4/4, including direct duplicate mapping and invalid intent coverage.
 
+## Reentrant OperationId ledger TDD RED
+
+- Added a synchronous same-OperationId replay from the Inventory commit delegate during the first successful bag-to-equip transaction.
+- The first compile attempt exposed a missing test delegate parameter and was corrected without production changes. The corrected `HSREditor Win64 Development` build passed (4/4 actions, exit 0).
+- `Saved/Logs/03E2-ReentrantLedger-RED.log`: valid runtime RED. The reentrant request did not return cached success or `bReplay=true` because the successful ledger entry was recorded after publication.
+- No production code changed before this RED was confirmed.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.
