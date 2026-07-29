@@ -138,6 +138,13 @@ Verdict: `REVISE`
 - `HSREditor Win64 Development` passed (5/5 actions after the exact expectation correction, exit 0).
 - `Saved/Logs/03E2-RestoreLedger-GREEN-02.log`: the same `BagToEquip` test passed 1/1. The old OperationId is no longer replayed and is rejected by current Inventory revision validation.
 
+## Pending candidate and persistence characterization coverage
+
+- Projection preflight now observes both the resolved candidate loadout and a concurrent read of committed authority. The candidate contains the requested placement while Inventory snapshot and schema-7 Equipment export still expose the pre-commit bag membership, Registry payload and empty Placement.
+- Replace coverage now round-trips Inventory membership plus schema-7 Registry/Placement and rechecks displaced InstanceId/ItemId, both enhancement payloads and the new equipped placement.
+- These characterization assertions passed immediately; no RED was manufactured and no production change was needed.
+- `HSREditor Win64 Development` passed (4/4 actions, exit 0). `Saved/Logs/03E2-Movement-Persistence-Coverage.log`: `HSR.Equipment.Movement` passed 4/4, exit 0.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.

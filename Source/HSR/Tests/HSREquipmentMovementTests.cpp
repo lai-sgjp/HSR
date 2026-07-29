@@ -153,11 +153,25 @@ bool FHSREquipmentMovementBagToEquipTest::RunTest(const FString& Parameters)
 	InventoryEvents = 0;
 	EquipmentEvents = 0;
 	TArray<FName> PublicationOrder;
+	bool bCandidateResolved = false;
+	bool bPendingCaptureObservedOldAuthority = false;
 	Inventory->OnInventoryChanged().AddLambda([&PublicationOrder](int64) { PublicationOrder.Add(TEXT("Inventory")); });
 	Equipment->OnLoadoutChanged().AddLambda([&PublicationOrder](const FGuid&, int32) { PublicationOrder.Add(TEXT("Equipment")); });
 	Equipment->SetMovementProjection(
 		UHSREquipmentSubsystem::FMovementProjectionPreflight::CreateLambda(
-			[](const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&) { return false; }),
+			[Inventory, Equipment, &bCandidateResolved, &bPendingCaptureObservedOldAuthority]
+			(const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout& CandidateLoadout)
+			{
+				bCandidateResolved = CandidateLoadout.Equipment.Contains(EHSREquipmentSlot::Weapon);
+				FHSRInventorySnapshot PendingInventory;
+				Inventory->GetSnapshot(PendingInventory);
+				TArray<FHSREquipmentRegistryDto> PendingRegistry;
+				TArray<FHSREquipmentPlacementDto> PendingPlacements;
+				Equipment->ExportSaveData(PendingRegistry, PendingPlacements);
+				bPendingCaptureObservedOldAuthority = PendingInventory.UniqueItems.Num() == 1
+					&& PendingRegistry.Num() == 1 && PendingPlacements.IsEmpty();
+				return false;
+			}),
 		UHSREquipmentSubsystem::FMovementProjectionCommit::CreateLambda(
 			[&PublicationOrder](const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&) { PublicationOrder.Add(TEXT("Projection")); }));
 	FHSREquipmentMovementRequest ProjectionRequest = Request;
@@ -176,6 +190,8 @@ bool FHSREquipmentMovementBagToEquipTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Projection rejection publishes no Inventory delegate"), InventoryEvents, 0);
 	TestEqual(TEXT("Projection rejection publishes no Equipment delegate"), EquipmentEvents, 0);
 	TestEqual(TEXT("Projection rejection publishes no callback"), PublicationOrder.Num(), 0);
+	TestTrue(TEXT("Projection preflight receives resolved candidate"), bCandidateResolved);
+	TestTrue(TEXT("Save capture during pending candidate sees old authority"), bPendingCaptureObservedOldAuthority);
 
 	Equipment->SetMovementProjection(
 		UHSREquipmentSubsystem::FMovementProjectionPreflight::CreateLambda(
@@ -458,6 +474,31 @@ bool FHSREquipmentMovementReplaceTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Equipment revision advances once"),Revision,ReplaceRequest.ExpectedEquipmentRevision+1);
 	FHSREquipmentInstance Resolved;TestTrue(TEXT("Old Registry retained"),Equipment->FindRegisteredInstance(OldId,Resolved));TestEqual(TEXT("Old enhancement retained"),Resolved.EnhancementLevel,4);
 	TestTrue(TEXT("New Registry retained"),Equipment->FindRegisteredInstance(NewId,Resolved));TestEqual(TEXT("New enhancement retained"),Resolved.EnhancementLevel,7);
+	FHSRInventorySaveData SavedInventory;
+	Inventory->ExportSaveData(SavedInventory);
+	FHSRInventoryRestoreState InventoryRestore;
+	TestTrue(TEXT("Replace membership prepares for round-trip"), Inventory->PrepareRestore(SavedInventory, InventoryRestore));
+	Inventory->CommitRestore(MoveTemp(InventoryRestore), false);
+	Inventory->GetSnapshot(Snapshot);
+	TestEqual(TEXT("Round-trip keeps displaced membership count"), Snapshot.UniqueItems.Num(), 1);
+	if (Snapshot.UniqueItems.Num() == 1)
+	{
+		TestEqual(TEXT("Round-trip keeps displaced InstanceId"), Snapshot.UniqueItems[0].InstanceId, OldId);
+		TestEqual(TEXT("Round-trip keeps displaced ItemId"), Snapshot.UniqueItems[0].DefinitionId, FName(TEXT("Item.Weapon.Old")));
+	}
+	TArray<FHSREquipmentRegistryDto> SavedRegistry;
+	TArray<FHSREquipmentPlacementDto> SavedPlacements;
+	Equipment->ExportSaveData(SavedRegistry, SavedPlacements);
+	FHSREquipmentRegistryRestoreState EquipmentRestore;
+	TestTrue(TEXT("Schema-7 Registry/Placement prepares for round-trip"),
+		Equipment->PrepareRestore(SavedRegistry, SavedPlacements, EquipmentRestore));
+	Equipment->CommitRestore(EquipmentRestore);
+	TestTrue(TEXT("Round-trip keeps old Registry payload"), Equipment->FindRegisteredInstance(OldId, Resolved));
+	TestEqual(TEXT("Round-trip keeps old enhancement"), Resolved.EnhancementLevel, 4);
+	TestTrue(TEXT("Round-trip keeps new Registry payload"), Equipment->FindRegisteredInstance(NewId, Resolved));
+	TestEqual(TEXT("Round-trip keeps new enhancement"), Resolved.EnhancementLevel, 7);
+	TestTrue(TEXT("Round-trip keeps loadout resolvable"), Equipment->GetLoadout(CharacterId, Loadout, Revision));
+	TestEqual(TEXT("Round-trip keeps new placement"), Loadout.Equipment.FindChecked(EHSREquipmentSlot::Weapon).InstanceId, NewId);
 	return true;
 }
 
