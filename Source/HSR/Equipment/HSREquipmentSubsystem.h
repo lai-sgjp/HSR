@@ -85,6 +85,11 @@ private:
 		TMap<EHSRRelicSlot, FGuid> Relics;
 		int32 Revision = 0;
 	};
+	struct FMovementLedgerEntry
+	{
+		FHSREquipmentMovementRequest Request;
+		FHSREquipmentMovementResult Result;
+	};
 
 	bool IsValidInstance(const FHSREquipmentInstance& Instance) const;
 	bool IsValidModifiers(const TArray<FHSREquipmentModifier>& Modifiers) const;
@@ -95,6 +100,7 @@ private:
 	void CommitLoadout(const FGuid& CharacterId, FLoadoutState Candidate);
 	bool ResolveLoadout(const FLoadoutState& State, FHSREquipmentLoadout& OutLoadout) const;
 	static bool IsSamePayload(const FHSREquipmentInstance& A, const FHSREquipmentInstance& B);
+	static bool IsSameMovementRequest(const FHSREquipmentMovementRequest& A, const FHSREquipmentMovementRequest& B);
 
 	TMap<FName, FDefinitionRule> Definitions;
 	TMap<FGuid, FHSREquipmentInstance> InstanceRegistry;
@@ -102,4 +108,6 @@ private:
 	TMap<FGuid, FGuid> InstanceOwners;
 	FHSREquipmentLoadoutChanged LoadoutChanged;
 	FHSREquipmentRestoreProjection RestoreProjection;
+	TMap<FGuid, FMovementLedgerEntry> MovementLedger;
+	TArray<FGuid> MovementLedgerOrder;
 };

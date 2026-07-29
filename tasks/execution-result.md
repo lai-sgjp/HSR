@@ -74,3 +74,12 @@ Verdict: `REVISE`
 - Extended the movement transaction test to require cached same-request replay, zero second publication/revision, and changed-request rejection under the same OperationId.
 - `Saved/Logs/03E2-OperationId-RED-Build.log`: intentional compile RED on missing `FHSREquipmentMovementResult::bReplay` and `EHSREquipmentMovementResultCode::OperationIdConflict`; exit 6.
 - No production code changed before this RED was confirmed.
+
+## OperationId GREEN checkpoint
+
+- Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.
+- Identical request replay returns the cached success result with `bReplay=true` and `bCommitted=false`; no revision or delegate advances.
+- Reusing an OperationId with any changed request field returns `OperationIdConflict` with zero mutation.
+- `Saved/Logs/03E2-OperationId-GREEN-Build.log`: `HSREditor Win64 Development` succeeded, 15 actions, exit 0.
+- `Saved/Logs/03E2-OperationId-GREEN-Automation.log`: `HSR.Equipment.Movement` 2/2 Success, exit 0.
+- Ledger restore/pending-save policy, unequip, replace, capacity and projection failure matrices remain pending.

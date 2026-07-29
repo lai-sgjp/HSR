@@ -201,6 +201,18 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 {
 	FHSREquipmentMovementResult Result;
 	Result.OperationId = Request.OperationId;
+	if (const FMovementLedgerEntry* ExistingOperation = MovementLedger.Find(Request.OperationId))
+	{
+		if (!IsSameMovementRequest(ExistingOperation->Request, Request))
+		{
+			Result.Code = EHSREquipmentMovementResultCode::OperationIdConflict;
+			return Result;
+		}
+		Result = ExistingOperation->Result;
+		Result.bCommitted = false;
+		Result.bReplay = true;
+		return Result;
+	}
 	FHSRInventorySnapshot InventorySnapshot;
 	Inventory.GetSnapshot(InventorySnapshot);
 	Result.OldInventoryRevision = InventorySnapshot.Revision;
@@ -294,6 +306,14 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 	LoadoutChanged.Broadcast(Request.CharacterId, InstalledLoadout.Revision);
 	Result.Code = EHSREquipmentMovementResultCode::Success;
 	Result.bCommitted = true;
+	MovementLedger.Add(Request.OperationId, {Request, Result});
+	MovementLedgerOrder.Add(Request.OperationId);
+	constexpr int32 MaxMovementLedgerEntries = 128;
+	if (MovementLedgerOrder.Num() > MaxMovementLedgerEntries)
+	{
+		MovementLedger.Remove(MovementLedgerOrder[0]);
+		MovementLedgerOrder.RemoveAt(0);
+	}
 	return Result;
 }
 
@@ -421,4 +441,13 @@ bool UHSREquipmentSubsystem::IsSamePayload(const FHSREquipmentInstance& A, const
 		if (A.Modifiers[Index].Stat != B.Modifiers[Index].Stat || A.Modifiers[Index].Value != B.Modifiers[Index].Value) return false;
 	}
 	return true;
+}
+
+bool UHSREquipmentSubsystem::IsSameMovementRequest(const FHSREquipmentMovementRequest& A,
+	const FHSREquipmentMovementRequest& B)
+{
+	return A.OperationId == B.OperationId && A.CharacterId == B.CharacterId && A.InstanceId == B.InstanceId
+		&& A.Intent == B.Intent && A.Kind == B.Kind && A.Slot == B.Slot
+		&& A.ExpectedInventoryRevision == B.ExpectedInventoryRevision
+		&& A.ExpectedEquipmentRevision == B.ExpectedEquipmentRevision;
 }

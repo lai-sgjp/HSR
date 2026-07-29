@@ -89,7 +89,8 @@ enum class EHSREquipmentMovementResultCode : uint8
 	EquipmentRevisionConflict,
 	MappingRejected,
 	InventoryRejected,
-	EquipmentRejected
+	EquipmentRejected,
+	OperationIdConflict
 };
 
 USTRUCT(BlueprintType)
@@ -115,6 +116,7 @@ struct FHSREquipmentMovementResult
 	UPROPERTY(BlueprintReadOnly) FGuid OperationId;
 	UPROPERTY(BlueprintReadOnly) EHSREquipmentMovementResultCode Code = EHSREquipmentMovementResultCode::InvalidRequest;
 	UPROPERTY(BlueprintReadOnly) bool bCommitted = false;
+	UPROPERTY(BlueprintReadOnly) bool bReplay = false;
 	UPROPERTY(BlueprintReadOnly) int64 OldInventoryRevision = 0;
 	UPROPERTY(BlueprintReadOnly) int64 NewInventoryRevision = 0;
 	UPROPERTY(BlueprintReadOnly) int32 OldEquipmentRevision = 0;
