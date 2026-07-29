@@ -152,6 +152,168 @@ bool FHSREquipmentMovementBagToEquipTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FHSREquipmentMovementDomainFailureMatrixTest,
+	"HSR.Equipment.Movement.FailureMatrix.DomainPreflight",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSREquipmentMovementDomainFailureMatrixTest::RunTest(const FString& Parameters)
+{
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GetTransientPackage());
+	UHSRInventorySubsystem* Inventory = NewObject<UHSRInventorySubsystem>(GameInstance);
+	UHSREquipmentSubsystem* Equipment = NewObject<UHSREquipmentSubsystem>(GameInstance);
+	UHSRItemEquipmentMappingCatalog* Catalog = NewObject<UHSRItemEquipmentMappingCatalog>();
+
+	auto RegisterPair = [this, Inventory, Equipment, Catalog](const FName ItemId, const FName EquipmentId)
+	{
+		UHSRItemDefinition* Item = NewObject<UHSRItemDefinition>();
+		Item->ItemId = ItemId; Item->StorageKind = EHSRItemStorageKind::Unique; Item->MaxStack = 1;
+		TestEqual(TEXT("Failure fixture Inventory definition"), Inventory->RegisterDefinition(*Item), EHSRInventoryOperationResult::Success);
+		UHSREquipmentDefinition* Definition = NewObject<UHSREquipmentDefinition>();
+		Definition->DefinitionId = EquipmentId; Definition->Slot = EHSREquipmentSlot::Weapon; Definition->EnhancementCap = 10;
+		TestEqual(TEXT("Failure fixture Equipment definition"), Equipment->RegisterDefinition(*Definition), EHSREquipmentOperationResult::Success);
+		FHSRItemEquipmentMappingEntry Mapping;
+		Mapping.ItemId = ItemId; Mapping.EquipmentDefinitionId = EquipmentId;
+		Mapping.Kind = EHSREquipmentKind::Equipment; Mapping.Slot = static_cast<int32>(EHSREquipmentSlot::Weapon);
+		TestTrue(TEXT("Failure fixture mapping"), Catalog->AddMapping(Mapping));
+	};
+	RegisterPair(TEXT("Item.Weapon.Primary"), TEXT("Equipment.Weapon.Primary"));
+	RegisterPair(TEXT("Item.Weapon.Other"), TEXT("Equipment.Weapon.Other"));
+
+	const FGuid CharacterId = FGuid::NewGuid();
+	const FGuid EquippedId = FGuid::NewGuid();
+	FHSREquipmentInstance EquippedPayload;
+	EquippedPayload.InstanceId = EquippedId; EquippedPayload.DefinitionId = TEXT("Equipment.Weapon.Primary");
+	EquippedPayload.Kind = EHSREquipmentKind::Equipment; EquippedPayload.EnhancementLevel = 6;
+	TestEqual(TEXT("Failure fixture Registry payload"), Equipment->RegisterInstance(EquippedPayload), EHSREquipmentOperationResult::Success);
+	TestEqual(TEXT("Failure fixture bag membership"), Inventory->AddUnique({EquippedId, TEXT("Item.Weapon.Primary")}), EHSRInventoryOperationResult::Success);
+	FHSRInventorySnapshot Snapshot;
+	Inventory->GetSnapshot(Snapshot);
+	FHSREquipmentMovementRequest EquipRequest;
+	EquipRequest.OperationId = FGuid::NewGuid(); EquipRequest.CharacterId = CharacterId; EquipRequest.InstanceId = EquippedId;
+	EquipRequest.Intent = EHSREquipmentMovementIntent::Equip; EquipRequest.Kind = EHSREquipmentKind::Equipment;
+	EquipRequest.Slot = static_cast<int32>(EHSREquipmentSlot::Weapon);
+	EquipRequest.ExpectedInventoryRevision = Snapshot.Revision; EquipRequest.ExpectedEquipmentRevision = 0;
+	const FHSREquipmentMovementResult EquipResult = Equipment->ExecuteMovement(EquipRequest, *Inventory, *Catalog);
+	TestEqual(TEXT("Failure fixture equipped"), EquipResult.Code, EHSREquipmentMovementResultCode::Success);
+
+	const FGuid CollisionId = FGuid::NewGuid();
+	FHSREquipmentInstance CollisionPayload;
+	CollisionPayload.InstanceId = CollisionId; CollisionPayload.DefinitionId = TEXT("Equipment.Weapon.Other");
+	CollisionPayload.Kind = EHSREquipmentKind::Equipment; CollisionPayload.EnhancementLevel = 2;
+	TestEqual(TEXT("Collision Registry payload"), Equipment->RegisterInstance(CollisionPayload), EHSREquipmentOperationResult::Success);
+	TestEqual(TEXT("Collision membership intentionally disagrees with Registry"),
+		Inventory->AddUnique({CollisionId, TEXT("Item.Weapon.Primary")}), EHSRInventoryOperationResult::Success);
+
+	int32 InventoryEvents = 0;
+	int32 EquipmentEvents = 0;
+	Inventory->OnInventoryChanged().AddLambda([&InventoryEvents](int64) { ++InventoryEvents; });
+	Equipment->OnLoadoutChanged().AddLambda([&EquipmentEvents](const FGuid&, int32) { ++EquipmentEvents; });
+
+	auto MakeUnequip = [CharacterId, EquippedId](const int64 InventoryRevision, const int32 EquipmentRevision)
+	{
+		FHSREquipmentMovementRequest Request;
+		Request.OperationId = FGuid::NewGuid(); Request.CharacterId = CharacterId; Request.InstanceId = EquippedId;
+		Request.Intent = EHSREquipmentMovementIntent::Unequip; Request.Kind = EHSREquipmentKind::Equipment;
+		Request.Slot = static_cast<int32>(EHSREquipmentSlot::Weapon);
+		Request.ExpectedInventoryRevision = InventoryRevision; Request.ExpectedEquipmentRevision = EquipmentRevision;
+		return Request;
+	};
+	auto VerifyUnchanged = [this, Inventory, Equipment, CharacterId, EquippedId, &InventoryEvents, &EquipmentEvents]
+		(const TCHAR* Label, const int64 InventoryRevision, const int32 EquipmentRevision, const int32 MembershipCount)
+	{
+		FHSRInventorySnapshot CurrentInventory; Inventory->GetSnapshot(CurrentInventory);
+		TestEqual(*FString::Printf(TEXT("%s Inventory revision stable"), Label), CurrentInventory.Revision, InventoryRevision);
+		TestEqual(*FString::Printf(TEXT("%s membership stable"), Label), CurrentInventory.UniqueItems.Num(), MembershipCount);
+		FHSREquipmentLoadout CurrentLoadout; int32 CurrentEquipmentRevision = 0;
+		TestTrue(*FString::Printf(TEXT("%s loadout resolves"), Label), Equipment->GetLoadout(CharacterId, CurrentLoadout, CurrentEquipmentRevision));
+		TestEqual(*FString::Printf(TEXT("%s Equipment revision stable"), Label), CurrentEquipmentRevision, EquipmentRevision);
+		TestEqual(*FString::Printf(TEXT("%s placement stable"), Label),
+			CurrentLoadout.Equipment.FindChecked(EHSREquipmentSlot::Weapon).InstanceId, EquippedId);
+		FHSREquipmentInstance CurrentPayload;
+		TestTrue(*FString::Printf(TEXT("%s Registry payload retained"), Label), Equipment->FindRegisteredInstance(EquippedId, CurrentPayload));
+		TestEqual(*FString::Printf(TEXT("%s enhancement stable"), Label), CurrentPayload.EnhancementLevel, 6);
+		TestEqual(*FString::Printf(TEXT("%s Inventory delegates zero"), Label), InventoryEvents, 0);
+		TestEqual(*FString::Printf(TEXT("%s Equipment delegates zero"), Label), EquipmentEvents, 0);
+	};
+
+	Inventory->GetSnapshot(Snapshot);
+	const int64 StableInventoryRevision = Snapshot.Revision;
+	const int32 StableEquipmentRevision = EquipResult.NewEquipmentRevision;
+	const int32 StableMembershipCount = Snapshot.UniqueItems.Num();
+
+	FHSREquipmentMovementRequest Request = MakeUnequip(StableInventoryRevision - 1, StableEquipmentRevision);
+	TestEqual(TEXT("Stale Inventory revision rejected"), Equipment->ExecuteMovement(Request, *Inventory, *Catalog).Code,
+		EHSREquipmentMovementResultCode::InventoryRevisionConflict);
+	VerifyUnchanged(TEXT("StaleInventory"), StableInventoryRevision, StableEquipmentRevision, StableMembershipCount);
+
+	Request = MakeUnequip(StableInventoryRevision, StableEquipmentRevision - 1);
+	TestEqual(TEXT("Stale Equipment revision rejected"), Equipment->ExecuteMovement(Request, *Inventory, *Catalog).Code,
+		EHSREquipmentMovementResultCode::EquipmentRevisionConflict);
+	VerifyUnchanged(TEXT("StaleEquipment"), StableInventoryRevision, StableEquipmentRevision, StableMembershipCount);
+
+	Request = MakeUnequip(StableInventoryRevision - 1, StableEquipmentRevision - 1);
+	TestEqual(TEXT("Mismatched revision pair rejected before candidates"), Equipment->ExecuteMovement(Request, *Inventory, *Catalog).Code,
+		EHSREquipmentMovementResultCode::InventoryRevisionConflict);
+	VerifyUnchanged(TEXT("RevisionPair"), StableInventoryRevision, StableEquipmentRevision, StableMembershipCount);
+
+	Request = MakeUnequip(StableInventoryRevision, 0);
+	Request.CharacterId = FGuid::NewGuid();
+	TestEqual(TEXT("Foreign Character owner rejected"), Equipment->ExecuteMovement(Request, *Inventory, *Catalog).Code,
+		EHSREquipmentMovementResultCode::EquipmentRejected);
+	VerifyUnchanged(TEXT("ForeignOwner"), StableInventoryRevision, StableEquipmentRevision, StableMembershipCount);
+
+	Request = MakeUnequip(StableInventoryRevision, StableEquipmentRevision);
+	Request.Slot = static_cast<int32>(EHSREquipmentSlot::Head);
+	TestEqual(TEXT("Wrong slot rejected"), Equipment->ExecuteMovement(Request, *Inventory, *Catalog).Code,
+		EHSREquipmentMovementResultCode::MappingRejected);
+	VerifyUnchanged(TEXT("WrongSlot"), StableInventoryRevision, StableEquipmentRevision, StableMembershipCount);
+
+	Request = MakeUnequip(StableInventoryRevision, StableEquipmentRevision);
+	Request.InstanceId = CollisionId;
+	TestEqual(TEXT("Wrong expected placement rejected"), Equipment->ExecuteMovement(Request, *Inventory, *Catalog).Code,
+		EHSREquipmentMovementResultCode::EquipmentRejected);
+	VerifyUnchanged(TEXT("WrongPlacement"), StableInventoryRevision, StableEquipmentRevision, StableMembershipCount);
+
+	Request = MakeUnequip(StableInventoryRevision, StableEquipmentRevision);
+	Request.InstanceId = FGuid::NewGuid();
+	TestEqual(TEXT("Missing Registry instance rejected"), Equipment->ExecuteMovement(Request, *Inventory, *Catalog).Code,
+		EHSREquipmentMovementResultCode::EquipmentRejected);
+	VerifyUnchanged(TEXT("MissingRegistry"), StableInventoryRevision, StableEquipmentRevision, StableMembershipCount);
+
+	UHSRItemEquipmentMappingCatalog* EmptyCatalog = NewObject<UHSRItemEquipmentMappingCatalog>();
+	Request = MakeUnequip(StableInventoryRevision, StableEquipmentRevision);
+	TestEqual(TEXT("Missing mapping rejected"), Equipment->ExecuteMovement(Request, *Inventory, *EmptyCatalog).Code,
+		EHSREquipmentMovementResultCode::MappingRejected);
+	VerifyUnchanged(TEXT("MissingMapping"), StableInventoryRevision, StableEquipmentRevision, StableMembershipCount);
+
+	Request = EquipRequest;
+	Request.OperationId = FGuid::NewGuid(); Request.InstanceId = CollisionId;
+	Request.ExpectedInventoryRevision = StableInventoryRevision; Request.ExpectedEquipmentRevision = StableEquipmentRevision;
+	TestEqual(TEXT("Inventory membership and Registry payload collision rejected"), Equipment->ExecuteMovement(Request, *Inventory, *Catalog).Code,
+		EHSREquipmentMovementResultCode::MappingRejected);
+	VerifyUnchanged(TEXT("PayloadCollision"), StableInventoryRevision, StableEquipmentRevision, StableMembershipCount);
+
+	TestTrue(TEXT("Capacity constrained to current membership"), Inventory->SetCapacityForAutomation(StableMembershipCount));
+	Request = MakeUnequip(StableInventoryRevision, StableEquipmentRevision);
+	const FGuid RetryOperationId = Request.OperationId;
+	TestEqual(TEXT("Unequip capacity rejection"), Equipment->ExecuteMovement(Request, *Inventory, *Catalog).Code,
+		EHSREquipmentMovementResultCode::InventoryRejected);
+	VerifyUnchanged(TEXT("Capacity"), StableInventoryRevision, StableEquipmentRevision, StableMembershipCount);
+
+	TestEqual(TEXT("Collision membership removed for retry"), Inventory->RemoveUnique(CollisionId), EHSRInventoryOperationResult::Success);
+	InventoryEvents = 0; EquipmentEvents = 0;
+	Inventory->GetSnapshot(Snapshot);
+	Request = MakeUnequip(Snapshot.Revision, StableEquipmentRevision);
+	Request.OperationId = RetryOperationId;
+	const FHSREquipmentMovementResult Retry = Equipment->ExecuteMovement(Request, *Inventory, *Catalog);
+	TestEqual(TEXT("Rejected OperationId remains reusable"), Retry.Code, EHSREquipmentMovementResultCode::Success);
+	TestTrue(TEXT("Corrected retry commits"), Retry.bCommitted);
+	TestEqual(TEXT("Corrected retry publishes Inventory once"), InventoryEvents, 1);
+	TestEqual(TEXT("Corrected retry publishes Equipment once"), EquipmentEvents, 1);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FHSREquipmentMovementReplaceTest,
 	"HSR.Equipment.Movement.Transaction.ReplaceNetCapacity",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

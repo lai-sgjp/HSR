@@ -99,6 +99,13 @@ Verdict: `REVISE`
 - `HSREditor Win64 Development` passed (6/6 actions, exit 0).
 - `Saved/Logs/03E2-FailureMatrix-DisplacedMapping-GREEN.log`: the same `ReplaceNetCapacity` test passed 1/1, including zero publication on rejection and successful same-OperationId retry with the canonical catalog.
 
+## Domain preflight failure matrix TDD RED
+
+- Added `HSR.Equipment.Movement.FailureMatrix.DomainPreflight` for stale Inventory revision, stale Equipment revision, mismatched revision pair, foreign owner, wrong slot/placement, missing Registry, missing mapping, Inventory/Registry payload collision, capacity rejection, zero mutation/publication and failed-OperationId reuse.
+- `HSREditor Win64 Development` compiled and linked the matrix (4/4 actions, exit 0 after the diagnostic expectation correction).
+- `Saved/Logs/03E2-FailureMatrix-DomainPreflight-RED.log`: valid runtime RED with one failing assertion. Wrong expected placement did not return `EquipmentRejected`; the current Unequip path prepares Inventory addition first and collapses the duplicate membership into `InventoryRejected`. All later zero-pollution assertions remained GREEN.
+- No production code changed before this RED was confirmed.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.
