@@ -122,6 +122,32 @@ bool FHSREquipmentMovementBagToEquipTest::RunTest(const FString& Parameters)
 	const FHSREquipmentMovementResult Conflict = Equipment->ExecuteMovement(ConflictingRequest, *Inventory, *Catalog);
 	TestEqual(TEXT("Changed request under same OperationId rejected"), Conflict.Code, EHSREquipmentMovementResultCode::OperationIdConflict);
 	TestFalse(TEXT("Conflict does not commit"), Conflict.bCommitted);
+
+	FHSREquipmentMovementRequest UnequipRequest;
+	UnequipRequest.OperationId = FGuid::NewGuid();
+	UnequipRequest.CharacterId = CharacterId;
+	UnequipRequest.InstanceId = InstanceId;
+	UnequipRequest.Intent = EHSREquipmentMovementIntent::Unequip;
+	UnequipRequest.Kind = EHSREquipmentKind::Equipment;
+	UnequipRequest.Slot = static_cast<int32>(EHSREquipmentSlot::Weapon);
+	UnequipRequest.ExpectedInventoryRevision = Result.NewInventoryRevision;
+	UnequipRequest.ExpectedEquipmentRevision = Result.NewEquipmentRevision;
+	const FHSREquipmentMovementResult UnequipResult = Equipment->ExecuteMovement(UnequipRequest, *Inventory, *Catalog);
+	TestEqual(TEXT("Unequip aggregate committed"), UnequipResult.Code, EHSREquipmentMovementResultCode::Success);
+	TestTrue(TEXT("Unequip marks commit"), UnequipResult.bCommitted);
+	Inventory->GetSnapshot(InventoryAfter);
+	TestEqual(TEXT("Unequip returns one bag membership"), InventoryAfter.UniqueItems.Num(), 1);
+	if (InventoryAfter.UniqueItems.Num() == 1)
+	{
+		TestEqual(TEXT("Unequip returns same InstanceId"), InventoryAfter.UniqueItems[0].InstanceId, InstanceId);
+		TestEqual(TEXT("Unequip returns mapped ItemId"), InventoryAfter.UniqueItems[0].DefinitionId, ItemDefinition->ItemId);
+	}
+	Equipment->GetLoadout(CharacterId, Loadout, EquipmentRevision);
+	TestEqual(TEXT("Unequip clears weapon placement"), Loadout.Equipment.Num(), 0);
+	TestEqual(TEXT("Unequip inventory revision advances once"), InventoryAfter.Revision, Result.NewInventoryRevision + 1);
+	TestEqual(TEXT("Unequip equipment revision advances once"), EquipmentRevision, Result.NewEquipmentRevision + 1);
+	TestTrue(TEXT("Unequip retains Registry payload"), Equipment->FindRegisteredInstance(InstanceId, ResolvedRegistry));
+	TestEqual(TEXT("Unequip retains enhancement"), ResolvedRegistry.EnhancementLevel, 3);
 	return true;
 }
 

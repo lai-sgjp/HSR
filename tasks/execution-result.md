@@ -83,3 +83,10 @@ Verdict: `REVISE`
 - `Saved/Logs/03E2-OperationId-GREEN-Build.log`: `HSREditor Win64 Development` succeeded, 15 actions, exit 0.
 - `Saved/Logs/03E2-OperationId-GREEN-Automation.log`: `HSR.Equipment.Movement` 2/2 Success, exit 0.
 - Ledger restore/pending-save policy, unequip, replace, capacity and projection failure matrices remain pending.
+
+## Unequip TDD RED
+
+- Extended the successful bag-to-equip journey with equip-to-unequip requirements: return the same InstanceId/mapped ItemId to Inventory, remove placement, retain Registry payload/enhancement, and advance both revisions exactly once.
+- The first run crashed only because the test indexed the expected membership after the unimplemented operation returned an empty array; assertion access was guarded and rerun without production changes.
+- `Saved/Logs/03E2-Unequip-RED-Automation-02.log`: valid runtime RED, exit 255. Unequip was not committed, membership stayed absent, placement stayed present, and both revisions stayed unchanged; Registry retention remained intact.
+- No production code changed before the valid runtime RED was confirmed.
