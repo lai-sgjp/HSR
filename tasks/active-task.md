@@ -1,6 +1,6 @@
 # TASK-P17-PATCH-03E2 - Atomic Equipment Movement and Runtime Projection
 
-Status: `TASK GATE REVISE / PLANNING BLOCKER / IMPLEMENTATION NOT AUTHORIZED`
+Status: `IMPLEMENTATION IN PROGRESS / TDD RED-GREEN / USER AUTHORIZED`
 
 ## Gate boundary
 
@@ -19,9 +19,9 @@ Status: `TASK GATE REVISE / PLANNING BLOCKER / IMPLEMENTATION NOT AUTHORIZED`
 - ASC/EffectBridge receives a post-commit resolved aggregate only. Projection validity and required source-effect handles must be preflighted before commit; if the projection cannot be proven ready, the transaction is rejected with zero domain mutation. Commit must not depend on a fallible post-commit compensation path.
 - Equipment Detail ViewModel/Widget remains a read/intent presentation layer: it may subscribe to the single committed revision and rebuild one resolved snapshot, but it cannot own OperationId, mutate Inventory/Equipment, apply/remove GE or serialize Save data.
 
-## Current planning blocker
+## Frozen mapping decision
 
-The existing definitions do not provide the required explicit mapping: `UHSRItemDefinition` contains only `ItemId`, `StorageKind` and `MaxStack`, while `UHSREquipmentDefinition` contains only `DefinitionId`, `Slot` and `EnhancementCap`. No authoritative Item-to-Equipment catalog or mapping field currently exists. The Gate must choose and freeze the mapping owner, stable mapping key, validation rules, Save schema impact and Editor asset boundary before implementation. Guessing by matching names, prefixes or `DefinitionId` is prohibited.
+The user confirmed a dedicated static Item-to-Equipment/Relic mapping catalog. `ItemId` is the lookup key; `EquipmentDefinitionId`, Kind and Slot are explicit mapped values. The catalog is static editor data, not per-instance Save data. It rejects missing, duplicate, conflicting, wrong-storage-kind, missing-target and incompatible mappings before domain mutation. Save schema 7 remains Registry payload plus Placement. Name, prefix, display text and DefinitionId similarity inference remain prohibited.
 
 ## Required failure matrix
 
@@ -48,6 +48,7 @@ The existing definitions do not provide the required explicit mapping: `UHSRItem
 ## Proposed implementation allowlist for Gate review only
 
 - `Source/HSR/Inventory/HSRInventorySubsystem.h/.cpp` and `HSRItemTypes.h` only for the minimum candidate/commit seam;
+- `Source/HSR/Data/Definitions/HSRItemEquipmentMappingCatalog.h/.cpp` for the explicit static mapping contract;
 - `Source/HSR/Equipment/HSREquipmentSubsystem.h/.cpp` and `HSREquipmentTypes.h` only for the minimum candidate/commit seam;
 - one bounded integration command/request/result type in the owning subsystem boundary; no global manager or new runtime module;
 - `Source/HSR/Equipment/HSREquipmentEffectBridge.h/.cpp` only for derived source-effect projection with preflightable failure behavior;

@@ -1,6 +1,6 @@
 # TASK-P17-PATCH-03E2 Task Gate Evidence
 
-Status: `TASK GATE REVISE / PLANNING BLOCKER / IMPLEMENTATION NOT AUTHORIZED`
+Status: `IMPLEMENTATION AUTHORIZED / TDD RED-GREEN IN PROGRESS`
 
 - 03E1 is archived with Build, Automation, Independent Review and user Editor/PIE compatibility evidence.
 - No 03E2 Source, test, Content, Build, Automation or PIE action has started.
@@ -15,6 +15,12 @@ Status: `PASS WITH PLANNING FOLLOW-UP`
 - Recommended direction is a dedicated static Item-to-Equipment/Relic mapping catalog. Inventory remains membership/capacity authority; Equipment remains complete payload/placement authority; `InstanceId` remains runtime ownership identity; ASC and UI remain derived/read-only.
 - Missing, duplicate, conflicting, wrong-storage-kind, missing-target or incompatible-slot mappings must reject before either domain mutates. Name, prefix, display text or DefinitionId similarity inference remains prohibited.
 - Recommendation is not treated as user authorization; the Gate remains `REVISE / PLANNING BLOCKER` until the mapping contract is independently reviewed and accepted.
+
+## User authorization and RED checkpoint
+
+- User confirmed the dedicated static Item-to-Equipment/Relic mapping catalog scheme and authorized implementation.
+- RED test added at `Source/HSR/Tests/HSREquipmentMovementTests.cpp` for explicit mapping insertion, duplicate rejection and lookup.
+- Mapping catalog implementation is now limited to `Source/HSR/Data/Definitions/HSRItemEquipmentMappingCatalog.h/.cpp`; no Content asset has been created.
 
 ## Role handoff: Independent Reviewer
 
