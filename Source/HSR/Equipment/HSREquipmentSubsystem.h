@@ -58,6 +58,7 @@ public:
 	EHSREquipmentOperationResult RegisterDefinition(const UHSREquipmentDefinition& Definition);
 	EHSREquipmentOperationResult RegisterDefinition(const UHSRRelicDefinition& Definition);
 	bool HasDefinition(FName DefinitionId) const { return Definitions.Contains(DefinitionId); }
+	bool IsDefinitionCompatible(FName DefinitionId,EHSREquipmentKind Kind,int32 Slot) const;
 	EHSREquipmentOperationResult RegisterInstance(const FHSREquipmentInstance& Instance);
 	bool FindRegisteredInstance(const FGuid& InstanceId, FHSREquipmentInstance& OutInstance) const;
 	EHSREquipmentOperationResult EquipById(const FGuid& CharacterId, const FGuid& InstanceId);

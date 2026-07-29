@@ -49,7 +49,8 @@ private:
 	TWeakObjectPtr<UHSRRewardSubsystem> Reward;
 	TWeakObjectPtr<UHSRQuestSubsystem> Quest;
 	TWeakObjectPtr<UHSRMapSubsystem> Map;
-	TWeakObjectPtr<UHSRItemEquipmentMappingCatalog> MappingCatalog;
+	UPROPERTY(Transient)
+	TObjectPtr<UHSRItemEquipmentMappingCatalog> MappingCatalog;
 #if WITH_EDITORONLY_DATA || WITH_DEV_AUTOMATION_TESTS
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRInventorySubsystem> DevelopmentInventory;

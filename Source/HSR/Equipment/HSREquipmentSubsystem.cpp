@@ -122,6 +122,12 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UH
 	return EHSREquipmentOperationResult::Success;
 }
 
+bool UHSREquipmentSubsystem::IsDefinitionCompatible(const FName DefinitionId,const EHSREquipmentKind Kind,const int32 Slot) const
+{
+	const FDefinitionRule* Rule=Definitions.Find(DefinitionId);
+	return Rule&&Rule->Kind==Kind&&Rule->Slot==Slot;
+}
+
 EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterInstance(const FHSREquipmentInstance& Instance)
 {
 	if (!Instance.InstanceId.IsValid()) return EHSREquipmentOperationResult::InvalidInstanceId;
