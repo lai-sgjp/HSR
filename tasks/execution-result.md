@@ -83,6 +83,7 @@ Verdict: `REVISE`
 - `Saved/Logs/03E2-Replace-GREEN-Build.log`: `HSREditor Win64 Development` succeeded, 11 actions, exit 0.
 - The first Automation invocation produced no process/log because permission approval timed out; the identical command was retried once.
 - `Saved/Logs/03E2-Replace-GREEN-Automation.log`: `HSR.Equipment.Movement` 3/3 Success, exit 0.
+- Post-replace focused regressions are GREEN: `HSR.Inventory` 3/3, `HSR.Equipment.Registry` 3/3 and `HSR.Equipment` 11/11, all exit 0 with zero failed tests (`03E2-Replace-Regression-*.log`).
 
 ## OperationId GREEN checkpoint
 
