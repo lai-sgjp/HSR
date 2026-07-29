@@ -1,6 +1,6 @@
 # TASK-P17-PATCH-03E2 Task Gate Evidence
 
-Status: `IMPLEMENTATION BLOCKED / PRE-EXISTING REGRESSION ALLOWLIST REQUIRED`
+Status: `IMPLEMENTATION IN PROGRESS / REGRESSION BLOCKER RESOLVED / MAPPING CHECKPOINT GREEN`
 
 - 03E1 is archived with Build, Automation, Independent Review and user Editor/PIE compatibility evidence.
 - No 03E2 Source, test, Content, Build, Automation or PIE action has started.
@@ -43,3 +43,11 @@ Verdict: `REVISE`
 - Reviewer confirms the definition and subsystem seam evidence and agrees that no authoritative Item-to-Equipment mapping path exists.
 - Reviewer confirms the execution packet is truthful: no 03E2 Source, test, Content, Build or PIE work has started.
 - Reviewer recommends freezing mapping owner, stable key, validation, Save impact and Editor boundary before implementation or Gate PASS.
+
+## 03R resolution and resumed 03E2 checkpoint
+
+- `TASK-P17-PATCH-03R` restored the existing Automation development seams and is archived with final Independent Reviewer `PASS` (`3321bf4`) and Coordinator closeout `ba747e7`.
+- Required `HSREditor Win64 Development` is GREEN after 03R; the historical regression blocker no longer blocks 03E2.
+- `Saved/Logs/03E2-Mapping-Checkpoint.log`: `HSR.Equipment.Movement.MappingContract` completed 1/1 Success, exit 0.
+- The committed catalog checkpoint is GREEN, not the remaining transaction RED. The next TDD RED must cover the authorized bag/equip/unequip/replace aggregate, dual revisions, replay, capacity and zero-mutation failure contract.
+- No 03E2 production transaction, Content, Config, Save schema, SettlementAuthority or UI asset change is claimed by this checkpoint.
