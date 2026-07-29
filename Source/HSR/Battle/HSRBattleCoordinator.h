@@ -119,6 +119,7 @@ public:
 	void SetProgressionOldRemoveFailureForDevelopmentTest(bool bForce) { bForceProgressionOldRemoveFailureForTest=bForce; }
 	void SetEquipmentRestoreProjectionFailureForDevelopmentTest(bool bForce) { bForceEquipmentRestoreProjectionFailure=bForce; }
 	void SetEquipmentRestoreProjectionFailureAfterOperationsForDevelopmentTest(int32 Count) { EquipmentRestoreFailureAfterOperations=Count; }
+	void SetEquipmentMovementProjectionFailureForDevelopmentTest(bool bApply,bool bRemove);
 	void SetParticipantsForEquipmentProjectionDevelopmentTest(const TArray<FHSRBattleParticipant>& InParticipants) { Participants=InParticipants; }
 	int32 GetEquipmentProjectionSourceCountForDevelopmentTest() const { return EquipmentEffectBridge?EquipmentEffectBridge->GetActiveSourceCount():0; }
 	EHSRStatusOperationResult AddStatusForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId);

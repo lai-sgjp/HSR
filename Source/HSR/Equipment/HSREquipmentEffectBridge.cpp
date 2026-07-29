@@ -5,8 +5,19 @@
 #include "GameplayEffect.h"
 bool UHSREquipmentEffectBridge::CanApply(UAbilitySystemComponent* ASC,TSubclassOf<UGameplayEffect> C,const FHSREquipmentAggregate& A) const
 {
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
+ if(bForceCanApplyFailure)return false;
+#endif
  if(!ASC||!C||A.Revision<0)return false;
  return ASC->MakeOutgoingSpec(C,1.f,ASC->MakeEffectContext()).IsValid();
+}
+bool UHSREquipmentEffectBridge::CanRemove(const FGuid& Key) const
+{
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
+ if(bForceCanRemoveFailure)return false;
+#endif
+ const FSource* Source=Sources.Find(Key);
+ return !Source||!Source->Handle.IsValid()||!Source->ASC.IsValid()||Source->ASC->GetActiveGameplayEffect(Source->Handle)!=nullptr;
 }
 bool UHSREquipmentEffectBridge::Apply(const FGuid& Key,UAbilitySystemComponent* ASC,TSubclassOf<UGameplayEffect> C,const FHSREquipmentAggregate& A){if(!Key.IsValid()||!ASC||!C||A.Revision<0){UE_LOG(LogTemp,Warning,TEXT("HSR.EquipmentBridge Apply InvalidInput Key=%s ASC=%s Class=%s Revision=%lld"),*Key.ToString(),ASC?*ASC->GetName():TEXT("None"),C?*C->GetName():TEXT("None"),A.Revision);return false;} if(FSource* O=Sources.Find(Key)) if(O->ASC.Get()==ASC&&O->Class==C&&O->Handle.IsValid()&&ASC->GetActiveGameplayEffect(O->Handle)&&O->Fingerprint.MaxHealth==A.MaxHealth&&O->Fingerprint.Attack==A.Attack&&O->Fingerprint.Defense==A.Defense&&O->Fingerprint.Speed==A.Speed){O->Fingerprint.Revision=A.Revision;return true;} const FGameplayEffectSpecHandle S=ASC->MakeOutgoingSpec(C,1.f,ASC->MakeEffectContext()); if(!S.IsValid()){UE_LOG(LogTemp,Warning,TEXT("HSR.EquipmentBridge Apply SpecInvalid Key=%s Class=%s"),*Key.ToString(),*C->GetName());return false;} S.Data->SetSetByCallerMagnitude(HSREquipmentTags::BonusMaxHealth,A.MaxHealth);S.Data->SetSetByCallerMagnitude(HSREquipmentTags::BonusAttack,A.Attack);S.Data->SetSetByCallerMagnitude(HSREquipmentTags::BonusDefense,A.Defense);S.Data->SetSetByCallerMagnitude(HSREquipmentTags::BonusSpeed,A.Speed); FActiveGameplayEffectHandle H=ASC->ApplyGameplayEffectSpecToSelf(*S.Data.Get()); if(!H.WasSuccessfullyApplied()){UE_LOG(LogTemp,Error,TEXT("HSR.EquipmentBridge Apply Failed Key=%s Class=%s Revision=%lld Values=%.3f/%.3f/%.3f/%.3f"),*Key.ToString(),*C->GetName(),A.Revision,A.MaxHealth,A.Attack,A.Defense,A.Speed);return false;} if(FSource* O=Sources.Find(Key)){if(O->ASC.IsValid()&&O->Handle.IsValid()&&O->ASC->GetActiveGameplayEffect(O->Handle)){if(!O->ASC->RemoveActiveGameplayEffect(O->Handle)){ASC->RemoveActiveGameplayEffect(H);UE_LOG(LogTemp,Error,TEXT("HSR.EquipmentBridge Apply OldRemoveFailed Key=%s OldHandle=%s NewHandle=%s"),*Key.ToString(),*O->Handle.ToString(),*H.ToString());return false;}}} FSource Src;Src.ASC=ASC;Src.Class=C;Src.Fingerprint=A;Src.Handle=H;Sources.Add(Key,Src); return true;}
 bool UHSREquipmentEffectBridge::Remove(const FGuid& Key){FSource* S=Sources.Find(Key);if(!S){UE_LOG(LogTemp,Warning,TEXT("HSR.EquipmentBridge Remove MissingSource Key=%s"),*Key.ToString());return true;}bool Ok=!S->Handle.IsValid()||!S->ASC.IsValid()||!S->ASC->GetActiveGameplayEffect(S->Handle)||S->ASC->RemoveActiveGameplayEffect(S->Handle);if(Ok)Sources.Remove(Key);else UE_LOG(LogTemp,Error,TEXT("HSR.EquipmentBridge Remove Failed Key=%s Handle=%s ASC=%s"),*Key.ToString(),*S->Handle.ToString(),S->ASC.IsValid()?*S->ASC->GetName():TEXT("None"));return Ok;}

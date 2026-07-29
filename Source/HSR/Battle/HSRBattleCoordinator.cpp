@@ -1940,6 +1940,7 @@ bool UHSRBattleCoordinator::RemoveEquipmentSetSource(FName ParticipantId,FName S
 }
 void UHSRBattleCoordinator::BindEquipmentMovementProjection(UHSREquipmentSubsystem& Equipment)
 {
+	if(!EquipmentEffectBridge)EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
 	Equipment.SetMovementProjection(
 		UHSREquipmentSubsystem::FMovementProjectionPreflight::CreateUObject(this,&ThisClass::CanProjectEquipmentMovement),
 		UHSREquipmentSubsystem::FMovementProjectionCommit::CreateUObject(this,&ThisClass::CommitEquipmentMovementProjection));
@@ -1949,12 +1950,21 @@ bool UHSRBattleCoordinator::CanProjectEquipmentMovement(const FHSREquipmentMovem
 	if(Request.CharacterId!=HSRCharacterGuidFromProfileName(PlayerCharacterId)||!EquipmentGameplayEffect)return false;
 	const FHSRBattleParticipant* Participant=Participants.FindByPredicate([](const FHSRBattleParticipant& Value){return Value.ParticipantId==TEXT("Player");});
 	if(!Participant||!Participant->AbilitySystemComponent.IsValid())return false;
-	FHSREquipmentAggregate Aggregate;
-	if(!UHSREquipmentStatAggregator::Aggregate(Candidate,Request.ExpectedEquipmentRevision+1,Aggregate))return false;
 	UHSREquipmentEffectBridge* Bridge=EquipmentEffectBridge.Get();
-	if(!Bridge) Bridge=NewObject<UHSREquipmentEffectBridge>(const_cast<UHSRBattleCoordinator*>(this));
-	return Bridge->CanApply(Participant->AbilitySystemComponent.Get(),EquipmentGameplayEffect,Aggregate);
+	if(!Bridge)return false;
+	TSet<FGuid> DesiredIds;for(const auto& Pair:Candidate.Equipment)DesiredIds.Add(Pair.Value.InstanceId);for(const auto& Pair:Candidate.Relics)DesiredIds.Add(Pair.Value.InstanceId);
+	for(const auto& Existing:EquipmentProjectionStates)if(!DesiredIds.Contains(Existing.Key)&&!Bridge->CanRemove(Existing.Key))return false;
+	if(Request.Intent==EHSREquipmentMovementIntent::Unequip)return true;
+	FHSREquipmentAggregate Aggregate;
+	return UHSREquipmentStatAggregator::Aggregate(Candidate,Request.ExpectedEquipmentRevision+1,Aggregate)&&Bridge->CanApply(Participant->AbilitySystemComponent.Get(),EquipmentGameplayEffect,Aggregate);
 }
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
+void UHSRBattleCoordinator::SetEquipmentMovementProjectionFailureForDevelopmentTest(bool bApply,bool bRemove)
+{
+	if(!EquipmentEffectBridge)EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
+	EquipmentEffectBridge->SetPreflightFailureForDevelopmentTest(bApply,bRemove);
+}
+#endif
 void UHSRBattleCoordinator::CommitEquipmentMovementProjection(const FHSREquipmentMovementRequest& Request,const FHSREquipmentLoadout& Candidate)
 {
 	if(Request.Intent==EHSREquipmentMovementIntent::Unequip)
