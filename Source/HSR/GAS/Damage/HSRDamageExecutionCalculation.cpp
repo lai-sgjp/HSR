@@ -53,7 +53,7 @@ void UHSRDamageExecutionCalculation::Execute_Implementation(const FGameplayEffec
 	FHSRDamageResult& Result = Context->DamageResult;
 	Result.ActionId = Context->DamageContext.ActionId;
 	Result.DamageType = Context->DamageContext.DamageType;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	if (Context->TestInjection == EHSRDamageTestInjection::ForceCaptureFailed) { Result.Result = EHSRDamageResultType::CaptureFailed; return; }
 	if (Context->TestInjection == EHSRDamageTestInjection::ForceInvalidCapturedValue) { Attack = std::numeric_limits<float>::quiet_NaN(); }
 #endif

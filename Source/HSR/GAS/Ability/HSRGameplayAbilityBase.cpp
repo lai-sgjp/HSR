@@ -79,7 +79,7 @@ bool UHSRGameplayAbilityBase::ApplyPreparedFormalDamage(UAbilitySystemComponent*
 		ClearPreparedFormalDamage();
 		return false;
 	}
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	if (const FHSRDamageEffectContext* DamageContext = static_cast<const FHSRDamageEffectContext*>(PreparedFormalDamage.Spec.Data->GetContext().Get()))
 	{
 		UE_LOG(LogTemp, Log, TEXT("P7-004 AbilityApply Context ActionId=%s Injection=%d"), *DamageContext->DamageContext.ActionId.ToString(), static_cast<int32>(DamageContext->TestInjection));
@@ -96,7 +96,7 @@ bool UHSRGameplayAbilityBase::ApplyPreparedFormalDamage(UAbilitySystemComponent*
 	if (const FHSRDamageEffectContext* DamageContext = static_cast<const FHSRDamageEffectContext*>(PreparedFormalDamage.Spec.Data->GetContext().Get()))
 	{
 		LastFormalDamageExecutionResult.DamageResult = DamageContext->DamageResult;
-		#if WITH_EDITOR
+		#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		const bool bInjectedFailure = DamageContext->TestInjection == EHSRDamageTestInjection::ForceCaptureFailed || DamageContext->TestInjection == EHSRDamageTestInjection::ForceInvalidCapturedValue || DamageContext->TestInjection == EHSRDamageTestInjection::ForcePostCostApplyFailure;
 		#else
 		const bool bInjectedFailure = false;
