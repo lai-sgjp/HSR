@@ -12,6 +12,8 @@
 #include "../Map/HSRMapSubsystem.h"
 #include "HSRSaveSubsystem.generated.h"
 
+class UHSRItemEquipmentMappingCatalog;
+
 UCLASS()
 class HSR_API UHSRSaveSubsystem : public UGameInstanceSubsystem { GENERATED_BODY()
 public:
@@ -33,7 +35,7 @@ public:
 	void SetRestoreBlockedForAutomation(bool bMapTravel, bool bBattleReturn) { bInjectMapTravelPending=bMapTravel;bInjectBattleReturnPending=bBattleReturn; }
 #endif
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
-	void InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles, UHSRPartySubsystem* InParty, UHSREquipmentSubsystem* InEquipment=nullptr, UHSRInventorySubsystem* InInventory=nullptr, UHSRRewardSubsystem* InReward=nullptr, UHSRQuestSubsystem* InQuest=nullptr, UHSRMapSubsystem* InMap=nullptr);
+	void InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles, UHSRPartySubsystem* InParty, UHSREquipmentSubsystem* InEquipment=nullptr, UHSRInventorySubsystem* InInventory=nullptr, UHSRRewardSubsystem* InReward=nullptr, UHSRQuestSubsystem* InQuest=nullptr, UHSRMapSubsystem* InMap=nullptr, UHSRItemEquipmentMappingCatalog* InMappingCatalog=nullptr);
 	int64 GetRestoreTransactionRevisionForDevelopmentTest() const { return RestoreTransactionRevision; }
 #endif
 private:
@@ -47,6 +49,7 @@ private:
 	TWeakObjectPtr<UHSRRewardSubsystem> Reward;
 	TWeakObjectPtr<UHSRQuestSubsystem> Quest;
 	TWeakObjectPtr<UHSRMapSubsystem> Map;
+	TWeakObjectPtr<UHSRItemEquipmentMappingCatalog> MappingCatalog;
 #if WITH_EDITORONLY_DATA || WITH_DEV_AUTOMATION_TESTS
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRInventorySubsystem> DevelopmentInventory;

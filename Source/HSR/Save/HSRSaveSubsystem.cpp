@@ -5,6 +5,7 @@
 #include "HSRSaveVersion.h"
 #include "Kismet/GameplayStatics.h"
 #include "../Battle/HSRBattleTransitionSubsystem.h"
+#include "../Data/Definitions/HSRItemEquipmentMappingCatalog.h"
 #if WITH_EDITOR
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -124,7 +125,7 @@ FAutoConsoleCommand P15MapCleanupCommand(TEXT("HSR.P15MapCleanup"), TEXT("Delete
 void UHSRSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection) { Super::Initialize(Collection); Profiles=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSRCharacterProfileSubsystem>():nullptr; Party=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSRPartySubsystem>():nullptr; Equipment=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSREquipmentSubsystem>():nullptr; Inventory=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSRInventorySubsystem>():nullptr; Reward=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSRRewardSubsystem>():nullptr; Quest=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSRQuestSubsystem>():nullptr; Map=GetGameInstance()?GetGameInstance()->GetSubsystem<UHSRMapSubsystem>():nullptr; }
 
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
-void UHSRSaveSubsystem::InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles, UHSRPartySubsystem* InParty, UHSREquipmentSubsystem* InEquipment, UHSRInventorySubsystem* InInventory, UHSRRewardSubsystem* InReward, UHSRQuestSubsystem* InQuest, UHSRMapSubsystem* InMap)
+void UHSRSaveSubsystem::InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles, UHSRPartySubsystem* InParty, UHSREquipmentSubsystem* InEquipment, UHSRInventorySubsystem* InInventory, UHSRRewardSubsystem* InReward, UHSRQuestSubsystem* InQuest, UHSRMapSubsystem* InMap, UHSRItemEquipmentMappingCatalog* InMappingCatalog)
 {
 	Profiles = InProfiles;
 	Party = InParty;
@@ -138,6 +139,7 @@ void UHSRSaveSubsystem::InitializeForDevelopmentTest(UHSRCharacterProfileSubsyst
 	Reward = DevelopmentReward;
 	Quest = DevelopmentQuest;
 	Map = DevelopmentMap;
+	MappingCatalog = InMappingCatalog;
 	DevelopmentReward->InitializeForDevelopmentTest(DevelopmentInventory);
 	DevelopmentQuest->InitializeForDevelopmentTest(DevelopmentReward);
 }
@@ -157,11 +159,12 @@ bool UHSRSaveSubsystem::Validate(const FHSRSaveData& C) const {
 		|| !C.Map.UnlockedRegionIds.IsEmpty() || !C.Map.UnlockedTeleportIds.IsEmpty()
 		|| !C.Map.ExplorationFlags.IsEmpty() || C.Map.Revision!=0))return false;
 	TSet<FGuid> OwnedInstances;
+	TMap<FGuid, const FHSREquipmentRegistryDto*> RegistryInstances;
 	TSet<FGuid> PlacedInstances;
-	if(C.SchemaVersion>=7){for(const auto& D:C.EquipmentRegistry){if(!D.InstanceId.IsValid()||OwnedInstances.Contains(D.InstanceId))return false;OwnedInstances.Add(D.InstanceId);}TSet<FString> Slots;for(const auto& D:C.EquipmentPlacements){const FName* Owner=GuidOwners.Find(D.CharacterId);const FString Slot=FString::Printf(TEXT("%s:%d:%d"),*D.CharacterId.ToString(),D.Kind,D.Slot);if(!Owner||HSRCharacterGuidFromProfileName(*Owner)!=D.CharacterId||!OwnedInstances.Contains(D.InstanceId)||PlacedInstances.Contains(D.InstanceId)||Slots.Contains(Slot))return false;PlacedInstances.Add(D.InstanceId);Slots.Add(Slot);}}
+	if(C.SchemaVersion>=7){for(const auto& D:C.EquipmentRegistry){if(!D.InstanceId.IsValid()||OwnedInstances.Contains(D.InstanceId))return false;OwnedInstances.Add(D.InstanceId);RegistryInstances.Add(D.InstanceId,&D);}TSet<FString> Slots;for(const auto& D:C.EquipmentPlacements){const FName* Owner=GuidOwners.Find(D.CharacterId);const FString Slot=FString::Printf(TEXT("%s:%d:%d"),*D.CharacterId.ToString(),D.Kind,D.Slot);if(!Owner||HSRCharacterGuidFromProfileName(*Owner)!=D.CharacterId||!OwnedInstances.Contains(D.InstanceId)||PlacedInstances.Contains(D.InstanceId)||Slots.Contains(Slot))return false;PlacedInstances.Add(D.InstanceId);Slots.Add(Slot);}}
 	else for(const FHSREquipmentSaveDto& D:C.Equipment){const FName* Owner=GuidOwners.Find(D.CharacterId);if(!Owner||HSRCharacterGuidFromProfileName(*Owner)!=D.CharacterId||!D.InstanceId.IsValid()||OwnedInstances.Contains(D.InstanceId))return false;OwnedInstances.Add(D.InstanceId);}
 	TSet<FGuid> InventoryInstances;
-	for(const FHSRItemInstance& I:C.Inventory.UniqueItems){if(!I.InstanceId.IsValid()||InventoryInstances.Contains(I.InstanceId)||(C.SchemaVersion>=7?PlacedInstances.Contains(I.InstanceId):OwnedInstances.Contains(I.InstanceId)))return false;InventoryInstances.Add(I.InstanceId);}
+	for(const FHSRItemInstance& I:C.Inventory.UniqueItems){if(!I.InstanceId.IsValid()||InventoryInstances.Contains(I.InstanceId)||(C.SchemaVersion>=7?PlacedInstances.Contains(I.InstanceId):OwnedInstances.Contains(I.InstanceId)))return false;InventoryInstances.Add(I.InstanceId);if(const FHSREquipmentRegistryDto* const* Registry=RegistryInstances.Find(I.InstanceId)){FHSRItemEquipmentMappingEntry Mapping;if(!MappingCatalog.IsValid()||!MappingCatalog->Resolve(I.DefinitionId,Mapping)||Mapping.EquipmentDefinitionId!=(*Registry)->DefinitionId||static_cast<int32>(Mapping.Kind)!=(*Registry)->Kind)return false;}}
 	// Read-only cross-domain preflight: this must complete before any domain PrepareRestore or equipment projection.
 	if(!Profiles.IsValid()||!Equipment.IsValid()||!Inventory.IsValid()||!Reward.IsValid()||!Quest.IsValid()||!Map.IsValid())return false;
 	for(const FHSRSaveProfileDto& P:C.Profiles)if(!Profiles->HasDefinition(P.State.CharacterId))return false;
