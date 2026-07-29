@@ -9,6 +9,7 @@ class HSR_API UHSREquipmentEffectBridge : public UObject
 {
  GENERATED_BODY()
 public:
+ bool CanApply(UAbilitySystemComponent* ASC,TSubclassOf<UGameplayEffect> EffectClass,const FHSREquipmentAggregate& Aggregate) const;
  bool Apply(const FGuid& InstanceId,UAbilitySystemComponent* ASC,TSubclassOf<UGameplayEffect> EffectClass,const FHSREquipmentAggregate& Aggregate);
  bool SetSourceId(const FGuid& InstanceId,UAbilitySystemComponent* ASC,TSubclassOf<UGameplayEffect> EffectClass,const FHSREquipmentAggregate& Aggregate) { return Apply(InstanceId,ASC,EffectClass,Aggregate); }
  bool ApplySetSource(const FName& SetSourceId,UAbilitySystemComponent* ASC,TSubclassOf<UGameplayEffect> EffectClass,const FHSREquipmentAggregate& Aggregate);

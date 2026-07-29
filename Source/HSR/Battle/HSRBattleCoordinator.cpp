@@ -22,6 +22,7 @@
 #include "GameplayEffect.h"
 #include "../Status/HSRStatusComponent.h"
 #include "../Data/Definitions/HSRStatusDefinition.h"
+#include "../Equipment/HSREquipmentStatAggregator.h"
 
 bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRequest)
 {
@@ -245,7 +246,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 
 	// Atomically transition to Spawned
 	CurrentState = EHSRBattleCoordinatorState::Spawned;
-	if (UGameInstance* GI=BattleWorld->GetGameInstance()) if (UHSREquipmentSubsystem* Equipment=GI->GetSubsystem<UHSREquipmentSubsystem>()) Equipment->SetRestoreProjection(FHSREquipmentRestoreProjection::CreateUObject(this,&ThisClass::ProjectEquipmentRestore));
+	if (UGameInstance* GI=BattleWorld->GetGameInstance()) if (UHSREquipmentSubsystem* Equipment=GI->GetSubsystem<UHSREquipmentSubsystem>()) { Equipment->SetRestoreProjection(FHSREquipmentRestoreProjection::CreateUObject(this,&ThisClass::ProjectEquipmentRestore)); BindEquipmentMovementProjection(*Equipment); }
 	BindEnemyTurnManager(TurnManager);
 	DevelopmentDamageRandomStream.Initialize(DevelopmentDamageSeed);
 	DevelopmentDamageConsumeCount = 0;
@@ -1936,6 +1937,29 @@ bool UHSRBattleCoordinator::RemoveEquipmentSetSource(FName ParticipantId,FName S
 	if (SetSourceId.IsNone() || !EquipmentEffectBridge) return false;
 	const FHSRBattleParticipant* P=Participants.FindByPredicate([&](const FHSRBattleParticipant& V){return V.ParticipantId==ParticipantId;});
 	return P && EquipmentEffectBridge->RemoveSetSource(SetSourceId);
+}
+void UHSRBattleCoordinator::BindEquipmentMovementProjection(UHSREquipmentSubsystem& Equipment)
+{
+	Equipment.SetMovementProjection(
+		UHSREquipmentSubsystem::FMovementProjectionPreflight::CreateUObject(this,&ThisClass::CanProjectEquipmentMovement),
+		UHSREquipmentSubsystem::FMovementProjectionCommit::CreateUObject(this,&ThisClass::CommitEquipmentMovementProjection));
+}
+bool UHSRBattleCoordinator::CanProjectEquipmentMovement(const FHSREquipmentMovementRequest& Request,const FHSREquipmentLoadout& Candidate) const
+{
+	if(Request.CharacterId!=HSRCharacterGuidFromProfileName(PlayerCharacterId)||!EquipmentGameplayEffect)return false;
+	const FHSRBattleParticipant* Participant=Participants.FindByPredicate([](const FHSRBattleParticipant& Value){return Value.ParticipantId==TEXT("Player");});
+	if(!Participant||!Participant->AbilitySystemComponent.IsValid())return false;
+	FHSREquipmentAggregate Aggregate;
+	if(!UHSREquipmentStatAggregator::Aggregate(Candidate,Request.ExpectedEquipmentRevision+1,Aggregate))return false;
+	UHSREquipmentEffectBridge* Bridge=EquipmentEffectBridge.Get();
+	if(!Bridge) Bridge=NewObject<UHSREquipmentEffectBridge>(const_cast<UHSRBattleCoordinator*>(this));
+	return Bridge->CanApply(Participant->AbilitySystemComponent.Get(),EquipmentGameplayEffect,Aggregate);
+}
+void UHSRBattleCoordinator::CommitEquipmentMovementProjection(const FHSREquipmentMovementRequest& Request,const FHSREquipmentLoadout& Candidate)
+{
+	FHSREquipmentAggregate Aggregate;
+	if(!UHSREquipmentStatAggregator::Aggregate(Candidate,Request.ExpectedEquipmentRevision+1,Aggregate))return;
+	ApplyEquipmentSource(TEXT("Player"),Request.InstanceId,Aggregate,Aggregate.Revision);
 }
 bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipmentRestoreState>& Candidate)
 {

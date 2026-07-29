@@ -104,6 +104,7 @@ public:
 	bool ApplyEquipmentSetSource(FName ParticipantId, FName SetSourceId, const FHSREquipmentAggregate& Aggregate, int64 Revision);
 	bool RemoveEquipmentSetSource(FName ParticipantId, FName SetSourceId);
 	bool ProjectEquipmentRestore(const TMap<FGuid,FHSREquipmentRestoreState>& Candidate);
+	void BindEquipmentMovementProjection(UHSREquipmentSubsystem& Equipment);
 	bool SetEquipmentSource(FName ParticipantId,const FGuid& InstanceId,const FHSREquipmentAggregate& Aggregate,int64 Revision) { return ApplyEquipmentSource(ParticipantId,InstanceId,Aggregate,Revision); }
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	bool HasProgressionPrimaryHandleForDevelopmentTest(FName Id) const;
@@ -292,6 +293,8 @@ private:
 	AActor* SpawnParticipantActor(UWorld* World, const FHSRBattleParticipantDefinition& Definition);
 	bool InitParticipantASC(AActor* TargetActor);
 	bool ApplyParticipantInitializationGameplayEffect(const FHSRBattleParticipant& Participant);
+	bool CanProjectEquipmentMovement(const FHSREquipmentMovementRequest& Request, const FHSREquipmentLoadout& Candidate) const;
+	void CommitEquipmentMovementProjection(const FHSREquipmentMovementRequest& Request, const FHSREquipmentLoadout& Candidate);
 	bool ApplyCharacterProgressionGameplayEffect(const FHSRBattleParticipant& Participant);
 	bool ClearProgressionGameplayEffects();
 	bool GrantBasicAttackAbility(const FHSRBattleParticipant& Participant);
