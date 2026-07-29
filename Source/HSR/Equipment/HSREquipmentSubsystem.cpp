@@ -394,12 +394,6 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 	Inventory.FinalizeEquipmentMovementRevisionNoFail(NewInventoryRevision);
 	Result.NewInventoryRevision = NewInventoryRevision;
 	Result.NewEquipmentRevision = InstalledLoadout.Revision;
-	Inventory.PublishEquipmentMovementCommit(NewInventoryRevision);
-	LoadoutChanged.Broadcast(Request.CharacterId, InstalledLoadout.Revision);
-	if (bHasProjectionCommit)
-	{
-		MovementProjectionCommit.Execute(Request, ProjectionLoadout);
-	}
 	Result.Code = EHSREquipmentMovementResultCode::Success;
 	Result.bCommitted = true;
 	MovementLedger.Add(Request.OperationId, {Request, Result});
@@ -409,6 +403,12 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 	{
 		MovementLedger.Remove(MovementLedgerOrder[0]);
 		MovementLedgerOrder.RemoveAt(0);
+	}
+	Inventory.PublishEquipmentMovementCommit(NewInventoryRevision);
+	LoadoutChanged.Broadcast(Request.CharacterId, InstalledLoadout.Revision);
+	if (bHasProjectionCommit)
+	{
+		MovementProjectionCommit.Execute(Request, ProjectionLoadout);
 	}
 	return Result;
 }

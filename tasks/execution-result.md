@@ -185,6 +185,12 @@ Verdict: `REVISE`
 - `Saved/Logs/03E2-ReentrantLedger-RED.log`: valid runtime RED. The reentrant request did not return cached success or `bReplay=true` because the successful ledger entry was recorded after publication.
 - No production code changed before this RED was confirmed.
 
+## Reentrant OperationId ledger GREEN
+
+- Successful ledger entries are now recorded after both domain candidates and projection preflight succeed, but before any Inventory/Equipment publication. Failed requests remain absent from the ledger.
+- `HSREditor Win64 Development` passed (6/6 actions, exit 0).
+- `Saved/Logs/03E2-ReentrantLedger-GREEN.log`: `BagToEquip` passed 1/1. The synchronous delegate-time duplicate received cached success with `bReplay=true` and performed no second commit.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.
