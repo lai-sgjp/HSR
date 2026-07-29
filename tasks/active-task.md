@@ -10,9 +10,11 @@ Status: `TASK GATE PREPARATION ONLY / INDEPENDENT REVIEW REQUIRED / IMPLEMENTATI
 
 - A pure-value request carries OperationId, CharacterId, InstanceId, source membership intent, target kind/slot and expected Inventory/Equipment revisions.
 - Inventory remains authoritative for bag membership/capacity; Equipment remains authoritative for complete payload and placement.
+- A bagged equipment instance is linked by the same `InstanceId` plus an explicit validated Definition mapping; Registry `Kind`/payload and Inventory storage kind must agree. DefinitionId similarity alone is never sufficient, and a missing or conflicting mapping rejects the request.
 - A bounded command/transaction boundary owned by the Equipment/Inventory integration surface validates both revisions, instance identity, source membership, target slot, capacity and ownership before mutating either subsystem. It may own only OperationId, step and pure candidates; it is not a new global data authority.
 - Commit order is candidate-first and publication is delayed until both domains commit. Any pre-commit failure leaves both domains and both revisions unchanged.
 - OperationId replay returns the cached result and produces no second membership, placement, revision, delegate or ASC effect mutation. A reused OperationId with a different request is rejected.
+- The integration boundary returns a typed pure-value result containing OperationId, result code, committed/no-op status, old/new Inventory revision, old/new Equipment revision, displaced InstanceId when applicable and a diagnostic step. Existing domain result enums remain domain-local and are not overloaded for cross-domain outcomes.
 - Replacing an occupied slot explicitly returns the displaced InstanceId to Inventory in the same transaction; capacity is checked against the net candidate, not sequential intermediate state.
 - ASC/EffectBridge receives a post-commit resolved aggregate only. Projection validity and required source-effect handles must be preflighted before commit; if the projection cannot be proven ready, the transaction is rejected with zero domain mutation. Commit must not depend on a fallible post-commit compensation path.
 - Equipment Detail ViewModel/Widget remains a read/intent presentation layer: it may subscribe to the single committed revision and rebuild one resolved snapshot, but it cannot own OperationId, mutate Inventory/Equipment, apply/remove GE or serialize Save data.
@@ -24,6 +26,7 @@ Status: `TASK GATE PREPARATION ONLY / INDEPENDENT REVIEW REQUIRED / IMPLEMENTATI
 - invalid CharacterId, kind, slot, definition or occupied slot;
 - insufficient capacity for unequip/replace net result;
 - duplicate OperationId replay and same OperationId with changed request;
+- OperationId cache scope, bounded retention/restore policy and stale callback rejection;
 - Inventory candidate/installation failure, Equipment candidate/installation failure, delegate publication failure and ASC projection preflight failure;
 - save/restore boundary while a candidate is pending; no half-committed aggregate may be serialized.
 
