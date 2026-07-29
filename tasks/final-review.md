@@ -1,6 +1,6 @@
 # TASK-P17-PATCH-03E2 Task Gate Review
 
-Status: `IMPLEMENTATION IN PROGRESS / REVIEW PENDING`
+Status: `IMPLEMENTATION BLOCKED / PRE-EXISTING REGRESSION`
 
 Coordinator pre-review found an unresolved authority gap: no explicit Item-to-Equipment mapping exists in the current definition types. No 03E2 Gate PASS or implementation authorization exists.
 
@@ -16,3 +16,7 @@ Verdict: `REVISE`
 ## User authorization update
 
 The user subsequently confirmed the dedicated static Item-to-Equipment/Relic mapping catalog scheme and authorized implementation. The prior planning blocker is resolved for implementation scope; independent review remains pending for the RED/GREEN implementation.
+
+## Build boundary update
+
+UE5.6 elevated Build reached C++ compilation but failed on existing test/API mismatches outside the 03E2 allowlist (`HSRSaveValidationTests.cpp`, `HSRCharacterDetailViewModelTests.cpp`). The new mapping files were not reported as the failure source. Verdict remains blocked until an explicit regression allowlist decision is made; no implementation GREEN is claimed.
