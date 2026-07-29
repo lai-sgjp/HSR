@@ -1,26 +1,45 @@
-# TASK-P17-PATCH-03R Execution Result
+# TASK-P17-PATCH-03E2 Task Gate Evidence
 
-Status: `IMPLEMENTATION COMPLETE / BUILD AND AFFECTED AUTOMATION GREEN / AWAITING INDEPENDENT REVIEW`
+Status: `IMPLEMENTATION BLOCKED / PRE-EXISTING REGRESSION ALLOWLIST REQUIRED`
 
-- User authorized a standalone repair limited to existing Automation development-test API seams and compile guards.
-- 03E2 production implementation is paused while this package runs.
-- RED evidence: elevated UE5.6 `HSREditor Win64 Development` Build exited 6 on missing development-test APIs across Save, Party, Battle, Status and Equipment projection tests.
-- No Content, Config, Blueprint, map or UI asset is in this package.
-- GREEN Build evidence: `Saved/Logs/03R-Build-07.log`; UE5.6 `HSR Win64 Development` completed 11 actions and exited 0.
-- GREEN Automation evidence:
-  - `HSR.Battle`: 10/10 Success, exit 0 (`03R-Automation-Battle.log`). This includes `StatusGeneric`, `RepeatableBreak`, `BattleReturn.MapContract`, and `BattleSettlement.Integration`.
-  - `HSR.Save`: 16/16 Success, exit 0.
-  - `HSR.Party`: 1/1 Success, exit 0.
-  - `HSR.Reward`: 6/6 Success, exit 0.
-  - `HSR.QuestDialogue`: 1/1 Success, exit 0.
-  - `HSR.Equipment.Effect`: 1/1 Success, exit 0.
-- `HSR.Status` matched zero tests and therefore exited 255; this is recorded as `NOT APPLICABLE`, not a test failure. The existing Status development seam is exercised by the successful `HSR.Battle.Patch.StatusGeneric` test.
-- `git diff --check` passed for the five current source paths. Existing user-owned Content, learning notes, `.claude/**`, `Content/AI/**`, and preserved pre-03R 03E2 task packets remain excluded.
+- 03E1 is archived with Build, Automation, Independent Review and user Editor/PIE compatibility evidence.
+- No 03E2 Source, test, Content, Build, Automation or PIE action has started.
+- The draft now records the real Inventory (`AddUnique/RemoveUnique`, capacity, revision), Equipment (Registry/placement, replace/unequip, revision) and EffectBridge boundaries, plus candidate-first transaction, OperationId replay, net-capacity replace and post-commit projection requirements.
+- Read-only definition audit found no explicit Item-to-Equipment mapping: `UHSRItemDefinition` has `ItemId/StorageKind/MaxStack`, and `UHSREquipmentDefinition` has `DefinitionId/Slot/EnhancementCap`. 03E2 cannot implement cross-domain movement until the Gate freezes an authoritative mapping owner and its persistence/Editor contract.
 
-## Independent Review Revision
+## Role handoff: Teacher pre-review
 
-- First independent review: `REVISE` (`4572ef0`). It correctly found that `03R-Build-07.log` was a game-target `HSR Win64 Development` build rather than the required `HSREditor` build, and that two Damage injection consumers remained editor-only.
-- Revision aligned the existing `TestInjection` consumer guards in `HSRGameplayAbilityBase.cpp` and `HSRDamageExecutionCalculation.cpp` with `WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS`; no production branch or business rule changed.
-- Required GREEN Build evidence: `Saved/Logs/03R-HSREditor-Build-08.log`; `HSREditor Win64 Development` compiled 15 actions, linked `UnrealEditor-HSR.dll`, wrote `HSREditor.target`, and exited 0.
-- Revision Automation evidence: `Saved/Logs/03R-Automation-Battle-Revision.log`; `HSR.Battle` 10/10 Success, exit 0.
-- Revision `git diff --check` passed for both consumer source paths.
+Status: `PASS WITH PLANNING FOLLOW-UP`
+
+- Teacher confirms five decisions must be frozen before implementation: mapping owner, stable key, one-to-one validation, static-catalog versus Save persistence behavior, and exact Editor ownership/boundary.
+- Recommended direction is a dedicated static Item-to-Equipment/Relic mapping catalog. Inventory remains membership/capacity authority; Equipment remains complete payload/placement authority; `InstanceId` remains runtime ownership identity; ASC and UI remain derived/read-only.
+- Missing, duplicate, conflicting, wrong-storage-kind, missing-target or incompatible-slot mappings must reject before either domain mutates. Name, prefix, display text or DefinitionId similarity inference remains prohibited.
+- Recommendation is not treated as user authorization; the Gate remains `REVISE / PLANNING BLOCKER` until the mapping contract is independently reviewed and accepted.
+
+## User authorization and RED checkpoint
+
+- User confirmed the dedicated static Item-to-Equipment/Relic mapping catalog scheme and authorized implementation.
+- RED test added at `Source/HSR/Tests/HSREquipmentMovementTests.cpp` for explicit mapping insertion, duplicate rejection and lookup.
+- Mapping catalog implementation is now limited to `Source/HSR/Data/Definitions/HSRItemEquipmentMappingCatalog.h/.cpp`; no Content asset has been created.
+
+## 2026-07-29 UE5.6 Build attempt
+
+- UE5.6 path: `E:\programs\Epic Games\UE_5.6`.
+- First Build attempt was blocked by UBT user-cache permission; the identical command was rerun with elevated permission.
+- Elevated `HSREditor` Build reached compilation but exited 6 on pre-existing test/API mismatches outside the 03E2 allowlist, including `HSRSaveValidationTests.cpp` and `HSRCharacterDetailViewModelTests.cpp` references to missing `InitializeForDevelopmentTest` and restore diagnostic APIs.
+- No mapping-catalog compiler error was reported before the unrelated failures. No GREEN or Automation claim is made.
+- Required next authorization is either a narrow regression-test allowlist expansion for those existing API mismatches or an alternate focused target that excludes them; no unrelated source or Content files were changed.
+
+### Regression-surface audit
+
+- Follow-up log inspection shows the failure is broader than the first two files: existing Battle, Status, EquipmentEffect, EquipmentSaveProjection and Save tests also reference development seams absent from current headers.
+- Several seams are guarded by `#if WITH_EDITOR` while Automation tests compile under `WITH_DEV_AUTOMATION_TESTS`, so this is a historical test/compile-guard contract mismatch rather than a 03E2 mapping failure.
+- Restoring that surface requires a separate, explicitly scoped regression-compatibility task or allowlist. 03E2 implementation remains paused after the mapping catalog checkpoint.
+
+## Role handoff: Independent Reviewer
+
+Verdict: `REVISE`
+
+- Reviewer confirms the definition and subsystem seam evidence and agrees that no authoritative Item-to-Equipment mapping path exists.
+- Reviewer confirms the execution packet is truthful: no 03E2 Source, test, Content, Build or PIE work has started.
+- Reviewer recommends freezing mapping owner, stable key, validation, Save impact and Editor boundary before implementation or Gate PASS.

@@ -1,5 +1,14 @@
 ﻿# HSR Worklog
 
+## 2026-07-29｜TASK-P17-PATCH-03R Automation seam compatibility archived
+
+- 03E2 首次 `HSREditor` Build 暴露既有 Automation development API guard 不一致；用户授权独立 03R，只恢复测试编译/API seam，不改变业务行为。
+- Implementation commits `e3ecf06`、`28114c4` 将 Party、Save、Reward、Quest、Battle、Status、Equipment Effect 与 Damage 既有测试 seam 对齐到 `WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS`。
+- 初次验证误跑 `HSR Win64 Development`，Reviewer 在 `4572ef0` 给出 `REVISE`，同时发现两个 Damage injection consumer 仍为 Editor-only；历史缺口保留，不被最终结果覆盖。
+- 修订 `badae3e` 对齐 `HSRGameplayAbilityBase` 与 `HSRDamageExecutionCalculation` guard。真实 `HSREditor Win64 Development` 15/15 actions 成功；修订后 `HSR.Battle` 10/10 Success。
+- 其余受影响回归为 Save 16/16、Party 1/1、Reward 6/6、QuestDialogue 1/1、Equipment Effect 1/1。`HSR.Status` 无匹配测试，保持 `NOT APPLICABLE`；Battle `StatusGeneric` 已通过。
+- Independent Reviewer 最终 `PASS`=`3321bf4`。03R 三件套已归档，03E2 保存包原样恢复为活动任务；未修改或提交用户 Content/Blueprint/Map/DataAsset、Config、学习文档或 03E2 生产行为。
+
 ## 2026-07-28｜P17-005 checkpoint 与 P17-PATCH-03 Gate 0
 
 - 按用户要求暂停 P17-005，并以 commit `4ef49f7` 精确提交 32 个 Frontend C++、测试、Input/WBP 与任务证据文件；未 push，未夹带 Enemy/Player Character、Enemy DataAsset、Map、`Content/AI/**`、`.claude/**`、学习文档或 Phase 20 存档演进改动。

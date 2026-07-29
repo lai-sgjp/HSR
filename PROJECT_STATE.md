@@ -4,6 +4,9 @@
 
 ## 2026-07-29 最新权威摘要
 
+- `TASK-P17-PATCH-03R` Regression Compatibility 已完成并归档。Implementation commits `e3ecf06`、`28114c4`、`badae3e`；首次 Reviewer `REVISE`=`4572ef0`，最终 Reviewer `PASS`=`3321bf4`。
+- 03R 最终证据：真实 `HSREditor Win64 Development` 15/15 actions 成功；修订后 `HSR.Battle` 10/10，另有 Save 16/16、Party 1/1、Reward 6/6、QuestDialogue 1/1、Equipment Effect 1/1。`HSR.Status` 无匹配测试，记录为 `NOT APPLICABLE`，由 Battle `StatusGeneric` 覆盖现有 seam。
+- 活动任务已恢复为 `TASK-P17-PATCH-03E2` 的已授权 TDD 实现包；03R 没有修改 03E2 mapping catalog、Movement 测试或生产事务行为。
 - `TASK-P17-PATCH-03E1` 已完成并准备归档：Equipment Registry 永久拥有完整实例 payload，loadout 仅保存 InstanceId placement，Save schema 7 分离 Registry/Placement，schema 6 保守迁移且不推断 Inventory unique item。
 - Build、`HSR.Equipment.Registry` 3/3、`HSR.Equipment` 8/8、`HSR.Save` 16/16、`HSR.Inventory` 3/3、`HSR.UI.EquipmentDetail.ViewModel` 1/1 与最终 Independent Review 均 `PASS`。
 - 用户提供的 Editor/PIE 日志确认探索启动、Character possession、Enhanced Input 和正常 teardown。当前 Character/Inventory/Equipment 与 Save/Load UI 未完成，因此 UI 驱动的装备 payload 检查和 PIE save/load 对比为 `NOT APPLICABLE / NOT VERIFIED`，不外推为已验证。

@@ -17,7 +17,8 @@
 - [x] TASK-P17-PATCH-03D1：Atomic Settlement Foundation（Build、13/13 Automation、Independent Reviewer `PASS`、Reward/Catalog Save/reopen 与胜利/战败 PIE 均通过，已归档）。
 - [x] TASK-P17-PATCH-03D2：Battle Result Settlement Integration（RED/GREEN、29/29 回归、胜利/战败/重复确认/返回 PIE 与最终复核均 `PASS`）。
 - [x] P17-PATCH-03E1：Equipment Instance Ownership Foundation；Build、Automation、Independent Review 与用户探索 PIE 兼容观察均 `PASS`，UI 驱动的装备检查和 Save/Load 因 UI 未完成而保留为 `NOT APPLICABLE / NOT VERIFIED`，已归档。
-- [ ] P17-PATCH-03E2：Inventory/Equipment 原子移动、OperationId/双 revision、ASC 与 UI 投影；必须等待 03E1 PASS。
+- [x] TASK-P17-PATCH-03R：恢复既有 Automation development seams；最终 `HSREditor` Build、受影响 Automation 与 Independent Reviewer `PASS`，已归档，不改变业务行为。
+- [ ] P17-PATCH-03E2：Inventory/Equipment 原子移动、OperationId/双 revision、ASC 与 UI 投影；mapping contract RED checkpoint 已提交，03R 阻断已关闭，恢复已授权 TDD 实现。
 - [ ] P17-PATCH-03F～03G：按计划串行整合 Map travel、Save restore。
 - [ ] P17-PATCH-03H：clean-save 端到端 closeout；不得以其结果倒推 P17-005 已完成。
 
