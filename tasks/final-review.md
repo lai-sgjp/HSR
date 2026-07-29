@@ -42,3 +42,18 @@ Verification evidence:
 Required authorization boundary:
 
 - Resolving P0 requires changing `UHSRSaveSubsystem::Validate` schema-7 ownership validation. The active task instructions explicitly prohibit Save schema/Save scope modification, so no corrective implementation was performed after this finding.
+
+## Authorized Save-scope correction re-review
+
+Verdict: `REVISE`
+
+- The authorized schema-7 correction is complete: unplaced Registry payload plus matching Inventory membership now Load/Save round-trips; direct mapping duplicates, invalid movement intent and delegate-time OperationId replay also have RED/GREEN checkpoints.
+- P1 remains: no production caller binds `SetMovementProjection`; Battle runtime registers Restore projection only. Movement can therefore commit without an ASC/EffectBridge update, and the test-only callback does not prove preflightable source handles or a non-fallible post-commit EffectBridge path.
+- P1 remains: schema-7 Save validation permits a shared unplaced Registry/Inventory InstanceId without validating the explicit static Item-to-Equipment mapping. A save containing `Registry(Id, Equipment.A)` and `Inventory(Id, Item.B)` can restore when both definitions exist, leaving poisoned authority for later movement rejection.
+- Closing these findings requires an explicit BattleCoordinator/EffectBridge integration scope and a Save mapping-catalog validation dependency plus malformed-save test. Neither is a safe local extension of the current transaction implementation.
+
+Post-authorization evidence:
+
+- `HSREditor Win64 Development`: PASS.
+- `HSR.Equipment`: 12/12 PASS; `HSR.Save`: 16/16 PASS after the authorized fixes.
+- These broad suite logs predate the last small mapping/reentrant commits; the focused GREEN logs cover those checkpoints, but a final full-suite rerun remains required once the two P1 findings are resolved.
