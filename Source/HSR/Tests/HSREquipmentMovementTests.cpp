@@ -198,6 +198,33 @@ bool FHSREquipmentMovementReplaceTest::RunTest(const FString& Parameters)
 	Inventory->GetSnapshot(Snapshot);
 	FHSREquipmentMovementRequest ReplaceRequest;
 	ReplaceRequest.OperationId=FGuid::NewGuid();ReplaceRequest.CharacterId=CharacterId;ReplaceRequest.InstanceId=NewId;ReplaceRequest.Intent=EHSREquipmentMovementIntent::Replace;ReplaceRequest.Kind=EHSREquipmentKind::Equipment;ReplaceRequest.Slot=0;ReplaceRequest.ExpectedInventoryRevision=Snapshot.Revision;ReplaceRequest.ExpectedEquipmentRevision=EquipResult.NewEquipmentRevision;
+
+	UHSRItemEquipmentMappingCatalog* ConflictingCatalog = NewObject<UHSRItemEquipmentMappingCatalog>();
+	FHSRItemEquipmentMappingEntry IncomingMapping;
+	IncomingMapping.ItemId = TEXT("Item.Weapon.New"); IncomingMapping.EquipmentDefinitionId = TEXT("Equipment.Weapon.New");
+	IncomingMapping.Kind = EHSREquipmentKind::Equipment; IncomingMapping.Slot = 0;
+	TestTrue(TEXT("Incoming mapping registered in conflicting catalog"), ConflictingCatalog->AddMapping(IncomingMapping));
+	FHSRItemEquipmentMappingEntry DisplacedMapping;
+	DisplacedMapping.ItemId = TEXT("Item.Weapon.Old"); DisplacedMapping.EquipmentDefinitionId = TEXT("Equipment.Weapon.Old");
+	DisplacedMapping.Kind = EHSREquipmentKind::Equipment; DisplacedMapping.Slot = static_cast<int32>(EHSREquipmentSlot::Head);
+	TestTrue(TEXT("Conflicting displaced mapping registered"), ConflictingCatalog->AddMapping(DisplacedMapping));
+	int32 InventoryEvents = 0;
+	int32 EquipmentEvents = 0;
+	Inventory->OnInventoryChanged().AddLambda([&InventoryEvents](int64) { ++InventoryEvents; });
+	Equipment->OnLoadoutChanged().AddLambda([&EquipmentEvents](const FGuid&, int32) { ++EquipmentEvents; });
+	const FHSREquipmentMovementResult RejectedReplace = Equipment->ExecuteMovement(ReplaceRequest, *Inventory, *ConflictingCatalog);
+	TestEqual(TEXT("Replace rejects incompatible displaced mapping"), RejectedReplace.Code, EHSREquipmentMovementResultCode::MappingRejected);
+	TestFalse(TEXT("Rejected replace does not commit"), RejectedReplace.bCommitted);
+	FHSRInventorySnapshot RejectedSnapshot; Inventory->GetSnapshot(RejectedSnapshot);
+	TestEqual(TEXT("Rejected replace keeps Inventory revision"), RejectedSnapshot.Revision, Snapshot.Revision);
+	TestEqual(TEXT("Rejected replace keeps Inventory membership"), RejectedSnapshot.UniqueItems.Num(), Snapshot.UniqueItems.Num());
+	FHSREquipmentLoadout RejectedLoadout; int32 RejectedEquipmentRevision = 0;
+	TestTrue(TEXT("Rejected replace keeps loadout resolvable"), Equipment->GetLoadout(CharacterId, RejectedLoadout, RejectedEquipmentRevision));
+	TestEqual(TEXT("Rejected replace keeps Equipment revision"), RejectedEquipmentRevision, EquipResult.NewEquipmentRevision);
+	TestEqual(TEXT("Rejected replace keeps old placement"), RejectedLoadout.Equipment.FindChecked(EHSREquipmentSlot::Weapon).InstanceId, OldId);
+	TestEqual(TEXT("Rejected replace publishes no Inventory delegate"), InventoryEvents, 0);
+	TestEqual(TEXT("Rejected replace publishes no Equipment delegate"), EquipmentEvents, 0);
+
 	const FHSREquipmentMovementResult ReplaceResult=Equipment->ExecuteMovement(ReplaceRequest,*Inventory,*Catalog);
 	TestEqual(TEXT("Replace commits at net capacity"),ReplaceResult.Code,EHSREquipmentMovementResultCode::Success);
 	TestTrue(TEXT("Replace committed"),ReplaceResult.bCommitted);

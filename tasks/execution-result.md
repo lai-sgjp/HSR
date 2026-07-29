@@ -85,6 +85,13 @@ Verdict: `REVISE`
 - `Saved/Logs/03E2-Replace-GREEN-Automation.log`: `HSR.Equipment.Movement` 3/3 Success, exit 0.
 - Post-replace focused regressions are GREEN: `HSR.Inventory` 3/3, `HSR.Equipment.Registry` 3/3 and `HSR.Equipment` 11/11, all exit 0 with zero failed tests (`03E2-Replace-Regression-*.log`).
 
+## Failure matrix: displaced mapping TDD RED
+
+- Extended `HSR.Equipment.Movement.Transaction.ReplaceNetCapacity` with a conflicting reverse mapping for the displaced instance: the incoming mapping is valid, while the displaced Equipment definition is explicitly mapped to the wrong slot.
+- The test requires `MappingRejected`, zero Inventory/Equipment mutation, stable revisions and zero domain delegates. It then retries the same OperationId with the canonical catalog to prove failed requests are not cached.
+- `HSREditor Win64 Development` compiled and linked the test successfully (6/6 actions, exit 0).
+- `Saved/Logs/03E2-FailureMatrix-DisplacedMapping-RED.log`: valid runtime RED. The test executed and failed because the conflicting mapping committed, advanced both revisions, changed placement and published both delegates. No production code changed before this RED was confirmed.
+
 ## OperationId GREEN checkpoint
 
 - Added a bounded 128-entry successful-operation ledger owned only by the Equipment movement integration boundary; it is runtime transaction state, not Inventory/Registry authority and not Save schema data.
