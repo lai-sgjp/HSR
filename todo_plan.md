@@ -334,7 +334,7 @@
 - [x] PATCH-02：Behavior Tree/Blackboard 探索敌人迁移完成；巡逻、追击、丢失返回、Encounter admission、teardown、半径数据驱动及用户 PIE 返回 Gate 已通过最终复核。
 - [ ] 完成主菜单、暂停、角色、队伍、背包、任务、地图和设置界面。
 - [ ] 建立 Screen Stack、统一 InputMode 和导航。
-- [ ] 验证地图旅行后的 UI 重建。
+- [x] 验证地图旅行后的 UI 重建（P17-PATCH-03F：A↔B UI Freeze/Restore、地图面板与 Pause 重开；HUD EndPlay 重复 teardown 日志保留 follow-up）。
 
 ## Phase 18：表现与模型导入
 

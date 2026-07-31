@@ -1,6 +1,12 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-07-29
+> 最后更新：2026-07-31
+
+## 2026-07-31 最新权威摘要
+
+- `TASK-P17-PATCH-03F` Map Frontend and Travel Rebuild 已归档为 `PASS WITH FOLLOW-UP / USER PIE ACCEPTED`。C++ Build、Map/UI Automation 与最终 A -> B -> A PIE 均成立；HUD EndPlay 在预先 TravelFreeze 后的重复 teardown 日志保留为非阻断生命周期 follow-up。
+- 用户地图 UI 集成资产已作为独立 provenance commit `b9d992a` 提交：HUD/frontend 绑定、新 Map panel 和确认删除的旧 Pause WBP；未包含学习笔记、`.claude/**` 或 `Content/AI/**`。
+- 活动任务进入 `TASK-P17-PATCH-03G`：Save UI and Integrated Restore。该任务只冻结 Save Slot UI、结构化 Save/Load/Overwrite 结果与跨域冷恢复证据，不重写 Save schema 或扩展资产所有权。
 
 ## 2026-07-29 最新权威摘要
 

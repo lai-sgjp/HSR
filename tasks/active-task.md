@@ -1,56 +1,44 @@
-# TASK-P17-PATCH-03F - Map Frontend and Travel Rebuild
+# TASK-P17-PATCH-03G - Save UI and Integrated Restore
 
-Status: `IMPLEMENTATION AUTHORIZED / TDD REQUIRED`
+Status: `TASK GATE / IMPLEMENTATION AUTHORIZED / TDD REQUIRED`
 
 ## Sole outcome
 
-The Map Frontend reads the authoritative MapSubsystem snapshot and submits one typed teleport intent. Legal A <-> B travel rebuilds the UI host exactly once after its matching arrival; rejection or travel failure preserves the committed map state and a usable exploration host.
+The frontend provides manual Save, Load and Overwrite requests with typed results. After a cold restart, Load restores the authoritative Character, Party, Inventory, Equipment, Reward and Map chain exactly once, and the UI presents only committed Save results.
 
 ## Authority contract
 
-- `UHSRMapSubsystem` owns definitions, unlocks, current location, travel validation, `OpenLevel`, pending requests, arrival commit and failure cleanup.
-- A Map ViewModel is a read projection of committed Map state. A Map Widget submits only a TeleportId intent and presents the result.
-- Widgets must not call `OpenLevel`, set map location, unlock destinations, consume arrivals or write Save data.
-- `UHSRUIManagerSubsystem` owns host teardown/rebuild, input/focus restoration and stale-host rejection. It restores only after the matching arrival generation and a valid new host.
-- Locked/unknown/wrong-source/pending/invalid-package requests, failed travel, arrival mismatch/ambiguity and stale host callbacks must not change committed map state.
+- `UHSRSaveSubsystem` owns slot naming, envelope validation, migration, disk write/read, backup selection and the global restore transaction.
+- Save ViewModel reads committed Save state and submits typed commands. A Save Widget presents slots/results only; it may not serialize domain state, mutate authorities or call map travel directly.
+- UIManager owns frontend route, input/focus and host rebuilding. Map arrival remains owned by MapSubsystem and is consumed through the existing restore path.
+- A failed save/load/overwrite must preserve the prior committed runtime state and present one typed failure result.
 
-## Frozen write allowlist
+## Frozen C++ allowlist
 
-- `Source/HSR/Map/HSRMapSubsystem.h`
-- `Source/HSR/Map/HSRMapSubsystem.cpp`
-- `Source/HSR/Map/HSRMapTypes.h`
-- `Source/HSR/Map/HSRMapArrivalConsumer.h`
-- `Source/HSR/Map/HSRMapArrivalConsumer.cpp`
-- `Source/HSR/Map/HSRMapArrivalPoint.h`
-- `Source/HSR/Map/HSRMapArrivalPoint.cpp`
-- `Source/HSR/Data/Definitions/HSRMapDefinition.h`
-- new `Source/HSR/UI/HSRMapViewModel.h/.cpp`
-- new `Source/HSR/UI/HSRMapWidget.h/.cpp`
+- `Source/HSR/Save/HSRSaveSubsystem.h`
+- `Source/HSR/Save/HSRSaveSubsystem.cpp`
+- `Source/HSR/Save/HSRSaveTypes.h`
+- new `Source/HSR/UI/HSRSaveViewModel.h/.cpp`
+- new `Source/HSR/UI/HSRSaveWidget.h/.cpp`
 - `Source/HSR/UI/HSRUIManagerSubsystem.h`
 - `Source/HSR/UI/HSRUIManagerSubsystem.cpp`
-- `Source/HSR/Tests/HSRMapSubsystemTests.cpp`
-- `Source/HSR/Tests/HSRMapSaveIntegrationTests.cpp`
-- one new focused UI/travel Automation test
+- focused new Save UI and integrated-restore Automation tests
 - `tasks/execution-result.md`
 
-Everything else is read-only. Save schema, Battle travel implementation, Inventory/Equipment, Config, Blueprint, map and Content files are excluded.
+All Blueprint, UMG, Content, Config, map and DataAsset edits remain user-owned. No Save schema rewrite, new module, battle-transition rewrite, inventory/equipment authority change or visual redesign is in scope.
 
 ## Required TDD coverage
 
-- Snapshot maps unlock/location state into one read model with no duplicate subscriptions after host replacement.
-- A legal A -> B -> A intent invokes MapSubsystem once per travel and consumes one matching arrival.
-- Locked, unknown, invalid-source and no-op intents have no travel, location or UI-host mutation.
-- Pending ordinary travel and pending Battle return reject the request without overwriting transition context.
-- Travel failure preserves the prior snapshot and restores a usable host exactly once.
-- Wrong map, missing/duplicate arrival and stale arrival generation cannot commit location or restore a stale host.
-- Existing `HSR.Map`, affected `HSR.Save` and affected `HSR.UI` regressions stay green.
+- Empty slot save, overwrite confirmation, successful load and structured result presentation.
+- Invalid/missing/corrupt/unsupported slot data rejects before any live authority commits.
+- Save/load requests cannot overlap; duplicate requests return a typed no-op/rejection without a second write or restore.
+- A successful cold restore rebuilds each domain exactly once and resumes at the committed Map location without stale UI/focus state.
+- Existing `HSR.Save`, affected `HSR.Map`, `HSR.Equipment`, `HSR.Inventory` and `HSR.UI` automation stays GREEN.
 
 ## User Editor boundary
 
-User-owned assets are limited to the exact Map WBP and existing A/B map, teleport and arrival references. Blueprint may bind read-only destinations, submit the typed intent and present the result. It may not call `OpenLevel`, commit map state, unlock a destination or consume arrivals. `Map_Phase1_Exploration` remains excluded.
+After C++ GREEN, the user creates or updates only the task-selected Save frontend WBP, binds read-only slot/result presentation and typed Save/Load/Overwrite intents, then performs Save All/reopen and PIE save -> stop -> restart -> load evidence. The Widget must not access disk APIs, mutate Save DTOs or initiate `OpenLevel`.
 
-After C++ GREEN: Save All/reopen, PIE A -> B -> A and one locked or invalid destination. Return Output Log lines containing request ID, arrival commit, host generation and result.
+## Stops
 
-## Non-goals and stops
-
-No new Map authority, retry loop, Save schema change, Battle-return rewrite, frontend redesign, Config update, asset creation, map mutation or Blueprint implementation. Stop for any needed file outside this allowlist, including a task-selected Map WBP or DataAsset modification.
+Stop for a Save schema change, a file outside the allowlist, any binary asset mutation by Codex, an ambiguous overwrite UX decision, or an Editor-only failure that cannot be reproduced through the permitted C++/Automation surface.

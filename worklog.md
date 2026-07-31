@@ -2250,3 +2250,9 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - User-provided Editor/PIE evidence confirms `Map_Exploration_P15_B` startup, `BP_HSRExplorationCharacter_C_0` possession, Enhanced Input bindings, `Character.A` bootstrap and normal teardown. The existing GameplayCue path fallback warning is unrelated and non-blocking.
 - Character/Inventory/Equipment and Save/Load UI are not complete, so UI-driven equipment payload inspection and PIE save/load comparison remain `NOT APPLICABLE / NOT VERIFIED`; no temporary Content or debug entry was created.
 - 03E1 is complete and archived. 03E2 may proceed only to Task Gate preparation; no 03E2 implementation is authorized.
+# 2026-07-31 | TASK-P17-PATCH-03F final closeout
+
+- User PIE accepted the complete Map.A -> Teleport.AB -> Map.B -> Teleport.BA -> Map.A loop. Each leg has one UI freeze, matching arrival commit and one restore; Pause reopened on Map.B.
+- The C++ work remains covered by focused Build and Map/UI Automation logs. Final user-owned UI integration assets were committed separately in `b9d992a`, including the intentionally deleted obsolete Pause WBP.
+- The pre-travel freeze leaves a duplicate HUD EndPlay teardown log (`Result=3`); it is behaviorally harmless in the accepted loop and is preserved as a UI lifecycle follow-up, not reported as fixed.
+- Archived the 03F task packet. Created 03G as the next authorized task gate for Save UI and integrated cold restore; no 03G source or binary asset implementation has started.
