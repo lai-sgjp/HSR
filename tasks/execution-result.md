@@ -1,6 +1,14 @@
 # TASK-P17-PATCH-03F Execution Result
 
-Status: `PASS WITH FOLLOW-UP / USER PIE ACCEPTED`
+Status: `IN PROGRESS / 03G SAVE FRONTEND FIRST GREEN`
+
+## 03G Save Frontend first GREEN
+
+- RED: `HSR.UI.SaveFrontend.Intent` initially failed to compile because `UHSRSaveViewModel` did not exist. `Saved/Logs/03G-SaveFrontend-RED-Build.log` records the intended missing-header failure.
+- GREEN: added `UHSRSaveViewModel` and `UHSRSaveWidget`. They delegate only to `UHSRSaveSubsystem::SaveToSlot` / `LoadFromSlot`, project a Blueprint-safe result DTO, and never serialize or mutate domain state themselves.
+- Overwrite is deliberately two-step: an existing slot returns `ConfirmationRequired`, stores only the pending slot name, and calls Save authority only after `ConfirmOverwrite`; `CancelOverwrite` clears the pending intent.
+- Build: `Saved/Logs/03G-OverwriteConfirm-Fix-Build.log` succeeded.
+- Automation: `Saved/Logs/03G-OverwriteConfirm-Fix-Automation.log` passed `HSR.UI.SaveFrontend.Intent`, exit 0. It covers typed missing-slot forwarding, Widget result projection, existing-slot confirmation, pending-slot identity and cancel cleanup.
 
 ## Scope
 
