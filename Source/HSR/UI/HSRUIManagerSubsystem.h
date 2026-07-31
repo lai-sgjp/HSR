@@ -43,6 +43,7 @@ public:
 		TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass);
 	EHSRUIScreenResult UnregisterExplorationHost(AHSRHUD* HUD, AHSRPlayerController* PlayerController);
 	EHSRUIScreenResult TeardownExplorationHostForTravel(AHSRHUD* HUD, AHSRPlayerController* PlayerController);
+	EHSRUIScreenResult PrepareExplorationTravel();
 
 	UFUNCTION(BlueprintCallable, Category = "HSR|UI")
 	EHSRUIScreenResult OpenPauseScreen();

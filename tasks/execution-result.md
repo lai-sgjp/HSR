@@ -23,3 +23,10 @@ The authorized 03F scope is Map Frontend read projection and typed travel intent
 
 - Existing `EHSRFrontendModule::Map` routing already mounts the user-selected generic Frontend module root, so no Router/UIManager code change was required for this slice.
 - Editor work is now required: create or update the task-selected Map WBP to derive from `UHSRMapWidget` (or contain one), bind `OnMapSnapshotChanged`, call `RequestTeleport` from destination controls, and ensure the existing Frontend Map module hosts it. Save All/reopen and provide A -> B -> A plus locked/invalid destination PIE log evidence.
+
+## Travel freeze correction
+
+- User PIE reproduced legal `Teleport.AB` travel but showed `HSRUI P17 Host teardown required forced cleanup` after `OpenLevel`. The old Host was only frozen during HUD EndPlay, after the Frontend stack remained open; this marked the persistent UIManager inconsistent and prevented the new Host from reopening Pause.
+- `UHSRMapSubsystem::RequestTeleportTravel` now asks the LocalPlayer UIManager to complete `PrepareExplorationTravel` after Map validation but before it stages a pending request or calls `OpenLevel`. UI preparation failure returns `UIPreparationFailed` with no Map pending state or travel.
+- `Saved/Logs/03F-TravelPreFreeze-Build.log` succeeded. `Saved/Logs/03F-TravelPreFreeze-Automation.log` completed Map and UI Automation with exit 0.
+- Real PIE revalidation is pending: A -> B must show `TravelFreeze` without forced cleanup, followed by `TravelRestore`, then a new `OpenPause Success` on B.

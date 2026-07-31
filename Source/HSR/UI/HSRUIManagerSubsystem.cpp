@@ -195,6 +195,23 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownExplorationHostForTravel(AHSR
 	return CaptureAndTeardownTravelHost();
 }
 
+EHSRUIScreenResult UHSRUIManagerSubsystem::PrepareExplorationTravel()
+{
+	if (!bInitialized || bInconsistent)
+	{
+		return EHSRUIScreenResult::Inconsistent;
+	}
+	if (ActiveHostGeneration == 0)
+	{
+		return EHSRUIScreenResult::Success;
+	}
+	if (bTravelRestorePending)
+	{
+		return EHSRUIScreenResult::InvalidHost;
+	}
+	return CaptureAndTeardownTravelHost();
+}
+
 EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownCurrentHost()
 {
 	bool bRecovered = true;

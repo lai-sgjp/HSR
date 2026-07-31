@@ -24,6 +24,8 @@ enum class EHSRMapOperationResult : uint8
 	PlacementFailed,
 	NothingPending,
 	RequestMismatch
+	,
+	UIPreparationFailed
 };
 
 UENUM(BlueprintType)

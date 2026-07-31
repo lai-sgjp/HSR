@@ -7,6 +7,8 @@
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "../Battle/HSRBattleTransitionSubsystem.h"
+#include "../UI/HSRUIManagerSubsystem.h"
+#include "Engine/LocalPlayer.h"
 #include "Misc/PackageName.h"
 
 namespace
@@ -289,6 +291,16 @@ EHSRMapOperationResult UHSRMapSubsystem::RequestTeleportTravel(const FName Telep
 	if (!World)
 	{
 		return EHSRMapOperationResult::InvalidWorld;
+	}
+	if (ULocalPlayer* LocalPlayer = GetGameInstance() ? GetGameInstance()->GetFirstGamePlayer() : nullptr)
+	{
+		if (UHSRUIManagerSubsystem* UIManager = LocalPlayer->GetSubsystem<UHSRUIManagerSubsystem>())
+		{
+			if (UIManager->PrepareExplorationTravel() != EHSRUIScreenResult::Success)
+			{
+				return EHSRMapOperationResult::UIPreparationFailed;
+			}
+		}
 	}
 
 	PendingRequest = Candidate;
