@@ -13,6 +13,7 @@ enum class EHSRFrontendModule : uint8
 	Party,
 	Map,
 	Challenge,
+	Quest,
 	Save
 };
 

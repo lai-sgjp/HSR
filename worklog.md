@@ -2256,3 +2256,10 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - The C++ work remains covered by focused Build and Map/UI Automation logs. Final user-owned UI integration assets were committed separately in `b9d992a`, including the intentionally deleted obsolete Pause WBP.
 - The pre-travel freeze leaves a duplicate HUD EndPlay teardown log (`Result=3`); it is behaviorally harmless in the accepted loop and is preserved as a UI lifecycle follow-up, not reported as fixed.
 - Archived the 03F task packet. Created 03G as the next authorized task gate for Save UI and integrated cold restore; no 03G source or binary asset implementation has started.
+# 2026-08-01 TASK-P17-006 Quest Frontend
+
+- 基线提交：`1a14a6c`；Quest 差异与此前 Save/Travel 工作隔离。
+- C++：新增 Quest 只读 DTO/ViewModel/Widget，并将 `EHSRFrontendModule::Quest` 接入通用 module-root route。
+- Automation：`HSR.UI.Quest` 3/3、`HSR.QuestDialogue` 1/1、`HSR.UI.FrontendNavigation` 11/11、`HSR.UI.MapFrontend` 1/1 通过；Development Editor Build exit 0。
+- 用户 Editor：创建并接入 Quest Panel/Entry/Objective Entry；确认 Empty 显示、Back、A↔B 后重开均正常。
+- 归档：`PASS WITH FOLLOW-UP / USER ACCEPTED`。生产 active Quest 的 Ready/Objective/Reward 展示仍待相邻任务验证。

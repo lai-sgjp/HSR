@@ -620,3 +620,12 @@
 - `SightRadius`、`LoseSightRadius`、`EncounterRadius` 已移入 `UHSREnemyDefinition`，兼容默认值为 `1000 / 1500 / 200`，并验证 LoseSight 归一、无 Definition fallback、负值 clamp 与配置零副作用。
 - Independent Reviewer 最终 commit `ff8f213`：`PASS WITH FOLLOW-UP`；半径 Addendum Reviewer commit `990d95d`。三件套归档至 `tasks/archive/TASK-P17-PATCH-02-*`。
 - 非阻断 follow-up：用户 `.uasset` 继续按 provenance 独立处理；未来调整三个半径后执行一次探索 smoke；历史失败日志继续保留。当前无活动任务，P17-005 尚未开始。
+
+# 2026-08-01 TASK-P17-006 Quest Frontend（已归档）
+
+- 接手前 03H/Save/Travel 工作已独立提交为 `1a14a6c`；Quest 子任务差异从该基线开始。
+- Quest 只读 ViewModel、Widget facade 与统一 `EHSRFrontendModule::Quest` route 已完成；QuestSubsystem 仍是唯一权威，UI 不暴露 Quest/Reward mutation。
+- Development Editor Build、`HSR.UI.Quest` 3/3、`HSR.QuestDialogue` 1/1、`HSR.UI.FrontendNavigation` 11/11、`HSR.UI.MapFrontend` 1/1 通过。
+- `HSR.UI.ScreenLifecycle` 保持既有基线：Boundaries、CandidateFailures、HostIdentity、TravelRestore 通过；CharacterDetail、HappyPath、Inventory ownership-count 用例失败，未出现 Quest 新失败。
+- 用户已完成 Quest UMG、Objective/Quest Entry 与 module-root 接线；PIE 确认 Empty、Back、A↔B 后重开均正常。任务以 `PASS WITH FOLLOW-UP / USER ACCEPTED` 归档。
+- FOLLOW-UP：当前生产 PIE 没有合法启动的 active Quest，Ready/Objective/Reward 展示链仍需在后续 Quest gameplay acceptance 子任务中验证；不得写成已验证。

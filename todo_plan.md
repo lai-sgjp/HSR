@@ -335,6 +335,7 @@
 - [ ] 完成主菜单、暂停、角色、队伍、背包、任务、地图和设置界面。
 - [ ] 建立 Screen Stack、统一 InputMode 和导航。
 - [x] 验证地图旅行后的 UI 重建（P17-PATCH-03F：A↔B UI Freeze/Restore、地图面板与 Pause 重开；HUD EndPlay 重复 teardown 日志保留 follow-up）。
+- [x] TASK-P17-006 Quest Frontend：只读 DTO/ViewModel、统一 route、Empty/Unavailable、Back 与 A↔B 后重开通过 Build、Automation 和用户 PIE；Ready/Objective/Reward 生产任务展示保留 follow-up。
 
 ## Phase 18：表现与模型导入
 

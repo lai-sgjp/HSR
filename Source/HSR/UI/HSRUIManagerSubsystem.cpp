@@ -762,6 +762,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenFrontendModule(const EHSRFrontend
 	case EHSRFrontendModule::Party:
 	case EHSRFrontendModule::Map:
 	case EHSRFrontendModule::Challenge:
+	case EHSRFrontendModule::Quest:
 	case EHSRFrontendModule::Save:
 	{
 		if (!FrontendModuleRootClass
@@ -999,6 +1000,7 @@ bool UHSRUIManagerSubsystem::RestoreFrontendModuleFocus(AHSRPlayerController* Pl
 	case EHSRFrontendModule::Party:
 	case EHSRFrontendModule::Map:
 	case EHSRFrontendModule::Challenge:
+	case EHSRFrontendModule::Quest:
 	case EHSRFrontendModule::Save:
 		return FrontendModuleRootInstance
 			&& ApplyFocusBackend(PlayerController, FrontendModuleRootInstance->GetPreferredFocusWidget(),

@@ -464,6 +464,12 @@ CancelOverwrite
 RequestLoad
 ```
 
+Quest 前端沿用通用 module-root 路由：`EHSRFrontendModule::Quest` 由
+`UIManagerSubsystem/FrontendRouter` 管理，`UHSRQuestWidget` 只持有
+`UHSRQuestViewModel` 的只读投影。ViewModel 监听 Quest changed/restored 后重新读取
+`GetQuestStates`；Widget 只展示 Quest、Objective、Reward claimed 状态并继承统一 Back，
+不调用 `StartQuest`、`SubmitEvent` 或 `ClaimQuestReward`。
+
 完整 `HSR.UI` Automation 当前仍有四个既有生命周期失败。新增 UI 模块时应保留这一基线事实，并增加模块打开、补偿、Back、Travel teardown/rebuild 测试。
 
 ## 5. World 与 Battle Runtime
