@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Curves/CurveFloat.h"
 #include "../Data/Definitions/HSRCharacterDefinition.h"
@@ -80,6 +81,47 @@ namespace HSR::P13::SaveTests
 		F.Save->InitializeForDevelopmentTest(F.Profiles, F.Party, F.Equipment, F.Inventory, F.Reward);
 		return F;
 	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRProductionSaveDefinitionsColdBootstrapTest,
+	"HSR.Save.ProductionDefinitions.ColdBootstrap",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRProductionSaveDefinitionsColdBootstrapTest::RunTest(const FString&)
+{
+	// 验证全新的 GameInstance 在任何奖励 Actor 注册前即可完成生产定义冷启动。
+	if (!TestNotNull(TEXT("Engine is available"), GEngine))
+	{
+		return false;
+	}
+
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GEngine);
+	GameInstance->AddToRoot();
+	GameInstance->InitializeStandalone(FName(*FString::Printf(TEXT("HSRProductionDefinitions_%s"),
+		*FGuid::NewGuid().ToString(EGuidFormats::Digits))));
+
+	UHSRInventorySubsystem* Inventory = GameInstance->GetSubsystem<UHSRInventorySubsystem>();
+	UHSRRewardSubsystem* Reward = GameInstance->GetSubsystem<UHSRRewardSubsystem>();
+	TestNotNull(TEXT("cold GameInstance creates Inventory"), Inventory);
+	TestNotNull(TEXT("cold GameInstance creates Reward"), Reward);
+	if (Inventory && Reward)
+	{
+		TestTrue(TEXT("cold Inventory knows LumenShard"),
+			Inventory->HasDefinition(TEXT("Item.Material.LumenShard")));
+		TestTrue(TEXT("cold Inventory knows ArchiveToken"),
+			Inventory->HasDefinition(TEXT("Item.Unique.ArchiveToken")));
+		TestTrue(TEXT("cold Reward knows Standard reward"),
+			Reward->HasDefinition(TEXT("Reward.P13.Standard")));
+	}
+
+	UWorld* World = GameInstance->GetWorld();
+	GameInstance->Shutdown();
+	if (World)
+	{
+		World->DestroyWorld(false);
+		GEngine->DestroyWorldContext(World);
+	}
+	GameInstance->RemoveFromRoot();
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRInventoryRewardSaveV3Test, "HSR.Save.InventoryRewardV3", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

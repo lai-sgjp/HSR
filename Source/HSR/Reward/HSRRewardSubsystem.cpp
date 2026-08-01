@@ -7,6 +7,7 @@
 #include "../Inventory/HSRInventorySubsystem.h"
 #include "Misc/Crc.h"
 #include "HSRSettlementTypes.h"
+#include "UObject/UObjectGlobals.h"
 
 namespace
 {
@@ -34,7 +35,40 @@ namespace
 void UHSRRewardSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	Collection.InitializeDependency<UHSRInventorySubsystem>();
 	Inventory = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRInventorySubsystem>() : nullptr;
+	if (!Inventory.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("P13-004 ProductionDefinitionBootstrap=FAILED Reason=InventoryUnavailable"));
+		return;
+	}
+
+	// 存档校验可能早于奖励宝箱进入游戏世界，必须在 GameInstance 启动时注册已发布的 P13 奖励包。
+	// 这样冷启动恢复不依赖 Actor BeginPlay 的副作用。
+	TArray<TObjectPtr<UHSRItemDefinition>> ItemDefinitions;
+	ItemDefinitions.Add(LoadObject<UHSRItemDefinition>(nullptr, TEXT("/Game/Data/Items/DA_Item_LumenShard_P13.DA_Item_LumenShard_P13")));
+	ItemDefinitions.Add(LoadObject<UHSRItemDefinition>(nullptr, TEXT("/Game/Data/Items/DA_Item_ArchiveToken_P13.DA_Item_ArchiveToken_P13")));
+	UHSRDropTableDefinition* DropTable = LoadObject<UHSRDropTableDefinition>(nullptr, TEXT("/Game/Data/Drops/DA_Drop_P13_Standard.DA_Drop_P13_Standard"));
+	UHSRRewardDefinition* RewardDefinition = LoadObject<UHSRRewardDefinition>(nullptr, TEXT("/Game/Data/Rewards/DA_Reward_P13_Standard.DA_Reward_P13_Standard"));
+	if (!ItemDefinitions[0] || !ItemDefinitions[1] || !DropTable || !RewardDefinition)
+	{
+		UE_LOG(LogTemp, Error, TEXT("P13-004 ProductionDefinitionBootstrap=FAILED Reason=AssetLoad Item0=%s Item1=%s DropTable=%s Reward=%s"),
+			ItemDefinitions[0] ? TEXT("OK") : TEXT("MISSING"),
+			ItemDefinitions[1] ? TEXT("OK") : TEXT("MISSING"),
+			DropTable ? TEXT("OK") : TEXT("MISSING"),
+			RewardDefinition ? TEXT("OK") : TEXT("MISSING"));
+		return;
+	}
+
+	const EHSRRewardOperationResult Result = RegisterBundle(ItemDefinitions, *DropTable, *RewardDefinition);
+	if (Result != EHSRRewardOperationResult::Success && Result != EHSRRewardOperationResult::NoOp)
+	{
+		UE_LOG(LogTemp, Error, TEXT("P13-004 ProductionDefinitionBootstrap=FAILED Reason=RegisterBundle Result=%d"), static_cast<int32>(Result));
+		return;
+	}
+	UE_LOG(LogTemp, Log, TEXT("P13-004 ProductionDefinitionBootstrap=READY Result=%d Item0=%s Item1=%s DropTable=%s Reward=%s"),
+		static_cast<int32>(Result), *ItemDefinitions[0]->ItemId.ToString(), *ItemDefinitions[1]->ItemId.ToString(),
+		*DropTable->DropTableId.ToString(), *RewardDefinition->RewardDefinitionId.ToString());
 }
 
 #if WITH_DEV_AUTOMATION_TESTS

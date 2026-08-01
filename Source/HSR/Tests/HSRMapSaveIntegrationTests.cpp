@@ -77,6 +77,15 @@ bool FHSRMapSaveV5IntegrationTest::RunTest(const FString&)
 	TestTrue(TEXT("capture carries teleport"), Captured.Map.UnlockedTeleportIds.Contains(TEXT("Teleport.AB")));
 	TestTrue(TEXT("capture carries flag"), Captured.Map.ExplorationFlags.Contains(TEXT("Exploration.Chest.B")));
 
+	TestEqual(TEXT("move away from saved map"), F.Maps->SetCurrentLocation(TEXT("Map.A")), EHSRMapOperationResult::Success);
+	const FHSRSaveData BeforeFailedTravel = F.Save->GetSnapshot();
+	TestEqual(TEXT("cross-map load without a world rejects before commit"), F.Save->LoadSnapshot(Captured), EHSRSaveResult::InvalidData);
+	TestEqual(TEXT("failed cross-map load preserves Save current map"), F.Save->GetSnapshot().Map.CurrentLocation.MapId,
+		BeforeFailedTravel.Map.CurrentLocation.MapId);
+	TestEqual(TEXT("failed cross-map load preserves runtime map"), F.Maps->GetSnapshot().CurrentLocation.MapId, FName(TEXT("Map.A")));
+	TestFalse(TEXT("failed cross-map load leaves no pending travel"), F.Maps->HasPendingTravel());
+	TestEqual(TEXT("return to saved map"), F.Maps->SetCurrentLocation(TEXT("Map.B")), EHSRMapOperationResult::Success);
+
 	F.Maps->SetExplorationFlag(TEXT("Exploration.Mutated"));
 	int32 MapEvents = 0;
 	int32 RestoreEvents = 0;

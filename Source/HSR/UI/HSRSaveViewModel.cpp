@@ -20,6 +20,7 @@ void UHSRSaveViewModel::Initialize(UHSRSaveSubsystem* InSave)
 		FrontendResult.Generation = static_cast<int64>(LastResult.Generation);
 		FrontendResult.bRecoveredFromBackup = LastResult.bRecoveredFromBackup;
 		FrontendResult.bRuntimeChanged = LastResult.bRuntimeChanged;
+		FrontendResult.bPending = InSave->HasPendingRestore();
 		bHasResult = true;
 	}
 }
@@ -63,6 +64,8 @@ EHSRSaveResult UHSRSaveViewModel::RequestLoad(const FString& SlotName)
 {
 	const EHSRSaveResult Result = Save.IsValid() ? Save->LoadFromSlot(SlotName) : EHSRSaveResult::InvalidArgument;
 	RefreshResult(Result);
+	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 SaveFrontend Load Slot=%s Result=%d Generation=%llu RuntimeChanged=%s"),
+		*SlotName, static_cast<int32>(Result), LastResult.Generation, LastResult.bRuntimeChanged ? TEXT("true") : TEXT("false"));
 	return Result;
 }
 
@@ -77,5 +80,6 @@ void UHSRSaveViewModel::RefreshResult(const EHSRSaveResult Result)
 	FrontendResult.Generation = static_cast<int64>(LastResult.Generation);
 	FrontendResult.bRecoveredFromBackup = LastResult.bRecoveredFromBackup;
 	FrontendResult.bRuntimeChanged = LastResult.bRuntimeChanged;
+	FrontendResult.bPending = Save.IsValid() && Save->HasPendingRestore();
 	bHasResult = true;
 }

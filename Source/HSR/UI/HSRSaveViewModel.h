@@ -17,6 +17,7 @@ struct HSR_API FHSRSaveFrontendResult
 	UPROPERTY(BlueprintReadOnly) int64 Generation = 0;
 	UPROPERTY(BlueprintReadOnly) bool bRecoveredFromBackup = false;
 	UPROPERTY(BlueprintReadOnly) bool bRuntimeChanged = false;
+	UPROPERTY(BlueprintReadOnly) bool bPending = false;
 };
 
 UCLASS(BlueprintType)

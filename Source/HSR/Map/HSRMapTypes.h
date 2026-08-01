@@ -135,4 +135,5 @@ struct FHSRMapSaveData
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRMapStateChanged, const FHSRMapRuntimeSnapshot&);
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRMapArrivalCommitted, const FHSRMapArrivalCommitInfo&);
+DECLARE_MULTICAST_DELEGATE_OneParam(FHSRMapRestoreTravelFailed, const FGuid&);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FHSRMapStateChangedBlueprint, const FHSRMapRuntimeSnapshot&, Snapshot);

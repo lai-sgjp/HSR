@@ -681,7 +681,13 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 			bInconsistent = true;
 			return EHSRUIScreenResult::Inconsistent;
 		}
-		return CloseInventoryScreen();
+		const EHSRUIScreenResult Result = CloseInventoryScreen();
+		if (Result == EHSRUIScreenResult::Success && bTravelRestoredModule)
+		{
+			bTravelRestoredModule = false;
+			return CloseFrontendToRoot();
+		}
+		return Result;
 	}
 	if (ActiveFrontendModule == EHSRFrontendModule::Character)
 	{
@@ -690,7 +696,13 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 			bInconsistent = true;
 			return EHSRUIScreenResult::Inconsistent;
 		}
-		return CloseCharacterDetailScreen();
+		const EHSRUIScreenResult Result = CloseCharacterDetailScreen();
+		if (Result == EHSRUIScreenResult::Success && bTravelRestoredModule)
+		{
+			bTravelRestoredModule = false;
+			return CloseFrontendToRoot();
+		}
+		return Result;
 	}
 	const FName TopId = Snapshot.Entries.Last().ScreenId;
 	if (TopId != PauseScreenId || ActiveFrontendModule != EHSRFrontendModule::PauseHub
@@ -1136,19 +1148,25 @@ FName UHSRUIManagerSubsystem::SelectRestorableScreenId() const
 {
 	if (!ScreenStack || bInconsistent || HasInventoryOwnershipMismatch()) return NAME_None;
 	const FHSRScreenStackSnapshot Snapshot = ScreenStack->GetSnapshot();
-	if (Snapshot.Entries.Num() != 2) return NAME_None;
-	const FName TopId = Snapshot.Entries.Last().ScreenId;
-	if (TopId == CharacterDetailScreenId && CharacterDetailWidgetInstance && !FrontendShellInstance
-		&& !InventoryWidgetInstance && !InventoryViewModelInstance) return TopId;
-	if (TopId == InventoryScreenId && InventoryWidgetInstance && InventoryViewModelInstance
-		&& !FrontendShellInstance && !CharacterDetailWidgetInstance) return TopId;
+	if (Snapshot.Entries.Num() < 2 || Snapshot.Entries[0].ScreenId != ExplorationRootId)
+	{
+		return NAME_None;
+	}
+	const EHSRFrontendModule ActiveModule = FrontendRouter
+		? FrontendRouter->GetSnapshot().GetActiveRoute().Module : EHSRFrontendModule::None;
+	if (ActiveModule == EHSRFrontendModule::Character && CharacterDetailWidgetInstance
+		&& !InventoryWidgetInstance && !InventoryViewModelInstance) return CharacterDetailScreenId;
+	if (ActiveModule == EHSRFrontendModule::Inventory && InventoryWidgetInstance && InventoryViewModelInstance
+		&& !CharacterDetailWidgetInstance) return InventoryScreenId;
 	return NAME_None;
 }
 
 EHSRUIScreenResult UHSRUIManagerSubsystem::CaptureAndTeardownTravelHost()
 {
 	const int64 CapturedHost = ActiveHostGeneration;
-	const FName Restorable = NAME_None; // Frontend routes are intentionally discarded across travel.
+	// Capture ownership while the old host is still alive; teardown releases the
+	// widget/view-model pair that SelectRestorableScreenId validates.
+	const FName Restorable = SelectRestorableScreenId();
 	AHSRPlayerController* CapturedPC = RegisteredPlayerController.Get();
 	int64 ArrivalBaseline = LastObservedArrivalCommitGeneration;
 	if (UGameInstance* GameInstance = GetLocalPlayer() ? GetLocalPlayer()->GetGameInstance() : nullptr)
@@ -1220,13 +1238,32 @@ void UHSRUIManagerSubsystem::TryRestoreTravelDescriptor()
 	LatchedArrivalCommitGeneration = 0;
 	TravelRestoreScreenId = NAME_None;
 	EHSRUIScreenResult Result = EHSRUIScreenResult::Success;
-	if (!ScreenId.IsNone()) Result = EHSRUIScreenResult::Inconsistent;
+	if (!ScreenId.IsNone())
+	{
+		if (ScreenId == CharacterDetailScreenId)
+		{
+			Result = OpenFrontendModule(EHSRFrontendModule::Character);
+		}
+		else if (ScreenId == InventoryScreenId)
+		{
+			Result = OpenFrontendModule(EHSRFrontendModule::Inventory);
+		}
+		else
+		{
+			Result = EHSRUIScreenResult::Inconsistent;
+		}
+	}
 	else
 	{
 		AHSRPlayerController* PC = RegisteredPlayerController.Get();
 		Result = ApplyPolicyBackend(PC, GetResolvedInputPolicy(), EHSRPlayerControlMode::Exploration)
 			? EHSRUIScreenResult::Success : EHSRUIScreenResult::PolicyApplyFailed;
 		ApplyFocusBackend(PC, RegisteredRootWidget.Get(), RegisteredRootWidget.Get());
+	}
+	bTravelRestoredModule = Result == EHSRUIScreenResult::Success && !ScreenId.IsNone();
+	if (Result == EHSRUIScreenResult::CompensationFailed || Result == EHSRUIScreenResult::Inconsistent)
+	{
+		bInconsistent = true;
 	}
 	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 TravelRestore Consume Generation=%lld NewHostGeneration=%lld Screen=%s Result=%d Stack=%d"),
 		DescriptorGeneration, ActiveHostGeneration, *ScreenId.ToString(), static_cast<int32>(Result), GetLogicalScreenCount());

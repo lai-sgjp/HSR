@@ -1,6 +1,14 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-07-31
+> 最后更新：2026-08-01
+
+## 2026-08-01 最新权威摘要
+
+- `TASK-P17-PATCH-03H` 已归档为 `PASS WITH FOLLOW-UP / USER ACCEPTED`。
+- 冷启动 Load 缺陷已修复：RewardSubsystem 在 Save 预检前原子注册 P13 生产定义；Development Editor Build、冷启动 RED/GREEN、Save/Inventory/Reward/Map 以及相关 SaveFrontend/TravelRestore Automation 已验证。
+- 用户最终 PIE 日志确认 `p17_slot_01` 可成功跨图恢复至 Map.B 与 Map.A，包含 restore travel、TravelRestore Consume、ArrivalCommitted 和保存坐标恢复。
+- 保留 follow-up：完整 UI 族仍有四个既有生命周期失败；restore arrival failure/timeout 注入、完整 AC-008 gameplay chain、Editor reopen 与双分辨率矩阵未单独验证；HUD stale-host teardown Error 仍为非阻断项。
+- 当前未自动创建下一任务卡，等待用户选择后续范围。
 
 ## 2026-07-31 最新权威摘要
 

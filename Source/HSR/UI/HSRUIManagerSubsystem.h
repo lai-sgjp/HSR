@@ -223,6 +223,7 @@ private:
 	int64 LatchedArrivalCommitGeneration = 0;
 	int64 LastObservedArrivalCommitGeneration = 0;
 	FName TravelRestoreScreenId = NAME_None;
+	bool bTravelRestoredModule = false;
 	bool bTravelRestorePending = false;
 	bool bTravelArrivalObserved = false;
 	FDelegateHandle ArrivalCommittedHandle;

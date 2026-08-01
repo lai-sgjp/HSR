@@ -18,11 +18,13 @@ UCLASS()
 class HSR_API UHSRSaveSubsystem : public UGameInstanceSubsystem { GENERATED_BODY()
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
 	EHSRSaveResult SaveSnapshot(FHSRSaveData& OutData);
 	EHSRSaveResult LoadSnapshot(const FHSRSaveData& Candidate);
 	EHSRSaveResult SaveToSlot(const FString& SlotName, int32 UserIndex = 0);
 	EHSRSaveResult LoadFromSlot(const FString& SlotName, int32 UserIndex = 0);
 	const FHSRSaveLoadResult& GetLastLoadResult() const { return LastLoadResult; }
+	bool HasPendingRestore() const { return PendingRestoreCandidate.IsSet(); }
 	const FHSRSaveData& GetSnapshot() const { return Current; }
 	FHSRRestoreCommitted& OnRestoreCommitted() { return RestoreCommitted; }
 	EHSRSaveFailureStage GetLastWriteFailureStage() const { return LastWriteFailureStage; }
@@ -41,6 +43,8 @@ public:
 private:
 	bool Validate(const FHSRSaveData& Candidate) const;
 	bool CanPrepareSnapshot(const FHSRSaveData& Candidate) const;
+	void HandleRestoreArrival(const FHSRMapArrivalCommitInfo& Info);
+	void HandleRestoreTravelFailure(const FGuid& RequestId);
 	UPROPERTY() FHSRSaveData Current;
 	TWeakObjectPtr<UHSRCharacterProfileSubsystem> Profiles;
 	TWeakObjectPtr<UHSRPartySubsystem> Party;
@@ -65,6 +69,9 @@ private:
 	FHSRRestoreCommitted RestoreCommitted;
 	FHSRSaveLoadResult LastLoadResult;
 	bool bOperationInProgress=false;
+	bool bCompletingRestoreTravel=false;
+	TOptional<FHSRSaveData> PendingRestoreCandidate;
+	FGuid PendingRestoreRequestId;
 	EHSRSaveFailureStage LastWriteFailureStage=EHSRSaveFailureStage::None;
 	bool bLastWriteCleanupWarning=false;
 	FHSRSaveEnvelopeHeader LastWriteHeader;
