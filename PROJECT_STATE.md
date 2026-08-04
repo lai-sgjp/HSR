@@ -630,9 +630,9 @@
 - 用户已完成 Quest UMG、Objective/Quest Entry 与 module-root 接线；PIE 确认 Empty、Back、A↔B 后重开均正常。任务以 `PASS WITH FOLLOW-UP / USER ACCEPTED` 归档。
 - FOLLOW-UP：当前生产 PIE 没有合法启动的 active Quest，Ready/Objective/Reward 展示链仍需在后续 Quest gameplay acceptance 子任务中验证；不得写成已验证。
 
-# 2026-08-04 TASK-P17-007 Party Frontend（已归档）
+# 2026-08-04 TASK-P17-009A Party 只读投影（已归档）
 
 - Party 固定两槽只读 DTO/ViewModel/Widget 已完成，复用既有通用 Party route，不修改 Party authority。
 - Development Editor Build、`HSR.UI.Party` 3/3、`HSR.Party` 1/1、`HSR.UI.FrontendNavigation` 11/11 通过。
 - 用户创建 Party Panel/Slot Entry 并接入 module root；PIE 确认固定两槽、Character.A、Back/Close 与 A↔B 后重开均正常。
-- TASK-P17-007 以 `PASS / USER ACCEPTED` 归档；只读切片不包含 Add/Remove/Replace/Swap。
+- TASK-P17-009A 以 `PASS / USER ACCEPTED` 归档；该结论只覆盖只读投影，不代表权威计划中的 P17-009 已完成。Add/Remove/Replace/Swap、永久队伍候选确认、战前候选队伍/Buff 与 Encounter Request 仍未完成。

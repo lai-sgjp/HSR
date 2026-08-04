@@ -1,4 +1,4 @@
-# TASK-P17-007 - Final Review
+# TASK-P17-009A - Final Review
 
 ## Review
 
@@ -14,4 +14,4 @@ Existing ScreenLifecycle ownership-count failures and HUD stale-host teardown tr
 
 ## Conclusion
 
-`PASS / USER ACCEPTED`
+`PASS / USER ACCEPTED` for P17-009A only. Canonical P17-009 remains open.

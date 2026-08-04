@@ -1,6 +1,8 @@
-# TASK-P17-007 - Execution Result
+# TASK-P17-009A - Execution Result
 
 Status: `ARCHIVED / PASS / USER ACCEPTED`
+
+This PASS covers read-only Party projection only. It does not cover permanent-party editing/confirmation or pre-battle formation/Buff behavior from canonical P17-009.
 
 ## Implementation
 

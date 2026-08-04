@@ -1,6 +1,8 @@
-# TASK-P17-007 - Party Frontend Read-only Integration
+# TASK-P17-009A - Party Frontend Read-only Projection
 
 Status: `ARCHIVED / PASS / USER ACCEPTED`
+
+Plan mapping: prerequisite slice of canonical `P17-009 Party 与战前编队/Buff`; canonical P17-009 remains incomplete.
 
 ## Sole Outcome
 

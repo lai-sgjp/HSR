@@ -2263,9 +2263,9 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Automation：`HSR.UI.Quest` 3/3、`HSR.QuestDialogue` 1/1、`HSR.UI.FrontendNavigation` 11/11、`HSR.UI.MapFrontend` 1/1 通过；Development Editor Build exit 0。
 - 用户 Editor：创建并接入 Quest Panel/Entry/Objective Entry；确认 Empty 显示、Back、A↔B 后重开均正常。
 - 归档：`PASS WITH FOLLOW-UP / USER ACCEPTED`。生产 active Quest 的 Ready/Objective/Reward 展示仍待相邻任务验证。
-# 2026-08-04 TASK-P17-007 Party Frontend
+# 2026-08-04 TASK-P17-009A Party 只读投影
 
 - 新增固定两槽 Party DTO/ViewModel/Widget，复用既有通用 Party route，不暴露 Party mutation。
 - Development Editor Build、`HSR.UI.Party` 3/3、`HSR.Party` 1/1、`HSR.UI.FrontendNavigation` 11/11 通过。
 - 用户创建并接入 Party Panel/Slot Entry；PIE 确认 Character.A、两个槽位、Back/Close 与 A↔B 后重开正常。
-- 归档结论：`PASS / USER ACCEPTED`。
+- 归档结论：`PASS / USER ACCEPTED`，仅覆盖只读投影前置切片；不代表权威执行计划 P17-009 整体通过。
