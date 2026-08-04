@@ -15,6 +15,11 @@ public:
 	void SetViewModel(UHSRPartyViewModel* InViewModel);
 	UFUNCTION(BlueprintPure, Category = "HSR|Party")
 	bool GetCurrentSnapshot(FHSRPartyFrontendSnapshot& OutSnapshot) const;
+	UFUNCTION(BlueprintCallable, Category = "HSR|Party") EHSRPartyResult SetCandidateSlot(int32 SlotIndex, FName CharacterId);
+	UFUNCTION(BlueprintCallable, Category = "HSR|Party") EHSRPartyResult ClearCandidateSlot(int32 SlotIndex);
+	UFUNCTION(BlueprintCallable, Category = "HSR|Party") EHSRPartyResult SwapCandidateSlots(int32 FirstSlot, int32 SecondSlot);
+	UFUNCTION(BlueprintCallable, Category = "HSR|Party") EHSRPartyResult ConfirmCandidate();
+	UFUNCTION(BlueprintCallable, Category = "HSR|Party") EHSRPartyResult CancelCandidate();
 	UFUNCTION(BlueprintImplementableEvent, Category = "HSR|Party")
 	void OnPartySnapshotChanged(const FHSRPartyFrontendSnapshot& Snapshot);
 

@@ -20,6 +20,31 @@ bool UHSRPartyWidget::GetCurrentSnapshot(FHSRPartyFrontendSnapshot& OutSnapshot)
 	return true;
 }
 
+EHSRPartyResult UHSRPartyWidget::SetCandidateSlot(int32 SlotIndex, FName CharacterId)
+{
+	return ViewModel ? ViewModel->SetCandidateSlot(SlotIndex, CharacterId) : EHSRPartyResult::InvalidCandidate;
+}
+
+EHSRPartyResult UHSRPartyWidget::ClearCandidateSlot(int32 SlotIndex)
+{
+	return ViewModel ? ViewModel->ClearCandidateSlot(SlotIndex) : EHSRPartyResult::InvalidCandidate;
+}
+
+EHSRPartyResult UHSRPartyWidget::SwapCandidateSlots(int32 FirstSlot, int32 SecondSlot)
+{
+	return ViewModel ? ViewModel->SwapCandidateSlots(FirstSlot, SecondSlot) : EHSRPartyResult::InvalidCandidate;
+}
+
+EHSRPartyResult UHSRPartyWidget::ConfirmCandidate()
+{
+	return ViewModel ? ViewModel->ConfirmCandidate() : EHSRPartyResult::InvalidCandidate;
+}
+
+EHSRPartyResult UHSRPartyWidget::CancelCandidate()
+{
+	return ViewModel ? ViewModel->CancelCandidate() : EHSRPartyResult::InvalidCandidate;
+}
+
 void UHSRPartyWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
