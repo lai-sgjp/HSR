@@ -1,14 +1,14 @@
-# TASK-P17-009C-A - Pure Pre-Battle Candidate and Encounter Request
+# TASK-P17-009C-B - Admission Build/Submit Separation
 
 Status: `ACTIVE / TASK GATE`
 
 ## Canonical mapping
 
-Prerequisite slice of Phase 17 `P17-009 Party 与战前编队/Buff`. P17-009A is read-only Party projection; P17-009B is permanent-party editing. This task establishes the independent pre-battle candidate contract without starting travel.
+Prerequisite slice of Phase 17 `P17-009 Party 与战前编队/Buff`. P17-009A is read-only Party projection; P17-009B is permanent-party editing; P17-009C-A supplied a pure candidate ViewModel. This task separates pure request construction from authoritative transition submission while preserving the existing convenience API.
 
 ## Sole observable outcome
 
-The frontend can hold an independent candidate Party and optional Buff IDs, cancel without changing permanent Party/resources/BattleTransition, and confirm into a pure-value `FHSREncounterRequest` without invoking `RequestEncounter` or mutating transition state.
+Pure admission input can be converted into a complete `FHSREncounterRequest` without World/Party/Reward/Travel side effects; the existing `RequestEncounter` remains a compatibility wrapper around the separated build/submit boundary.
 
 ## Authority boundaries
 
@@ -22,8 +22,8 @@ The frontend can hold an independent candidate Party and optional Buff IDs, canc
 1. Candidate starts from the committed Party snapshot but remains independent after edits.
 2. Candidate validates slot bounds, duplicate/unknown CharacterIds, missing EncounterId and invalid candidate state.
 3. Optional Buff IDs are local and deterministic; no resource or GameplayEffect mutation exists in this slice.
-4. Cancel restores the candidate from the latest committed Party without changing Party revision or BattleTransition state.
-5. Confirm returns a pure `FHSREncounterRequest` containing candidate identity and encounter definition fields; no travel or pending transition mutation occurs.
+4. Pure build carries candidate leader, encounter fields and Buff IDs without changing Party revision or BattleTransition state.
+5. Existing RequestEncounter behavior remains covered by the prior admission tests.
 6. RED/GREEN automation and Development Editor Build pass.
 
 ## Initial allowlist
@@ -31,6 +31,9 @@ The frontend can hold an independent candidate Party and optional Buff IDs, canc
 - `Source/HSR/UI/HSRPreBattleCandidateTypes.h`
 - `Source/HSR/UI/HSRPreBattleCandidateViewModel.h`
 - `Source/HSR/UI/HSRPreBattleCandidateViewModel.cpp`
+- `Source/HSR/Battle/HSREncounterTypes.h`
+- `Source/HSR/Battle/HSRBattleTransitionSubsystem.h`
+- `Source/HSR/Battle/HSRBattleTransitionSubsystem.cpp`
 - `Source/HSR/Tests/HSRPreBattleCandidateTests.cpp`
 - `tasks/active-task.md`
 - `tasks/execution-result.md`
@@ -50,6 +53,6 @@ User-owned future assets, not edited by Codex in this slice:
 
 ## TDD order
 
-1. Add pure candidate/request RED tests and execute them.
-2. Implement minimal DTO/ViewModel and execute the same tests GREEN.
-3. Hand off future UMG wiring only after code evidence passes.
+1. Add pure admission build RED tests and execute them.
+2. Implement DTO/build boundary and execute the same tests GREEN.
+3. Extract submit/travel side effects without changing existing wrapper behavior.
