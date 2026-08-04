@@ -16,6 +16,7 @@ public:
 	EHSRPartyResult RemoveCharacter(int32 Slot);
 	EHSRPartyResult ReplaceCharacter(int32 Slot, FName CharacterId);
 	EHSRPartyResult SwapSlots(int32 FirstSlot, int32 SecondSlot);
+	EHSRPartyResult CommitCandidate(const FHSRPartySnapshot& Candidate);
 	bool GetSnapshot(FHSRPartySnapshot& OutSnapshot) const;
 	FHSRPartyChanged& OnPartyChanged() { return PartyChanged; }
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS

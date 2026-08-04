@@ -108,6 +108,22 @@ EHSRPartyResult UHSRPartySubsystem::SwapSlots(int32 FirstSlot, int32 SecondSlot)
 	return Commit(MoveTemp(Candidate)) ? EHSRPartyResult::Success : EHSRPartyResult::InvalidCandidate;
 }
 
+EHSRPartyResult UHSRPartySubsystem::CommitCandidate(const FHSRPartySnapshot& Candidate)
+{
+	if (Candidate.Revision != Revision) return EHSRPartyResult::RevisionConflict;
+	if (Candidate.Slots.Num() != Capacity) return EHSRPartyResult::InvalidCandidate;
+	TSet<FName> Seen;
+	for (const FHSRPartySlot& Slot : Candidate.Slots)
+	{
+		if (Slot.IsEmpty()) continue;
+		if (!IsKnownProfile(Slot.CharacterId)) return EHSRPartyResult::ProfileNotFound;
+		if (Seen.Contains(Slot.CharacterId)) return EHSRPartyResult::DuplicateCharacter;
+		Seen.Add(Slot.CharacterId);
+	}
+	TArray<FHSRPartySlot> SlotsCandidate = Candidate.Slots;
+	return Commit(MoveTemp(SlotsCandidate)) ? EHSRPartyResult::Success : EHSRPartyResult::InvalidCandidate;
+}
+
 bool UHSRPartySubsystem::GetSnapshot(FHSRPartySnapshot& OutSnapshot) const
 {
 	OutSnapshot.Slots = Slots; OutSnapshot.Revision = Revision; return true;

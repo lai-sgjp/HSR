@@ -84,6 +84,16 @@ bool UHSRCharacterProfileSubsystem::GetProfileSnapshot(FName CharacterId, FHSRCh
 	return true;
 }
 
+bool UHSRCharacterProfileSubsystem::GetAllProfileSnapshots(TArray<FHSRCharacterProfileSnapshot>& OutSnapshots) const
+{
+	Profiles.GenerateValueArray(OutSnapshots);
+	OutSnapshots.Sort([](const FHSRCharacterProfileSnapshot& A, const FHSRCharacterProfileSnapshot& B)
+	{
+		return A.RuntimeState.CharacterId.LexicalLess(B.RuntimeState.CharacterId);
+	});
+	return true;
+}
+
 bool UHSRCharacterProfileSubsystem::GetProgressionContext(FName CharacterId, FHSRCharacterProgressionContext& OutContext) const
 {
 	const FHSRCharacterProfileSnapshot* Profile = Profiles.Find(CharacterId);

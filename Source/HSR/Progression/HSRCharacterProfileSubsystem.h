@@ -22,6 +22,7 @@ public:
 	EHSRCharacterProfileResult GrantExperience(FName CharacterId, int32 ExperienceToGrant);
 	EHSRCharacterProfileResult SetSkillLevel(FName CharacterId, FName SkillId, int32 SkillLevel);
 	bool GetProfileSnapshot(FName CharacterId, FHSRCharacterProfileSnapshot& OutSnapshot) const;
+	bool GetAllProfileSnapshots(TArray<FHSRCharacterProfileSnapshot>& OutSnapshots) const;
 	bool GetProgressionContext(FName CharacterId, FHSRCharacterProgressionContext& OutContext) const;
 	bool GetDefinition(FName CharacterId, const UHSRCharacterDefinition*& OutDefinition) const;
 	bool HasDefinition(FName CharacterId) const { return Definitions.Contains(CharacterId); }
