@@ -67,6 +67,7 @@ EHSRPreBattleCandidateResult UHSRPreBattleCandidateViewModel::ConfirmCandidate(F
 	}
 	OutRequest = Template;
 	OutRequest.PlayerCharacterId = CandidateCharacterIds[0];
+	OutRequest.BuffIds = BuffIds;
 	return EHSRPreBattleCandidateResult::Success;
 }
 

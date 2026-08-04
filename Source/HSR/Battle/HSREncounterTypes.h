@@ -61,6 +61,9 @@ struct FHSREncounterRequest
 	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
 	FName EnemyDefinitionId;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Encounter|Preparation")
+	TArray<FName> BuffIds;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
 	EHSREncounterInitiative Initiative = EHSREncounterInitiative::Neutral;
 
@@ -83,6 +86,21 @@ struct FHSREncounterRequest
 	int32 VictoryExperience = 0;
 
 	FHSREncounterRequest() = default;
+};
+
+USTRUCT(BlueprintType)
+struct HSR_API FHSRPreBattleAdmissionInput
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, Category = "Encounter|Preparation")
+	FHSREncounterRequest Template;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Encounter|Preparation")
+	TArray<FName> CandidateParty;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Encounter|Preparation")
+	TArray<FName> BuffIds;
 };
 
 USTRUCT(BlueprintType)

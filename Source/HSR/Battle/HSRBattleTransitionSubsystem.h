@@ -38,6 +38,8 @@ class HSR_API UHSRBattleTransitionSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
+	static EHSREncounterResultType BuildEncounterRequest(const FHSRPreBattleAdmissionInput& Input,
+		FHSREncounterRequest& OutRequest);
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 

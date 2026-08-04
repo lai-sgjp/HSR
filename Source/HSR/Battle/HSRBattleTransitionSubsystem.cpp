@@ -51,6 +51,27 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 	return RequestEncounterInternal(Definition, Initiative, PlayerController ? PlayerController->GetPawn() : nullptr);
 }
 
+EHSREncounterResultType UHSRBattleTransitionSubsystem::BuildEncounterRequest(
+	const FHSRPreBattleAdmissionInput& Input, FHSREncounterRequest& OutRequest)
+{
+	if (Input.Template.EncounterId.IsNone() || Input.Template.EnemyDefinitionId.IsNone()
+		|| Input.Template.BattleMapPath.IsNone() || Input.CandidateParty.IsEmpty()
+		|| Input.CandidateParty[0].IsNone())
+	{
+		return EHSREncounterResultType::InvalidRequest;
+	}
+	TSet<FName> Seen;
+	for (const FName CharacterId : Input.CandidateParty)
+	{
+		if (CharacterId.IsNone() || Seen.Contains(CharacterId)) return EHSREncounterResultType::InvalidRequest;
+		Seen.Add(CharacterId);
+	}
+	OutRequest = Input.Template;
+	OutRequest.PlayerCharacterId = Input.CandidateParty[0];
+	OutRequest.BuffIds = Input.BuffIds;
+	return EHSREncounterResultType::Success;
+}
+
 FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterForInteractor(
 	UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative, AActor* Interactor)
 
