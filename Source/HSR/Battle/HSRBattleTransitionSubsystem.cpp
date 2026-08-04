@@ -188,34 +188,37 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 		NewRequest.VictoryExperience = FMath::Max(0, Definition->VictoryExperience);
 	}
 
-	PendingRequest = NewRequest;
+	return SubmitEncounterRequest(NewRequest, World);
+}
+
+FHSREncounterResult UHSRBattleTransitionSubsystem::SubmitEncounterRequest(
+	const FHSREncounterRequest& Request, UWorld* World)
+{
+	if (!World || !Request.RequestId.IsValid() || Request.BattleMapPath.IsNone())
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest);
+	if (CurrentState == EHSREncounterState::Pending || CurrentState == EHSREncounterState::Traveling)
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::AlreadyPending);
+	PendingRequest = Request;
 	CurrentState = EHSREncounterState::Pending;
 #if WITH_DEV_AUTOMATION_TESTS
 	++AdmissionMutationCountForAutomation;
 #endif
-
-	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - RequestId=%s EncounterId=%s EnemyDefId=%s ExplorationMap=%s"),
-		*NewRequestId.ToString(), *Definition->EncounterId.ToString(), *Definition->EnemyDefinitionId.ToString(),
-		*NewRequest.ExplorationMapPath.ToString());
-	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestEncounter - BattleMap=%s ReturnLoc=%s"),
-		*Definition->BattleMap.GetLongPackageName(),
-		*ReturnTransform.GetLocation().ToString());
-
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::SubmitEncounterRequest - RequestId=%s EncounterId=%s"),
+		*Request.RequestId.ToString(), *Request.EncounterId.ToString());
 	CurrentState = EHSREncounterState::Traveling;
 	TravelKind = EHSRTravelKind::Encounter;
-	TravelRequestId = NewRequestId;
-	TravelSourceMap = NewRequest.ExplorationMapPath;
-	TravelTargetMap = FName(*Definition->BattleMap.GetLongPackageName());
+	TravelRequestId = Request.RequestId;
+	TravelSourceMap = Request.ExplorationMapPath;
+	TravelTargetMap = Request.BattleMapPath;
 	StartTravelTimeout();
 #if WITH_DEV_AUTOMATION_TESTS
 	++TravelInitiationCountForAutomation;
 	if (!bSuppressTravelForAutomation)
 #endif
 	{
-		UGameplayStatics::OpenLevel(World, FName(*Definition->BattleMap.GetLongPackageName()), true);
+		UGameplayStatics::OpenLevel(World, Request.BattleMapPath, true);
 	}
-
-	return FHSREncounterResult::MakeSuccess(NewRequestId);
+	return FHSREncounterResult::MakeSuccess(Request.RequestId);
 }
 
 #if WITH_DEV_AUTOMATION_TESTS

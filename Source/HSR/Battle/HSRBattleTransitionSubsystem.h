@@ -91,6 +91,7 @@ public:
 	static bool DoesTravelFailureMatch(const FString& FailureWorldPackage, const FString& SourcePackage, const FString& TargetPackage);
 
 private:
+	FHSREncounterResult SubmitEncounterRequest(const FHSREncounterRequest& Request, UWorld* World);
 	FHSREncounterResult RequestEncounterInternal(UHSREncounterDefinition* Definition,
 		EHSREncounterInitiative Initiative, AActor* Interactor);
 	void StartTravelTimeout();
