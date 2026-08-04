@@ -45,6 +45,10 @@ bool FHSRPartyFrontendProjectionTest::RunTest(const FString&)
 	Widget->SetViewModel(ViewModel);
 	Widget->AttachForAutomation();
 	TestEqual(TEXT("widget binds once"), Widget->GetBindCountForAutomation(), 1);
+	TestEqual(TEXT("widget forwards candidate clear"), Widget->ClearCandidateSlot(1), EHSRPartyResult::Success);
+	FHSRPartySnapshot BeforeWidgetConfirm; Party->GetSnapshot(BeforeWidgetConfirm);
+	TestFalse(TEXT("widget candidate does not mutate authority"), BeforeWidgetConfirm.Slots[1].IsEmpty());
+	TestEqual(TEXT("widget forwards candidate cancel"), Widget->CancelCandidate(), EHSRPartyResult::Success);
 	Widget->SetViewModel(nullptr);
 	TestEqual(TEXT("widget unbinds once"), Widget->GetUnbindCountForAutomation(), 1);
 	ViewModel->Shutdown();
