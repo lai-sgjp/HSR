@@ -1,4 +1,4 @@
-# TASK-P17-009C-B - Admission Build/Submit Separation
+# TASK-P17-009C - Pre-Battle UI Flow
 
 Status: `ACTIVE / TASK GATE`
 
@@ -7,6 +7,10 @@ Status: `ACTIVE / TASK GATE`
 Prerequisite slice of Phase 17 `P17-009 Party 与战前编队/Buff`. P17-009A is read-only Party projection; P17-009B is permanent-party editing; P17-009C-A supplied a pure candidate ViewModel. This task separates pure request construction from authoritative transition submission while preserving the existing convenience API.
 
 ## Sole observable outcome
+
+Challenge selection can open a Blueprint-authored pre-battle panel that edits a local candidate, confirms a pure encounter request, submits it through BattleTransition, and reports cancellation or submission failures without mutating permanent Party state.
+
+The admission build/submit separation from the prerequisite slice remains the C++ contract.
 
 Pure admission input can be converted into a complete `FHSREncounterRequest` without World/Party/Reward/Travel side effects; the existing `RequestEncounter` remains a compatibility wrapper around the separated build/submit boundary.
 
@@ -31,6 +35,8 @@ Pure admission input can be converted into a complete `FHSREncounterRequest` wit
 - `Source/HSR/UI/HSRPreBattleCandidateTypes.h`
 - `Source/HSR/UI/HSRPreBattleCandidateViewModel.h`
 - `Source/HSR/UI/HSRPreBattleCandidateViewModel.cpp`
+- `Source/HSR/UI/HSRPreBattleCandidateWidget.h`
+- `Source/HSR/UI/HSRPreBattleCandidateWidget.cpp`
 - `Source/HSR/Battle/HSREncounterTypes.h`
 - `Source/HSR/Battle/HSRBattleTransitionSubsystem.h`
 - `Source/HSR/Battle/HSRBattleTransitionSubsystem.cpp`
@@ -48,7 +54,8 @@ User-owned future assets, not edited by Codex in this slice:
 
 ## Explicit non-goals
 
-- Calling BattleTransition, OpenLevel, consuming resources, applying Buff GameplayEffects, Challenge Directory route, stage Buff authority, battle admission, or travel failure handling.
+- Consuming resources or applying Buff GameplayEffects before Buff authority is explicitly designed.
+- Hard-coding Challenge/Encounter definitions in C++ or replacing the Blueprint-authored panel asset.
 - Replacing the existing committed-party `RequestEncounter` path.
 
 ## TDD order

@@ -7,6 +7,7 @@
 #include "../Progression/HSRCharacterProfileSubsystem.h"
 #include "../Party/HSRPartySubsystem.h"
 #include "../UI/HSRPreBattleCandidateViewModel.h"
+#include "../UI/HSRPreBattleCandidateWidget.h"
 #include "../Battle/HSRBattleTransitionSubsystem.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRPreBattleCandidateTest,
@@ -67,6 +68,19 @@ bool FHSRPreBattleAdmissionBuildTest::RunTest(const FString&)
 	TestEqual(TEXT("pure build copies buffs"), Out.BuffIds.Num(), 1);
 	Input.CandidateParty[1] = TEXT("Character.A");
 	TestEqual(TEXT("pure build rejects duplicate candidate"), UHSRBattleTransitionSubsystem::BuildEncounterRequest(Input, Out), EHSREncounterResultType::InvalidRequest);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRPreBattleCandidateWidgetSubmissionGuardTest,
+	"HSR.UI.PreBattleCandidate.WidgetSubmissionGuard", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSRPreBattleCandidateWidgetSubmissionGuardTest::RunTest(const FString&)
+{
+	UHSRPreBattleCandidateWidget* Widget = NewObject<UHSRPreBattleCandidateWidget>();
+	FHSREncounterRequest Request;
+	const FHSREncounterResult Result = Widget->ConfirmAndSubmitEncounter(Request);
+	TestEqual(TEXT("uninitialized widget rejects submission"), Result.ResultType, EHSREncounterResultType::InvalidRequest);
+	TestTrue(TEXT("failure is diagnostic"), !Result.Message.IsEmpty());
 	return true;
 }
 
