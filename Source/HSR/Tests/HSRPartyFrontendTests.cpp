@@ -74,6 +74,61 @@ bool FHSRPartyFrontendStableStatesTest::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRPartyFrontendCandidateEditingTest,
+	"HSR.UI.Party.CandidateEditing", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSRPartyFrontendCandidateEditingTest::RunTest(const FString&)
+{
+	UGameInstance* GameInstance = NewObject<UGameInstance>();
+	UHSRCharacterProfileSubsystem* Profiles = NewObject<UHSRCharacterProfileSubsystem>(GameInstance);
+	UHSRPartySubsystem* Party = NewObject<UHSRPartySubsystem>(GameInstance);
+	auto Register = [Profiles](const TCHAR* Id)
+	{
+		UHSRCharacterDefinition* Definition = NewObject<UHSRCharacterDefinition>(Profiles);
+		Definition->CharacterId = FName(Id); Definition->MaxLevel = 2;
+		UCurveFloat* Curve = NewObject<UCurveFloat>(Definition); Curve->FloatCurve.AddKey(2, 100);
+		Definition->CumulativeExperienceCurve = Curve;
+		return Profiles->RegisterDefinition(Definition);
+	};
+	TestEqual(TEXT("register B"), Register(TEXT("Character.B")), EHSRCharacterProfileResult::Success);
+	TestEqual(TEXT("register A"), Register(TEXT("Character.A")), EHSRCharacterProfileResult::Success);
+	TestEqual(TEXT("register C"), Register(TEXT("Character.C")), EHSRCharacterProfileResult::Success);
+	Party->InitializeForDevelopmentTest(Profiles);
+	TestEqual(TEXT("seed permanent A"), Party->AddCharacter(TEXT("Character.A"), 0), EHSRPartyResult::Success);
+
+	UHSRPartyViewModel* ViewModel = NewObject<UHSRPartyViewModel>();
+	ViewModel->Initialize(Party, Profiles);
+	FHSRPartyFrontendSnapshot Snapshot;
+	TestTrue(TEXT("candidate snapshot available"), ViewModel->GetSnapshot(Snapshot));
+	TestEqual(TEXT("available characters sorted"), Snapshot.AvailableCharacterIds[0], FName(TEXT("Character.A")));
+	TestFalse(TEXT("initial candidate clean"), Snapshot.bHasPendingChanges);
+	TestEqual(TEXT("select B into candidate"), ViewModel->SetCandidateSlot(1, TEXT("Character.B")), EHSRPartyResult::Success);
+	ViewModel->GetSnapshot(Snapshot);
+	TestTrue(TEXT("candidate becomes dirty"), Snapshot.bHasPendingChanges);
+	TestEqual(TEXT("candidate displays B"), Snapshot.Slots[1].CharacterId, FName(TEXT("Character.B")));
+	FHSRPartySnapshot Permanent; Party->GetSnapshot(Permanent);
+	TestTrue(TEXT("permanent slot remains empty before confirm"), Permanent.Slots[1].IsEmpty());
+	TestEqual(TEXT("duplicate candidate rejected"), ViewModel->SetCandidateSlot(1, TEXT("Character.A")), EHSRPartyResult::DuplicateCharacter);
+	TestEqual(TEXT("cancel candidate"), ViewModel->CancelCandidate(), EHSRPartyResult::Success);
+	ViewModel->GetSnapshot(Snapshot);
+	TestFalse(TEXT("cancel restores clean state"), Snapshot.bHasPendingChanges);
+	TestFalse(TEXT("cancel restores empty slot"), Snapshot.Slots[1].bOccupied);
+
+	TestEqual(TEXT("reselect B"), ViewModel->SetCandidateSlot(1, TEXT("Character.B")), EHSRPartyResult::Success);
+	TestEqual(TEXT("confirm candidate"), ViewModel->ConfirmCandidate(), EHSRPartyResult::Success);
+	Party->GetSnapshot(Permanent);
+	TestEqual(TEXT("confirm installs B"), Permanent.Slots[1].CharacterId, FName(TEXT("Character.B")));
+	ViewModel->GetSnapshot(Snapshot);
+	TestFalse(TEXT("confirmed candidate clean"), Snapshot.bHasPendingChanges);
+
+	TestEqual(TEXT("edit from current revision"), ViewModel->ClearCandidateSlot(1), EHSRPartyResult::Success);
+	TestEqual(TEXT("external authority mutation"), Party->ReplaceCharacter(1, TEXT("Character.C")), EHSRPartyResult::Success);
+	TestEqual(TEXT("stale candidate rejected"), ViewModel->ConfirmCandidate(), EHSRPartyResult::RevisionConflict);
+	Party->GetSnapshot(Permanent);
+	TestEqual(TEXT("stale confirm preserves external state"), Permanent.Slots[1].CharacterId, FName(TEXT("Character.C")));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRPartyFrontendRouteLifecycleTest,
 	"HSR.UI.Party.RouteLifecycle", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
