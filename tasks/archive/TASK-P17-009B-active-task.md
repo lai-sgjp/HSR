@@ -1,6 +1,6 @@
 # TASK-P17-009B — Permanent Party Candidate Editing and Confirmation
 
-Status: `ACTIVE / TASK GATE`
+Status: `ARCHIVED / PASS / USER ACCEPTED`
 
 ## Plan mapping
 

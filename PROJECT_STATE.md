@@ -636,3 +636,10 @@
 - Development Editor Build、`HSR.UI.Party` 3/3、`HSR.Party` 1/1、`HSR.UI.FrontendNavigation` 11/11 通过。
 - 用户创建 Party Panel/Slot Entry 并接入 module root；PIE 确认固定两槽、Character.A、Back/Close 与 A↔B 后重开均正常。
 - TASK-P17-009A 以 `PASS / USER ACCEPTED` 归档；该结论只覆盖只读投影，不代表权威计划中的 P17-009 已完成。Add/Remove/Replace/Swap、永久队伍候选确认、战前候选队伍/Buff 与 Encounter Request 仍未完成。
+
+# 2026-08-04 TASK-P17-009B Party 永久候选编辑与确认（已归档）
+
+- Party authority 增加 revision-aware atomic candidate commit；Profile 提供确定性只读角色列表。
+- Party ViewModel/Widget 支持候选 Set/Clear/Swap、Confirm、Cancel、重复/未知/stale 拒绝与蓝图转发；Widget 初始化顺序修复后 Construct 可读快照。
+- User Build、`HSR.Party` 2/2、`HSR.UI.Party` 4/4、`HSR.UI.FrontendNavigation` 11/11 与用户 PIE 均通过。
+- TASK-P17-009B 以 `PASS / USER ACCEPTED` 归档；P17-009C 战前候选队伍、Buff、Encounter Request 与取消零污染仍未完成。

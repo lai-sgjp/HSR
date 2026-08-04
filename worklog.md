@@ -1,5 +1,13 @@
 ﻿# HSR Worklog
 
+## 2026-08-04 - TASK-P17-009B Party permanent candidate editing archived
+
+- Added atomic revision-aware Party candidate confirmation, deterministic profile option projection, ViewModel candidate editing and Blueprint-safe Widget intent forwarding.
+- RED checkpoints `a891716`, `f1b0857`, `6a31a2a`; GREEN commits `da2affc`, `e0a75cd`, `053a2f3`, `aeff321`.
+- User Build succeeded; `HSR.Party` 2/2, `HSR.UI.Party` 4/4 and `HSR.UI.FrontendNavigation` 11/11 succeeded.
+- User PIE accepted candidate edit, duplicate rejection, Cancel restore, Confirm persistence, Back/Close and Party navigation. `WBP_HSRPartyPanel_P17.uasset` recorded as user-authored provenance.
+- P17-009C pre-battle candidate Party/Buff/Encounter Request remains open.
+
 ## 2026-07-29｜TASK-P17-PATCH-03R Automation seam compatibility archived
 
 - 03E2 首次 `HSREditor` Build 暴露既有 Automation development API guard 不一致；用户授权独立 03R，只恢复测试编译/API seam，不改变业务行为。
