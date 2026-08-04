@@ -470,6 +470,12 @@ Quest 前端沿用通用 module-root 路由：`EHSRFrontendModule::Quest` 由
 `GetQuestStates`；Widget 只展示 Quest、Objective、Reward claimed 状态并继承统一 Back，
 不调用 `StartQuest`、`SubmitEvent` 或 `ClaimQuestReward`。
 
+Party 前端同样使用通用 `EHSRFrontendModule::Party` route。
+`UHSRPartyViewModel` 只读取固定两槽 `FHSRPartySnapshot` 并监听
+`OnPartyChanged`；`UHSRPartyWidget` 只展示 SlotIndex、CharacterId 和 occupied
+状态。本只读切片不暴露 Add/Remove/Replace/Swap，队伍编辑必须作为独立 authority-intent
+任务设计和验证。
+
 完整 `HSR.UI` Automation 当前仍有四个既有生命周期失败。新增 UI 模块时应保留这一基线事实，并增加模块打开、补偿、Back、Travel teardown/rebuild 测试。
 
 ## 5. World 与 Battle Runtime
