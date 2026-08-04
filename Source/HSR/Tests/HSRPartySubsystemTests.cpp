@@ -31,4 +31,42 @@ bool FHSRPartySubsystemTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Remove to empty succeeds"),Party->RemoveCharacter(0),EHSRPartyResult::Success); TestEqual(TEXT("Swap empty rejected"),Party->SwapSlots(0,1),EHSRPartyResult::EmptySlot); TestEqual(TEXT("Remove empty rejected"),Party->RemoveCharacter(0),EHSRPartyResult::EmptySlot);
 	S.Slots[0].CharacterId=TEXT("Mutated");FHSRPartySnapshot Fresh;Party->GetSnapshot(Fresh);TestNotEqual(TEXT("Snapshot isolated"),Fresh.Slots[0].CharacterId,FName(TEXT("Mutated")));return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRPartyCandidateCommitTest,"HSR.Party.CandidateCommit",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FHSRPartyCandidateCommitTest::RunTest(const FString& Parameters)
+{
+	UGameInstance* GI=NewObject<UGameInstance>(); UHSRCharacterProfileSubsystem* Profiles=NewObject<UHSRCharacterProfileSubsystem>(GI); UHSRPartySubsystem* Party=NewObject<UHSRPartySubsystem>(GI);
+	auto Register=[Profiles](const TCHAR* Id){ UHSRCharacterDefinition* D=NewObject<UHSRCharacterDefinition>(Profiles); D->CharacterId=FName(Id); D->MaxLevel=2; UCurveFloat* C=NewObject<UCurveFloat>(D); C->FloatCurve.AddKey(2,100); D->CumulativeExperienceCurve=C; return Profiles->RegisterDefinition(D); };
+	TestEqual(TEXT("register B"),Register(TEXT("Character.B")),EHSRCharacterProfileResult::Success);
+	TestEqual(TEXT("register A"),Register(TEXT("Character.A")),EHSRCharacterProfileResult::Success);
+	TestEqual(TEXT("register C"),Register(TEXT("Character.C")),EHSRCharacterProfileResult::Success);
+	Party->InitializeForDevelopmentTest(Profiles);
+
+	TArray<FHSRCharacterProfileSnapshot> Available;
+	TestTrue(TEXT("available profiles projected"),Profiles->GetAllProfileSnapshots(Available));
+	TestEqual(TEXT("all profiles included"),Available.Num(),3);
+	TestEqual(TEXT("profiles sorted deterministically"),Available[0].RuntimeState.CharacterId,FName(TEXT("Character.A")));
+
+	int32 Events=0; Party->OnPartyChanged().AddLambda([&Events](int64){++Events;});
+	FHSRPartySnapshot Candidate; Party->GetSnapshot(Candidate);
+	Candidate.Slots[0].CharacterId=TEXT("Character.A"); Candidate.Slots[1].CharacterId=TEXT("Character.B");
+	TestEqual(TEXT("candidate commits atomically"),Party->CommitCandidate(Candidate),EHSRPartyResult::Success);
+	FHSRPartySnapshot Committed; Party->GetSnapshot(Committed);
+	TestEqual(TEXT("single revision increment"),Committed.Revision,static_cast<int64>(1));
+	TestEqual(TEXT("single coherent event"),Events,1);
+
+	FHSRPartySnapshot Stale=Candidate; Stale.Slots[1].CharacterId=TEXT("Character.C");
+	TestEqual(TEXT("stale candidate rejected"),Party->CommitCandidate(Stale),EHSRPartyResult::RevisionConflict);
+	FHSRPartySnapshot AfterStale; Party->GetSnapshot(AfterStale);
+	TestEqual(TEXT("stale leaves revision"),AfterStale.Revision,Committed.Revision);
+	TestEqual(TEXT("stale leaves slots"),AfterStale.Slots[1].CharacterId,Committed.Slots[1].CharacterId);
+	TestEqual(TEXT("stale emits no event"),Events,1);
+
+	FHSRPartySnapshot Duplicate=Committed; Duplicate.Slots[1].CharacterId=Duplicate.Slots[0].CharacterId;
+	TestEqual(TEXT("duplicate candidate rejected"),Party->CommitCandidate(Duplicate),EHSRPartyResult::DuplicateCharacter);
+	FHSRPartySnapshot AfterDuplicate; Party->GetSnapshot(AfterDuplicate);
+	TestEqual(TEXT("invalid candidate leaves revision"),AfterDuplicate.Revision,Committed.Revision);
+	TestEqual(TEXT("invalid candidate emits no event"),Events,1);
+	return true;
+}
 #endif
