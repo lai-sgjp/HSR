@@ -23,6 +23,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "HSR|PreBattle")
 	EHSRPreBattleCandidateResult ConfirmCandidate(UPARAM(ref) FHSREncounterRequest& OutRequest);
 
+	/** Confirms the local candidate and submits the resulting request to BattleTransition. */
+	UFUNCTION(BlueprintCallable, Category = "HSR|PreBattle")
+	FHSREncounterResult ConfirmAndSubmitEncounter(UPARAM(ref) FHSREncounterRequest& OutRequest);
+
 	UFUNCTION(BlueprintCallable, Category = "HSR|PreBattle")
 	EHSRPreBattleCandidateResult CancelCandidate();
 

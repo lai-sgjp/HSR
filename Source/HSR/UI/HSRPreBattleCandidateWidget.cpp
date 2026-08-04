@@ -2,6 +2,7 @@
 
 #include "../Party/HSRPartySubsystem.h"
 #include "../Progression/HSRCharacterProfileSubsystem.h"
+#include "../Battle/HSRBattleTransitionSubsystem.h"
 #include "Engine/GameInstance.h"
 
 void UHSRPreBattleCandidateWidget::InitializeCandidate(const FHSREncounterRequest& Template)
@@ -40,6 +41,28 @@ EHSRPreBattleCandidateResult UHSRPreBattleCandidateWidget::SetBuff(FName BuffId)
 EHSRPreBattleCandidateResult UHSRPreBattleCandidateWidget::ConfirmCandidate(FHSREncounterRequest& OutRequest)
 {
 	return ViewModel ? ViewModel->ConfirmCandidate(OutRequest) : EHSRPreBattleCandidateResult::InvalidCandidate;
+}
+
+FHSREncounterResult UHSRPreBattleCandidateWidget::ConfirmAndSubmitEncounter(FHSREncounterRequest& OutRequest)
+{
+	if (!ViewModel)
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
+			FText::FromString(TEXT("Pre-battle candidate is not initialized.")));
+	}
+
+	if (ConfirmCandidate(OutRequest) != EHSRPreBattleCandidateResult::Success)
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
+			FText::FromString(TEXT("Pre-battle candidate validation failed.")));
+	}
+
+	UHSRBattleTransitionSubsystem* Transition = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>() : nullptr;
+	return Transition
+		? Transition->SubmitEncounterRequestFromUI(OutRequest)
+		: FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
+			FText::FromString(TEXT("Battle transition is unavailable.")));
 }
 
 EHSRPreBattleCandidateResult UHSRPreBattleCandidateWidget::CancelCandidate()
