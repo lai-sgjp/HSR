@@ -47,7 +47,6 @@ EHSRPartyResult UHSRPartyWidget::CancelCandidate()
 
 void UHSRPartyWidget::NativeConstruct()
 {
-	Super::NativeConstruct();
 	if (!ViewModel)
 	{
 		UGameInstance* GameInstance = GetGameInstance();
@@ -58,6 +57,8 @@ void UHSRPartyWidget::NativeConstruct()
 		bOwnsViewModel = true;
 	}
 	BindAndRefresh();
+	// Initialize before Super so the Blueprint Construct event can read a valid snapshot.
+	Super::NativeConstruct();
 }
 
 void UHSRPartyWidget::NativeDestruct()
