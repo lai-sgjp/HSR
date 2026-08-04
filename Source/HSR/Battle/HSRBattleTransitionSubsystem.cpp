@@ -51,6 +51,11 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 	return RequestEncounterInternal(Definition, Initiative, PlayerController ? PlayerController->GetPawn() : nullptr);
 }
 
+FHSREncounterResult UHSRBattleTransitionSubsystem::SubmitEncounterRequestFromUI(const FHSREncounterRequest& Request)
+{
+	return SubmitEncounterRequest(Request, GetWorld());
+}
+
 EHSREncounterResultType UHSRBattleTransitionSubsystem::BuildEncounterRequest(
 	const FHSRPreBattleAdmissionInput& Input, FHSREncounterRequest& OutRequest)
 {

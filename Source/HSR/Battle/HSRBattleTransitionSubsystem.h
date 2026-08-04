@@ -45,6 +45,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Encounter")
 	FHSREncounterResult RequestEncounter(UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative);
+
+	/** Submits a previously validated, pure encounter request for travel. */
+	UFUNCTION(BlueprintCallable, Category = "Encounter")
+	FHSREncounterResult SubmitEncounterRequestFromUI(const FHSREncounterRequest& Request);
 	FHSREncounterResult RequestEncounterForInteractor(UHSREncounterDefinition* Definition,
 		EHSREncounterInitiative Initiative, AActor* Interactor);
 
