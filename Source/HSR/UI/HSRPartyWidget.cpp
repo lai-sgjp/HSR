@@ -1,6 +1,7 @@
 #include "HSRPartyWidget.h"
 
 #include "../Party/HSRPartySubsystem.h"
+#include "../Progression/HSRCharacterProfileSubsystem.h"
 #include "Engine/GameInstance.h"
 
 void UHSRPartyWidget::SetViewModel(UHSRPartyViewModel* InViewModel)
@@ -26,8 +27,9 @@ void UHSRPartyWidget::NativeConstruct()
 	{
 		UGameInstance* GameInstance = GetGameInstance();
 		UHSRPartySubsystem* Party = GameInstance ? GameInstance->GetSubsystem<UHSRPartySubsystem>() : nullptr;
+		UHSRCharacterProfileSubsystem* Profiles = GameInstance ? GameInstance->GetSubsystem<UHSRCharacterProfileSubsystem>() : nullptr;
 		ViewModel = NewObject<UHSRPartyViewModel>(this);
-		ViewModel->Initialize(Party);
+		ViewModel->Initialize(Party, Profiles);
 		bOwnsViewModel = true;
 	}
 	BindAndRefresh();
