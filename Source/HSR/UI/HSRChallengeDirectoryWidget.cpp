@@ -17,7 +17,10 @@ EHSRChallengeDirectoryResult UHSRChallengeDirectoryWidget::InitializeDirectory(
 
 EHSRChallengeDirectoryResult UHSRChallengeDirectoryWidget::InitializeConfiguredDirectory()
 {
-	return InitializeDirectory(ChallengeSources);
+	const EHSRChallengeDirectoryResult Result = InitializeDirectory(ChallengeSources);
+	UE_LOG(LogTemp, Log, TEXT("HSR ChallengeDirectory initialized Sources=%d Entries=%d Result=%d"),
+		ChallengeSources.Num(), ViewModel ? ViewModel->GetSnapshot().Entries.Num() : 0, static_cast<int32>(Result));
+	return Result;
 }
 
 FHSRChallengeDirectorySnapshot UHSRChallengeDirectoryWidget::GetDirectorySnapshot() const
