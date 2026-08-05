@@ -640,9 +640,9 @@
 # 2026-08-05 TASK-P17-009C 前战面板纵向切片
 
 - `WBP_HSRPreBattlePanel_P17` 已由用户创建并完成候选角色、重复拒绝、Buff、快照、Confirm、Cancel 与诊断错误接线。
-- Challenge 临时入口通过 Encounter Definition 构建只读模板；前战 Widget 只生成纯 Request，并经 BattleTransition 提交，不直接调用 OpenLevel 或修改永久 Party。
+- Shell 已恢复统一 Challenge route；独立 Challenge 模块的 Enter 入口通过 Encounter Definition 构建只读模板。前战 Widget 只生成纯 Request，并经 BattleTransition 提交，不直接调用 OpenLevel 或修改永久 Party。
 - 用户 PIE 确认前战面板覆盖 Pause、Cancel 返回 Pause、Confirm 提交 `Enc_Test_Phase5` 并进入战斗；日志无 Blueprint Runtime Error/Accessed None。
-- P17-009C 仍为 ACTIVE：正式 Challenge Directory/Screen Stack 路由和 Buff 权威效果不在本纵向切片内。
+- 用户 PIE 已确认 `Pause -> Challenge module -> Enter -> PreBattle -> Confirm -> Battle`；Buff 权威效果仍不在本纵向切片内。
 
 # 2026-08-04 TASK-P17-009B Party 永久候选编辑与确认（已归档）
 
