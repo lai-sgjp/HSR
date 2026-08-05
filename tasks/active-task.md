@@ -1,6 +1,6 @@
 # TASK-P17-009C - Pre-Battle UI Flow
 
-Status: `ACTIVE / TASK GATE`
+Status: `PASS / USER ACCEPTED`
 
 ## Canonical mapping
 

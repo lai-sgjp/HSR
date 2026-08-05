@@ -338,7 +338,8 @@
 - [x] TASK-P17-006 Quest Frontend：只读 DTO/ViewModel、统一 route、Empty/Unavailable、Back 与 A↔B 后重开通过 Build、Automation 和用户 PIE；Ready/Objective/Reward 生产任务展示保留 follow-up。
 - [x] TASK-P17-009A Party 只读投影：固定两槽 DTO/ViewModel、Ready/Empty/Unavailable、Back/Close 与 A↔B 后重开通过 Build、Automation 和用户 PIE。
 - [ ] P17-009 Party 与战前编队/Buff：009A 仅完成显示基础；永久队伍候选编辑/确认、独立战前候选队伍、Buff、Encounter Request 与取消零污染仍待完成。
-- [x] P17-009B Party 永久候选编辑与确认：候选 Set/Clear/Swap、Confirm/Cancel、revision/duplicate 失败保护、用户 PIE 与回归 Automation 已通过；P17-009C 战前编队/Buff 仍待完成。
+- [x] P17-009B Party 永久候选编辑与确认：候选 Set/Clear/Swap、Confirm/Cancel、revision/duplicate 失败保护、用户 PIE 与回归 Automation 已通过。
+- [x] P17-009C 战前候选/Buff 元数据与准入：Challenge 路由、独立候选、重复拒绝、Cancel、纯 Request、BattleTransition 提交、Build/Automation/用户 PIE 已通过；Buff GameplayEffect 与资源消耗另立后续任务。
 
 ## Phase 18：表现与模型导入
 

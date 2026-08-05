@@ -6,6 +6,7 @@
 - The panel displays the local Party candidate, rejects duplicate/invalid selections, selects local Buff IDs, supports Cancel, and confirms through the Blueprint-safe pure build/authoritative submit boundary.
 - User PIE verified the pre-battle overlay above Pause, Cancel returning to Pause, and Confirm submitting `Enc_Test_Phase5` before successful battle travel. Final log recorded `SubmitEncounterRequest`, `CaptureTravel=true`, and no Blueprint Runtime Error or `Accessed None`.
 - User PIE subsequently verified the formal `Pause -> Challenge module -> Enter -> PreBattle -> Confirm -> Battle` route. Stage Buff authority/effects remain out of scope.
+- Final commandlet regression passed: `HSR.UI.PreBattleCandidate` 3/3 and `HSR.InteractionBattle.Admission` 1/1. TASK-P17-009C is accepted for local candidate/Buff metadata and encounter admission; Buff GameplayEffect/resource authority remains a separate future task.
 
 ## 2026-08-04 - TASK-P17-009B Party permanent candidate editing archived
 

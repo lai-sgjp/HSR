@@ -643,6 +643,7 @@
 - Shell 已恢复统一 Challenge route；独立 Challenge 模块的 Enter 入口通过 Encounter Definition 构建只读模板。前战 Widget 只生成纯 Request，并经 BattleTransition 提交，不直接调用 OpenLevel 或修改永久 Party。
 - 用户 PIE 确认前战面板覆盖 Pause、Cancel 返回 Pause、Confirm 提交 `Enc_Test_Phase5` 并进入战斗；日志无 Blueprint Runtime Error/Accessed None。
 - 用户 PIE 已确认 `Pause -> Challenge module -> Enter -> PreBattle -> Confirm -> Battle`；Buff 权威效果仍不在本纵向切片内。
+- Commandlet 回归 `HSR.UI.PreBattleCandidate` 3/3、`HSR.InteractionBattle.Admission` 1/1 通过；TASK-P17-009C 以 `PASS / USER ACCEPTED` 收尾，Buff GameplayEffect/资源消耗另立任务。
 
 # 2026-08-04 TASK-P17-009B Party 永久候选编辑与确认（已归档）
 
