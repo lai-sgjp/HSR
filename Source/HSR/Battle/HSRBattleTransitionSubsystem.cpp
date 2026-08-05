@@ -77,6 +77,58 @@ EHSREncounterResultType UHSRBattleTransitionSubsystem::BuildEncounterRequest(
 	return EHSREncounterResultType::Success;
 }
 
+FHSREncounterResult UHSRBattleTransitionSubsystem::BuildPreBattleEncounterTemplate(
+	UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative,
+	FHSREncounterRequest& OutTemplate) const
+{
+	OutTemplate = FHSREncounterRequest();
+	if (!Definition)
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidDefinition,
+			FText::FromString(TEXT("EncounterDefinition is null.")));
+	}
+	if (Definition->EncounterId.IsNone() || Definition->EnemyDefinitionId.IsNone())
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
+			FText::FromString(TEXT("EncounterId or EnemyDefinitionId is not set.")));
+	}
+	if (Definition->BattleMap.IsNull())
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidMap,
+			FText::FromString(TEXT("BattleMap is not set.")));
+	}
+	const FString BattleMapPackage = Definition->BattleMap.GetLongPackageName();
+	if (!FPackageName::DoesPackageExist(BattleMapPackage))
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidMap,
+			FText::FromString(TEXT("BattleMap package does not exist on disk.")));
+	}
+
+	UWorld* World = GetWorld();
+	APlayerController* PlayerController = World ? World->GetFirstPlayerController() : nullptr;
+	APawn* PlayerPawn = PlayerController ? PlayerController->GetPawn() : nullptr;
+	if (!World || !IsValid(PlayerPawn))
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::NoPlayerSelection,
+			FText::FromString(TEXT("Cannot resolve the current player Pawn.")));
+	}
+
+	FPlatformMisc::CreateGuid(OutTemplate.RequestId);
+	OutTemplate.EncounterId = Definition->EncounterId;
+	OutTemplate.EnemyDefinitionId = Definition->EnemyDefinitionId;
+	OutTemplate.Initiative = Initiative;
+	OutTemplate.BattleMapPath = FName(*BattleMapPackage);
+	OutTemplate.ReturnTransform = PlayerPawn->GetActorTransform();
+	OutTemplate.ExplorationMapPath = FName(*UWorld::RemovePIEPrefix(World->GetOutermost()->GetPathName()));
+	if (Definition->VictoryRewardDefinition)
+	{
+		OutTemplate.RewardDefinitionId = Definition->VictoryRewardDefinition->RewardDefinitionId;
+		OutTemplate.RewardSeed = Definition->RewardSeed;
+		OutTemplate.VictoryExperience = FMath::Max(0, Definition->VictoryExperience);
+	}
+	return FHSREncounterResult::MakeSuccess(OutTemplate.RequestId);
+}
+
 FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterForInteractor(
 	UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative, AActor* Interactor)
 

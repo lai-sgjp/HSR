@@ -40,6 +40,11 @@ class HSR_API UHSRBattleTransitionSubsystem : public UGameInstanceSubsystem
 public:
 	static EHSREncounterResultType BuildEncounterRequest(const FHSRPreBattleAdmissionInput& Input,
 		FHSREncounterRequest& OutRequest);
+
+	/** Builds the read-only template consumed by the pre-battle candidate UI. */
+	UFUNCTION(BlueprintCallable, Category = "Encounter|Preparation")
+	FHSREncounterResult BuildPreBattleEncounterTemplate(UHSREncounterDefinition* Definition,
+		EHSREncounterInitiative Initiative, UPARAM(ref) FHSREncounterRequest& OutTemplate) const;
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
