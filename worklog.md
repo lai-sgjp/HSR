@@ -1,5 +1,12 @@
 ﻿# HSR Worklog
 
+## 2026-08-05 - TASK-P17-009C pre-battle panel vertical slice
+
+- Added the user-authored `WBP_HSRPreBattlePanel_P17` and a temporary Challenge button overlay entry in `WBP_FrontendShell_P17`.
+- The panel displays the local Party candidate, rejects duplicate/invalid selections, selects local Buff IDs, supports Cancel, and confirms through the Blueprint-safe pure build/authoritative submit boundary.
+- User PIE verified the pre-battle overlay above Pause, Cancel returning to Pause, and Confirm submitting `Enc_Test_Phase5` before successful battle travel. Final log recorded `SubmitEncounterRequest`, `CaptureTravel=true`, and no Blueprint Runtime Error or `Accessed None`.
+- This is not full P17-009C closeout: the temporary Shell entry must later move behind the formal Challenge Directory/Screen Stack route, and stage Buff authority/effects remain out of scope.
+
 ## 2026-08-04 - TASK-P17-009B Party permanent candidate editing archived
 
 - Added atomic revision-aware Party candidate confirmation, deterministic profile option projection, ViewModel candidate editing and Blueprint-safe Widget intent forwarding.

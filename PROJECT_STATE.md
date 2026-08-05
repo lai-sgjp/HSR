@@ -637,6 +637,13 @@
 - 用户创建 Party Panel/Slot Entry 并接入 module root；PIE 确认固定两槽、Character.A、Back/Close 与 A↔B 后重开均正常。
 - TASK-P17-009A 以 `PASS / USER ACCEPTED` 归档；该结论只覆盖只读投影，不代表权威计划中的 P17-009 已完成。Add/Remove/Replace/Swap、永久队伍候选确认、战前候选队伍/Buff 与 Encounter Request 仍未完成。
 
+# 2026-08-05 TASK-P17-009C 前战面板纵向切片
+
+- `WBP_HSRPreBattlePanel_P17` 已由用户创建并完成候选角色、重复拒绝、Buff、快照、Confirm、Cancel 与诊断错误接线。
+- Challenge 临时入口通过 Encounter Definition 构建只读模板；前战 Widget 只生成纯 Request，并经 BattleTransition 提交，不直接调用 OpenLevel 或修改永久 Party。
+- 用户 PIE 确认前战面板覆盖 Pause、Cancel 返回 Pause、Confirm 提交 `Enc_Test_Phase5` 并进入战斗；日志无 Blueprint Runtime Error/Accessed None。
+- P17-009C 仍为 ACTIVE：正式 Challenge Directory/Screen Stack 路由和 Buff 权威效果不在本纵向切片内。
+
 # 2026-08-04 TASK-P17-009B Party 永久候选编辑与确认（已归档）
 
 - Party authority 增加 revision-aware atomic candidate commit；Profile 提供确定性只读角色列表。
