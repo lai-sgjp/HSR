@@ -12,8 +12,15 @@ class HSR_API UHSRChallengeDirectoryWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	/** Encounter definitions supplied by the owning frontend instance. */
+	UPROPERTY(EditInstanceOnly, BlueprintReadWrite, Category = "HSR|Challenge", meta = (ExposeOnSpawn = "true"))
+	TArray<FHSRChallengeDirectorySource> ChallengeSources;
+
 	UFUNCTION(BlueprintCallable, Category = "HSR|Challenge")
 	EHSRChallengeDirectoryResult InitializeDirectory(const TArray<FHSRChallengeDirectorySource>& Sources);
+
+	UFUNCTION(BlueprintCallable, Category = "HSR|Challenge")
+	EHSRChallengeDirectoryResult InitializeConfiguredDirectory();
 
 	UFUNCTION(BlueprintPure, Category = "HSR|Challenge")
 	FHSRChallengeDirectorySnapshot GetDirectorySnapshot() const;

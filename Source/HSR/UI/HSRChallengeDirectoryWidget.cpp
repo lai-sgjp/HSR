@@ -15,6 +15,11 @@ EHSRChallengeDirectoryResult UHSRChallengeDirectoryWidget::InitializeDirectory(
 	return Result;
 }
 
+EHSRChallengeDirectoryResult UHSRChallengeDirectoryWidget::InitializeConfiguredDirectory()
+{
+	return InitializeDirectory(ChallengeSources);
+}
+
 FHSRChallengeDirectorySnapshot UHSRChallengeDirectoryWidget::GetDirectorySnapshot() const
 {
 	return ViewModel ? ViewModel->GetSnapshot() : FHSRChallengeDirectorySnapshot();
