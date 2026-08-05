@@ -1,65 +1,41 @@
-# TASK-P17-009C - Pre-Battle UI Flow
+# TASK-P17-010A - Data-driven Challenge Directory
 
-Status: `PASS / USER ACCEPTED`
-
-## Canonical mapping
-
-Prerequisite slice of Phase 17 `P17-009 Party 与战前编队/Buff`. P17-009A is read-only Party projection; P17-009B is permanent-party editing; P17-009C-A supplied a pure candidate ViewModel. This task separates pure request construction from authoritative transition submission while preserving the existing convenience API.
+Status: `ACTIVE / TASK GATE`
 
 ## Sole observable outcome
 
-Challenge selection can open a Blueprint-authored pre-battle panel that edits a local candidate, confirms a pure encounter request, submits it through BattleTransition, and reports cancellation or submission failures without mutating permanent Party state.
-
-The admission build/submit separation from the prerequisite slice remains the C++ contract.
-
-Pure admission input can be converted into a complete `FHSREncounterRequest` without World/Party/Reward/Travel side effects; the existing `RequestEncounter` remains a compatibility wrapper around the separated build/submit boundary.
+The Challenge module projects a deterministic read-only directory from configured Encounter Definitions. An unlocked valid entry can build a pre-battle template; locked, duplicate, unknown, or invalid entries preserve the current UI and never submit travel.
 
 ## Authority boundaries
 
-- Permanent Party remains owned by `UHSRPartySubsystem`.
-- Encounter travel remains owned by `UHSRBattleTransitionSubsystem`; this task never calls `RequestEncounter`.
-- Candidate and Buff selection are local pure values owned by the ViewModel.
-- Encounter definition data is read-only input; no Blueprint hard-coded CharacterId/EncounterId values.
+- Encounter definitions remain read-only DataAssets.
+- Unlock state is read-only input supplied by the caller; this task does not invent Save authority.
+- Challenge UI never calls OpenLevel or mutates Party, Inventory, Reward, Buff GameplayEffects, or BattleTransition pending/traveling state.
+- BattleTransition remains the only template builder and encounter submission authority.
 
 ## Acceptance criteria
 
-1. Candidate starts from the committed Party snapshot but remains independent after edits.
-2. Candidate validates slot bounds, duplicate/unknown CharacterIds, missing EncounterId and invalid candidate state.
-3. Optional Buff IDs are local and deterministic; no resource or GameplayEffect mutation exists in this slice.
-4. Pure build carries candidate leader, encounter fields and Buff IDs without changing Party revision or BattleTransition state.
-5. Existing RequestEncounter behavior remains covered by the prior admission tests.
-6. RED/GREEN automation and Development Editor Build pass.
+1. Directory projection is deterministic and exposes stable EncounterId, enemy ID, map path, availability, and diagnostic state.
+2. Null definitions, duplicate IDs, missing IDs/enemy/map, locked entries, and unknown selections are controlled results.
+3. Selection only resolves a definition; template construction delegates to BattleTransition.
+4. Existing PreBattle and Admission tests remain green.
+5. Development Editor Build and focused Automation pass.
 
-## Initial allowlist
+## Allowlist
 
-- `Source/HSR/UI/HSRPreBattleCandidateTypes.h`
-- `Source/HSR/UI/HSRPreBattleCandidateViewModel.h`
-- `Source/HSR/UI/HSRPreBattleCandidateViewModel.cpp`
-- `Source/HSR/UI/HSRPreBattleCandidateWidget.h`
-- `Source/HSR/UI/HSRPreBattleCandidateWidget.cpp`
-- `Source/HSR/Battle/HSREncounterTypes.h`
-- `Source/HSR/Battle/HSRBattleTransitionSubsystem.h`
-- `Source/HSR/Battle/HSRBattleTransitionSubsystem.cpp`
-- `Source/HSR/Tests/HSRPreBattleCandidateTests.cpp`
+- `Source/HSR/UI/HSRChallengeDirectoryTypes.h`
+- `Source/HSR/UI/HSRChallengeDirectoryViewModel.h`
+- `Source/HSR/UI/HSRChallengeDirectoryViewModel.cpp`
+- `Source/HSR/UI/HSRChallengeDirectoryWidget.h`
+- `Source/HSR/UI/HSRChallengeDirectoryWidget.cpp`
+- `Source/HSR/Tests/HSRChallengeDirectoryTests.cpp`
+- `Content/UI/P17/Frontend/WBP_FrontendModuleRoot_P17.uasset`
 - `tasks/active-task.md`
-- `tasks/execution-result.md`
+- `worklog.md`
 - `PROJECT_STATE.md`
 - `todo_plan.md`
-- `worklog.md`
-
-User-owned future assets, not edited by Codex in this slice:
-
-- `Content/UI/P17/Frontend/WBP_HSRPreBattlePanel_P17.uasset`
-- `Content/Data/Definitions/DA_Encounter*.uasset`
 
 ## Explicit non-goals
 
-- Consuming resources or applying Buff GameplayEffects before Buff authority is explicitly designed.
-- Hard-coding Challenge/Encounter definitions in C++ or replacing the Blueprint-authored panel asset.
-- Replacing the existing committed-party `RequestEncounter` path.
-
-## TDD order
-
-1. Add pure admission build RED tests and execute them.
-2. Implement DTO/build boundary and execute the same tests GREEN.
-3. Extract submit/travel side effects without changing existing wrapper behavior.
+- Dynamic progression locks, challenge completion Save data, costs, rewards, Buff effects, OpenLevel, or BattleTransition state inspection.
+- Material/high-difficulty rule implementation or multiple challenge categories.
