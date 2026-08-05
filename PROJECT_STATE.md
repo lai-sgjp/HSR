@@ -637,6 +637,12 @@
 - 用户创建 Party Panel/Slot Entry 并接入 module root；PIE 确认固定两槽、Character.A、Back/Close 与 A↔B 后重开均正常。
 - TASK-P17-009A 以 `PASS / USER ACCEPTED` 归档；该结论只覆盖只读投影，不代表权威计划中的 P17-009 已完成。Add/Remove/Replace/Swap、永久队伍候选确认、战前候选队伍/Buff 与 Encounter Request 仍未完成。
 
+# 2026-08-05 TASK-P17-010A 数据驱动 Challenge Directory
+
+- C++ 只读目录投影、稳定 ID 选择、锁定/无效/重复处理与前战模板门面已完成；Build、Challenge 2/2、PreBattle 3/3、Admission 1/1 通过。
+- 用户创建 Directory/Entry UMG 并配置三个 Source，最终日志为 `Sources=3 Entries=2 Result=0`，无 Blueprint Runtime Error/Accessed None/ensure；选择与锁定行为为 `USER ACCEPTED`。
+- 动态进度解锁、完成度 Save、成本、奖励和挑战分类不属于 010A。
+
 # 2026-08-05 TASK-P17-009C 前战面板纵向切片
 
 - `WBP_HSRPreBattlePanel_P17` 已由用户创建并完成候选角色、重复拒绝、Buff、快照、Confirm、Cancel 与诊断错误接线。

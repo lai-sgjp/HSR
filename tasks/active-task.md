@@ -1,6 +1,6 @@
 # TASK-P17-010A - Data-driven Challenge Directory
 
-Status: `ACTIVE / TASK GATE`
+Status: `PASS / USER ACCEPTED`
 
 ## Sole observable outcome
 

@@ -1,5 +1,11 @@
 ﻿# HSR Worklog
 
+## 2026-08-05 - TASK-P17-010A data-driven Challenge Directory
+
+- Added deterministic Challenge source projection, locked/invalid/duplicate handling, stable-ID selection, and a Blueprint-safe template-build facade; Build and `HSR.UI.ChallengeDirectory` 2/2 passed with PreBattle 3/3 and Admission 1/1 regression.
+- User created the Challenge Directory and Entry widgets, configured three sources yielding two unique entries, and confirmed selection/locked behavior with no runtime errors. Final supplied log records `Sources=3 Entries=2 Result=0`; it does not independently record an encounter submission (`CaptureTravel=false`).
+- TASK-P17-010A closes as `PASS / USER ACCEPTED`; dynamic progression locks, completion persistence, costs, rewards and category rules remain out of scope.
+
 ## 2026-08-05 - TASK-P17-009C pre-battle panel vertical slice
 
 - Added the user-authored `WBP_HSRPreBattlePanel_P17`; the Shell now routes to the dedicated Challenge module, whose Enter action builds the encounter template and opens the pre-battle overlay.

@@ -340,6 +340,7 @@
 - [ ] P17-009 Party 与战前编队/Buff：009A 仅完成显示基础；永久队伍候选编辑/确认、独立战前候选队伍、Buff、Encounter Request 与取消零污染仍待完成。
 - [x] P17-009B Party 永久候选编辑与确认：候选 Set/Clear/Swap、Confirm/Cancel、revision/duplicate 失败保护、用户 PIE 与回归 Automation 已通过。
 - [x] P17-009C 战前候选/Buff 元数据与准入：Challenge 路由、独立候选、重复拒绝、Cancel、纯 Request、BattleTransition 提交、Build/Automation/用户 PIE 已通过；Buff GameplayEffect 与资源消耗另立后续任务。
+- [x] P17-010A 数据驱动 Challenge Directory：只读 Source 投影、稳定 ID 选择、锁定/无效/重复处理、模板门面、Build/Automation 与用户 PIE 通过；动态解锁/完成度/成本/奖励另立任务。
 
 ## Phase 18：表现与模型导入
 
