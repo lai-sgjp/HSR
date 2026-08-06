@@ -1,6 +1,6 @@
 # TASK-P17-005R Execution Result
 
-Status: `CODE GATE PASS / USER EDITOR AND PIE GATE PENDING`
+Status: `COMPLETE`
 
 ## Scope completed
 
@@ -26,13 +26,12 @@ existing snapshot/ViewModel contract, but is mounted into the optional
 | Character has a module-root host after replacement | `CrossTypeReplace` | PASS |
 | Back/X and route-failure compensation preserve ownership | `DirectAndBackFailure`, `FailureCompensation` | PASS |
 
-## Remaining gate
+## User acceptance
 
-In `WBP_FrontendModuleRoot_P17`, add an `Overlay` or `CanvasPanel` named
-`ModuleContentHost`, then Compile, Save, and reopen the Blueprint. PIE evidence
-is required for Character, Inventory, Map, Back/X, battle return, and Pause
-using the user's `1` mapping. Physical controller, Standalone, Packaged, and
-Shipping remain `NOT VERIFIED`.
+The user configured `ModuleContentHost` in `WBP_FrontendModuleRoot_P17` and
+reported all requested Editor/PIE checks normal: Character, Inventory, Map,
+Back/X, battle return, and Pause using the `1` mapping. Physical controller,
+Standalone, Packaged, and Shipping remain `NOT VERIFIED`.
 
 ## User PIE update (2026-08-06)
 

@@ -1,6 +1,6 @@
 # TASK-P17-005R - Unified Frontend Module Host for Character and Inventory
 
-Status: `CODE GATE PASS / USER EDITOR AND PIE GATE PENDING`
+Status: `COMPLETE`
 
 ## Sole observable outcome
 
@@ -40,8 +40,8 @@ that own only their existing snapshot/ViewModel presentation contracts.
 2. GREEN `HSR.UI.FrontendNavigation` proves shared host ownership, replace,
    Back/X, and failure compensation.
 3. Fresh Development Editor build and `git diff --check`.
-4. User Editor configures `ModuleContentHost`, compiles/saves/reopens, then
-   validates Character, Inventory, Map, Back/X, and post-return Pause in PIE.
+4. User configured `ModuleContentHost`, compiled/saved/reopened, and validated
+   Character, Inventory, Map, Back/X, and post-return Pause in PIE.
 
 ## Non-goals
 
