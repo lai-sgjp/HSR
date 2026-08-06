@@ -1,49 +1,97 @@
-# TASK-P17-005R - Unified Frontend Module Host for Character and Inventory
+# TASK-P17-010C - Challenge Directory Progression Projection
 
-Status: `COMPLETE`
+Status: `AUTHORIZED / RED VALIDATED`
 
 ## Sole observable outcome
 
-Character and Inventory open through the same `FrontendModuleRoot` host path
-used by Map, Party, Challenge, Quest, and Save. The host owns viewport
-attachment, module route presentation, focus, Back/X lifecycle, and content
-replacement. Character Detail and Inventory remain specialized content widgets
-that own only their existing snapshot/ViewModel presentation contracts.
+Challenge Directory projects `Available`, `Locked`, `Completed`, and
+`Unavailable` from runtime challenge progression and Encounter definition
+data. Static `FHSRChallengeDirectorySource::bUnlocked` is compatibility-only
+and does not decide runtime status. Only `Available` continues through the
+existing Pre-Battle and BattleTransition path.
 
-## Contract
+## Frozen ownership and data flow
 
-- `UHSRFrontendModuleRootWidget` gains one optional named content host,
-  `ModuleContentHost`, and only it attaches/removes specialized module content.
-- `UHSRUIManagerSubsystem` creates the module root before a Character or
-  Inventory content candidate, attaches the candidate to the root, then
-  commits the route. It must roll back root, content, ViewModel, route, focus,
-  and input policy on every failure.
-- The user will add an `Overlay` or `CanvasPanel` named `ModuleContentHost` to
-  `WBP_FrontendModuleRoot_P17`; Codex will not modify UAssets.
-- No Party, Inventory, Character, Save, Battle, Map, or routing authority
-  changes. Existing Character and Inventory ViewModels are not rewritten.
+- `UHSREncounterDefinition` owns static Encounter identity, prerequisites,
+  BattleMap, Buff, Reward, and EXP definitions.
+- `UHSRChallengeProgressionSubsystem` owns completed Encounter IDs, revision,
+  completion idempotence, and progression restore/capture DTOs.
+- Challenge Directory ViewModel/Widget owns only the transient projection and
+  selected ID; it does not own completion state or unlock authority.
+- BattleGameMode submits completion only after SettlementAuthority returns
+  `Success` or `NoOp` for victory. Defeat never completes a challenge.
+- SaveSubsystem owns the Save envelope and restore transaction; it does not
+  become the progression authority.
 
-## Allowed files
+## Status rules
 
-- `Source/HSR/UI/Frontend/HSRFrontendModuleRootWidget.h`
-- `Source/HSR/UI/Frontend/HSRFrontendModuleRootWidget.cpp`
-- `Source/HSR/UI/HSRUIManagerSubsystem.h`
-- `Source/HSR/UI/HSRUIManagerSubsystem.cpp`
-- `Source/HSR/Tests/HSRFrontendNavigationTests.cpp`
-- `tasks/active-task.md`
-- `tasks/execution-result.md`
+`Unavailable > Completed > Locked > Available`.
 
-## Required checks
+Empty prerequisites are available. All prerequisites must be completed for an
+entry to be available. Unknown prerequisite references and incomplete runtime
+definitions are unavailable. Completed entries are display-only in 010C;
+repeat/reward replay rules are explicitly deferred.
 
-1. RED Automation proved Character and Inventory did not hold a module-root
-   host.
-2. GREEN `HSR.UI.FrontendNavigation` proves shared host ownership, replace,
-   Back/X, and failure compensation.
-3. Fresh Development Editor build and `git diff --check`.
-4. User configured `ModuleContentHost`, compiled/saved/reopened, and validated
-   Character, Inventory, Map, Back/X, and post-return Pause in PIE.
+## Exact implementation allowlist
+
+- `Source/HSR/Challenge/HSRChallengeProgressionTypes.h`
+- `Source/HSR/Challenge/HSRChallengeProgressionSubsystem.h`
+- `Source/HSR/Challenge/HSRChallengeProgressionSubsystem.cpp`
+- `Source/HSR/Data/Definitions/HSREncounterDefinition.h`
+- `Source/HSR/UI/HSRChallengeDirectoryTypes.h`
+- `Source/HSR/UI/HSRChallengeDirectoryViewModel.h`
+- `Source/HSR/UI/HSRChallengeDirectoryViewModel.cpp`
+- `Source/HSR/UI/HSRChallengeDirectoryWidget.h`
+- `Source/HSR/UI/HSRChallengeDirectoryWidget.cpp`
+- `Source/HSR/Save/HSRSaveTypes.h`
+- `Source/HSR/Save/HSRSaveSubsystem.h`
+- `Source/HSR/Save/HSRSaveSubsystem.cpp`
+- `Source/HSR/Save/HSRSaveVersion.h`
+- `Source/HSR/Save/HSRSaveVersion.cpp`
+- `Source/HSR/Battle/HSRBattleGameMode.h`
+- `Source/HSR/Battle/HSRBattleGameMode.cpp`
+- `Source/HSR/Tests/HSRChallengeProgressionTests.cpp`
+- `Source/HSR/Tests/HSRChallengeDirectoryTests.cpp`
+- `Source/HSR/Tests/HSRSaveSubsystemTests.cpp`
+- `Source/HSR/Tests/HSRSaveVersionTests.cpp`
+- `Source/HSR/Tests/HSRSaveValidationTests.cpp`
+- `Source/HSR/Tests/HSRSaveColdRecoveryTests.cpp`
+- `Source/HSR/Tests/HSRBattleSettlementIntegrationTests.cpp`
+
+## Explicitly read-only
+
+Reward, Inventory, Character Profile, Quest, Map, Party, BattleTransition,
+009D, 010A/010B production filtering/failure behavior, FrontendModuleRoot,
+`ModuleContentHost`, Pause input `1`, and all unrelated Content/Config/module
+files.
+
+## User Editor gate
+
+User may modify only the locked Encounter DataAsset and the Challenge Directory
+and Entry widgets. Configure `DA_Encounter_Phase5Test1_Locked` with prerequisite
+`Enc_Test_Phase5`; preserve existing Reward, Buff, BattleMap, and IDs. Keep the
+three existing directory sources, compile/save/reopen, and bind all four status
+presentations. Do not modify the unified frontend root.
+
+## TDD and verification plan
+
+1. Add progression, projection, save, settlement, and failure-matrix tests.
+2. Run the focused target in RED before production implementation.
+3. Implement the smallest runtime slice and rerun the same target GREEN.
+4. Run fresh Development Editor Build, focused Automation, approved regressions,
+   `git diff --check`, then collect user Editor/PIE evidence.
+5. Record unverified physical-controller, Standalone, Packaged, and Shipping
+   checks honestly; do not claim them from keyboard PIE.
+
+## RED evidence
+
+`HSREditor Win64 Development` was executed with the new tests. It failed on
+the intended missing implementation: `HSRChallengeProgressionSubsystem.h`,
+`FHSRSaveData::ChallengeProgression`, and schema-8 interfaces do not exist
+yet. One test assertion omitted the actual boolean argument and is a test-only
+fixture correction before GREEN.
 
 ## Non-goals
 
-- No UAsset edit by Codex, no visual redesign, no new data binding, no module
-  registry/DataAsset, and no unrelated frontend refactor.
+No new reward grant, resource deduction, Buff rule, battle rule, repeat reward,
+new module, Config change, UI root refactor, or direct AddToViewport path.

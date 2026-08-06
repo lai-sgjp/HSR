@@ -8,6 +8,7 @@
 #include "../Battle/HSRBattleGameMode.h"
 #include "../Battle/HSRBattleTypes.h"
 #include "../Battle/HSREncounterTypes.h"
+#include "../Challenge/HSRChallengeProgressionSubsystem.h"
 #include "../Data/Definitions/HSRCharacterCatalog.h"
 #include "../Data/Definitions/HSRItemDefinition.h"
 #include "../Data/Definitions/HSRRewardDefinition.h"
@@ -26,6 +27,7 @@ namespace HSR::BattleSettlement::Tests
 		UHSRCharacterProfileSubsystem* Profiles = nullptr;
 		UHSRRewardSubsystem* Reward = nullptr;
 		UHSRSettlementAuthority* Authority = nullptr;
+		UHSRChallengeProgressionSubsystem* Progression = nullptr;
 		FName ItemId = TEXT("Item.BattleSettlement.Automation");
 		FName RewardId = TEXT("Reward.BattleSettlement.Automation");
 		FName CharacterId = TEXT("Character.A");
@@ -42,7 +44,8 @@ namespace HSR::BattleSettlement::Tests
 			Profiles = GameInstance->GetSubsystem<UHSRCharacterProfileSubsystem>();
 			Reward = GameInstance->GetSubsystem<UHSRRewardSubsystem>();
 			Authority = GameInstance->GetSubsystem<UHSRSettlementAuthority>();
-			if (!Inventory || !Profiles || !Reward || !Authority)
+			Progression = GameInstance->GetSubsystem<UHSRChallengeProgressionSubsystem>();
+			if (!Inventory || !Profiles || !Reward || !Authority || !Progression)
 			{
 				return false;
 			}
@@ -130,6 +133,8 @@ bool FHSRBattleSettlementIntegrationTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Inventory commits once"), State.Receipt.InventoryRevision, int64(1));
 	TestEqual(TEXT("Profile commits once"), State.Receipt.ProfileRevision, int64(1));
 	TestEqual(TEXT("Reward commits once"), State.Receipt.RewardRevision, int64(1));
+	TestTrue(TEXT("victory marks encounter complete after settlement"), Fixture.Progression->IsCompleted(Encounter.EncounterId));
+	TestEqual(TEXT("victory completion revision is one"), Fixture.Progression->GetSnapshot().Revision, int64(1));
 
 	int32 InventoryEvents = 0, ProfileEvents = 0, RewardEvents = 0;
 	Fixture.Inventory->OnInventoryChanged().AddLambda([&](int64){ ++InventoryEvents; });
@@ -141,6 +146,7 @@ bool FHSRBattleSettlementIntegrationTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Retry emits no inventory event"), InventoryEvents, 0);
 	TestEqual(TEXT("Retry emits no profile event"), ProfileEvents, 0);
 	TestEqual(TEXT("Retry emits no reward event"), RewardEvents, 0);
+	TestEqual(TEXT("settlement retry does not advance challenge progress"), Fixture.Progression->GetSnapshot().Revision, int64(1));
 
 	FHSREncounterRequest Changed = Encounter;
 	Changed.RewardSeed++;
