@@ -22,6 +22,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter")
 	FName EnemyDefinitionId;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter|Progression")
+	TArray<FName> PrerequisiteEncounterIds;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter")
 	TSoftObjectPtr<UWorld> BattleMap;
 

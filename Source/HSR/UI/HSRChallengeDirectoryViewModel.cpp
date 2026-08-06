@@ -1,15 +1,17 @@
 #include "HSRChallengeDirectoryViewModel.h"
 
+#include "../Challenge/HSRChallengeProgressionSubsystem.h"
 #include "../Data/Definitions/HSREncounterDefinition.h"
 
 EHSRChallengeDirectoryResult UHSRChallengeDirectoryViewModel::Initialize(
-	const TArray<FHSRChallengeDirectorySource>& Sources)
+	const TArray<FHSRChallengeDirectorySource>& Sources,
+	UHSRChallengeProgressionSubsystem* InProgression)
 {
-	Snapshot = FHSRChallengeDirectorySnapshot();
+	ConfiguredSources = Sources;
+	Progression = InProgression;
 	DefinitionsById.Reset();
-	AvailableIds.Reset();
 
-	for (const FHSRChallengeDirectorySource& Source : Sources)
+	for (const FHSRChallengeDirectorySource& Source : ConfiguredSources)
 	{
 		UHSREncounterDefinition* Definition = Source.Definition;
 		if (!Definition || Definition->EncounterId.IsNone() || DefinitionsById.Contains(Definition->EncounterId))
@@ -18,26 +20,76 @@ EHSRChallengeDirectoryResult UHSRChallengeDirectoryViewModel::Initialize(
 		}
 
 		DefinitionsById.Add(Definition->EncounterId, Definition);
+	}
+
+	return Refresh();
+}
+
+EHSRChallengeDirectoryResult UHSRChallengeDirectoryViewModel::Refresh()
+{
+	Snapshot = FHSRChallengeDirectorySnapshot();
+	AvailableIds.Reset();
+	TSet<FName> ProjectedIds;
+
+	for (const FHSRChallengeDirectorySource& Source : ConfiguredSources)
+	{
+		UHSREncounterDefinition* Definition = Source.Definition;
+		if (!Definition || Definition->EncounterId.IsNone() || ProjectedIds.Contains(Definition->EncounterId))
+		{
+			continue;
+		}
+		ProjectedIds.Add(Definition->EncounterId);
+
 		FHSRChallengeDirectoryEntry& Entry = Snapshot.Entries.AddDefaulted_GetRef();
 		Entry.EncounterId = Definition->EncounterId;
 		Entry.EnemyDefinitionId = Definition->EnemyDefinitionId;
 		Entry.BattleMapPath = Definition->BattleMap.IsNull()
 			? NAME_None : FName(*Definition->BattleMap.GetLongPackageName());
-		Entry.bUnlocked = Source.bUnlocked;
 		const bool bDefinitionValid = !Entry.EnemyDefinitionId.IsNone() && !Entry.BattleMapPath.IsNone();
-		Entry.bAvailable = Source.bUnlocked && bDefinitionValid;
-		if (!Source.bUnlocked)
+		bool bPrerequisitesValid = true;
+		bool bPrerequisitesComplete = true;
+		if (bDefinitionValid)
 		{
-			Entry.Diagnostic = FText::FromString(TEXT("Challenge is locked."));
+			for (const FName PrerequisiteId : Definition->PrerequisiteEncounterIds)
+			{
+				const TObjectPtr<UHSREncounterDefinition>* Prerequisite = DefinitionsById.Find(PrerequisiteId);
+				if (PrerequisiteId.IsNone() || !Prerequisite || !Prerequisite->Get()
+					|| (*Prerequisite)->EnemyDefinitionId.IsNone() || (*Prerequisite)->BattleMap.IsNull())
+				{
+					bPrerequisitesValid = false;
+					break;
+				}
+				if (!Progression.IsValid() || !Progression->IsCompleted(PrerequisiteId))
+				{
+					bPrerequisitesComplete = false;
+				}
+			}
 		}
-		else if (!bDefinitionValid)
+
+		if (!bDefinitionValid || !bPrerequisitesValid)
 		{
-			Entry.Diagnostic = FText::FromString(TEXT("Challenge definition is incomplete."));
+			Entry.Status = EHSRChallengeDirectoryStatus::Unavailable;
+			Entry.Diagnostic = FText::FromString(TEXT("Challenge is unavailable."));
+		}
+		else if (Progression.IsValid() && Progression->IsCompleted(Entry.EncounterId))
+		{
+			Entry.Status = EHSRChallengeDirectoryStatus::Completed;
+			Entry.Diagnostic = FText::FromString(TEXT("Challenge is completed."));
+		}
+		else if (!bPrerequisitesComplete)
+		{
+			Entry.Status = EHSRChallengeDirectoryStatus::Locked;
+			Entry.Diagnostic = FText::FromString(TEXT("Challenge prerequisites are incomplete."));
 		}
 		else
 		{
+			Entry.Status = EHSRChallengeDirectoryStatus::Available;
+			Entry.Diagnostic = FText::GetEmpty();
 			AvailableIds.Add(Entry.EncounterId);
 		}
+		Entry.bCompleted = Entry.Status == EHSRChallengeDirectoryStatus::Completed;
+		Entry.bUnlocked = Entry.Status == EHSRChallengeDirectoryStatus::Available;
+		Entry.bAvailable = Entry.Status == EHSRChallengeDirectoryStatus::Available;
 	}
 
 	Snapshot.Entries.Sort([](const FHSRChallengeDirectoryEntry& A, const FHSRChallengeDirectoryEntry& B)
@@ -64,8 +116,19 @@ EHSRChallengeDirectoryResult UHSRChallengeDirectoryViewModel::ResolveSelection(
 			{
 				return Candidate.EncounterId == EncounterId;
 			});
-		return Entry && !Entry->bUnlocked ? EHSRChallengeDirectoryResult::Locked
-			: EHSRChallengeDirectoryResult::InvalidDefinition;
+		if (!Entry)
+		{
+			return EHSRChallengeDirectoryResult::InvalidDefinition;
+		}
+		if (Entry->Status == EHSRChallengeDirectoryStatus::Locked)
+		{
+			return EHSRChallengeDirectoryResult::Locked;
+		}
+		if (Entry->Status == EHSRChallengeDirectoryStatus::Completed)
+		{
+			return EHSRChallengeDirectoryResult::Completed;
+		}
+		return EHSRChallengeDirectoryResult::InvalidDefinition;
 	}
 	OutDefinition = Found->Get();
 	return EHSRChallengeDirectoryResult::Success;

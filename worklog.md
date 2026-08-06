@@ -2346,3 +2346,17 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Frontend log records CharacterDetail and Inventory open success plus TravelRestore consume; no `PartySlotEmpty` appeared in the approved run.
 - First sandbox run hit the known Zen `CreateProc Access Denied` assertion; the identical command passed outside the sandbox and the environment failure is retained in `tasks/execution-result.md`.
 - `git diff --check` passed. User Editor Save All/reopen, PIE route/focus/input, post-return `1` Pause, and both resolutions remain pending; task is not yet final PASS.
+
+## 2026-08-06 - TASK-P17-010C C++ implementation GREEN
+
+- Authorized implementation continued from RED checkpoint `24e3f35`.
+- Added runtime Challenge progression ownership, prerequisite-based Directory
+  projection, Save schema 8 capture/restore/migration, and post-Settlement
+  victory completion. Static `bUnlocked` is no longer authoritative.
+- Fresh `HSREditor Win64 Development` build passed. Combined Battle, Challenge,
+  Save, and Challenge Directory Automation passed 36/36; `git diff --check`
+  passed.
+- User-owned Editor prerequisite/status bindings and PIE acceptance remain
+  pending. No UAsset, frontend root, Pause input, Reward, Inventory, Map,
+  Party, or BattleTransition production logic was modified. `.claude/**` stays
+  untracked and excluded.

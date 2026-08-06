@@ -46,12 +46,18 @@ bool FHSRChallengeDirectoryInvalidEntriesTest::RunTest(const FString&)
 	LockedDefinition->EncounterId = TEXT("Encounter.Locked");
 	LockedDefinition->EnemyDefinitionId = TEXT("Enemy.Locked");
 	LockedDefinition->BattleMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Maps/Map_Battle.Map_Battle")));
+	UHSREncounterDefinition* PrerequisiteDefinition = NewObject<UHSREncounterDefinition>();
+	PrerequisiteDefinition->EncounterId = TEXT("Encounter.ZPrerequisite");
+	PrerequisiteDefinition->EnemyDefinitionId = TEXT("Enemy.ZPrerequisite");
+	PrerequisiteDefinition->BattleMap = LockedDefinition->BattleMap;
+	LockedDefinition->PrerequisiteEncounterIds.Add(PrerequisiteDefinition->EncounterId);
 	FHSRChallengeDirectorySource Locked; Locked.Definition = LockedDefinition; Locked.bUnlocked = false;
+	FHSRChallengeDirectorySource Prerequisite; Prerequisite.Definition = PrerequisiteDefinition;
 	FHSRChallengeDirectorySource Missing;
 	UHSRChallengeDirectoryViewModel* ViewModel = NewObject<UHSRChallengeDirectoryViewModel>();
-	TestEqual(TEXT("mixed invalid source remains projectable"), ViewModel->Initialize({ Missing, Locked }),
+	TestEqual(TEXT("mixed invalid source remains projectable"), ViewModel->Initialize({ Missing, Locked, Prerequisite }),
 		EHSRChallengeDirectoryResult::Success);
-	TestEqual(TEXT("only stable id entry projected"), ViewModel->GetSnapshot().Entries.Num(), 1);
+	TestEqual(TEXT("stable entries projected"), ViewModel->GetSnapshot().Entries.Num(), 2);
 	TestFalse(TEXT("locked entry unavailable"), ViewModel->GetSnapshot().Entries[0].bAvailable);
 	UHSREncounterDefinition* Selected = nullptr;
 	TestEqual(TEXT("locked selection rejected"), ViewModel->ResolveSelection(TEXT("Encounter.Locked"), Selected),
@@ -73,6 +79,7 @@ bool FHSRChallengeDirectorySelectionFailureMatrixTest::RunTest(const FString&)
 	LockedDefinition->EncounterId = TEXT("Encounter.Locked");
 	LockedDefinition->EnemyDefinitionId = TEXT("Enemy.Locked");
 	LockedDefinition->BattleMap = Valid->BattleMap;
+	LockedDefinition->PrerequisiteEncounterIds.Add(Valid->EncounterId);
 
 	UHSREncounterDefinition* SecondValid = NewObject<UHSREncounterDefinition>();
 	SecondValid->EncounterId = TEXT("Encounter.SecondValid");

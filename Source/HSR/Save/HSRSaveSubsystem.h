@@ -10,6 +10,7 @@
 #include "../Reward/HSRRewardSubsystem.h"
 #include "../Quest/HSRQuestSubsystem.h"
 #include "../Map/HSRMapSubsystem.h"
+#include "../Challenge/HSRChallengeProgressionSubsystem.h"
 #include "HSRSaveSubsystem.generated.h"
 
 class UHSRItemEquipmentMappingCatalog;
@@ -53,6 +54,7 @@ private:
 	TWeakObjectPtr<UHSRRewardSubsystem> Reward;
 	TWeakObjectPtr<UHSRQuestSubsystem> Quest;
 	TWeakObjectPtr<UHSRMapSubsystem> Map;
+	TWeakObjectPtr<UHSRChallengeProgressionSubsystem> ChallengeProgression;
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRItemEquipmentMappingCatalog> MappingCatalog;
 #if WITH_EDITORONLY_DATA || WITH_DEV_AUTOMATION_TESTS
@@ -64,6 +66,8 @@ private:
 	TObjectPtr<UHSRQuestSubsystem> DevelopmentQuest;
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRMapSubsystem> DevelopmentMap;
+	UPROPERTY(Transient)
+	TObjectPtr<UHSRChallengeProgressionSubsystem> DevelopmentChallengeProgression;
 #endif
 	int64 RestoreTransactionRevision=0;
 	FHSRRestoreCommitted RestoreCommitted;

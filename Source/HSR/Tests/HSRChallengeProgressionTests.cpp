@@ -1,8 +1,10 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Engine/GameInstance.h"
 #include "../Challenge/HSRChallengeProgressionSubsystem.h"
 #include "../Data/Definitions/HSREncounterDefinition.h"
+#include "../Save/HSRSaveVersion.h"
 #include "../UI/HSRChallengeDirectoryViewModel.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRChallengeProgressionIdempotenceTest,
@@ -11,7 +13,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRChallengeProgressionIdempotenceTest,
 
 bool FHSRChallengeProgressionIdempotenceTest::RunTest(const FString&)
 {
-	UHSRChallengeProgressionSubsystem* Progression = NewObject<UHSRChallengeProgressionSubsystem>();
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GetTransientPackage());
+	UHSRChallengeProgressionSubsystem* Progression = NewObject<UHSRChallengeProgressionSubsystem>(GameInstance);
 	TestNotNull(TEXT("progression subsystem fixture exists"), Progression);
 	if (!Progression)
 	{
@@ -46,7 +49,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRChallengeProgressionProjectionTest,
 
 bool FHSRChallengeProgressionProjectionTest::RunTest(const FString&)
 {
-	UHSRChallengeProgressionSubsystem* Progression = NewObject<UHSRChallengeProgressionSubsystem>();
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GetTransientPackage());
+	UHSRChallengeProgressionSubsystem* Progression = NewObject<UHSRChallengeProgressionSubsystem>(GameInstance);
 	UHSREncounterDefinition* Base = NewObject<UHSREncounterDefinition>();
 	Base->EncounterId = TEXT("Encounter.Base");
 	Base->EnemyDefinitionId = TEXT("Enemy.Base");
@@ -88,6 +92,44 @@ bool FHSRChallengeProgressionProjectionTest::RunTest(const FString&)
 		TestEqual(TEXT("dependent becomes available"), Snapshot.Entries[1].Status,
 			EHSRChallengeDirectoryStatus::Available);
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRChallengeProgressionSaveProjectionTest,
+	"HSR.Challenge.Progression.SaveProjection",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSRChallengeProgressionSaveProjectionTest::RunTest(const FString&)
+{
+	FHSRSaveData Data;
+	Data.SchemaVersion = HSRSaveVersion::CurrentSchema;
+	Data.PartySlots.SetNum(HSRSaveVersion::PartySlotCount);
+	Data.ChallengeProgression.CompletedEncounterIds = { TEXT("Encounter.Next"), TEXT("Encounter.Base") };
+	Data.ChallengeProgression.Revision = 2;
+
+	TArray<uint8> Payload;
+	TestTrue(TEXT("schema 8 challenge progression encodes"),
+		HSRSaveVersion::EncodeCanonicalPayload(Data, Payload));
+	FHSRSaveData Decoded;
+	TestEqual(TEXT("schema 8 challenge progression decodes"),
+		HSRSaveVersion::DecodeCanonicalPayload(Payload, Decoded),
+		EHSRSaveDecodeResult::Success);
+	TestEqual(TEXT("challenge progression revision round trips"),
+		Decoded.ChallengeProgression.Revision, int64(2));
+	TestEqual(TEXT("challenge progression rows round trip"),
+		Decoded.ChallengeProgression.CompletedEncounterIds.Num(), 2);
+	if (Decoded.ChallengeProgression.CompletedEncounterIds.Num() == 2)
+	{
+		TestEqual(TEXT("challenge rows use canonical order"),
+			Decoded.ChallengeProgression.CompletedEncounterIds[0], FName(TEXT("encounter.base")));
+		TestEqual(TEXT("challenge rows preserve second ID"),
+			Decoded.ChallengeProgression.CompletedEncounterIds[1], FName(TEXT("encounter.next")));
+	}
+
+	FHSRSaveData Duplicate = Data;
+	Duplicate.ChallengeProgression.CompletedEncounterIds.Add(TEXT("Encounter.Base"));
+	TestFalse(TEXT("duplicate challenge completion rows reject"),
+		HSRSaveVersion::EncodeCanonicalPayload(Duplicate, Payload));
 	return true;
 }
 

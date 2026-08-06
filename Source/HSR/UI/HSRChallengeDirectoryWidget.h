@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "HSRChallengeDirectoryViewModel.h"
+#include "../Challenge/HSRChallengeProgressionSubsystem.h"
 #include "../Battle/HSREncounterTypes.h"
 #include "HSRChallengeDirectoryWidget.generated.h"
 
@@ -12,6 +13,7 @@ class HSR_API UHSRChallengeDirectoryWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	virtual void NativeDestruct() override;
 	/** Encounter definitions supplied by the owning frontend instance. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HSR|Challenge", meta = (ExposeOnSpawn = "true"))
 	TArray<FHSRChallengeDirectorySource> ChallengeSources;
@@ -45,4 +47,9 @@ private:
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "HSR|Challenge", meta = (AllowPrivateAccess = "true"))
 	FName SelectedEncounterId;
+
+	TWeakObjectPtr<UHSRChallengeProgressionSubsystem> BoundProgression;
+	FDelegateHandle ProgressionChangedHandle;
+	void HandleProgressionChanged(const FHSRChallengeProgressionSnapshot& Snapshot);
+	void UnbindProgression();
 };

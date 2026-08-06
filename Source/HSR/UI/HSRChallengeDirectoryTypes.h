@@ -12,7 +12,17 @@ enum class EHSRChallengeDirectoryResult : uint8
 	EmptyDirectory,
 	UnknownChallenge,
 	Locked,
+	Completed,
 	InvalidDefinition
+};
+
+UENUM(BlueprintType)
+enum class EHSRChallengeDirectoryStatus : uint8
+{
+	Available,
+	Locked,
+	Completed,
+	Unavailable
 };
 
 USTRUCT(BlueprintType)
@@ -46,6 +56,12 @@ struct HSR_API FHSRChallengeDirectoryEntry
 
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Challenge")
 	bool bAvailable = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "HSR|Challenge")
+	bool bCompleted = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "HSR|Challenge")
+	EHSRChallengeDirectoryStatus Status = EHSRChallengeDirectoryStatus::Unavailable;
 
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Challenge")
 	FText Diagnostic;

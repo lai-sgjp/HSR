@@ -344,6 +344,8 @@
 - [x] P17-009C 战前候选/Buff 元数据与准入：Challenge 路由、独立候选、重复拒绝、Cancel、纯 Request、BattleTransition 提交、Build/Automation/用户 PIE 已通过；Buff GameplayEffect 与资源消耗另立后续任务。
 - [x] P17-009D 战前 Buff GameplayEffect 与资源权威：C++、Automation、用户 Buff/GE 配置与 PIE 的战斗进入、Stage Buff 应用、指令面板、胜利结算、返回旅行和返回后 Pause 重开均已通过。
 - [x] P17-010A 数据驱动 Challenge Directory：只读 Source 投影、稳定 ID 选择、锁定/无效/重复处理、模板门面、Build/Automation 与用户 PIE 通过；动态解锁/完成度/成本/奖励另立任务。
+- [x] P17-010B Challenge Directory 失败矩阵与正式收口：用户确认完成。
+- [ ] P17-010C Challenge Directory Progression Projection：C++/Save/Settlement 与 36/36 Automation 已通过；用户 prerequisite/status Editor 配置与 Available/Completed/Defeat PIE 验证待完成。
 
 ## Phase 18：表现与模型导入
 

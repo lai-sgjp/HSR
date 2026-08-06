@@ -147,7 +147,7 @@ bool FHSRQuestSaveV4Test::RunTest(const FString&)
 	Source.Dialogue->SelectChoice(TEXT("Dialogue.P14.NPC"), TEXT("Branch"), TEXT("ChoiceA"), Choice);
 	FHSRSaveData Captured;
 	TestEqual(TEXT("capture v4"), Source.Save->SaveSnapshot(Captured), EHSRSaveResult::Success);
-	TestEqual(TEXT("schema v7"), Captured.SchemaVersion, 7);
+	TestEqual(TEXT("schema v8"), Captured.SchemaVersion, 8);
 	TestEqual(TEXT("one quest saved"), Captured.Quests.States.Num(), 1);
 	TestEqual(TEXT("one reward receipt saved"), Captured.Rewards.Receipts.Num(), 1);
 

@@ -18,7 +18,7 @@ struct HSR_API FHSRSaveEnvelopeHeader
 	static constexpr uint16 HeaderBytes = 104;
 	static constexpr uint16 PayloadCodecVersion = 1;
 	static constexpr int64 MaxPayloadBytes = 16ll * 1024ll * 1024ll;
-	uint32 SchemaVersion = 7;
+	uint32 SchemaVersion = 8;
 	uint32 MinimumCompatibleSchema = 1;
 	FGuid SaveId;
 	uint64 Generation = 1;
@@ -28,7 +28,7 @@ struct HSR_API FHSRSaveEnvelopeHeader
 
 namespace HSRSaveVersion
 {
-	constexpr int32 CurrentSchema = 7;
+	constexpr int32 CurrentSchema = 8;
 	constexpr uint32 MaxRecordCount = 65535;
 	constexpr uint32 MaxTokenBytes = 4096;
 	constexpr uint32 PartySlotCount = 2;

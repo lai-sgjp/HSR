@@ -7,6 +7,7 @@
 #include "../Reward/HSRRewardTypes.h"
 #include "../Quest/HSRQuestTypes.h"
 #include "../Map/HSRMapTypes.h"
+#include "../Challenge/HSRChallengeProgressionTypes.h"
 #include "HSRSaveTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -73,7 +74,7 @@ struct HSR_API FHSREquipmentPlacementDto { GENERATED_BODY()
 
 USTRUCT(BlueprintType)
 struct HSR_API FHSRSaveData { GENERATED_BODY()
-	UPROPERTY(BlueprintReadWrite) int32 SchemaVersion = 7;
+	UPROPERTY(BlueprintReadWrite) int32 SchemaVersion = 8;
 	UPROPERTY(BlueprintReadWrite) TArray<FHSRSaveProfileDto> Profiles;
 	UPROPERTY(BlueprintReadWrite) TArray<FHSRPartySlot> PartySlots;
 	UPROPERTY(BlueprintReadWrite) int64 PartyRevision = 0;
@@ -84,6 +85,7 @@ struct HSR_API FHSRSaveData { GENERATED_BODY()
 	UPROPERTY(BlueprintReadWrite) FHSRRewardSaveData Rewards;
 	UPROPERTY(BlueprintReadWrite) FHSRQuestSaveData Quests;
 	UPROPERTY(BlueprintReadWrite) FHSRMapSaveData Map;
+	UPROPERTY(BlueprintReadWrite) FHSRChallengeProgressionSaveData ChallengeProgression;
 };
 
 USTRUCT(BlueprintType)
@@ -94,6 +96,7 @@ struct HSR_API FHSRRestoreCommitInfo { GENERATED_BODY()
 	UPROPERTY(BlueprintReadOnly) bool bRewardsChanged = false;
 	UPROPERTY(BlueprintReadOnly) bool bQuestsChanged = false;
 	UPROPERTY(BlueprintReadOnly) bool bMapChanged = false;
+	UPROPERTY(BlueprintReadOnly) bool bChallengeProgressionChanged = false;
 	UPROPERTY(BlueprintReadOnly) int64 TransactionRevision = 0;
 };
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRRestoreCommitted,const FHSRRestoreCommitInfo&);

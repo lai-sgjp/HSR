@@ -27,6 +27,7 @@
 #include "../Reward/HSRRewardSubsystem.h"
 #include "../Reward/HSRSettlementAuthority.h"
 #include "../Inventory/HSRInventorySubsystem.h"
+#include "../Challenge/HSRChallengeProgressionSubsystem.h"
 
 namespace
 {
@@ -2529,7 +2530,9 @@ EHSRBattleSettlementConfirmResult AHSRBattleGameMode::ProcessSettlement(UGameIns
 	UHSRCharacterProfileSubsystem* Profiles = GameInstance->GetSubsystem<UHSRCharacterProfileSubsystem>();
 	UHSRRewardSubsystem* Reward = GameInstance->GetSubsystem<UHSRRewardSubsystem>();
 	UHSRSettlementAuthority* Authority = GameInstance->GetSubsystem<UHSRSettlementAuthority>();
-	if (!Inventory || !Profiles || !Reward || !Authority)
+	UHSRChallengeProgressionSubsystem* ChallengeProgression = GameInstance->GetSubsystem<UHSRChallengeProgressionSubsystem>();
+	if (!Inventory || !Profiles || !Reward || !Authority || !ChallengeProgression
+		|| !ChallengeProgression->IsValidEncounterId(EncounterRequest.EncounterId))
 	{
 		return EHSRBattleSettlementConfirmResult::Rejected;
 	}
@@ -2557,6 +2560,13 @@ EHSRBattleSettlementConfirmResult AHSRBattleGameMode::ProcessSettlement(UGameIns
 
 	const EHSRSettlementResult Result = Authority->SubmitSettlement(State.Request, State.Receipt);
 	if (Result != EHSRSettlementResult::Success && Result != EHSRSettlementResult::NoOp)
+	{
+		return EHSRBattleSettlementConfirmResult::Rejected;
+	}
+	const EHSRChallengeProgressionResult ProgressionResult =
+		ChallengeProgression->CompleteEncounter(EncounterRequest.EncounterId);
+	if (ProgressionResult != EHSRChallengeProgressionResult::Success
+		&& ProgressionResult != EHSRChallengeProgressionResult::NoOp)
 	{
 		return EHSRBattleSettlementConfirmResult::Rejected;
 	}

@@ -1,6 +1,6 @@
 # TASK-P17-010C - Challenge Directory Progression Projection
 
-Status: `AUTHORIZED / RED VALIDATED`
+Status: `IMPLEMENTED / C++ GREEN / USER EDITOR GATE PENDING`
 
 ## Sole observable outcome
 
@@ -88,10 +88,18 @@ presentations. Do not modify the unified frontend root.
 `HSREditor Win64 Development` was executed with the new tests. It failed on
 the intended missing implementation: `HSRChallengeProgressionSubsystem.h`,
 `FHSRSaveData::ChallengeProgression`, and schema-8 interfaces do not exist
-yet. One test assertion omitted the actual boolean argument and is a test-only
-fixture correction before GREEN.
+yet. The test-only fixture assertion issue was corrected before the GREEN run.
 
 ## Non-goals
 
 No new reward grant, resource deduction, Buff rule, battle rule, repeat reward,
 new module, Config change, UI root refactor, or direct AddToViewport path.
+
+## Implementation evidence
+
+- RED checkpoint: `24e3f35`.
+- Fresh `HSREditor Win64 Development` build passed.
+- Combined `HSR.Battle+HSR.Challenge+HSR.Save+HSR.UI.ChallengeDirectory`
+  Automation passed 36/36.
+- User Editor prerequisite/status binding and PIE acceptance remain pending;
+  no UAsset was modified by Codex.

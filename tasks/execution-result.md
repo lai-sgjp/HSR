@@ -1,52 +1,77 @@
-# TASK-P17-005R Execution Result
+# TASK-P17-010C Execution Result
 
-Status: `COMPLETE`
+Status: `IMPLEMENTED / C++ GREEN / USER EDITOR GATE PENDING`
 
-## Scope completed
+## Sole observable outcome
 
-Character Detail and Inventory now use `UHSRFrontendModuleRootWidget` as the
-only viewport host. Each specialized widget remains responsible for its
-existing snapshot/ViewModel contract, but is mounted into the optional
-`ModuleContentHost` panel of the module root. No UAsset was modified by Codex.
+Challenge Directory now projects runtime `Available`, `Locked`, `Completed`,
+and `Unavailable` states. Static `FHSRChallengeDirectorySource::bUnlocked` is
+compatibility-only and does not determine the projection. Only `Available`
+entries continue through the existing Pre-Battle/BattleTransition path.
 
-## Verification
+## Ownership and data flow
 
-- RED: `HSR.UI.FrontendNavigation` failed exactly on the new assertions that
-  Character and Inventory lacked `FrontendModuleRootInstance`.
-- GREEN: fresh `HSREditor Win64 Development` build succeeded.
-- GREEN: `HSR.UI.FrontendNavigation` 11/11 Success, including shared host
-  ownership, cross-module replacement, Back/X, and failure compensation.
-- `git diff --check`: exit 0.
+- `UHSRChallengeProgressionSubsystem` owns completed Encounter IDs, revision,
+  idempotent completion, and progression change notification.
+- `UHSREncounterDefinition` owns static Encounter identity and prerequisite IDs.
+- Challenge Directory ViewModel/Widget owns only the transient projection and
+  selected Encounter ID.
+- BattleGameMode completes an Encounter only after victory Settlement returns
+  `Success` or `NoOp`; Defeat never completes it.
+- Save schema 8 captures/restores progression. Schema 7 and earlier migrate to
+  an empty progression state.
 
 ## TDD evidence
 
-| Guarantee | Test | Result |
-| --- | --- | --- |
-| Inventory has a module-root host after direct open | `SharedSession` | PASS |
-| Character has a module-root host after replacement | `CrossTypeReplace` | PASS |
-| Back/X and route-failure compensation preserve ownership | `DirectAndBackFailure`, `FailureCompensation` | PASS |
+- RED checkpoint: commit `24e3f35` (`test: add challenge progression projection reproducer`).
+- Intended RED failures were missing progression subsystem/types, Save DTO
+  field, and schema-8 interfaces.
+- GREEN build: `HSREditor Win64 Development` completed with UHT, compile, link,
+  and target metadata success.
 
-## User acceptance
+## Automation evidence
 
-The user configured `ModuleContentHost` in `WBP_FrontendModuleRoot_P17` and
-reported all requested Editor/PIE checks normal: Character, Inventory, Map,
-Back/X, battle return, and Pause using the `1` mapping. Physical controller,
-Standalone, Packaged, and Shipping remain `NOT VERIFIED`.
+- `HSR.Challenge`: 3/3 Success, including idempotence, directory projection,
+  and schema-8 progression payload round trip.
+- `HSR.UI.ChallengeDirectory`: 3/3 Success, including invalid entries and the
+  accepted 010A/010B selection failure matrix.
+- `HSR.Save`: 17/17 Success, including schema migration, disk recovery,
+  validation preflight, and write failure matrix.
+- `HSR.BattleSettlement.Integration`: 1/1 Success, including victory
+  completion after Settlement, duplicate NoOp, defeat no-completion, and
+  settlement failure paths.
+- Combined `HSR.Battle+HSR.Challenge+HSR.Save+HSR.UI.ChallengeDirectory`:
+  36/36 Success.
+- `git diff --check`: passed.
 
-## User PIE update (2026-08-06)
+## User Editor gate
 
-The supplied PIE logs confirm `Character.A` bootstrap, valid detail snapshots,
-`DetailWidgetInit Result=SUCCESS`, and `DetailRefresh` with a valid Level/EXP
-payload. Pause, return travel, and post-return Pause using `1` worked.
-However, the visible Character page showed only its static title. This is a
-user-owned `WBP_CharacterDetail_P11` presentation binding gap: the C++ widget
-successfully calls the BlueprintImplementableEvent `OnDetailSnapshotChanged`,
-but the WBP must consume the snapshot and set its visible fields. This remains
-a blocking presentation defect for P17-005 final acceptance; resolution
-coverage is intentionally deferred by the user and does not block the current
-diagnosis.
+No UAsset was modified by Codex. The user must configure and Save All/reopen:
 
-## Logs
+1. `DA_Encounter_Phase5Test1_Locked`: add prerequisite `Enc_Test_Phase5`;
+   preserve its existing Encounter ID, BattleMap, Buff, and Reward fields.
+2. Challenge Directory and Entry widgets: bind all four status presentations
+   to the new `Status`/projection snapshot; preserve the existing selection and
+   Pre-Battle path.
 
-- `Saved/Logs/P17-005R-Red-FrontendNavigation.log`
-- `Saved/Logs/P17-005R-Green-FrontendNavigation.log`
+Do not modify `WBP_FrontendModuleRoot_P17`, `ModuleContentHost`, Pause input `1`,
+or the already accepted Party/Map/BattleReturn assets.
+
+## Not verified
+
+- User Editor Save All/reopen for the prerequisite and four status bindings.
+- User PIE Available -> Battle -> Victory -> Completed -> prerequisite unlock
+  path.
+- User PIE Defeat and Settlement rejection path with directory state unchanged.
+- Standalone, Packaged, Shipping, physical controller, and network behavior.
+
+## Files changed by implementation
+
+- Challenge progression subsystem/types.
+- Encounter prerequisite definition.
+- Challenge Directory projection/status/widget notification.
+- Save DTO, schema version, migration, capture/restore.
+- Battle settlement completion hook.
+- Focused and schema regression tests.
+
+`.claude/**` remains untracked and intentionally excluded.

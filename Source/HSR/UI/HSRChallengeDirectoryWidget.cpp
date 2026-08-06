@@ -3,14 +3,48 @@
 #include "../Battle/HSRBattleTransitionSubsystem.h"
 #include "Engine/GameInstance.h"
 
+void UHSRChallengeDirectoryWidget::UnbindProgression()
+{
+	if (BoundProgression.IsValid() && ProgressionChangedHandle.IsValid())
+	{
+		BoundProgression->OnProgressionChanged().Remove(ProgressionChangedHandle);
+	}
+	BoundProgression.Reset();
+	ProgressionChangedHandle.Reset();
+}
+
+void UHSRChallengeDirectoryWidget::NativeDestruct()
+{
+	UnbindProgression();
+	Super::NativeDestruct();
+}
+
+void UHSRChallengeDirectoryWidget::HandleProgressionChanged(const FHSRChallengeProgressionSnapshot&)
+{
+	if (ViewModel)
+	{
+		ViewModel->Refresh();
+		OnDirectoryChanged(ViewModel->GetSnapshot());
+	}
+}
+
 EHSRChallengeDirectoryResult UHSRChallengeDirectoryWidget::InitializeDirectory(
 	const TArray<FHSRChallengeDirectorySource>& Sources)
 {
+	UnbindProgression();
 	if (!ViewModel)
 	{
 		ViewModel = NewObject<UHSRChallengeDirectoryViewModel>(this);
 	}
-	const EHSRChallengeDirectoryResult Result = ViewModel->Initialize(Sources);
+	UHSRChallengeProgressionSubsystem* Progression = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UHSRChallengeProgressionSubsystem>() : nullptr;
+	const EHSRChallengeDirectoryResult Result = ViewModel->Initialize(Sources, Progression);
+	if (Progression)
+	{
+		BoundProgression = Progression;
+		ProgressionChangedHandle = Progression->OnProgressionChanged().AddUObject(
+			this, &UHSRChallengeDirectoryWidget::HandleProgressionChanged);
+	}
 	SelectedEncounterId = NAME_None;
 	OnDirectoryChanged(ViewModel->GetSnapshot());
 	return Result;
