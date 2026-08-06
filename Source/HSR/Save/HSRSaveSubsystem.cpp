@@ -143,6 +143,7 @@ void UHSRSaveSubsystem::HandleRestoreArrival(const FHSRMapArrivalCommitInfo& Inf
 	PendingRestoreRequestId.Invalidate();
 	LastLoadResult.Result = Result;
 	LastLoadResult.bRuntimeChanged = Result == EHSRSaveResult::Success;
+	LoadCompleted.Broadcast(LastLoadResult);
 }
 
 void UHSRSaveSubsystem::HandleRestoreTravelFailure(const FGuid& RequestId)
@@ -152,6 +153,7 @@ void UHSRSaveSubsystem::HandleRestoreTravelFailure(const FGuid& RequestId)
 	PendingRestoreRequestId.Invalidate();
 	LastLoadResult.Result = EHSRSaveResult::LoadFailed;
 	LastLoadResult.bRuntimeChanged = false;
+	LoadCompleted.Broadcast(LastLoadResult);
 }
 
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
@@ -234,6 +236,178 @@ bool UHSRSaveSubsystem::CanPrepareSnapshot(const FHSRSaveData& Candidate) const
 #endif
 	return bProfiles&&bParty&&bEquipment&&bInventory&&bReward&&bQuest&&bMap&&bChallengeProgression;
 }
+
+bool UHSRSaveSubsystem::GetSlotSummary(const FString& SlotName, const int32 UserIndex, FHSRSaveSlotSummary& OutSummary) const
+{
+	OutSummary = FHSRSaveSlotSummary();
+	OutSummary.SlotName = SlotName;
+	if (!HSRSaveVersion::IsValidSlot(SlotName, UserIndex) || SlotName.Contains(TEXT(".__hsr_")))
+	{
+		OutSummary.State = EHSRSaveSlotState::Unavailable;
+		OutSummary.Result = EHSRSaveResult::InvalidArgument;
+		return false;
+	}
+
+	const FString BackupSlot = SlotName + TEXT(".__hsr_backup_v1");
+	const FString StagingSlot = SlotName + TEXT(".__hsr_staging_v1");
+	OutSummary.bPrimaryPresent = UGameplayStatics::DoesSaveGameExist(SlotName, UserIndex);
+	OutSummary.bBackupPresent = UGameplayStatics::DoesSaveGameExist(BackupSlot, UserIndex);
+	const bool bStagingPresent = UGameplayStatics::DoesSaveGameExist(StagingSlot, UserIndex);
+	if (!OutSummary.bPrimaryPresent && !OutSummary.bBackupPresent && !bStagingPresent)
+	{
+		OutSummary.State = EHSRSaveSlotState::Empty;
+		OutSummary.Result = EHSRSaveResult::SlotNotFound;
+		return true;
+	}
+
+	FHSRSaveData PrimaryData;
+	FHSRSaveData BackupData;
+	FHSRSaveEnvelopeHeader PrimaryHeader;
+	FHSRSaveEnvelopeHeader BackupHeader;
+	EHSRSaveDecodeResult PrimaryDecode = EHSRSaveDecodeResult::TooShort;
+	EHSRSaveDecodeResult BackupDecode = EHSRSaveDecodeResult::TooShort;
+	EHSRSaveResult PrimaryFailure = EHSRSaveResult::InvalidEnvelope;
+	EHSRSaveResult BackupFailure = EHSRSaveResult::InvalidEnvelope;
+	bool bPrimaryCanonical = false;
+	bool bBackupCanonical = false;
+	bool bPrimaryValid = false;
+	bool bBackupValid = false;
+
+	auto DecodeFailureToSaveResult = [](const EHSRSaveDecodeResult Reason)
+	{
+		switch (Reason)
+		{
+		case EHSRSaveDecodeResult::ChecksumMismatch:
+			return EHSRSaveResult::IntegrityFailed;
+		case EHSRSaveDecodeResult::FutureSchema:
+		case EHSRSaveDecodeResult::TooOld:
+		case EHSRSaveDecodeResult::UnsupportedFormat:
+			return EHSRSaveResult::UnsupportedSchema;
+		case EHSRSaveDecodeResult::SlotMismatch:
+			return EHSRSaveResult::SlotIdentityMismatch;
+		default:
+			return EHSRSaveResult::InvalidEnvelope;
+		}
+	};
+
+	if (OutSummary.bPrimaryPresent)
+	{
+		TArray<uint8> PrimaryBytes;
+		if (UGameplayStatics::LoadDataFromSlot(PrimaryBytes, SlotName, UserIndex))
+		{
+			PrimaryDecode = HSRSaveVersion::DecodeEnvelope(PrimaryBytes, SlotName, UserIndex, PrimaryData, &PrimaryHeader);
+			OutSummary.bPrimaryTrusted = PrimaryHeader.SaveId.IsValid();
+			if (PrimaryDecode == EHSRSaveDecodeResult::Success)
+			{
+				bPrimaryCanonical = true;
+				bPrimaryValid = Validate(PrimaryData);
+				PrimaryFailure = bPrimaryValid ? EHSRSaveResult::Success : EHSRSaveResult::InvalidData;
+			}
+			else if (PrimaryDecode == EHSRSaveDecodeResult::BadMagic)
+			{
+				USaveGame* LegacyObject = UGameplayStatics::LoadGameFromSlot(SlotName, UserIndex);
+				const UHSRSaveGame* Legacy = Cast<UHSRSaveGame>(LegacyObject);
+				const bool bSupportedLegacy = Legacy && (Legacy->Data.SchemaVersion <= 5 || Legacy->Data.SchemaVersion == HSRSaveVersion::CurrentSchema);
+				if (bSupportedLegacy)
+				{
+					PrimaryData = Legacy->Data;
+					bPrimaryValid = Validate(PrimaryData);
+					PrimaryFailure = bPrimaryValid ? EHSRSaveResult::Success : EHSRSaveResult::InvalidData;
+				}
+				else
+				{
+					PrimaryFailure = !LegacyObject ? EHSRSaveResult::LoadFailed
+						: !Legacy ? EHSRSaveResult::ClassMismatch : EHSRSaveResult::UnsupportedSchema;
+				}
+			}
+			else
+			{
+				PrimaryFailure = DecodeFailureToSaveResult(PrimaryDecode);
+			}
+		}
+		else
+		{
+			PrimaryFailure = EHSRSaveResult::LoadFailed;
+		}
+	}
+
+	if (OutSummary.bBackupPresent)
+	{
+		TArray<uint8> BackupBytes;
+		if (UGameplayStatics::LoadDataFromSlot(BackupBytes, BackupSlot, UserIndex))
+		{
+			BackupDecode = HSRSaveVersion::DecodeEnvelope(BackupBytes, SlotName, UserIndex, BackupData, &BackupHeader);
+			if (BackupDecode == EHSRSaveDecodeResult::Success)
+			{
+				bBackupCanonical = true;
+				bBackupValid = Validate(BackupData);
+				BackupFailure = bBackupValid ? EHSRSaveResult::Success : EHSRSaveResult::InvalidData;
+			}
+			else
+			{
+				BackupFailure = DecodeFailureToSaveResult(BackupDecode);
+			}
+		}
+		else
+		{
+			BackupFailure = EHSRSaveResult::LoadFailed;
+		}
+	}
+
+	const bool bPrimarySelected = bPrimaryValid;
+	bool bBackupLineageValid = bBackupValid;
+	if (bBackupLineageValid && OutSummary.bPrimaryTrusted)
+	{
+		bBackupLineageValid = bPrimaryCanonical
+			&& BackupHeader.SaveId == PrimaryHeader.SaveId
+			&& BackupHeader.Generation < PrimaryHeader.Generation;
+	}
+
+	auto CountPartyMembers = [](const TArray<FHSRPartySlot>& Slots)
+	{
+		int32 Count = 0;
+		for (const FHSRPartySlot& Slot : Slots)
+		{
+			if (!Slot.CharacterId.IsNone())
+			{
+				++Count;
+			}
+		}
+		return Count;
+	};
+	auto ProjectSummary = [&](const FHSRSaveData& Data, const FHSRSaveEnvelopeHeader* Header, const bool bRecovered)
+	{
+		OutSummary.Result = EHSRSaveResult::Success;
+		OutSummary.Generation = Header ? static_cast<int64>(Header->Generation) : 0;
+		OutSummary.UtcUnixMilliseconds = Header ? Header->UtcUnixMilliseconds : 0;
+		OutSummary.MapId = Data.Map.CurrentLocation.MapId;
+		OutSummary.PartyMemberCount = CountPartyMembers(Data.PartySlots);
+		OutSummary.CompletedChallengeCount = Data.ChallengeProgression.CompletedEncounterIds.Num();
+		OutSummary.bRecoveredFromBackup = bRecovered;
+	};
+
+	if (!bPrimarySelected && bBackupLineageValid)
+	{
+		OutSummary.State = EHSRSaveSlotState::Recoverable;
+		ProjectSummary(BackupData, bBackupCanonical ? &BackupHeader : nullptr, true);
+		return true;
+	}
+	if (bPrimarySelected)
+	{
+		OutSummary.State = EHSRSaveSlotState::Ready;
+		ProjectSummary(PrimaryData, bPrimaryCanonical ? &PrimaryHeader : nullptr, false);
+		return true;
+	}
+
+	OutSummary.State = EHSRSaveSlotState::Unavailable;
+	OutSummary.Result = OutSummary.bPrimaryPresent ? PrimaryFailure : BackupFailure;
+	if (OutSummary.Result == EHSRSaveResult::Success)
+	{
+		OutSummary.Result = bStagingPresent ? EHSRSaveResult::SaveFailed : EHSRSaveResult::InvalidEnvelope;
+	}
+	return true;
+}
+
 EHSRSaveResult UHSRSaveSubsystem::SaveSnapshot(FHSRSaveData& Out) { if(!Party.IsValid()||!Profiles.IsValid()||!Equipment.IsValid()||!Inventory.IsValid()||!Reward.IsValid()||!Quest.IsValid()||!Map.IsValid()||!ChallengeProgression.IsValid()) return EHSRSaveResult::InvalidData; FHSRSaveData Captured; Captured.SchemaVersion=HSRSaveVersion::CurrentSchema; TArray<FHSRCharacterProfileSnapshot> P; Profiles->ExportProfiles(P); for(const auto& Entry:P){ FHSRSaveProfileDto D;D.State=Entry.RuntimeState;D.RuntimeRevision=Entry.RuntimeRevision;Captured.Profiles.Add(MoveTemp(D)); } FHSRPartySnapshot PS;Party->GetSnapshot(PS);Captured.PartySlots=PS.Slots;Captured.PartyRevision=PS.Revision;Equipment->ExportSaveData(Captured.EquipmentRegistry,Captured.EquipmentPlacements);Inventory->ExportSaveData(Captured.Inventory);Reward->ExportSaveData(Captured.Rewards);Quest->ExportSaveData(Captured.Quests);Map->ExportSaveData(Captured.Map);ChallengeProgression->ExportSaveData(Captured.ChallengeProgression);if(!Validate(Captured))return EHSRSaveResult::InvalidData;Current=Captured;Out=Captured;return EHSRSaveResult::Success; }
 EHSRSaveResult UHSRSaveSubsystem::LoadSnapshot(const FHSRSaveData& Candidate)
 {

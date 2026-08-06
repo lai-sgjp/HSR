@@ -24,10 +24,12 @@ public:
 	EHSRSaveResult LoadSnapshot(const FHSRSaveData& Candidate);
 	EHSRSaveResult SaveToSlot(const FString& SlotName, int32 UserIndex = 0);
 	EHSRSaveResult LoadFromSlot(const FString& SlotName, int32 UserIndex = 0);
+	bool GetSlotSummary(const FString& SlotName, int32 UserIndex, FHSRSaveSlotSummary& OutSummary) const;
 	const FHSRSaveLoadResult& GetLastLoadResult() const { return LastLoadResult; }
 	bool HasPendingRestore() const { return PendingRestoreCandidate.IsSet(); }
 	const FHSRSaveData& GetSnapshot() const { return Current; }
 	FHSRRestoreCommitted& OnRestoreCommitted() { return RestoreCommitted; }
+	FHSRSaveLoadCompleted& OnLoadCompleted() { return LoadCompleted; }
 	EHSRSaveFailureStage GetLastWriteFailureStage() const { return LastWriteFailureStage; }
 	bool HadLastWriteCleanupWarning() const { return bLastWriteCleanupWarning; }
 	const FHSRSaveEnvelopeHeader& GetLastWriteHeader() const { return LastWriteHeader; }
@@ -71,6 +73,7 @@ private:
 #endif
 	int64 RestoreTransactionRevision=0;
 	FHSRRestoreCommitted RestoreCommitted;
+	FHSRSaveLoadCompleted LoadCompleted;
 	FHSRSaveLoadResult LastLoadResult;
 	bool bOperationInProgress=false;
 	bool bCompletingRestoreTravel=false;
