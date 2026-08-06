@@ -1,79 +1,49 @@
-# TASK-P17-005 - Frontend Shell Final Acceptance After Party Bootstrap
+# TASK-P17-005R - Unified Frontend Module Host for Character and Inventory
 
-Status: `READY / FINAL ACCEPTANCE GATE`
-
-## Context
-
-P17-005 previously reached a code-gate pass and a user PIE checkpoint, but
-final acceptance was paused because Character Detail resolved to
-`PartySlotEmpty`. P17-009A/009B now provide the Party projection and permanent
-candidate confirmation, and the accepted 009D PIE route proves battle return
-and post-return Pause reopen. This task closes only the remaining P17-005
-evidence boundary; it must not reopen Party, Challenge, Battle, or Save
-authority.
+Status: `CODE GATE PASS / USER EDITOR AND PIE GATE PENDING`
 
 ## Sole observable outcome
 
-In Exploration, the existing Frontend Shell opens the correct Pause, Party,
-Map, Challenge, and Character routes; one Frontend pause session is retained
-through module navigation; Back returns one level; `X` closes to Exploration;
-repeated input has no duplicate side effects; and after a successful battle or
-map return, Exploration input, cursor, focus, and the user's `1` Pause mapping
-remain usable. Character Detail must no longer fail solely because the Party
-bootstrap is empty.
+Character and Inventory open through the same `FrontendModuleRoot` host path
+used by Map, Party, Challenge, Quest, and Save. The host owns viewport
+attachment, module route presentation, focus, Back/X lifecycle, and content
+replacement. Character Detail and Inventory remain specialized content widgets
+that own only their existing snapshot/ViewModel presentation contracts.
 
-## Verification scope
+## Contract
 
-- Existing P17-005 Frontend transaction implementation and Automation only.
-- Current Party/Challenge/Map/return integrations are read-only evidence
-  dependencies; do not change their authority contracts.
-- User-owned UAssets remain outside Codex ownership. No new or modified UAsset,
-  Config, Build.cs, Save schema, module, dependency, or Git delivery work.
+- `UHSRFrontendModuleRootWidget` gains one optional named content host,
+  `ModuleContentHost`, and only it attaches/removes specialized module content.
+- `UHSRUIManagerSubsystem` creates the module root before a Character or
+  Inventory content candidate, attaches the candidate to the root, then
+  commits the route. It must roll back root, content, ViewModel, route, focus,
+  and input policy on every failure.
+- The user will add an `Overlay` or `CanvasPanel` named `ModuleContentHost` to
+  `WBP_FrontendModuleRoot_P17`; Codex will not modify UAssets.
+- No Party, Inventory, Character, Save, Battle, Map, or routing authority
+  changes. Existing Character and Inventory ViewModels are not rewritten.
 
-## Exact Codex allowlist
+## Allowed files
 
-- `Source/HSR/UI/Frontend/HSRFrontendRouteTypes.h`
-- `Source/HSR/UI/Frontend/HSRFrontendRouter.h`
-- `Source/HSR/UI/Frontend/HSRFrontendRouter.cpp`
-- `Source/HSR/UI/Frontend/HSRFrontendShellWidget.h`
-- `Source/HSR/UI/Frontend/HSRFrontendShellWidget.cpp`
 - `Source/HSR/UI/Frontend/HSRFrontendModuleRootWidget.h`
 - `Source/HSR/UI/Frontend/HSRFrontendModuleRootWidget.cpp`
 - `Source/HSR/UI/HSRUIManagerSubsystem.h`
 - `Source/HSR/UI/HSRUIManagerSubsystem.cpp`
-- `Source/HSR/UI/HSRScreenWidget.h`
-- `Source/HSR/UI/HSRScreenWidget.cpp`
-- `Source/HSR/UI/HSRScreenStackTypes.h`
-- `Source/HSR/UI/HSRScreenStack.h`
-- `Source/HSR/UI/HSRScreenStack.cpp`
-- `Source/HSR/UI/HSRInputModeCoordinator.h`
-- `Source/HSR/UI/HSRInputModeCoordinator.cpp`
-- `Source/HSR/UI/HSRHUD.h`
-- `Source/HSR/UI/HSRHUD.cpp`
-- `Source/HSR/Player/HSRPlayerController.h`
-- `Source/HSR/Player/HSRPlayerController.cpp`
 - `Source/HSR/Tests/HSRFrontendNavigationTests.cpp`
 - `tasks/active-task.md`
 - `tasks/execution-result.md`
 
-Production source edits are permitted only if a focused verification exposes
-a P17-005 defect and the edit remains inside this allowlist. Otherwise this
-task is evidence-only.
+## Required checks
 
-## Required evidence
+1. RED Automation proved Character and Inventory did not hold a module-root
+   host.
+2. GREEN `HSR.UI.FrontendNavigation` proves shared host ownership, replace,
+   Back/X, and failure compensation.
+3. Fresh Development Editor build and `git diff --check`.
+4. User Editor configures `ModuleContentHost`, compiles/saves/reopens, then
+   validates Character, Inventory, Map, Back/X, and post-return Pause in PIE.
 
-1. Fresh `HSREditor Win64 Development` build.
-2. `HSR.UI.FrontendNavigation` and focused Party/Challenge/Map/return
-   regressions, all with explicit Success results.
-3. `git diff --check`.
-4. User Editor Save All, close/reopen, and PIE evidence for keyboard/mouse
-   navigation, Character Detail, Back/X, post-return Pause using `1`, and
-   1920x1080 plus 1280x720. Physical controller, Standalone, Packaged, and
-   Shipping remain `NOT VERIFIED` unless separately demonstrated.
+## Non-goals
 
-## Explicit non-goals
-
-- No new frontend features, full Character progression, Save UI, Dialogue,
-  Battle HUD, Gacha, Party mutation redesign, or Challenge rules.
-- No claim of final PASS from automation alone; user Editor/PIE evidence and
-  independent review remain separate gates.
+- No UAsset edit by Codex, no visual redesign, no new data binding, no module
+  registry/DataAsset, and no unrelated frontend refactor.

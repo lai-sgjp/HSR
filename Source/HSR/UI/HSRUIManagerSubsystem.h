@@ -151,12 +151,12 @@ private:
 	bool IsBackendPaused(UWorld* World) const;
 	bool IsTravelPending() const;
 	UHSRFrontendShellWidget* CreatePauseCandidate(AHSRPlayerController* PlayerController);
+	UHSRFrontendModuleRootWidget* CreateFrontendModuleRootCandidate(AHSRPlayerController* PlayerController);
 	UHSRCharacterDetailWidget* CreateCharacterDetailCandidate(AHSRPlayerController* PlayerController);
 	UHSRInventoryWidget* CreateInventoryCandidate(AHSRPlayerController* PlayerController);
 	UHSRInventoryRewardViewModel* CreateInventoryViewModelCandidate();
 	bool AttachPauseCandidate(UHSRFrontendShellWidget* Candidate);
-	bool AttachCharacterDetailCandidate(UHSRCharacterDetailWidget* Candidate);
-	bool AttachInventoryCandidate(UHSRInventoryWidget* Candidate);
+	bool AttachFrontendModuleRootCandidate(UHSRFrontendModuleRootWidget* Candidate);
 	bool ApplyPolicyBackend(AHSRPlayerController* PlayerController, const FHSRInputModePolicy& Policy,
 		EHSRPlayerControlMode SemanticMode);
 	bool ApplyPauseBackend(UWorld* World, bool bPaused);

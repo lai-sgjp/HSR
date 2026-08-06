@@ -1,43 +1,38 @@
-# TASK-P17-005 Execution Result
+# TASK-P17-005R Execution Result
 
 Status: `CODE GATE PASS / USER EDITOR AND PIE GATE PENDING`
 
 ## Scope completed
 
-The completed 009D task was archived before this task started. P17-005 was
-reopened only for final evidence after Party bootstrap work; no production
-source edit was required and no UAsset was authored or modified by Codex.
+Character Detail and Inventory now use `UHSRFrontendModuleRootWidget` as the
+only viewport host. Each specialized widget remains responsible for its
+existing snapshot/ViewModel contract, but is mounted into the optional
+`ModuleContentHost` panel of the module root. No UAsset was modified by Codex.
 
 ## Verification
 
-- Fresh `HSREditor Win64 Development` build: `Result: Succeeded`.
-- `HSR.UI.FrontendNavigation`: 11/11 Success. The approved log records
-  `CharacterDetail Open Success`, `Inventory Open Success`, successful
-  `TravelRestore Consume`, and `TEST COMPLETE. EXIT CODE: 0`.
-- `HSR.UI.Party`: 4/4 Success.
-- `HSR.UI.ChallengeDirectory`: 3/3 Success.
-- `HSR.Map`: 5/5 Success.
-- `HSR.BattleReturn`: 2/2 Success.
-- `HSR.UI.PreBattleCandidate`: 3/3 Success.
-- `HSR.InteractionBattle.Admission`: 1/1 Success.
-- `git diff --check`: exit 0; only existing LF/CRLF conversion warnings remain.
+- RED: `HSR.UI.FrontendNavigation` failed exactly on the new assertions that
+  Character and Inventory lacked `FrontendModuleRootInstance`.
+- GREEN: fresh `HSREditor Win64 Development` build succeeded.
+- GREEN: `HSR.UI.FrontendNavigation` 11/11 Success, including shared host
+  ownership, cross-module replacement, Back/X, and failure compensation.
+- `git diff --check`: exit 0.
 
-## First failure and rerun
+## TDD evidence
 
-The first Frontend commandlet attempt failed before test discovery because the
-UE Zen utility could not be launched from the sandbox (`CreateProc failed:
-Access Denied`), then UE exited on the Zen version assertion. The identical
-command was rerun with the required elevated execution and completed 11/11.
-This is retained as environment setup history, not a source or test failure.
+| Guarantee | Test | Result |
+| --- | --- | --- |
+| Inventory has a module-root host after direct open | `SharedSession` | PASS |
+| Character has a module-root host after replacement | `CrossTypeReplace` | PASS |
+| Back/X and route-failure compensation preserve ownership | `DirectAndBackFailure`, `FailureCompensation` | PASS |
 
 ## Remaining gate
 
-User Editor/PIE evidence is still required for Save All/reopen persistence,
-keyboard/mouse route navigation, Character Detail with the now-populated Party,
-Back/X, post-battle/map-return Pause using the user's `1` mapping, and both
-1920x1080 and 1280x720 layouts. Physical controller, Standalone, Packaged, and
-Shipping remain `NOT VERIFIED` unless separately demonstrated. No final PASS is
-claimed from automation alone.
+In `WBP_FrontendModuleRoot_P17`, add an `Overlay` or `CanvasPanel` named
+`ModuleContentHost`, then Compile, Save, and reopen the Blueprint. PIE evidence
+is required for Character, Inventory, Map, Back/X, battle return, and Pause
+using the user's `1` mapping. Physical controller, Standalone, Packaged, and
+Shipping remain `NOT VERIFIED`.
 
 ## User PIE update (2026-08-06)
 
@@ -54,10 +49,5 @@ diagnosis.
 
 ## Logs
 
-- `Saved/Logs/P17-005-Final-Frontend-Approved.stdout.log`
-- `Saved/Logs/P17-005-Final-Adjacent-Approved.stdout.log`
-- `Saved/Logs/P17-005-Final-Challenge-Approved.stdout.log`
-- `Saved/Logs/P17-005-Final-Map-Approved.stdout.log`
-- `Saved/Logs/P17-005-Final-BattleReturn-Approved.stdout.log`
-- `Saved/Logs/P17-005-Final-PreBattle-Approved.stdout.log`
-- `Saved/Logs/P17-005-Final-Admission-Approved.stdout.log`
+- `Saved/Logs/P17-005R-Red-FrontendNavigation.log`
+- `Saved/Logs/P17-005R-Green-FrontendNavigation.log`

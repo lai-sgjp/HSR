@@ -12,6 +12,8 @@ class HSR_API UHSRFrontendModuleRootWidget : public UHSRScreenWidget
 
 public:
 	void PresentModule(EHSRFrontendModule InModule);
+	bool SetModuleContent(UWidget* InContent);
+	void ClearModuleContent();
 
 	UFUNCTION(BlueprintCallable, Category = "HSR|UI|Frontend")
 	bool RequestOpenModule(EHSRFrontendModule Module);
@@ -26,6 +28,9 @@ public:
 	EHSRFrontendModule GetPresentedModule() const { return PresentedModule; }
 
 private:
+	UPROPERTY(meta = (BindWidgetOptional), Transient)
+	TObjectPtr<class UPanelWidget> ModuleContentHost;
+
 	UPROPERTY(Transient)
 	EHSRFrontendModule PresentedModule = EHSRFrontendModule::None;
 };
