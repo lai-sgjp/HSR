@@ -1,6 +1,14 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-08-05
+> 最后更新：2026-08-06
+
+## 2026-08-06 TASK-P17-010C 归档
+
+- `TASK-P17-010C - Challenge Directory Progression Projection` 已按用户确认收口，状态为 `USER ACCEPTED / INDEPENDENT REVIEW NOT RUN`。
+- Runtime progression authority、prerequisite projection、Save schema 8、victory settlement completion 以及 36/36 Combined Automation 均已通过；实现提交为 `82a0b98`。
+- 用户最新 PIE 日志确认 `Sources=3 Entries=3`，`Enc_Test_Phase5` 带 Stage Buff 胜利并返回，`Enc_Test_Phase5_locked` 解锁后正常进入、胜利并返回；此前的 `invalid buff` 不再出现。
+- 本轮未创建下一张活动任务卡；P17-005 最终 Editor/PIE 验收仍是独立事项。Standalone、Packaged、Shipping、物理控制器和网络行为继续保持 `NOT VERIFIED`。
+- 归档任务包位于 `tasks/archive/TASK-P17-010C-*`。`.claude/**` 继续保持未跟踪且排除在交付之外。
 
 ## 2026-08-05 最新权威摘要
 

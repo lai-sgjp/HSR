@@ -2360,3 +2360,25 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
   pending. No UAsset, frontend root, Pause input, Reward, Inventory, Map,
   Party, or BattleTransition production logic was modified. `.claude/**` stays
   untracked and excluded.
+
+## 2026-08-06 - TASK-P17-010C final closeout
+
+- User confirmed the current tests pass. The latest PIE evidence is
+  `C:\Users\Lai\.codex\attachments\ecbdfb99-7b64-4738-8ec9-fcca586d3e62\pasted-text.txt`.
+- The directory initialized with `Sources=3 Entries=3`, proving the locked
+  Encounter now has a unique runtime ID and is projected as an independent
+  entry.
+- `Enc_Test_Phase5` submitted and consumed successfully, applied one Stage
+  Buff with `Count=1 Debits=0`, completed the real battle with `Outcome=1`,
+  and committed the return context.
+- `Enc_Test_Phase5_locked` submitted and consumed successfully after the
+  prerequisite was completed, completed the real battle with `Outcome=1`,
+  and committed the return context without an invalid-buff failure.
+- The Phase4 segment used the existing `Map_BattleTest` consumer and returned
+  successfully; it is retained as an adjacent regression observation rather
+  than counted as a new battle-rule implementation.
+- No new code or asset was authored by Codex in this closeout turn. The two
+  user-owned UAsset modifications remain in scope for the exact closeout
+  delivery; `.claude/**` remains excluded.
+- 010C is archived as `USER ACCEPTED / INDEPENDENT REVIEW NOT RUN`. No next
+  task was created automatically.

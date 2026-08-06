@@ -1,8 +1,8 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：P17-005 已恢复最终验收；P17-PATCH-03A～03H 与 P17-006/P17-009/P17-010A 已按各自证据归档。010B 已按用户确认收口；009D 已归档。P17-005 代码/自动化已通过，等待用户 Editor/PIE 最终证据。
+> 当前状态：P17-005 已恢复最终验收；P17-PATCH-03A～03H 与 P17-006/P17-009/P17-010A～010C 已按各自证据归档。010B 已按用户确认收口；009D 已归档。P17-005 代码/自动化已通过，等待用户 Editor/PIE 最终证据。
 
-> Latest state (2026-08-05): TASK-P17-010B is user-confirmed complete and its implementation evidence is archived; independent review and a fresh Editor/PIE gate remain unverified. TASK-P17-009D is archived. TASK-P17-005 is reopened for final acceptance after Party bootstrap; code/Automation passed, while user Editor/PIE evidence remains pending.
+> Latest state (2026-08-06): TASK-P17-010C is user-confirmed complete and archived with C++ Build, 36/36 Combined Automation, and fresh user PIE evidence. Independent review, Standalone, Packaged, Shipping, physical controller, and network behavior remain unverified. TASK-P17-005 remains reopened for separate final acceptance after Party bootstrap; no new active task was created automatically.
 
 ## 已完成的规划工作
 
@@ -345,7 +345,7 @@
 - [x] P17-009D 战前 Buff GameplayEffect 与资源权威：C++、Automation、用户 Buff/GE 配置与 PIE 的战斗进入、Stage Buff 应用、指令面板、胜利结算、返回旅行和返回后 Pause 重开均已通过。
 - [x] P17-010A 数据驱动 Challenge Directory：只读 Source 投影、稳定 ID 选择、锁定/无效/重复处理、模板门面、Build/Automation 与用户 PIE 通过；动态解锁/完成度/成本/奖励另立任务。
 - [x] P17-010B Challenge Directory 失败矩阵与正式收口：用户确认完成。
-- [ ] P17-010C Challenge Directory Progression Projection：C++/Save/Settlement 与 36/36 Automation 已通过；用户 prerequisite/status Editor 配置与 Available/Completed/Defeat PIE 验证待完成。
+- [x] P17-010C Challenge Directory Progression Projection：runtime progression authority、prerequisite/status 投影、Save schema 8、Settlement completion、36/36 Automation 与用户 Available/Completed/unlock PIE 均通过，已按用户确认归档；Independent Review、Standalone、Packaged、Shipping、物理控制器和网络行为保留为 `NOT VERIFIED`。
 
 ## Phase 18：表现与模型导入
 
