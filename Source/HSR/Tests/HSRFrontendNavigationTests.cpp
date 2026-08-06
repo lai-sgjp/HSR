@@ -104,6 +104,7 @@ bool FHSRFrontendSharedSessionTest::RunTest(const FString&)
 	Manager->ConfigureAutomationInventoryBackend(true, true, true, true, true, true);
 	TestEqual(TEXT("direct inventory opens shared shell and module"),
 		Manager->OpenFrontendModule(EHSRFrontendModule::Inventory), EHSRUIScreenResult::Success);
+	TestTrue(TEXT("inventory is hosted by the shared module root"), Manager->HasFrontendModuleRootForAutomation());
 	TestTrue(TEXT("frontend owns one pause"), Manager->IsPausedForAutomation());
 	TestEqual(TEXT("global stack remains root plus shell"), Manager->GetLogicalScreenCount(), 2);
 	TestEqual(TEXT("inventory route active"), Manager->GetFrontendRouter()->GetSnapshot().GetActiveRoute().Module,
@@ -149,6 +150,7 @@ bool FHSRFrontendCrossTypeReplaceTest::RunTest(const FString&)
 	Manager->ConfigureAutomationInventoryBackend(true, true, true, true, true, true);
 	TestEqual(TEXT("placeholder opens"), Manager->OpenFrontendModule(EHSRFrontendModule::Party), EHSRUIScreenResult::Success);
 	TestEqual(TEXT("placeholder to character replaces"), Manager->OpenFrontendModule(EHSRFrontendModule::Character), EHSRUIScreenResult::Success);
+	TestTrue(TEXT("character is hosted by the shared module root"), Manager->HasFrontendModuleRootForAutomation());
 	Manager->FailNextAutomationRouteSubmit();
 	TestEqual(TEXT("failed character to inventory route is controlled"),
 		Manager->OpenFrontendModule(EHSRFrontendModule::Inventory), EHSRUIScreenResult::StackRejected);
