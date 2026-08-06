@@ -7,6 +7,7 @@
 #include "../Battle/HSREncounterTypes.h"
 #include "../Data/Definitions/HSRMapDefinition.h"
 #include "../Map/HSRMapSubsystem.h"
+#include "../Player/HSRPlayerController.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRBattleMapReturnContractTest, "HSR.BattleReturn.MapContract",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -51,6 +52,20 @@ bool FHSRBattleMapReturnContractTest::RunTest(const FString&)
 		TEXT("/Game/Maps/UEDPIE_0_Map_Exploration_P15_B"), TEXT("/Game/Maps/Map_Battle"), TEXT("/Game/Maps/Map_Exploration_P15_B")));
 	TestFalse(TEXT("unrelated travel failure is ignored"), UHSRBattleTransitionSubsystem::DoesTravelFailureMatch(
 		TEXT("/Game/Maps/Map_Unrelated"), TEXT("/Game/Maps/Map_Battle"), TEXT("/Game/Maps/Map_Exploration_P15_B")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRBattleReturnConsumerRecoveryContractTest,
+	"HSR.BattleReturn.ConsumerRecoveryContract",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRBattleReturnConsumerRecoveryContractTest::RunTest(const FString&)
+{
+	TestTrue(TEXT("pending return without map consumer requests fallback"),
+		AHSRPlayerController::ShouldEnsureBattleReturnConsumer(true, false));
+	TestFalse(TEXT("pending return with map consumer does not duplicate fallback"),
+		AHSRPlayerController::ShouldEnsureBattleReturnConsumer(true, true));
+	TestFalse(TEXT("empty return does not spawn a consumer"),
+		AHSRPlayerController::ShouldEnsureBattleReturnConsumer(false, false));
 	return true;
 }
 

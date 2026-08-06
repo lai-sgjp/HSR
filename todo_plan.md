@@ -1,6 +1,8 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：P17-005 已暂停并 checkpoint 于 `4ef49f7`；最终 PASS 不可用。P17-PATCH-03 Gate 0 已 PASS，03A～03E1 已完成；03E2 仅可准备 Task Gate，实施仍需用户单独确认。
+> 当前状态：P17-005 已恢复最终验收；P17-PATCH-03A～03H 与 P17-006/P17-009/P17-010A 已按各自证据归档。010B 已按用户确认收口；009D 已归档。P17-005 代码/自动化已通过，等待用户 Editor/PIE 最终证据。
+
+> Latest state (2026-08-05): TASK-P17-010B is user-confirmed complete and its implementation evidence is archived; independent review and a fresh Editor/PIE gate remain unverified. TASK-P17-009D is archived. TASK-P17-005 is reopened for final acceptance after Party bootstrap; code/Automation passed, while user Editor/PIE evidence remains pending.
 
 ## 已完成的规划工作
 
@@ -340,6 +342,7 @@
 - [ ] P17-009 Party 与战前编队/Buff：009A 仅完成显示基础；永久队伍候选编辑/确认、独立战前候选队伍、Buff、Encounter Request 与取消零污染仍待完成。
 - [x] P17-009B Party 永久候选编辑与确认：候选 Set/Clear/Swap、Confirm/Cancel、revision/duplicate 失败保护、用户 PIE 与回归 Automation 已通过。
 - [x] P17-009C 战前候选/Buff 元数据与准入：Challenge 路由、独立候选、重复拒绝、Cancel、纯 Request、BattleTransition 提交、Build/Automation/用户 PIE 已通过；Buff GameplayEffect 与资源消耗另立后续任务。
+- [x] P17-009D 战前 Buff GameplayEffect 与资源权威：C++、Automation、用户 Buff/GE 配置与 PIE 的战斗进入、Stage Buff 应用、指令面板、胜利结算、返回旅行和返回后 Pause 重开均已通过。
 - [x] P17-010A 数据驱动 Challenge Directory：只读 Source 投影、稳定 ID 选择、锁定/无效/重复处理、模板门面、Build/Automation 与用户 PIE 通过；动态解锁/完成度/成本/奖励另立任务。
 
 ## Phase 18：表现与模型导入

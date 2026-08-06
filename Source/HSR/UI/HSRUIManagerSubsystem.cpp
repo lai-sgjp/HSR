@@ -41,6 +41,7 @@ void UHSRUIManagerSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	NextFrontendRequestToken = 1;
 	bInitialized = true;
 	bInconsistent = false;
+	bInconsistencyIsTravelRecoverable = false;
 	if (UGameInstance* GameInstance = GetLocalPlayer() ? GetLocalPlayer()->GetGameInstance() : nullptr)
 	{
 		if (UHSRMapSubsystem* Maps = GameInstance->GetSubsystem<UHSRMapSubsystem>())
@@ -137,6 +138,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
 	if (HasInventoryOwnershipMismatch())
 	{
 		bInconsistent = true;
+		bInconsistencyIsTravelRecoverable = false;
 		return EHSRUIScreenResult::Inconsistent;
 	}
 	if (RegisteredHUD.Get() == HUD && RegisteredPlayerController.Get() == PlayerController
@@ -174,6 +176,9 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
 	FrontendModuleRootClass = InFrontendModuleRootClass;
 	CharacterDetailWidgetClass = InCharacterDetailWidgetClass;
 	InventoryWidgetClass = InInventoryWidgetClass;
+	// Clear before restoring: a travel-scoped inconsistency would otherwise reject the restore
+	// and every later OpenFrontendModule call on this otherwise-healthy host.
+	TryClearRecoverableInconsistency();
 	TryRestoreTravelDescriptor();
 	return EHSRUIScreenResult::Success;
 }
@@ -260,6 +265,21 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownCurrentHost()
 		{
 			FrontendShellInstance->RemoveFromParent();
 			FrontendShellInstance = nullptr;
+			// The shell owns the module root; CloseFrontendToRoot() only reaches its own
+			// clear on the success path, so a forced shell teardown must release it here or
+			// the retired module root outlives the host and blocks every later recovery.
+			if (FrontendModuleRootInstance)
+			{
+				FrontendModuleRootInstance->RemoveFromParent();
+				FrontendModuleRootInstance = nullptr;
+			}
+			if (FrontendRouter)
+			{
+				FHSRFrontendRouteRequest ForcedClose;
+				ForcedClose.RequestToken = AllocateFrontendRequestToken();
+				ForcedClose.Operation = EHSRFrontendRouteOperation::CloseToRoot;
+				FrontendRouter->Submit(ForcedClose);
+			}
 			if (ScreenStack && ScreenStack->GetSnapshot().Entries.Num() > 1)
 			{
 				bRecovered &= ScreenStack->SubmitRequest(MakePopRequest(AllocateRequestToken())) == EHSRScreenStackResult::Success;
@@ -272,6 +292,9 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownCurrentHost()
 		}
 	}
 	PauseOwnerToken.Invalidate();
+	// Evaluate containment while the retired host is still observable: ClearHostReferences()
+	// zeroes ActiveHostGeneration, and IsAtCleanExplorationRoot() would then read a torn state.
+	const bool bContainedToRetiredHost = IsAtCleanExplorationRoot();
 	ClearHostReferences();
 #if WITH_DEV_AUTOMATION_TESTS
 	AutomationHostIdentity = 0;
@@ -280,7 +303,12 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownCurrentHost()
 	if (!bRecovered)
 	{
 		bInconsistent = true;
-		UE_LOG(LogTemp, Error, TEXT("HSRUI P17 Host teardown required forced cleanup; host references cleared"));
+		// Host references and module instances are cleared above, so if the stack is back at a
+		// clean root the damage is contained to the retired host and a fresh one can recover.
+		bInconsistencyIsTravelRecoverable = bContainedToRetiredHost;
+		UE_LOG(LogTemp, Error,
+			TEXT("HSRUI P17 Host teardown required forced cleanup; host references cleared Recoverable=%s Stack=%d"),
+			bContainedToRetiredHost ? TEXT("true") : TEXT("false"), GetLogicalScreenCount());
 		return EHSRUIScreenResult::Inconsistent;
 	}
 	return EHSRUIScreenResult::Success;
@@ -1039,7 +1067,9 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::ResolveCompensation(const bool bRecov
 	const EHSRUIScreenResult OriginalFailure)
 {
 	if (bRecovered) return OriginalFailure;
+	// A failed compensation left the backend in an unknown state; never auto-clear this.
 	bInconsistent = true;
+	bInconsistencyIsTravelRecoverable = false;
 	return EHSRUIScreenResult::CompensationFailed;
 }
 
@@ -1163,6 +1193,29 @@ FName UHSRUIManagerSubsystem::SelectRestorableScreenId() const
 	return NAME_None;
 }
 
+bool UHSRUIManagerSubsystem::IsAtCleanExplorationRoot() const
+{
+	if (!ScreenStack || HasInventoryOwnershipMismatch()) return false;
+	if (FrontendShellInstance || FrontendModuleRootInstance || CharacterDetailWidgetInstance
+		|| InventoryWidgetInstance || InventoryViewModelInstance) return false;
+	const FHSRScreenStackSnapshot Snapshot = ScreenStack->GetSnapshot();
+	return Snapshot.Entries.Num() == 1 && Snapshot.Entries[0].ScreenId == ExplorationRootId;
+}
+
+void UHSRUIManagerSubsystem::TryClearRecoverableInconsistency()
+{
+	if (!bInconsistent || !bInconsistencyIsTravelRecoverable) return;
+	// Only a live registered host plus an exact, unowned root proves the UI is coherent again.
+	AHSRPlayerController* PC = RegisteredPlayerController.Get();
+	if (ActiveHostGeneration == 0
+		|| !IsBackendHostValid(PC, RegisteredRootWidget.Get(), PC ? PC->GetWorld() : nullptr)
+		|| !IsAtCleanExplorationRoot()) return;
+	bInconsistent = false;
+	bInconsistencyIsTravelRecoverable = false;
+	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Inconsistency cleared by fresh host HostGeneration=%lld Stack=%d"),
+		ActiveHostGeneration, GetLogicalScreenCount());
+}
+
 EHSRUIScreenResult UHSRUIManagerSubsystem::CaptureAndTeardownTravelHost()
 {
 	const int64 CapturedHost = ActiveHostGeneration;
@@ -1197,8 +1250,12 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::CaptureAndTeardownTravelHost()
 	if (bForcedRootCleanup)
 	{
 		bInconsistent = true;
+		// Travel cleanup that still lands on an exact root is recoverable: the next host
+		// registration re-validates the stack and clears the flag. Anything else is real corruption.
+		bInconsistencyIsTravelRecoverable = bAtExactRoot;
 		Result = EHSRUIScreenResult::Inconsistent;
-		UE_LOG(LogTemp, Warning, TEXT("HSRUI P17 TravelFreeze forced non-owned stack cleanup to root"));
+		UE_LOG(LogTemp, Warning, TEXT("HSRUI P17 TravelFreeze forced non-owned stack cleanup to root Recoverable=%s"),
+			bInconsistencyIsTravelRecoverable ? TEXT("true") : TEXT("false"));
 	}
 	TravelRestoreGeneration = NextTravelRestoreGeneration++;
 	TravelCapturedHostGeneration = CapturedHost;
@@ -1538,6 +1595,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterHostIdentityForAutomation(con
 	if (HasInventoryOwnershipMismatch())
 	{
 		bInconsistent = true;
+		bInconsistencyIsTravelRecoverable = false;
 		return EHSRUIScreenResult::Inconsistent;
 	}
 	if (AutomationHostIdentity == HostIdentity)
@@ -1563,6 +1621,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterHostIdentityForAutomation(con
 	bAutomationHasPauseClass = bHasPauseClass;
 	bAutomationHasDetailClass = true;
 	bAutomationHasInventoryClass = true;
+	TryClearRecoverableInconsistency();
 	TryRestoreTravelDescriptor();
 	return EHSRUIScreenResult::Success;
 }
@@ -1665,6 +1724,8 @@ void UHSRUIManagerSubsystem::DeinitializeForAutomation()
 	FrontendRouter = nullptr;
 	ScreenStack = nullptr;
 	bInitialized = false;
+	bInconsistent = false;
+	bInconsistencyIsTravelRecoverable = false;
 	bUseAutomationBackend = false;
 	bAutomationHostValid = false;
 	AutomationHostIdentity = 0;

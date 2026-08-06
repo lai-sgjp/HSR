@@ -146,6 +146,9 @@ public:
 	void ClearDamageTestInjection() { DamageTestInjectionActionId = FGuid(); NextDamageTestInjection = EHSRDamageTestInjection::None; }
 	const FHSRFormalDamageExecutionResult& GetLastDevelopmentFormalExecutionResult() const { return LastDevelopmentFormalExecutionResult; }
 	FHSRBattleInitResult ResetAndRebuildForDevelopmentTest(UWorld* BattleWorld);
+	bool HasStageBuffPlayerForDevelopmentTest() const { return FindStageBuffPlayerParticipant() != nullptr; }
+	int32 GetAppliedStageBuffCountForDevelopmentTest() const { return AppliedStageBuffHandles.Num(); }
+	int32 GetConsumedStageBuffResourceCountForDevelopmentTest() const { return AppliedStageBuffCosts.Num(); }
 	void SetTeamSkillPointsForDevelopmentTest(int32 Current, int32 Max) { TeamResourceState.MaxSkillPoints = FMath::Max(0, Max); TeamResourceState.CurrentSkillPoints = FMath::Clamp(Current, 0, TeamResourceState.MaxSkillPoints); }
 	void InitializeDevelopmentDamageRng(int32 InSeed);
 	int32 GetDevelopmentDamageConsumeCount() const { return DevelopmentDamageConsumeCount; }
@@ -168,6 +171,9 @@ private:
 	int32 CurrentRewardSeed = 0;
 	FName CurrentEncounterId;
 	FName CurrentEnemyDefinitionId;
+	TArray<FName> CurrentStageBuffIds;
+	TMap<FName, FActiveGameplayEffectHandle> AppliedStageBuffHandles;
+	TMap<FName, int32> AppliedStageBuffCosts;
 	FHSRBattleReturnContext ReturnContext;
 	TArray<FHSRBattleParticipant> Participants;
 	TArray<FHSRBattleParticipantDefinition> ParticipantDefinitions;
@@ -317,6 +323,9 @@ private:
 	void CommitSkillPoints(const FGuid& ActionId);
 	void CommitActionEnergyGain(const FGuid& ActionId, const UHSRSkillDefinition& ActionSkillDefinition, UAbilitySystemComponent& SourceASC);
 	FHSRBattleInitResult BuildAndValidateParticipantDefinitions();
+	const FHSRBattleParticipant* FindStageBuffPlayerParticipant() const;
+	bool ApplyStageBuffs(UWorld* BattleWorld);
+	void RollbackStageBuffs(bool bRefundResources);
 	void BindHealthObserver(const FHSRBattleParticipant& Participant);
 	void HandleHealthChanged(const FOnAttributeChangeData& ChangeData, FName ParticipantId);
 	void ResolveDefeat(FName DefeatedParticipantId);

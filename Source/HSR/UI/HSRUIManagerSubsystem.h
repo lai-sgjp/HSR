@@ -112,6 +112,8 @@ public:
 	EHSRUIScreenResult TeardownHostIdentityForTravelForAutomation(int32 HostIdentity);
 	void NotifyArrivalCommittedForAutomation(int64 CommitGeneration, FName MapId = TEXT("Map.Automation"));
 	bool HasPendingTravelRestoreForAutomation() const { return bTravelRestorePending; }
+	bool IsInconsistencyTravelRecoverableForAutomation() const { return bInconsistencyIsTravelRecoverable; }
+	bool HasFrontendModuleRootForAutomation() const { return FrontendModuleRootInstance != nullptr; }
 	int64 GetHostGenerationForAutomation() const { return ActiveHostGeneration; }
 	void FailNextAutomationInventoryPolicyApply() { bAutomationFailNextInventoryPolicyApply = true; }
 #endif
@@ -139,6 +141,10 @@ private:
 	FName SelectRestorableScreenId() const;
 	EHSRUIScreenResult CaptureAndTeardownTravelHost();
 	EHSRUIScreenResult TeardownCurrentHost();
+	/** True when the stack is exactly the exploration root and no module instance is owned. */
+	bool IsAtCleanExplorationRoot() const;
+	/** Clears a travel-scoped inconsistency once a fresh host proves the UI is coherent again. */
+	void TryClearRecoverableInconsistency();
 	void ClearHostReferences();
 	bool IsBackendHostValid(AHSRPlayerController* PlayerController, UHSRUserWidget* RootWidget, UWorld* World) const;
 	bool IsBackendExploration(AHSRPlayerController* PlayerController) const;
@@ -214,6 +220,12 @@ private:
 	int64 NextFrontendRequestToken = 1;
 	bool bInitialized = false;
 	bool bInconsistent = false;
+	/**
+	 * Set when bInconsistent was raised solely by travel-scoped forced cleanup, which is
+	 * recoverable: a fresh host plus a clean exploration root proves the UI is coherent again.
+	 * Never set for genuine corruption (compensation failure, ownership mismatch, broken invariants).
+	 */
+	bool bInconsistencyIsTravelRecoverable = false;
 	int64 NextHostGeneration = 1;
 	int64 ActiveHostGeneration = 0;
 	int64 NextTravelRestoreGeneration = 1;

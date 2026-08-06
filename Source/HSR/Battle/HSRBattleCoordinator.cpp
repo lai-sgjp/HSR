@@ -23,6 +23,9 @@
 #include "../Status/HSRStatusComponent.h"
 #include "../Data/Definitions/HSRStatusDefinition.h"
 #include "../Equipment/HSREquipmentStatAggregator.h"
+#include "HSRBattleTransitionSubsystem.h"
+#include "../Data/Definitions/HSRStageBuffDefinition.h"
+#include "../Inventory/HSRInventorySubsystem.h"
 
 bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRequest)
 {
@@ -65,6 +68,19 @@ bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRe
 		return false;
 	}
 
+	if (!InRequest.BuffIds.IsEmpty())
+	{
+		UHSRBattleTransitionSubsystem* Transition = GetWorld() && GetWorld()->GetGameInstance()
+			? GetWorld()->GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>() : nullptr;
+		if (!Transition || !Transition->ValidateStageBuffIds(InRequest.EncounterId, InRequest.BuffIds))
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("UHSRBattleCoordinator::SubmitBattleRequest - REJECTED invalid Stage Buff selection RequestId=%s"),
+				*InRequest.RequestId.ToString());
+			return false;
+		}
+	}
+
 	// Build pure-value ReturnContext from the consumed request
 	FHSRBattleReturnContext RetCtx;
 	RetCtx.RequestId = InRequest.RequestId;
@@ -75,6 +91,9 @@ bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRe
 	CurrentRequestId = InRequest.RequestId;
 	CurrentEncounterId = InRequest.EncounterId;
 	CurrentEnemyDefinitionId = InRequest.EnemyDefinitionId;
+	CurrentStageBuffIds = InRequest.BuffIds;
+	AppliedStageBuffHandles.Reset();
+	AppliedStageBuffCosts.Reset();
 	CurrentRewardDefinitionId = InRequest.RewardDefinitionId;
 	CurrentRewardSeed = InRequest.RewardSeed;
 	ReturnContext = RetCtx;
@@ -90,6 +109,165 @@ bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRe
 		*InRequest.ExplorationMapPath.ToString());
 
 	return true;
+}
+
+const FHSRBattleParticipant* UHSRBattleCoordinator::FindStageBuffPlayerParticipant() const
+{
+	return Participants.FindByPredicate([](const FHSRBattleParticipant& Participant)
+	{
+		return Participant.Team == EHSRBattleParticipantTeam::Player
+			&& Participant.AbilitySystemComponent.IsValid();
+	});
+}
+
+bool UHSRBattleCoordinator::ApplyStageBuffs(UWorld* BattleWorld)
+{
+	if (CurrentStageBuffIds.IsEmpty())
+	{
+		return true;
+	}
+	if (!BattleWorld || !BattleWorld->GetGameInstance())
+	{
+		UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: missing BattleWorld or GameInstance"));
+		return false;
+	}
+
+	const FHSRBattleParticipant* Player = FindStageBuffPlayerParticipant();
+	if (!Player)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("P17-009D Stage Buff application failed: no player-team participant with valid ASC CharacterId=%s"),
+			*PlayerCharacterId.ToString());
+		return false;
+	}
+
+	UHSRBattleTransitionSubsystem* Transition =
+		BattleWorld->GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>();
+	UHSRInventorySubsystem* Inventory =
+		BattleWorld->GetGameInstance()->GetSubsystem<UHSRInventorySubsystem>();
+	if (!Transition || !Inventory || !Transition->ValidateStageBuffIds(CurrentEncounterId, CurrentStageBuffIds))
+	{
+		UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: invalid Transition, Inventory, or Buff IDs"));
+		return false;
+	}
+
+	for (const FName BuffId : CurrentStageBuffIds)
+	{
+		if (AppliedStageBuffHandles.Contains(BuffId))
+		{
+			UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: duplicate runtime BuffId=%s"), *BuffId.ToString());
+			return false;
+		}
+		const UHSRStageBuffDefinition* Definition =
+			Transition->FindStageBuffDefinition(CurrentEncounterId, BuffId);
+		if (!Definition || !Definition->GameplayEffectClass
+			|| Definition->ResourceCost < 0
+			|| (Definition->ResourceCost > 0 && Definition->ResourceItemId.IsNone()))
+		{
+			UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: invalid definition BuffId=%s"), *BuffId.ToString());
+			return false;
+		}
+
+		if (Definition->ResourceCost > 0)
+		{
+			FHSRInventorySnapshot Snapshot;
+			Inventory->GetSnapshot(Snapshot);
+			const FHSRItemStackSnapshot* Stack = Snapshot.Stacks.FindByPredicate(
+				[Definition](const FHSRItemStackSnapshot& Entry)
+				{
+					return Entry.ItemId == Definition->ResourceItemId;
+				});
+			if (!Stack || Stack->Quantity < Definition->ResourceCost)
+			{
+				UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: resource changed after preflight BuffId=%s"), *BuffId.ToString());
+				return false;
+			}
+		}
+
+		FGameplayEffectSpecHandle Spec = Player->AbilitySystemComponent->MakeOutgoingSpec(
+			Definition->GameplayEffectClass, 1.0f, Player->AbilitySystemComponent->MakeEffectContext());
+		if (!Spec.IsValid())
+		{
+			UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: invalid GE spec BuffId=%s"), *BuffId.ToString());
+			return false;
+		}
+		const FActiveGameplayEffectHandle Handle =
+			Player->AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+		if (!Handle.WasSuccessfullyApplied() || !Player->AbilitySystemComponent->GetActiveGameplayEffect(Handle))
+		{
+			UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: GE was not active BuffId=%s"), *BuffId.ToString());
+			return false;
+		}
+		AppliedStageBuffHandles.Add(BuffId, Handle);
+
+		if (Definition->ResourceCost > 0)
+		{
+			if (Inventory->RemoveStack(Definition->ResourceItemId, Definition->ResourceCost)
+				!= EHSRInventoryOperationResult::Success)
+			{
+				Player->AbilitySystemComponent->RemoveActiveGameplayEffect(Handle);
+				AppliedStageBuffHandles.Remove(BuffId);
+				UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: resource debit failed BuffId=%s"), *BuffId.ToString());
+				return false;
+			}
+			AppliedStageBuffCosts.Add(BuffId, Definition->ResourceCost);
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("P17-009D Stage Buffs applied RequestId=%s Count=%d Debits=%d"),
+		*CurrentRequestId.ToString(), AppliedStageBuffHandles.Num(), AppliedStageBuffCosts.Num());
+	return true;
+}
+
+void UHSRBattleCoordinator::RollbackStageBuffs(bool bRefundResources)
+{
+	UAbilitySystemComponent* PlayerASC = nullptr;
+	for (const FHSRBattleParticipant& Participant : Participants)
+	{
+		if (Participant.Team == EHSRBattleParticipantTeam::Player
+			&& Participant.ParticipantId == PlayerCharacterId)
+		{
+			PlayerASC = Participant.AbilitySystemComponent.Get();
+			break;
+		}
+	}
+
+	if (PlayerASC)
+	{
+		for (const TPair<FName, FActiveGameplayEffectHandle>& Entry : AppliedStageBuffHandles)
+		{
+			if (Entry.Value.IsValid())
+			{
+				PlayerASC->RemoveActiveGameplayEffect(Entry.Value);
+			}
+		}
+	}
+
+	if (bRefundResources)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			if (UGameInstance* GI = World->GetGameInstance())
+			{
+				if (UHSRInventorySubsystem* Inventory = GI->GetSubsystem<UHSRInventorySubsystem>())
+				{
+					for (const TPair<FName, int32>& Entry : AppliedStageBuffCosts)
+					{
+						const UHSRBattleTransitionSubsystem* Transition = GI->GetSubsystem<UHSRBattleTransitionSubsystem>();
+						const UHSRStageBuffDefinition* Definition = Transition
+							? Transition->FindStageBuffDefinition(CurrentEncounterId, Entry.Key) : nullptr;
+						if (Definition)
+						{
+							Inventory->AddStack(Definition->ResourceItemId, Entry.Value);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	AppliedStageBuffHandles.Reset();
+	AppliedStageBuffCosts.Reset();
 }
 
 FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
@@ -130,6 +308,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 	Participants.Empty();
 	const auto RollbackBuild = [this]()
 	{
+		RollbackStageBuffs(true);
 		ClearRuntimeDelegates();
 		ClearProgressionGameplayEffects();
 		for (FHSRBattleParticipant& Existing : Participants) if (Existing.Actor.IsValid()) Existing.Actor->Destroy();
@@ -226,6 +405,16 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			static_cast<int32>(Def.Team),
 			*SpawnedActor->GetName(),
 			Participant.AbilitySystemComponent.IsValid() ? *Participant.AbilitySystemComponent->GetName() : TEXT("null"));
+	}
+
+	if (!ApplyStageBuffs(BattleWorld))
+	{
+		UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed RequestId=%s"), *CurrentRequestId.ToString());
+		RollbackBuild();
+		ParticipantDefinitions.Empty();
+		CurrentState = EHSRBattleCoordinatorState::Failed;
+		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed,
+			FText::FromString(TEXT("Stage Buff application or resource transaction failed.")));
 	}
 
 	TurnManager = NewObject<UHSRTurnManager>(this);
@@ -1202,6 +1391,7 @@ void UHSRBattleCoordinator::Reset()
 		TEXT("UHSRBattleCoordinator::Reset - Clearing state. Previous state=%d RequestId=%s"),
 		static_cast<int32>(CurrentState), *CurrentRequestId.ToString());
 
+	RollbackStageBuffs(false);
 	ClearRuntimeDelegates();
 	ClearProgressionGameplayEffects();
 	if (EquipmentEffectBridge) EquipmentEffectBridge->RemoveAll();
@@ -1213,6 +1403,7 @@ void UHSRBattleCoordinator::Reset()
 	CurrentRequestId = FGuid();
 	CurrentEncounterId = NAME_None;
 	CurrentEnemyDefinitionId = NAME_None;
+	CurrentStageBuffIds.Reset();
 	CurrentRewardDefinitionId = NAME_None;
 	CurrentRewardSeed = 0;
 	ReturnContext = FHSRBattleReturnContext();

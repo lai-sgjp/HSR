@@ -246,6 +246,12 @@ bool FHSRFrontendInputBindingGuardTest::RunTest(const FString&)
 	TestTrue(TEXT("first setup binds"), AHSRPlayerController::ShouldBindFrontendInputComponent(nullptr, First));
 	TestFalse(TEXT("repeated setup on same component is idempotent"), AHSRPlayerController::ShouldBindFrontendInputComponent(First, First));
 	TestTrue(TEXT("recreated input component receives one new binding set"), AHSRPlayerController::ShouldBindFrontendInputComponent(First, Replacement));
+	TestTrue(TEXT("first setup restores an unmarked frontend context"),
+		AHSRPlayerController::ShouldRestoreFrontendNavigationContext(false, false));
+	TestTrue(TEXT("cross-map reset restores a context even when its old controller marked it added"),
+		AHSRPlayerController::ShouldRestoreFrontendNavigationContext(true, false));
+	TestFalse(TEXT("present frontend context is not added twice"),
+		AHSRPlayerController::ShouldRestoreFrontendNavigationContext(true, true));
 	UHSRScreenWidget* Widget = NewObject<UHSRScreenWidget>();
 	TestFalse(TEXT("unowned widget cannot consume X"), Widget->ShouldConsumeCloseToRootKeyForAutomation(EKeys::X));
 	ULocalPlayer* LocalPlayer = NewObject<ULocalPlayer>(GEngine);

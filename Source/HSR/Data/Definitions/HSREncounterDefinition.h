@@ -8,6 +8,7 @@
 class UHSRDropTableDefinition;
 class UHSRItemDefinition;
 class UHSRRewardDefinition;
+class UHSRStageBuffDefinition;
 
 UCLASS(BlueprintType)
 class HSR_API UHSREncounterDefinition : public UPrimaryDataAsset
@@ -23,6 +24,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter")
 	TSoftObjectPtr<UWorld> BattleMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter|Preparation")
+	TArray<TObjectPtr<UHSRStageBuffDefinition>> StageBuffDefinitions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter|Reward")
 	TArray<TObjectPtr<UHSRItemDefinition>> RewardItemDefinitions;

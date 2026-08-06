@@ -1,5 +1,51 @@
 ﻿# HSR Worklog
 
+## 2026-08-05 - TASK-P17-009D C++ and commandlet gates
+
+- Gate 0 frozen in code: `UHSRStageBuffDefinition` is Encounter-owned;
+  `UHSRStageBuffAuthority` validates registered IDs; Inventory preflights and
+  debits resources; Coordinator applies GE then debits, refunds only failed
+  builds, and removes only runtime GE handles on normal Reset.
+- TDD RED caught a GE-less definition replacing a valid registry. Registration
+  now rejects it before mutation; Development Editor build and
+  `HSR.Battle.StageBuff` 1/1 passed GREEN.
+- Regression commandlets passed: PreBattle 3/3, Admission 1/1, Challenge
+  Directory 3/3, Frontend Navigation 11/11, Map 5/5, BattleReturn 2/2.
+- No UAsset was authored. Final acceptance waits for user-created Stage Buff,
+  GE, and resource assets plus PIE evidence for apply/debit, cancel, duplicate,
+  insufficient-resource, application-failure/refund, and return travel.
+
+- Follow-up correction: Battle participant IDs use `Player`, while the selected
+  character definition ID is `Character.A`. Stage Buff application now resolves
+  the player by team plus valid ASC rather than comparing those unrelated IDs;
+  Development Editor and `HSR.Battle.StageBuff` 2/2 passed.
+
+- User PIE accepted the corrected route: `SubmitEncounterRequest`, battle
+  `BuildParticipants`, `P17-009D Stage Buffs applied Count=1 Debits=0`, real
+  `P6-004A` command-panel binding and action submissions, victory settlement,
+  battle return, and post-return Pause reopen all completed successfully.
+
+## 2026-08-05 - TASK-P17-010B user-confirmed closeout and TASK-P17-009D handoff
+
+- User confirmed that the 010B Challenge failure-matrix implementation is complete; its build/Automation evidence was moved to the 010B archive with the independent-review and fresh Editor/PIE boundaries preserved as `NOT VERIFIED`.
+- Created the sole active card `TASK-P17-009D - Pre-Battle Buff GameplayEffect and Resource Authority`.
+- Frozen the 009D outcome: a valid stable Buff ID is validated by authority, applies one configured GameplayEffect, and debits one resource; invalid, duplicate, insufficient, or failed paths are zero-mutation and exactly-once.
+- Gate 0 is intentionally open because the current code has only `BuffIds` metadata and no Buff-specific definition/registry, resource type/API, or authorized Stage Buff GameplayEffect asset contract. No 009D production or asset implementation started.
+
+## 2026-08-05 - TASK-P17-010B Task Gate created
+
+- Audited the accepted P17-010A directory evidence against the Phase 17 plan and adjacent PATCH-03F/03G/03H, P17-006, and PATCH-03E2 records.
+- Archived the 010A handoff summary and created the only active card `TASK-P17-010B - Challenge Directory Failure Matrix and Formal Closeout`.
+- Frozen scope: invalid/locked/unknown/unavailable Challenge rejection, preservation of the last valid selection, and zero BattleTransition travel side effects. Map, Save, Quest, Equipment, Party authority, Content, Config, Build, Automation, and PIE implementation are not authorized.
+- No Source/Content/Config/Build/Automation/PIE action was performed. Independent Task Gate review and separate user implementation confirmation are still required.
+
+## 2026-08-05 - TASK-P17-010B implementation checkpoint
+
+- User confirmed implementation. TDD RED compiled against the missing selection seam, then the minimal Widget selection transaction was implemented.
+- Final focused Challenge Automation passed 3/3; final adjacent regression passed 21/21: PreBattle 3, Admission 1, FrontendNavigation 11, Map 5, TravelRestore 1.
+- Final Development Editor Build passed UHT, compile, link and metadata. The first sandbox UBT permission failure and intended compile RED remain preserved in the execution report.
+- User Editor/PIE is still required for Blueprint binding/reopen, valid and controlled failure routes, focus/input recovery, resolutions and visual runtime errors. No final PASS or asset provenance claim is made.
+
 ## 2026-08-05 - TASK-P17-010A data-driven Challenge Directory
 
 - Added deterministic Challenge source projection, locked/invalid/duplicate handling, stable-ID selection, and a Blueprint-safe template-build facade; Build and `HSR.UI.ChallengeDirectory` 2/2 passed with PreBattle 3/3 and Admission 1/1 regression.
@@ -2291,3 +2337,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Development Editor Build、`HSR.UI.Party` 3/3、`HSR.Party` 1/1、`HSR.UI.FrontendNavigation` 11/11 通过。
 - 用户创建并接入 Party Panel/Slot Entry；PIE 确认 Character.A、两个槽位、Back/Close 与 A↔B 后重开正常。
 - 归档结论：`PASS / USER ACCEPTED`，仅覆盖只读投影前置切片；不代表权威执行计划 P17-009 整体通过。
+
+## 2026-08-05 - TASK-P17-005 final code-gate rerun after Party bootstrap
+
+- Reopened P17-005 only for final acceptance evidence after P17-009A/009B removed the former `PartySlotEmpty` dependency; archived completed 009D before switching the active task.
+- Fresh `HSREditor Win64 Development` build succeeded.
+- Approved UE commandlets passed: FrontendNavigation 11/11, Party 4/4, ChallengeDirectory 3/3, Map 5/5, BattleReturn 2/2, PreBattleCandidate 3/3, and InteractionBattle Admission 1/1.
+- Frontend log records CharacterDetail and Inventory open success plus TravelRestore consume; no `PartySlotEmpty` appeared in the approved run.
+- First sandbox run hit the known Zen `CreateProc Access Denied` assertion; the identical command passed outside the sandbox and the environment failure is retained in `tasks/execution-result.md`.
+- `git diff --check` passed. User Editor Save All/reopen, PIE route/focus/input, post-return `1` Pause, and both resolutions remain pending; task is not yet final PASS.

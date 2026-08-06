@@ -25,9 +25,16 @@ public:
 	UFUNCTION(BlueprintPure, Category = "HSR|Challenge")
 	FHSRChallengeDirectorySnapshot GetDirectorySnapshot() const;
 
+	/** Resolves a directory entry and changes selection only on success. */
+	UFUNCTION(BlueprintCallable, Category = "HSR|Challenge")
+	EHSRChallengeDirectoryResult SelectChallenge(FName EncounterId);
+
+	UFUNCTION(BlueprintPure, Category = "HSR|Challenge")
+	FName GetSelectedEncounterId() const { return SelectedEncounterId; }
+
 	UFUNCTION(BlueprintCallable, Category = "HSR|Challenge")
 	FHSREncounterResult BuildChallengeTemplate(FName EncounterId, EHSREncounterInitiative Initiative,
-		UPARAM(ref) FHSREncounterRequest& OutTemplate) const;
+		UPARAM(ref) FHSREncounterRequest& OutTemplate);
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "HSR|Challenge")
 	void OnDirectoryChanged(const FHSRChallengeDirectorySnapshot& Snapshot);
@@ -35,4 +42,7 @@ public:
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRChallengeDirectoryViewModel> ViewModel;
+
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "HSR|Challenge", meta = (AllowPrivateAccess = "true"))
+	FName SelectedEncounterId;
 };

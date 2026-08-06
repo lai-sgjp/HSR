@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "../Data/Definitions/HSREncounterDefinition.h"
 #include "../UI/HSRChallengeDirectoryViewModel.h"
+#include "../UI/HSRChallengeDirectoryWidget.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRChallengeDirectoryProjectionTest,
 	"HSR.UI.ChallengeDirectory.Projection", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -55,6 +56,83 @@ bool FHSRChallengeDirectoryInvalidEntriesTest::RunTest(const FString&)
 	UHSREncounterDefinition* Selected = nullptr;
 	TestEqual(TEXT("locked selection rejected"), ViewModel->ResolveSelection(TEXT("Encounter.Locked"), Selected),
 		EHSRChallengeDirectoryResult::Locked);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRChallengeDirectorySelectionFailureMatrixTest,
+	"HSR.UI.ChallengeDirectory.SelectionFailureMatrix", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSRChallengeDirectorySelectionFailureMatrixTest::RunTest(const FString&)
+{
+	UHSREncounterDefinition* Valid = NewObject<UHSREncounterDefinition>();
+	Valid->EncounterId = TEXT("Encounter.Valid");
+	Valid->EnemyDefinitionId = TEXT("Enemy.Valid");
+	Valid->BattleMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Maps/Map_Battle.Map_Battle")));
+
+	UHSREncounterDefinition* LockedDefinition = NewObject<UHSREncounterDefinition>();
+	LockedDefinition->EncounterId = TEXT("Encounter.Locked");
+	LockedDefinition->EnemyDefinitionId = TEXT("Enemy.Locked");
+	LockedDefinition->BattleMap = Valid->BattleMap;
+
+	UHSREncounterDefinition* SecondValid = NewObject<UHSREncounterDefinition>();
+	SecondValid->EncounterId = TEXT("Encounter.SecondValid");
+	SecondValid->EnemyDefinitionId = TEXT("Enemy.SecondValid");
+	SecondValid->BattleMap = Valid->BattleMap;
+
+	UHSREncounterDefinition* InvalidDefinition = NewObject<UHSREncounterDefinition>();
+	InvalidDefinition->EncounterId = TEXT("Encounter.Invalid");
+	InvalidDefinition->EnemyDefinitionId = NAME_None;
+	InvalidDefinition->BattleMap = Valid->BattleMap;
+
+	FHSRChallengeDirectorySource ValidSource;
+	ValidSource.Definition = Valid;
+	FHSRChallengeDirectorySource LockedSource;
+	LockedSource.Definition = LockedDefinition;
+	FHSRChallengeDirectorySource SecondValidSource;
+	SecondValidSource.Definition = SecondValid;
+	LockedSource.bUnlocked = false;
+	FHSRChallengeDirectorySource InvalidSource;
+	InvalidSource.Definition = InvalidDefinition;
+
+	UHSRChallengeDirectoryWidget* Widget = NewObject<UHSRChallengeDirectoryWidget>();
+	TestNotNull(TEXT("challenge widget is created"), Widget);
+	if (!Widget)
+	{
+		return false;
+	}
+
+	TestEqual(TEXT("directory initializes"), Widget->InitializeDirectory(
+		{ ValidSource, LockedSource, SecondValidSource, InvalidSource }), EHSRChallengeDirectoryResult::Success);
+	TestEqual(TEXT("valid selection succeeds"), Widget->SelectChallenge(TEXT("Encounter.Valid")),
+		EHSRChallengeDirectoryResult::Success);
+	TestEqual(TEXT("valid selection is retained"), Widget->GetSelectedEncounterId(), FName(TEXT("Encounter.Valid")));
+	FHSREncounterRequest UnavailableTemplate;
+	TestEqual(TEXT("missing transition rejects valid Enter"), Widget->BuildChallengeTemplate(
+		TEXT("Encounter.SecondValid"), EHSREncounterInitiative::Player, UnavailableTemplate).ResultType,
+		EHSREncounterResultType::InvalidRequest);
+	TestEqual(TEXT("missing transition preserves selection"), Widget->GetSelectedEncounterId(), FName(TEXT("Encounter.Valid")));
+
+	TestEqual(TEXT("locked selection is rejected"), Widget->SelectChallenge(TEXT("Encounter.Locked")),
+		EHSRChallengeDirectoryResult::Locked);
+	TestEqual(TEXT("locked failure preserves selection"), Widget->GetSelectedEncounterId(), FName(TEXT("Encounter.Valid")));
+	TestEqual(TEXT("invalid selection is rejected"), Widget->SelectChallenge(TEXT("Encounter.Invalid")),
+		EHSRChallengeDirectoryResult::InvalidDefinition);
+	TestEqual(TEXT("invalid failure preserves selection"), Widget->GetSelectedEncounterId(), FName(TEXT("Encounter.Valid")));
+	TestEqual(TEXT("unknown selection is rejected"), Widget->SelectChallenge(TEXT("Encounter.Unknown")),
+		EHSRChallengeDirectoryResult::UnknownChallenge);
+	TestEqual(TEXT("unknown failure preserves selection"), Widget->GetSelectedEncounterId(), FName(TEXT("Encounter.Valid")));
+
+	FHSREncounterRequest FailedTemplate;
+	FailedTemplate.EncounterId = TEXT("Encounter.Prior");
+	TestEqual(TEXT("failed Enter is rejected"), Widget->BuildChallengeTemplate(
+		TEXT("Encounter.Locked"), EHSREncounterInitiative::Player, FailedTemplate).ResultType,
+		EHSREncounterResultType::InvalidDefinition);
+	TestEqual(TEXT("failed Enter preserves selection"), Widget->GetSelectedEncounterId(), FName(TEXT("Encounter.Valid")));
+
+	UHSRChallengeDirectoryWidget* UninitializedWidget = NewObject<UHSRChallengeDirectoryWidget>();
+	TestEqual(TEXT("uninitialized selection is controlled"), UninitializedWidget->SelectChallenge(TEXT("Encounter.Valid")),
+		EHSRChallengeDirectoryResult::EmptyDirectory);
+	TestEqual(TEXT("uninitialized widget has no selection"), UninitializedWidget->GetSelectedEncounterId(), NAME_None);
 	return true;
 }
 

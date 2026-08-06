@@ -11,6 +11,7 @@ EHSRChallengeDirectoryResult UHSRChallengeDirectoryWidget::InitializeDirectory(
 		ViewModel = NewObject<UHSRChallengeDirectoryViewModel>(this);
 	}
 	const EHSRChallengeDirectoryResult Result = ViewModel->Initialize(Sources);
+	SelectedEncounterId = NAME_None;
 	OnDirectoryChanged(ViewModel->GetSnapshot());
 	return Result;
 }
@@ -28,8 +29,24 @@ FHSRChallengeDirectorySnapshot UHSRChallengeDirectoryWidget::GetDirectorySnapsho
 	return ViewModel ? ViewModel->GetSnapshot() : FHSRChallengeDirectorySnapshot();
 }
 
+EHSRChallengeDirectoryResult UHSRChallengeDirectoryWidget::SelectChallenge(const FName EncounterId)
+{
+	if (!ViewModel)
+	{
+		return EHSRChallengeDirectoryResult::EmptyDirectory;
+	}
+
+	UHSREncounterDefinition* Definition = nullptr;
+	const EHSRChallengeDirectoryResult Result = ViewModel->ResolveSelection(EncounterId, Definition);
+	if (Result == EHSRChallengeDirectoryResult::Success)
+	{
+		SelectedEncounterId = EncounterId;
+	}
+	return Result;
+}
+
 FHSREncounterResult UHSRChallengeDirectoryWidget::BuildChallengeTemplate(
-	const FName EncounterId, const EHSREncounterInitiative Initiative, FHSREncounterRequest& OutTemplate) const
+	const FName EncounterId, const EHSREncounterInitiative Initiative, FHSREncounterRequest& OutTemplate)
 {
 	UHSREncounterDefinition* Definition = nullptr;
 	const EHSRChallengeDirectoryResult SelectionResult = ViewModel
@@ -41,11 +58,18 @@ FHSREncounterResult UHSRChallengeDirectoryWidget::BuildChallengeTemplate(
 			FText::FromString(SelectionResult == EHSRChallengeDirectoryResult::Locked
 				? TEXT("Challenge is locked.") : TEXT("Challenge is unavailable.")));
 	}
-
 	UHSRBattleTransitionSubsystem* Transition = GetGameInstance()
 		? GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>() : nullptr;
-	return Transition
-		? Transition->BuildPreBattleEncounterTemplate(Definition, Initiative, OutTemplate)
-		: FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
+	if (!Transition)
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
 			FText::FromString(TEXT("Battle transition is unavailable.")));
+	}
+
+	FHSREncounterResult Result = Transition->BuildPreBattleEncounterTemplate(Definition, Initiative, OutTemplate);
+	if (Result.ResultType == EHSREncounterResultType::Success)
+	{
+		SelectedEncounterId = EncounterId;
+	}
+	return Result;
 }

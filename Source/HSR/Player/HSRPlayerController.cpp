@@ -7,6 +7,9 @@
 #include "InputMappingContext.h"
 #include "../UI/HSRScreenStackTypes.h"
 #include "../UI/HSRUIManagerSubsystem.h"
+#include "../Battle/HSRBattleTransitionSubsystem.h"
+#include "../Battle/HSRExplorationReturnConsumer.h"
+#include "EngineUtils.h"
 
 AHSRPlayerController::AHSRPlayerController()
 {
@@ -25,6 +28,10 @@ void AHSRPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 	bInputSystemReady = true;
+	if (InputComponent)
+	{
+		InputComponent->Priority = FrontendInputPriority;
+	}
 	AddFrontendNavigationContext();
 	if (UEnhancedInputComponent* Enhanced = Cast<UEnhancedInputComponent>(InputComponent);
 		Enhanced && ShouldBindFrontendInputComponent(FrontendBindingsInputComponent, InputComponent))
@@ -41,6 +48,15 @@ void AHSRPlayerController::SetupInputComponent()
 		BindStarted(ChallengeAction, &ThisClass::HandleChallenge);
 		BindStarted(CloseToRootAction, &ThisClass::HandleCloseToRoot);
 		FrontendBindingsInputComponent = InputComponent;
+		const bool bPauseMapped = FrontendNavigationMappingContext && PauseBackAction
+			&& FrontendNavigationMappingContext->GetMappings().ContainsByPredicate([this](const FEnhancedActionKeyMapping& Mapping)
+			{
+				return Mapping.Action == PauseBackAction;
+			});
+		UE_LOG(LogTemp, Log, TEXT("HSRUI Frontend input bound Component=%s Priority=%d Context=%s PauseAction=%s PauseMapped=%s"),
+			*InputComponent->GetName(), InputComponent->Priority,
+			FrontendNavigationMappingContext ? *FrontendNavigationMappingContext->GetPathName() : TEXT("None"),
+			PauseBackAction ? *PauseBackAction->GetPathName() : TEXT("None"), bPauseMapped ? TEXT("true") : TEXT("false"));
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::SetupInputComponent - PlayerInput=%s InputComponent=%s"),
@@ -66,6 +82,36 @@ void AHSRPlayerController::BeginPlay()
 	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::BeginPlay - PlayerInput=%s InputComponent=%s"),
 		PlayerInput ? *PlayerInput->GetClass()->GetName() : TEXT("None"),
 		InputComponent ? *InputComponent->GetClass()->GetName() : TEXT("None"));
+
+	// Battle return is a GameInstance transaction. Exploration maps may not
+	// contain a placed consumer, so provide a runtime fallback at the map's
+	// PlayerController lifecycle boundary without duplicating the transaction.
+	if (UHSRBattleTransitionSubsystem* BattleTravel = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>() : nullptr;
+		BattleTravel && BattleTravel->HasReturnPending() && GetWorld())
+	{
+		bool bConsumerPresent = false;
+		for (TActorIterator<AHSRExplorationReturnConsumer> It(GetWorld()); It; ++It)
+		{
+			bConsumerPresent = true;
+			break;
+		}
+		if (ShouldEnsureBattleReturnConsumer(true, bConsumerPresent))
+		{
+			FActorSpawnParameters SpawnParameters;
+			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			if (AHSRExplorationReturnConsumer* Consumer = GetWorld()->SpawnActor<AHSRExplorationReturnConsumer>(
+				AHSRExplorationReturnConsumer::StaticClass(), FTransform::Identity, SpawnParameters))
+			{
+				UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::BeginPlay - Spawned battle return consumer %s"),
+					*Consumer->GetName());
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("AHSRPlayerController::BeginPlay - Failed to spawn battle return consumer"));
+			}
+		}
+	}
 	SetControlMode(EHSRPlayerControlMode::Exploration);
 }
 
@@ -211,12 +257,20 @@ void AHSRPlayerController::RequestCloseFrontendToRoot()
 
 void AHSRPlayerController::HandlePauseBack()
 {
-	if (ULocalPlayer* LP = GetLocalPlayer())
-		if (UHSRUIManagerSubsystem* Manager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
-		{
-			if (Manager->GetLogicalScreenCount() <= 1) Manager->OpenFrontendModule(EHSRFrontendModule::PauseHub);
-			else Manager->RequestBack();
-		}
+	ULocalPlayer* LP = GetLocalPlayer();
+	UHSRUIManagerSubsystem* Manager = LP ? LP->GetSubsystem<UHSRUIManagerSubsystem>() : nullptr;
+	if (!Manager)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HSRUI P17 PauseBack ignored LocalPlayer=%s Manager=None"), LP ? TEXT("valid") : TEXT("None"));
+		return;
+	}
+
+	const int32 StackBefore = Manager->GetLogicalScreenCount();
+	const EHSRUIScreenResult Result = StackBefore <= 1
+		? Manager->OpenFrontendModule(EHSRFrontendModule::PauseHub) : Manager->RequestBack();
+	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 PauseBack handled StackBefore=%d Result=%d StackAfter=%d HasPause=%s"),
+		StackBefore, static_cast<int32>(Result), Manager->GetLogicalScreenCount(),
+		Manager->HasOpenPauseScreen() ? TEXT("true") : TEXT("false"));
 }
 
 void AHSRPlayerController::HandleInventory() { if (ULocalPlayer* LP = GetLocalPlayer()) if (auto* M = LP->GetSubsystem<UHSRUIManagerSubsystem>()) M->OpenFrontendModule(EHSRFrontendModule::Inventory); }
@@ -227,15 +281,31 @@ void AHSRPlayerController::HandleCloseToRoot() { RequestCloseFrontendToRoot(); }
 
 void AHSRPlayerController::AddFrontendNavigationContext()
 {
-	if (bFrontendNavigationContextAdded || !FrontendNavigationMappingContext) return;
-	if (ULocalPlayer* LP = GetLocalPlayer())
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
-		{
-			FModifyContextOptions Options;
-			Options.bForceImmediately = true;
-			Subsystem->AddMappingContext(FrontendNavigationMappingContext, 10, Options);
-			bFrontendNavigationContextAdded = true;
-		}
+	if (!FrontendNavigationMappingContext)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HSRUI Frontend context is not configured"));
+		return;
+	}
+	ULocalPlayer* LP = GetLocalPlayer();
+	UEnhancedInputLocalPlayerSubsystem* Subsystem = LP ? LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() : nullptr;
+	if (!Subsystem)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HSRUI Frontend context unavailable LocalPlayer=%s Subsystem=%s"),
+			LP ? TEXT("valid") : TEXT("None"), Subsystem ? TEXT("valid") : TEXT("None"));
+		return;
+	}
+
+	const bool bContextPresent = Subsystem->HasMappingContext(FrontendNavigationMappingContext);
+	if (ShouldRestoreFrontendNavigationContext(bFrontendNavigationContextAdded, bContextPresent))
+	{
+		FModifyContextOptions Options;
+		Options.bForceImmediately = true;
+		Subsystem->AddMappingContext(FrontendNavigationMappingContext, 10, Options);
+	}
+	bFrontendNavigationContextAdded = true;
+	UE_LOG(LogTemp, Log, TEXT("HSRUI Frontend context %s Context=%s Present=%s"),
+		bContextPresent ? TEXT("verified") : TEXT("restored"), *FrontendNavigationMappingContext->GetPathName(),
+		Subsystem->HasMappingContext(FrontendNavigationMappingContext) ? TEXT("true") : TEXT("false"));
 }
 
 void AHSRPlayerController::RequestBackScreen()

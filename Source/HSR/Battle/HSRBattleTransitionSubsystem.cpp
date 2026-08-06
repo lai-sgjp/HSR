@@ -11,6 +11,8 @@
 #include "../Reward/HSRRewardSubsystem.h"
 #include "../Map/HSRMapSubsystem.h"
 #include "../Party/HSRPartySubsystem.h"
+#include "HSRStageBuffAuthority.h"
+#include "../Data/Definitions/HSRStageBuffDefinition.h"
 
 void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -22,6 +24,7 @@ void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collect
 	TravelRequestId = FGuid();
 	TravelSourceMap = NAME_None;
 	TravelCompletedEncounterId = NAME_None;
+	StageBuffAuthority = NewObject<UHSRStageBuffAuthority>(this);
 
 	if (GEngine)
 	{
@@ -56,6 +59,66 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::SubmitEncounterRequestFromUI(
 	return SubmitEncounterRequest(Request, GetWorld());
 }
 
+bool UHSRBattleTransitionSubsystem::ValidateStageBuffIds(FName EncounterId, const TArray<FName>& BuffIds) const
+{
+	return BuffIds.IsEmpty() || (StageBuffAuthority && StageBuffAuthority->ValidateBuffIds(EncounterId, BuffIds));
+}
+
+bool UHSRBattleTransitionSubsystem::CanAffordStageBuffs(FName EncounterId, const TArray<FName>& BuffIds) const
+{
+	if (BuffIds.IsEmpty())
+	{
+		return true;
+	}
+	UHSRInventorySubsystem* Inventory = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UHSRInventorySubsystem>() : nullptr;
+	if (!Inventory)
+	{
+		return false;
+	}
+
+	TMap<FName, int32> Required;
+	for (const FName BuffId : BuffIds)
+	{
+		const UHSRStageBuffDefinition* Definition = FindStageBuffDefinition(EncounterId, BuffId);
+		if (!Definition)
+		{
+			return false;
+		}
+		if (Definition->ResourceCost > 0)
+		{
+			int32& Total = Required.FindOrAdd(Definition->ResourceItemId);
+			if (Definition->ResourceCost > MAX_int32 - Total)
+			{
+				return false;
+			}
+			Total += Definition->ResourceCost;
+		}
+	}
+
+	FHSRInventorySnapshot Snapshot;
+	Inventory->GetSnapshot(Snapshot);
+	for (const TPair<FName, int32>& Entry : Required)
+	{
+		const FHSRItemStackSnapshot* Stack = Snapshot.Stacks.FindByPredicate(
+			[&Entry](const FHSRItemStackSnapshot& Candidate)
+			{
+				return Candidate.ItemId == Entry.Key;
+			});
+		if (!Stack || Stack->Quantity < Entry.Value)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+const UHSRStageBuffDefinition* UHSRBattleTransitionSubsystem::FindStageBuffDefinition(
+	FName EncounterId, FName BuffId) const
+{
+	return StageBuffAuthority ? StageBuffAuthority->FindBuff(EncounterId, BuffId) : nullptr;
+}
+
 EHSREncounterResultType UHSRBattleTransitionSubsystem::BuildEncounterRequest(
 	const FHSRPreBattleAdmissionInput& Input, FHSREncounterRequest& OutRequest)
 {
@@ -79,7 +142,7 @@ EHSREncounterResultType UHSRBattleTransitionSubsystem::BuildEncounterRequest(
 
 FHSREncounterResult UHSRBattleTransitionSubsystem::BuildPreBattleEncounterTemplate(
 	UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative,
-	FHSREncounterRequest& OutTemplate) const
+	FHSREncounterRequest& OutTemplate)
 {
 	OutTemplate = FHSREncounterRequest();
 	if (!Definition)
@@ -111,6 +174,12 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::BuildPreBattleEncounterTempla
 	{
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::NoPlayerSelection,
 			FText::FromString(TEXT("Cannot resolve the current player Pawn.")));
+	}
+	if (!StageBuffAuthority || !StageBuffAuthority->RegisterEncounterBuffs(
+		Definition->EncounterId, Definition->StageBuffDefinitions))
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidDefinition,
+			FText::FromString(TEXT("Stage Buff definitions are invalid.")));
 	}
 
 	FPlatformMisc::CreateGuid(OutTemplate.RequestId);
@@ -253,6 +322,12 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::SubmitEncounterRequest(
 {
 	if (!World || !Request.RequestId.IsValid() || Request.BattleMapPath.IsNone())
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest);
+	if (!ValidateStageBuffIds(Request.EncounterId, Request.BuffIds))
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
+			FText::FromString(TEXT("Stage Buff selection is invalid or unavailable.")));
+	if (!CanAffordStageBuffs(Request.EncounterId, Request.BuffIds))
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
+			FText::FromString(TEXT("Stage Buff resource is insufficient.")));
 	if (CurrentState == EHSREncounterState::Pending || CurrentState == EHSREncounterState::Traveling)
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::AlreadyPending);
 	PendingRequest = Request;

@@ -1,6 +1,19 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-08-01
+> 最后更新：2026-08-05
+
+## 2026-08-05 最新权威摘要
+
+- `TASK-P17-010A` 已归档为 `PASS / USER ACCEPTED`；其数据驱动目录 happy path 不再继续塞入新功能。
+- `TASK-P17-010B` 已按用户确认收口；实现、聚焦 Challenge Automation `3/3`、相邻回归 `21/21` 和 Development Editor Build 证据已归档。独立复核与新鲜 Editor/PIE Gate 未在本轮执行，仍标为 `NOT VERIFIED`。
+- `TASK-P17-009D - Pre-Battle Buff GameplayEffect and Resource Authority` 已完成，状态为 `COMPLETE / ENGINE AUTOMATION PASS / USER PIE PASS`。
+- 009D 承接已验收的 009C：Encounter-owned Stage Buff definitions 经 Transition registry 校验，Coordinator 对玩家 ASC exactly-once 应用 GE 后由 Inventory exactly-once 扣资源；构建失败回滚 GE 与已扣资源，正常 Reset 不退款。永久 Party、Reward/Save、Challenge 目录和已修复的前端输入链路未重新打开。
+- Development Editor 与 StageBuff 2/2、PreBattle 3/3、Admission 1/1、Challenge 3/3、Frontend 11/11、Map 5/5、BattleReturn 2/2 已通过；用户 PIE 进一步确认 Stage Buff 应用、战斗指令面板、胜利结算、战斗返回和返回后的 Pause 重开。Codex 未创建 UAsset。
+- `.claude/**` 仍为用户本地未跟踪文件，不属于本次文档交付。
+- 当前活动任务已切换为 `TASK-P17-005` 最终验收：Fresh Editor Build 与
+  Frontend/Party/Challenge/Map/BattleReturn/PreBattle/Admission 自动化均已
+  通过；用户 Editor Save All/reopen、PIE 路由/焦点/输入、返回后 `1` 键
+  Pause 与双分辨率证据仍为 `NOT VERIFIED`，因此不宣称最终 PASS。
 
 ## 2026-08-01 最新权威摘要
 

@@ -9,6 +9,8 @@
 #include "HSRBattleTransitionSubsystem.generated.h"
 
 class UHSREncounterDefinition;
+class UHSRStageBuffAuthority;
+class UHSRStageBuffDefinition;
 class APawn;
 
 UENUM()
@@ -44,7 +46,10 @@ public:
 	/** Builds the read-only template consumed by the pre-battle candidate UI. */
 	UFUNCTION(BlueprintCallable, Category = "Encounter|Preparation")
 	FHSREncounterResult BuildPreBattleEncounterTemplate(UHSREncounterDefinition* Definition,
-		EHSREncounterInitiative Initiative, UPARAM(ref) FHSREncounterRequest& OutTemplate) const;
+		EHSREncounterInitiative Initiative, UPARAM(ref) FHSREncounterRequest& OutTemplate);
+	bool ValidateStageBuffIds(FName EncounterId, const TArray<FName>& BuffIds) const;
+	bool CanAffordStageBuffs(FName EncounterId, const TArray<FName>& BuffIds) const;
+	const UHSRStageBuffDefinition* FindStageBuffDefinition(FName EncounterId, FName BuffId) const;
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
@@ -118,6 +123,8 @@ private:
 	FName TravelCompletedEncounterId;
 	FTSTicker::FDelegateHandle TravelTimeoutHandle;
 	TSet<FName> ResolvedEncounterIds;
+	UPROPERTY()
+	TObjectPtr<UHSRStageBuffAuthority> StageBuffAuthority;
 #if WITH_DEV_AUTOMATION_TESTS
 	int32 AdmissionMutationCountForAutomation = 0;
 	int32 TravelInitiationCountForAutomation = 0;

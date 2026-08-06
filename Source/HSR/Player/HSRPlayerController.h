@@ -41,6 +41,14 @@ public:
 	{
 		return Current && Bound != Current;
 	}
+	static bool ShouldEnsureBattleReturnConsumer(bool bReturnPending, bool bConsumerPresent)
+	{
+		return bReturnPending && !bConsumerPresent;
+	}
+	static bool ShouldRestoreFrontendNavigationContext(bool bMarkedAdded, bool bContextPresent)
+	{
+		return !bMarkedAdded || !bContextPresent;
+	}
 
 	UFUNCTION(BlueprintCallable, Category = "UI|Navigation")
 	void RequestOpenPauseScreen();
@@ -63,6 +71,7 @@ protected:
 	void AddExplorationContext();
 	void RemoveExplorationContext();
 	void AddFrontendNavigationContext();
+	static constexpr int32 FrontendInputPriority = 100;
 	void HandlePauseBack();
 	void HandleInventory();
 	void HandleParty();
