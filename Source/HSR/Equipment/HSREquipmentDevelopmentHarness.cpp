@@ -1,8 +1,12 @@
 #include "HSREquipmentDevelopmentHarness.h"
 
 #include "HSREquipmentSubsystem.h"
+#include "../Data/Definitions/HSREquipmentEnhancementCatalog.h"
 #include "../Data/Definitions/HSREquipmentDefinition.h"
 #include "../Data/Definitions/HSRRelicDefinition.h"
+#include "../Data/Definitions/HSRItemDefinition.h"
+#include "../Data/Definitions/HSRItemEquipmentMappingCatalog.h"
+#include "../Inventory/HSRInventorySubsystem.h"
 #include "../Save/HSRSaveSubsystem.h"
 #include "../UI/HSREquipmentDetailViewModel.h"
 #include "../UI/HSREquipmentDetailWidget.h"
@@ -78,13 +82,55 @@ namespace
 	}
 
 	void LogResult(const TCHAR* Command,bool bSuccess){if(bSuccess){UE_LOG(LogTemp,Log,TEXT("HSR.EquipmentHarness Command=%s Result=SUCCESS"),Command);}else{UE_LOG(LogTemp,Error,TEXT("HSR.EquipmentHarness Command=%s Result=FAIL"),Command);}}
-	void RunSetup(){UGameInstance* GI=FindPIEGameInstance();LogResult(TEXT("Setup"),FHSREquipmentDevelopmentHarness::SetupFixedLoadout(GI));}
+	void EnsureLumenShards(UGameInstance* GI)
+	{
+		UHSRInventorySubsystem* Inventory = GI ? GI->GetSubsystem<UHSRInventorySubsystem>() : nullptr;
+		if (!Inventory) return;
+		static const FName MaterialId(TEXT("Item.Material.LumenShard"));
+		if (!Inventory->HasDefinition(MaterialId))
+		{
+			UHSRItemDefinition* Material = NewObject<UHSRItemDefinition>(GetTransientPackage());
+			Material->ItemId = MaterialId; Material->StorageKind = EHSRItemStorageKind::Stackable; Material->MaxStack = 99;
+			const EHSRInventoryOperationResult DefResult = Inventory->RegisterDefinition(*Material);
+			if (DefResult != EHSRInventoryOperationResult::Success
+				&& DefResult != EHSRInventoryOperationResult::DuplicateDefinitionId) return;
+		}
+		EHSRItemStorageKind StorageKind = EHSRItemStorageKind::Stackable;
+		int32 MaxStack = 0;
+		if (!Inventory->GetDefinitionInfo(MaterialId, StorageKind, MaxStack))
+		{
+			UE_LOG(LogTemp, Error, TEXT("HSR.EquipmentHarness EnsureLumenShards FAIL MissingDefinition"));
+			return;
+		}
+		FHSRInventorySnapshot Snap; Inventory->GetSnapshot(Snap);
+		int32 Have = 0;
+		for (const FHSRItemStackSnapshot& Stack : Snap.Stacks) if (Stack.ItemId == MaterialId) Have = Stack.Quantity;
+		const int32 Desired = FMath::Min(999, MaxStack);
+		if (Have >= Desired)
+		{
+			UE_LOG(LogTemp, Log, TEXT("HSR.EquipmentHarness EnsureLumenShards Have=%d MaxStack=%d"), Have, MaxStack);
+			return;
+		}
+		const EHSRInventoryOperationResult AddResult = Inventory->AddStack(MaterialId, Desired - Have);
+		if (AddResult != EHSRInventoryOperationResult::Success)
+		{
+			UE_LOG(LogTemp, Error,
+				TEXT("HSR.EquipmentHarness EnsureLumenShards FAIL AddStack Result=%d Have=%d Desired=%d MaxStack=%d"),
+				static_cast<int32>(AddResult), Have, Desired, MaxStack);
+			return;
+		}
+		UE_LOG(LogTemp, Log, TEXT("HSR.EquipmentHarness EnsureLumenShards Granted=%d Total=%d MaxStack=%d"),
+			Desired - Have, Desired, MaxStack);
+	}
+	void RunSetup(){UGameInstance* GI=FindPIEGameInstance();const bool bOk=FHSREquipmentDevelopmentHarness::SetupFixedLoadout(GI);if(bOk)EnsureLumenShards(GI);LogResult(TEXT("Setup"),bOk);}
 	void RunRemove(){UGameInstance* GI=FindPIEGameInstance();LogResult(TEXT("RemoveSecondRelic"),FHSREquipmentDevelopmentHarness::RemoveSecondRelic(GI));}
 	void RunRestore(){UGameInstance* GI=FindPIEGameInstance();LogResult(TEXT("RestoreSecondRelic"),FHSREquipmentDevelopmentHarness::RestoreSecondRelic(GI));}
 	void RunClear(){UGameInstance* GI=FindPIEGameInstance();LogResult(TEXT("Clear"),FHSREquipmentDevelopmentHarness::ClearLoadout(GI));}
 	void RunSave(){UGameInstance* GI=FindPIEGameInstance();LogResult(TEXT("Save"),FHSREquipmentDevelopmentHarness::Save(GI));}
 	void RunLoad(){UGameInstance* GI=FindPIEGameInstance();LogResult(TEXT("Load"),FHSREquipmentDevelopmentHarness::Load(GI));}
 	void RunCleanup(){LogResult(TEXT("Cleanup"),FHSREquipmentDevelopmentHarness::CleanupSave());}
+	void RunP17Audit(){UGameInstance* GI=FindPIEGameInstance();LogResult(TEXT("P17MovementAudit"),FHSREquipmentDevelopmentHarness::RunP17MovementAudit(GI));}
+	void RunP17RelicFixture(){UGameInstance* GI=FindPIEGameInstance();LogResult(TEXT("P17RelicFixture"),FHSREquipmentDevelopmentHarness::RunP17RelicFixture(GI));}
 	void RunHide(){if(DetailWidget.IsValid()){DetailWidget->RemoveFromParent();DetailWidget.Reset();}LogResult(TEXT("HideDetail"),true);}
 	void RunShow()
 	{
@@ -104,6 +150,8 @@ namespace
 	FAutoConsoleCommand SaveCommand(TEXT("HSR.Equipment.Save"),TEXT("Save the Phase 12 development slot."),FConsoleCommandDelegate::CreateStatic(&RunSave));
 	FAutoConsoleCommand LoadCommand(TEXT("HSR.Equipment.Load"),TEXT("Load the Phase 12 development slot."),FConsoleCommandDelegate::CreateStatic(&RunLoad));
 	FAutoConsoleCommand CleanupCommand(TEXT("HSR.Equipment.Cleanup"),TEXT("Delete the Phase 12 development slot."),FConsoleCommandDelegate::CreateStatic(&RunCleanup));
+	FAutoConsoleCommand P17AuditCommand(TEXT("HSR.Equipment.P17Audit"),TEXT("Run the P17 equip, replace, and unequip transaction audit."),FConsoleCommandDelegate::CreateStatic(&RunP17Audit));
+	FAutoConsoleCommand P17RelicFixtureCommand(TEXT("HSR.Equipment.P17RelicFixture"),TEXT("Run the P17 relic candidate and material enhancement authority audit."),FConsoleCommandDelegate::CreateStatic(&RunP17RelicFixture));
 }
 
 bool FHSREquipmentDevelopmentHarness::SetupFixedLoadout(UGameInstance* GI){UHSREquipmentSubsystem* E=GI?GI->GetSubsystem<UHSREquipmentSubsystem>():nullptr;if(!E)return false;const FHSREquipmentRestoreState State=BuildFixedState(E,true);return !State.Loadout.Relics.IsEmpty()&&Commit(GI,&State);}
@@ -116,3 +164,73 @@ bool FHSREquipmentDevelopmentHarness::CleanupSave(){return !UGameplayStatics::Do
 bool FHSREquipmentDevelopmentHarness::SetupFixedLoadoutForTest(UHSREquipmentSubsystem* E){if(!E)return false;const FHSREquipmentRestoreState State=BuildFixedState(E,true);return !State.Loadout.Relics.IsEmpty()&&Commit(E,&State);}
 bool FHSREquipmentDevelopmentHarness::RemoveSecondRelicForTest(UHSREquipmentSubsystem* E){if(!E)return false;const FHSREquipmentRestoreState State=BuildFixedState(E,false);return !State.Loadout.Relics.IsEmpty()&&Commit(E,&State);}
 bool FHSREquipmentDevelopmentHarness::ClearLoadoutForTest(UHSREquipmentSubsystem* E){if(!E)return false;FHSREquipmentLoadout Existing;int32 Revision=0;E->GetLoadout(HSRCharacterGuidFromProfileName(CharacterName),Existing,Revision);const int32 ClearRevision=FMath::Max(FMath::Max(Revision,LastHarnessRevisions.FindRef(E))+1,1);if(!Commit(E,nullptr))return false;LastHarnessRevisions.Add(E,ClearRevision);return true;}
+bool FHSREquipmentDevelopmentHarness::RunP17MovementAudit(UGameInstance* GI){return RunP17MovementAuditForTest(GI?GI->GetSubsystem<UHSREquipmentSubsystem>():nullptr,GI?GI->GetSubsystem<UHSRInventorySubsystem>():nullptr);}
+bool FHSREquipmentDevelopmentHarness::RunP17MovementAuditForTest(UHSREquipmentSubsystem* E,UHSRInventorySubsystem* I)
+{
+	if(!E||!I)return false;
+	auto* Item=NewObject<UHSRItemDefinition>(GetTransientPackage());Item->ItemId=TEXT("Item.P17.Console");Item->StorageKind=EHSRItemStorageKind::Unique;Item->MaxStack=1;
+	const EHSRInventoryOperationResult ItemResult=I->RegisterDefinition(*Item);if(ItemResult!=EHSRInventoryOperationResult::Success&&ItemResult!=EHSRInventoryOperationResult::DuplicateDefinitionId)return false;
+	auto* Definition=NewObject<UHSREquipmentDefinition>(GetTransientPackage());Definition->DefinitionId=TEXT("Equipment.P17.Console");Definition->Slot=EHSREquipmentSlot::Body;Definition->EnhancementCap=1;
+	const EHSREquipmentOperationResult DefinitionResult=E->RegisterDefinition(*Definition);if(DefinitionResult!=EHSREquipmentOperationResult::Success&&DefinitionResult!=EHSREquipmentOperationResult::DuplicateDefinitionId)return false;
+	auto* Catalog=NewObject<UHSRItemEquipmentMappingCatalog>(GetTransientPackage());FHSRItemEquipmentMappingEntry Mapping;Mapping.ItemId=Item->ItemId;Mapping.EquipmentDefinitionId=Definition->DefinitionId;Mapping.Kind=EHSREquipmentKind::Equipment;Mapping.Slot=static_cast<int32>(EHSREquipmentSlot::Body);if(!Catalog->AddMapping(Mapping))return false;
+	const FGuid CharacterId=HSRCharacterGuidFromProfileName(CharacterName);const FGuid First=FGuid::NewGuid(),Second=FGuid::NewGuid();for(const FGuid Id:{First,Second}){FHSRItemInstance Bag;Bag.InstanceId=Id;Bag.DefinitionId=Item->ItemId;if(I->AddUnique(Bag)!=EHSRInventoryOperationResult::Success)return false;FHSREquipmentInstance Registry;Registry.InstanceId=Id;Registry.DefinitionId=Definition->DefinitionId;Registry.Kind=EHSREquipmentKind::Equipment;if(E->RegisterInstance(Registry)!=EHSREquipmentOperationResult::Success)return false;}
+	auto Execute=[&](FGuid OperationId,FGuid InstanceId,EHSREquipmentMovementIntent Intent,int64 InventoryRevision,int64 EquipmentRevision){FHSREquipmentMovementRequest Request;Request.OperationId=OperationId;Request.CharacterId=CharacterId;Request.InstanceId=InstanceId;Request.Intent=Intent;Request.Kind=EHSREquipmentKind::Equipment;Request.Slot=static_cast<int32>(EHSREquipmentSlot::Body);Request.ExpectedInventoryRevision=InventoryRevision;Request.ExpectedEquipmentRevision=EquipmentRevision;return E->ExecuteMovement(Request,*I,*Catalog);};
+	FHSRInventorySnapshot Inventory;FHSREquipmentLoadout InitialLoadout;int32 InitialEquipmentRevision=0;E->GetLoadout(CharacterId,InitialLoadout,InitialEquipmentRevision);I->GetSnapshot(Inventory);const FHSREquipmentMovementResult Equip=Execute(FGuid::NewGuid(),First,EHSREquipmentMovementIntent::Equip,Inventory.Revision,InitialEquipmentRevision);if(Equip.Code!=EHSREquipmentMovementResultCode::Success)return false;I->GetSnapshot(Inventory);const FHSREquipmentMovementResult Replace=Execute(FGuid::NewGuid(),Second,EHSREquipmentMovementIntent::Replace,Inventory.Revision,Equip.NewEquipmentRevision);if(Replace.Code!=EHSREquipmentMovementResultCode::Success)return false;I->GetSnapshot(Inventory);const FHSREquipmentMovementResult Unequip=Execute(FGuid::NewGuid(),Second,EHSREquipmentMovementIntent::Unequip,Inventory.Revision,Replace.NewEquipmentRevision);FHSREquipmentLoadout FinalLoadout;int32 FinalRevision=0;E->GetLoadout(CharacterId,FinalLoadout,FinalRevision);return Unequip.Code==EHSREquipmentMovementResultCode::Success&&FinalLoadout.Equipment.Num()==InitialLoadout.Equipment.Num();
+}
+
+bool FHSREquipmentDevelopmentHarness::RunP17RelicFixture(UGameInstance* GI)
+{
+	return RunP17RelicFixtureForTest(GI ? GI->GetSubsystem<UHSREquipmentSubsystem>() : nullptr,
+		GI ? GI->GetSubsystem<UHSRInventorySubsystem>() : nullptr);
+}
+
+bool FHSREquipmentDevelopmentHarness::RunP17RelicFixtureForTest(UHSREquipmentSubsystem* Equipment,
+	UHSRInventorySubsystem* Inventory)
+{
+	if (!Equipment || !Inventory) return false;
+	const FName MaterialId(TEXT("Item.P17.RelicMaterial"));
+	const FName DefinitionId(TEXT("Relic.P17.ConsoleHead"));
+	const FGuid CharacterId = HSRCharacterGuidFromProfileName(TEXT("Character.A"));
+	const FGuid InstanceId(0x17007001, 0, 0, 1);
+	UHSRItemDefinition* Material = NewObject<UHSRItemDefinition>(GetTransientPackage());
+	Material->ItemId = MaterialId; Material->StorageKind = EHSRItemStorageKind::Stackable; Material->MaxStack = 20;
+	const EHSRInventoryOperationResult MaterialDefinitionResult = Inventory->RegisterDefinition(*Material);
+	if (MaterialDefinitionResult != EHSRInventoryOperationResult::Success
+		&& MaterialDefinitionResult != EHSRInventoryOperationResult::DuplicateDefinitionId) return false;
+	if (Inventory->AddStack(MaterialId, 5) != EHSRInventoryOperationResult::Success) return false;
+	UHSRRelicDefinition* Definition = NewObject<UHSRRelicDefinition>(GetTransientPackage());
+	Definition->DefinitionId = DefinitionId; Definition->SetId = TEXT("Set.P17.Console");
+	Definition->Slot = EHSRRelicSlot::Head; Definition->EnhancementCap = 3;
+	const EHSREquipmentOperationResult DefinitionResult = Equipment->RegisterDefinition(*Definition);
+	if (DefinitionResult != EHSREquipmentOperationResult::Success
+		&& DefinitionResult != EHSREquipmentOperationResult::DuplicateDefinitionId) return false;
+	FHSREquipmentInstance Instance; Instance.InstanceId = InstanceId; Instance.DefinitionId = DefinitionId;
+	Instance.Kind = EHSREquipmentKind::Relic; Instance.Modifiers.Add({EHSREquipmentStat::Attack, 4.0f});
+	const EHSREquipmentOperationResult InstanceResult = Equipment->Equip(CharacterId, Instance);
+	if (InstanceResult != EHSREquipmentOperationResult::Success
+		&& InstanceResult != EHSREquipmentOperationResult::NoOp) return false;
+	UHSREquipmentEnhancementCatalog* Catalog = NewObject<UHSREquipmentEnhancementCatalog>(GetTransientPackage());
+	FHSREquipmentEnhancementRule Rule; Rule.DefinitionId = DefinitionId; Rule.Kind = EHSREquipmentKind::Relic;
+	Rule.TargetLevel = 1; Rule.MaterialItemId = MaterialId; Rule.MaterialCost = 2;
+	Rule.TargetModifiers.Add({EHSREquipmentStat::Attack, 8.0f});
+	if (!Catalog->AddRule(Rule)) return false;
+	FHSRInventorySnapshot InventorySnapshot; Inventory->GetSnapshot(InventorySnapshot);
+	FHSREquipmentLoadout Loadout; int32 EquipmentRevision = 0;
+	if (!Equipment->GetLoadout(CharacterId, Loadout, EquipmentRevision)) return false;
+	FHSREquipmentEnhancementRequest Request; Request.OperationId = FGuid::NewGuid(); Request.CharacterId = CharacterId;
+	Request.InstanceId = InstanceId; Request.Kind = EHSREquipmentKind::Relic;
+	Request.ExpectedInventoryRevision = InventorySnapshot.Revision; Request.ExpectedEquipmentRevision = EquipmentRevision;
+	Request.ExpectedEnhancementLevel = 0; Request.TargetLevel = 1;
+	const FHSREquipmentEnhancementResult Result = Equipment->ExecuteEnhancement(Request, *Inventory, *Catalog);
+	const FHSREquipmentEnhancementResult Replay = Equipment->ExecuteEnhancement(Request, *Inventory, *Catalog);
+	FHSRInventorySnapshot AfterInventory; Inventory->GetSnapshot(AfterInventory);
+	FHSREquipmentInstance AfterInstance; Equipment->FindRegisteredInstance(InstanceId, AfterInstance);
+	const bool bSuccess = Result.Code == EHSREquipmentEnhancementResultCode::Success && Result.bCommitted
+		&& Replay.Code == EHSREquipmentEnhancementResultCode::Success && Replay.bReplay && !Replay.bCommitted
+		&& AfterInstance.EnhancementLevel == 1 && AfterInventory.Stacks.Num() == 1
+		&& AfterInventory.Stacks[0].ItemId == MaterialId && AfterInventory.Stacks[0].Quantity == 3;
+	UE_LOG(LogTemp, Log, TEXT("HSR.EquipmentHarness P17RelicFixture Result=%s Code=%d Replay=%s Level=%d Material=%d"),
+		bSuccess ? TEXT("SUCCESS") : TEXT("FAIL"), static_cast<int32>(Result.Code), Replay.bReplay ? TEXT("true") : TEXT("false"),
+		AfterInstance.EnhancementLevel, AfterInventory.Stacks.Num() == 1 ? AfterInventory.Stacks[0].Quantity : -1);
+	return bSuccess;
+}
