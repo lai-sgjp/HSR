@@ -1,6 +1,7 @@
 #include "HSREquipmentSubsystem.h"
 
 #include "../Data/Definitions/HSREquipmentDefinition.h"
+#include "../Data/Definitions/HSREquipmentEnhancementCatalog.h"
 #include "../Data/Definitions/HSRRelicDefinition.h"
 #include "../Data/Definitions/HSRItemEquipmentMappingCatalog.h"
 #include "../Inventory/HSRInventorySubsystem.h"
@@ -66,7 +67,7 @@ bool UHSREquipmentSubsystem::PrepareRestore(const TArray<FHSREquipmentRegistryDt
 void UHSREquipmentSubsystem::CommitRestore(const FHSREquipmentRestoreMap& Candidate)
 {
 	Loadouts.Reset(); InstanceOwners.Reset(); InstanceRegistry.Reset(); for(const auto& P:Candidate){FLoadoutState& S=Loadouts.Add(P.Key); S.Revision=P.Value.Revision; for(const auto& E:P.Value.Loadout.Equipment){InstanceRegistry.Add(E.Value.InstanceId,E.Value);S.Equipment.Add(E.Key,E.Value.InstanceId);InstanceOwners.Add(E.Value.InstanceId,P.Key);} for(const auto& R:P.Value.Loadout.Relics){InstanceRegistry.Add(R.Value.InstanceId,R.Value);S.Relics.Add(R.Key,R.Value.InstanceId);InstanceOwners.Add(R.Value.InstanceId,P.Key);}}
-	MovementLedger.Reset(); MovementLedgerOrder.Reset();
+	MovementLedger.Reset(); MovementLedgerOrder.Reset(); EnhancementLedger.Reset(); EnhancementLedgerOrder.Reset();
 }
 void UHSREquipmentSubsystem::NotifyRestored(const TSet<FGuid>& Changed){for(const FGuid& Id:Changed){int32 Rev=Loadouts.FindRef(Id).Revision; LoadoutChanged.Broadcast(Id,Rev);}}
 
@@ -95,7 +96,7 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UH
 void UHSREquipmentSubsystem::CommitRestore(const FHSREquipmentRegistryRestoreState& Candidate)
 {
 	InstanceRegistry=Candidate.Registry;Loadouts.Reset();InstanceOwners.Reset();for(const auto& P:Candidate.Loadouts){FLoadoutState& S=Loadouts.Add(P.Key);S.Revision=P.Value.Revision;for(const auto& E:P.Value.Loadout.Equipment){S.Equipment.Add(E.Key,E.Value.InstanceId);InstanceOwners.Add(E.Value.InstanceId,P.Key);}for(const auto& R:P.Value.Loadout.Relics){S.Relics.Add(R.Key,R.Value.InstanceId);InstanceOwners.Add(R.Value.InstanceId,P.Key);}}
-	MovementLedger.Reset();MovementLedgerOrder.Reset();
+	MovementLedger.Reset();MovementLedgerOrder.Reset();EnhancementLedger.Reset();EnhancementLedgerOrder.Reset();
 }
 
 EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UHSRRelicDefinition& Definition)
@@ -424,6 +425,148 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 	return Result;
 }
 
+FHSREquipmentEnhancementResult UHSREquipmentSubsystem::ExecuteEnhancement(
+	const FHSREquipmentEnhancementRequest& Request, UHSRInventorySubsystem& Inventory,
+	const UHSREquipmentEnhancementCatalog& Catalog)
+{
+	FHSREquipmentEnhancementResult Result;
+	Result.OperationId = Request.OperationId;
+	if (const FEnhancementLedgerEntry* ExistingOperation = EnhancementLedger.Find(Request.OperationId))
+	{
+		if (!IsSameEnhancementRequest(ExistingOperation->Request, Request))
+		{
+			Result.Code = EHSREquipmentEnhancementResultCode::OperationIdConflict;
+			return Result;
+		}
+		Result = ExistingOperation->Result;
+		Result.bCommitted = false;
+		Result.bReplay = true;
+		return Result;
+	}
+
+	FHSRInventorySnapshot InventorySnapshot;
+	Inventory.GetSnapshot(InventorySnapshot);
+	Result.OldInventoryRevision = InventorySnapshot.Revision;
+	Result.NewInventoryRevision = InventorySnapshot.Revision;
+	const FLoadoutState* ExistingLoadout = Loadouts.Find(Request.CharacterId);
+	Result.OldEquipmentRevision = ExistingLoadout ? ExistingLoadout->Revision : 0;
+	Result.NewEquipmentRevision = Result.OldEquipmentRevision;
+
+	if (!Request.OperationId.IsValid() || !Request.CharacterId.IsValid() || !Request.InstanceId.IsValid()
+		|| Request.TargetLevel < 0 || Request.ExpectedEnhancementLevel < 0)
+	{
+		return Result;
+	}
+	if (Request.ExpectedInventoryRevision != InventorySnapshot.Revision)
+	{
+		Result.Code = EHSREquipmentEnhancementResultCode::InventoryRevisionConflict;
+		return Result;
+	}
+	if (Request.ExpectedEquipmentRevision != Result.OldEquipmentRevision)
+	{
+		Result.Code = EHSREquipmentEnhancementResultCode::EquipmentRevisionConflict;
+		return Result;
+	}
+
+	FHSREquipmentInstance* CurrentInstance = InstanceRegistry.Find(Request.InstanceId);
+	if (CurrentInstance == nullptr)
+	{
+		Result.Code = EHSREquipmentEnhancementResultCode::EquipmentRejected;
+		return Result;
+	}
+	Result.OldEnhancementLevel = CurrentInstance->EnhancementLevel;
+	Result.NewEnhancementLevel = CurrentInstance->EnhancementLevel;
+	const FGuid* Owner = InstanceOwners.Find(Request.InstanceId);
+	if (Owner == nullptr || *Owner != Request.CharacterId || CurrentInstance->Kind != Request.Kind)
+	{
+		Result.Code = EHSREquipmentEnhancementResultCode::EquipmentRejected;
+		return Result;
+	}
+	if (Request.ExpectedEnhancementLevel != CurrentInstance->EnhancementLevel)
+	{
+		Result.Code = EHSREquipmentEnhancementResultCode::EnhancementLevelConflict;
+		return Result;
+	}
+	if (Request.TargetLevel < CurrentInstance->EnhancementLevel)
+	{
+		Result.Code = EHSREquipmentEnhancementResultCode::CatalogRejected;
+		return Result;
+	}
+
+	FHSREquipmentEnhancementRule Rule;
+	if (!Catalog.ResolveRule(CurrentInstance->DefinitionId, CurrentInstance->Kind, Request.TargetLevel, Rule))
+	{
+		Result.Code = EHSREquipmentEnhancementResultCode::CatalogRejected;
+		return Result;
+	}
+	const FDefinitionRule* DefinitionRule = Definitions.Find(CurrentInstance->DefinitionId);
+	if (DefinitionRule == nullptr || DefinitionRule->Kind != Rule.Kind
+		|| Rule.TargetLevel > DefinitionRule->EnhancementCap || Rule.MaterialCost <= 0
+		|| !IsValidModifiers(Rule.TargetModifiers))
+	{
+		Result.Code = EHSREquipmentEnhancementResultCode::CatalogRejected;
+		return Result;
+	}
+	if (Request.TargetLevel == CurrentInstance->EnhancementLevel)
+	{
+		Result.Code = EHSREquipmentEnhancementResultCode::NoOp;
+		EnhancementLedger.Add(Request.OperationId, {Request, Result});
+		EnhancementLedgerOrder.Add(Request.OperationId);
+		constexpr int32 MaxEnhancementLedgerEntries = 128;
+		if (EnhancementLedgerOrder.Num() > MaxEnhancementLedgerEntries)
+		{
+			EnhancementLedger.Remove(EnhancementLedgerOrder[0]);
+			EnhancementLedgerOrder.RemoveAt(0);
+		}
+		return Result;
+	}
+
+	FHSRInventoryEnhancementCandidate InventoryCandidate;
+	if (Inventory.PrepareEquipmentEnhancementCandidate(Rule.MaterialItemId, Rule.MaterialCost,
+		Request.ExpectedInventoryRevision, InventoryCandidate) != EHSRInventoryOperationResult::Success)
+	{
+		Result.Code = EHSREquipmentEnhancementResultCode::InventoryRejected;
+		return Result;
+	}
+	FHSREquipmentInstance CandidateInstance = *CurrentInstance;
+	CandidateInstance.EnhancementLevel = Rule.TargetLevel;
+	CandidateInstance.Modifiers = Rule.TargetModifiers;
+	if (EnhancementProjectionPreflight.IsBound()
+		&& !EnhancementProjectionPreflight.Execute(Request, CandidateInstance))
+	{
+		Result.Code = EHSREquipmentEnhancementResultCode::ProjectionRejected;
+		return Result;
+	}
+
+	Inventory.InstallEquipmentEnhancementCandidateNoFail(MoveTemp(InventoryCandidate));
+	CurrentInstance = InstanceRegistry.Find(Request.InstanceId);
+	check(CurrentInstance != nullptr);
+	*CurrentInstance = CandidateInstance;
+	FLoadoutState& InstalledLoadout = Loadouts.FindOrAdd(Request.CharacterId);
+	InstalledLoadout.Revision = Result.OldEquipmentRevision + 1;
+	Inventory.FinalizeEquipmentEnhancementRevisionNoFail(InventorySnapshot.Revision + 1);
+	Result.NewInventoryRevision = InventorySnapshot.Revision + 1;
+	Result.NewEquipmentRevision = InstalledLoadout.Revision;
+	Result.NewEnhancementLevel = CandidateInstance.EnhancementLevel;
+	Result.Code = EHSREquipmentEnhancementResultCode::Success;
+	Result.bCommitted = true;
+	EnhancementLedger.Add(Request.OperationId, {Request, Result});
+	EnhancementLedgerOrder.Add(Request.OperationId);
+	constexpr int32 MaxEnhancementLedgerEntries = 128;
+	if (EnhancementLedgerOrder.Num() > MaxEnhancementLedgerEntries)
+	{
+		EnhancementLedger.Remove(EnhancementLedgerOrder[0]);
+		EnhancementLedgerOrder.RemoveAt(0);
+	}
+	Inventory.PublishEquipmentEnhancementCommit(Result.NewInventoryRevision);
+	LoadoutChanged.Broadcast(Request.CharacterId, InstalledLoadout.Revision);
+	if (EnhancementProjectionCommit.IsBound())
+	{
+		EnhancementProjectionCommit.Execute(Request, CandidateInstance);
+	}
+	return Result;
+}
+
 EHSREquipmentOperationResult UHSREquipmentSubsystem::Unequip(const FGuid& CharacterId, EHSREquipmentKind Kind, int32 Slot, const FGuid& ExpectedInstanceId)
 {
 	if (!CharacterId.IsValid()) return EHSREquipmentOperationResult::InvalidCharacterId;
@@ -468,6 +611,14 @@ bool UHSREquipmentSubsystem::GetLoadout(const FGuid& CharacterId, FHSREquipmentL
 	if (State == nullptr) return false;
 	if (!ResolveLoadout(*State, OutLoadout)) return false;
 	OutRevision = State->Revision;
+	return true;
+}
+
+bool UHSREquipmentSubsystem::FindInstanceOwner(const FGuid& InstanceId, FGuid& OutCharacterId) const
+{
+	const FGuid* Owner = InstanceOwners.Find(InstanceId);
+	if (Owner == nullptr) return false;
+	OutCharacterId = *Owner;
 	return true;
 }
 
@@ -557,4 +708,13 @@ bool UHSREquipmentSubsystem::IsSameMovementRequest(const FHSREquipmentMovementRe
 		&& A.Intent == B.Intent && A.Kind == B.Kind && A.Slot == B.Slot
 		&& A.ExpectedInventoryRevision == B.ExpectedInventoryRevision
 		&& A.ExpectedEquipmentRevision == B.ExpectedEquipmentRevision;
+}
+
+bool UHSREquipmentSubsystem::IsSameEnhancementRequest(const FHSREquipmentEnhancementRequest& A,
+	const FHSREquipmentEnhancementRequest& B)
+{
+	return A.OperationId == B.OperationId && A.CharacterId == B.CharacterId && A.InstanceId == B.InstanceId
+		&& A.Kind == B.Kind && A.ExpectedInventoryRevision == B.ExpectedInventoryRevision
+		&& A.ExpectedEquipmentRevision == B.ExpectedEquipmentRevision
+		&& A.ExpectedEnhancementLevel == B.ExpectedEnhancementLevel && A.TargetLevel == B.TargetLevel;
 }

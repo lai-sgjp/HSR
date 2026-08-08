@@ -94,6 +94,22 @@ enum class EHSREquipmentMovementResultCode : uint8
 	OperationIdConflict
 };
 
+UENUM(BlueprintType)
+enum class EHSREquipmentEnhancementResultCode : uint8
+{
+	Success,
+	NoOp,
+	InvalidRequest,
+	InventoryRevisionConflict,
+	EquipmentRevisionConflict,
+	EnhancementLevelConflict,
+	CatalogRejected,
+	EquipmentRejected,
+	InventoryRejected,
+	ProjectionRejected,
+	OperationIdConflict
+};
+
 USTRUCT(BlueprintType)
 struct FHSREquipmentMovementRequest
 {
@@ -123,6 +139,38 @@ struct FHSREquipmentMovementResult
 	UPROPERTY(BlueprintReadOnly) int32 OldEquipmentRevision = 0;
 	UPROPERTY(BlueprintReadOnly) int32 NewEquipmentRevision = 0;
 	UPROPERTY(BlueprintReadOnly) FGuid DisplacedInstanceId;
+};
+
+USTRUCT(BlueprintType)
+struct FHSREquipmentEnhancementRequest
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite) FGuid OperationId;
+	UPROPERTY(BlueprintReadWrite) FGuid CharacterId;
+	UPROPERTY(BlueprintReadWrite) FGuid InstanceId;
+	UPROPERTY(BlueprintReadWrite) EHSREquipmentKind Kind = EHSREquipmentKind::Equipment;
+	UPROPERTY(BlueprintReadWrite) int64 ExpectedInventoryRevision = 0;
+	UPROPERTY(BlueprintReadWrite) int32 ExpectedEquipmentRevision = 0;
+	UPROPERTY(BlueprintReadWrite) int32 ExpectedEnhancementLevel = 0;
+	UPROPERTY(BlueprintReadWrite) int32 TargetLevel = 0;
+};
+
+USTRUCT(BlueprintType)
+struct FHSREquipmentEnhancementResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly) FGuid OperationId;
+	UPROPERTY(BlueprintReadOnly) EHSREquipmentEnhancementResultCode Code = EHSREquipmentEnhancementResultCode::InvalidRequest;
+	UPROPERTY(BlueprintReadOnly) bool bCommitted = false;
+	UPROPERTY(BlueprintReadOnly) bool bReplay = false;
+	UPROPERTY(BlueprintReadOnly) int64 OldInventoryRevision = 0;
+	UPROPERTY(BlueprintReadOnly) int64 NewInventoryRevision = 0;
+	UPROPERTY(BlueprintReadOnly) int32 OldEquipmentRevision = 0;
+	UPROPERTY(BlueprintReadOnly) int32 NewEquipmentRevision = 0;
+	UPROPERTY(BlueprintReadOnly) int32 OldEnhancementLevel = 0;
+	UPROPERTY(BlueprintReadOnly) int32 NewEnhancementLevel = 0;
 };
 
 USTRUCT(BlueprintType)

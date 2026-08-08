@@ -1,296 +1,200 @@
-# TASK-P17-011 - Save UI
+# TASK-P17-RELIC-EQUIPMENT-001 - Relic/Equipment Selection and Enhancement
 
-Status: `IMPLEMENTATION GREEN / USER EDITOR-PIE PENDING`
+Status: `C++/AUTOMATION COMPLETE / USER EDITOR ASSET GATE`
+
+## Scope identity
+
+This task implements the Phase 17 execution-plan meaning of P17-007. It must
+not be labeled `TASK-P17-006`: the repository task with that number is the
+archived Quest Frontend. It must not be labeled `TASK-P17-012`: the repository
+task with that number is the archived five-module dynamic mount. This new
+unambiguous task name is the only active identity for the implementation.
+
+User authorization: 2026-08-07, explicit authorization for
+`TASK-P17-RELIC-EQUIPMENT-001`.
 
 ## Sole observable outcome
 
-From the existing Pause Hub, the user can inspect the two real Save slots,
-submit Save, Load, and Overwrite intents, and see typed results. A successful
-Load restores the authoritative runtime and leaves a valid UI/input host; a
-failed Load leaves the old World and its input usable. Delete is not part of
-this task.
+From the accepted Character Shell Relics tab, the player can enter one
+Relic/Equipment flow, select a relic slot, inspect bag candidates, compare a
+candidate with the committed relic, equip or replace through one authoritative
+movement request, open enhancement choices, and confirm one material-backed
+enhancement transaction. Back returns one presentation level at a time; X and
+the existing Frontend route retain their existing semantics.
 
-The implementation authorization was granted by the user on 2026-08-06.
-Blueprint/UAsset work and final Editor/PIE acceptance remain pending.
+The only committed domain result is an authoritative Equipment/Inventory state
+with exactly-once revisions/publication. A rejected request keeps the previous
+Inventory snapshot, Equipment registry/loadout, revisions, materials, and UI
+selection state intact. Missing catalog or authority data is a typed
+unavailable state, not a Blueprint-created success.
 
-## Baseline and existing evidence
+The Exploration Pause shortcut remains numeric `1`. Character and Inventory
+remain dynamically mounted and must not use direct `AddToViewport`.
 
-- Phase 17 P17-010C is archived as `USER ACCEPTED / INDEPENDENT REVIEW NOT
-  RUN` after Build, combined Challenge/Battle/Save Automation `36/36`, and
-  user PIE progression evidence. Do not reopen its Challenge, Save schema 8,
-  Settlement, Buff, Party, Map, BattleReturn, or FrontendModuleRoot logic.
-- P17-PATCH-03G already delivered the Save ViewModel/Widget facade and
-  Map-owned integrated restore. P17-PATCH-03H delivered the cold-load
-  production-definition repair and accepted successful cross-map restore.
-  The restore arrival/failure injection path remains an explicit follow-up.
-- Existing Save UI source is:
-  `Source/HSR/UI/HSRSaveViewModel.h/.cpp` and
-  `Source/HSR/UI/HSRSaveWidget.h/.cpp`.
-- Existing Save authority is:
-  `Source/HSR/Save/HSRSaveSubsystem.h/.cpp`, `HSRSaveTypes.h`,
-  `HSRSaveVersion.h/.cpp`, and `HSRSaveGame.h/.cpp`.
-- Existing user-owned Save panel asset:
-  `/Game/UI/P17/Frontend/WBP_HSRSavePanel_P17`.
-- The accepted physical slot names for this task are `p17_slot_01` and
-  `p17_slot_02`. UI must not derive slot identity from display text.
-- The accepted exploration Pause shortcut is the numeric `1`; this task must
-  not restore the historical `Esc` shortcut or change the existing input map.
+## Ownership and data-flow contract
 
-## Gate 0 ownership contract
+1. `UHSREquipmentSubsystem` owns the complete equipment/relic instance payload,
+   placement, owner mapping, Equipment revision, and enhancement transaction
+   ledger.
+2. `UHSRInventorySubsystem` owns bag membership, stackable material quantity,
+   capacity, Inventory revision, and Inventory publication.
+3. `UHSREquipmentEnhancementCatalog` owns static editor-authored target-level
+   rules. It is not Save data and it does not perform a transaction.
+4. The aggregate enhancement seam prepares an immutable Inventory candidate and
+   Registry/loadout candidate, validates both expected revisions and the
+   expected current enhancement level, installs both only after preflight,
+   advances each revision once, then publishes once per domain. OperationId
+   replay returns the cached result without a second side effect; a changed
+   payload under the same OperationId is rejected.
+5. `UHSRRelicEquipmentViewModel` owns only transient selected character/slot,
+   selected candidate, stage, comparison values, and enhancement options. It
+   reads committed snapshots and forwards UI intent; it is not domain or Save
+   authority.
+6. `UHSRRelicEquipmentWidget` owns delegate lifecycle and Blueprint event
+   forwarding. Blueprint owns layout, styling, focus, entry visuals, and
+   snapshot binding only.
+7. Existing Character Shell, Frontend root/router/UIManager, Save schema,
+   Party/Map/BattleReturn/Quest/Challenge/Inventory reward logic, and accepted
+   009D/010A/010B/010C behavior are regression inputs, not implementation
+   targets.
 
-1. `UHSRSaveSubsystem` is the only Save/Load authority. It owns slot
-   validation, envelope decode, schema compatibility, Primary/Staging/Backup
-   selection, candidate validation, and the global restore transaction.
-2. `UHSRMapSubsystem` remains the only owner of restore travel, pending travel,
-   arrival placement, and arrival publication. Save UI never calls
-   `OpenLevel`, creates a teleport, or applies a transform.
-3. `UHSRBattleTransitionSubsystem` remains the owner of Battle Return pending
-   state. A Load during Map Travel or Battle Return pending is rejected before
-   any restore mutation.
-4. Character Profile, Party, Equipment, Inventory, Reward, Quest, Map, and
-   Challenge Progression subsystems retain their current state ownership. Save
-   only captures/prepares/commits their existing DTO contracts.
-5. `UHSRSaveViewModel` owns only transient slot-summary projection, the current
-   typed frontend result, a pending overwrite intent, and a pending deferred
-   Load presentation state. It never writes `USaveGame` or disk bytes.
-6. `UHSRSaveWidget` owns only UMG forwarding and presentation callbacks. It
-   does not call a domain subsystem directly and does not invent success,
-   generation, map, or party values.
-7. `UHSRUIManagerSubsystem`, Frontend Router, Screen Stack, and
-   `WBP_FrontendModuleRoot_P17` remain the UI host owners. Save Panel is module
-   content under the existing `ModuleContentHost`; it must not call
-   `AddToViewport`.
+## Codex Source allowlist
 
-## Frozen Save UI contract
+New files:
 
-### Slot summary
+- `Source/HSR/Data/Definitions/HSREquipmentEnhancementCatalog.h`
+- `Source/HSR/Data/Definitions/HSREquipmentEnhancementCatalog.cpp`
+- `Source/HSR/UI/Relic/HSRRelicEquipmentTypes.h`
+- `Source/HSR/UI/Relic/HSRRelicEquipmentViewModel.h`
+- `Source/HSR/UI/Relic/HSRRelicEquipmentViewModel.cpp`
+- `Source/HSR/UI/Relic/HSRRelicEquipmentWidget.h`
+- `Source/HSR/UI/Relic/HSRRelicEquipmentWidget.cpp`
+- `Source/HSR/Tests/HSREquipmentEnhancementTests.cpp`
+- `Source/HSR/Tests/HSRRelicEquipmentViewModelTests.cpp`
+- `docs/testing/TASK-P17-RELIC-EQUIPMENT-001.tdd.md`
 
-The authority must provide a read-only summary for exactly `p17_slot_01` and
-`p17_slot_02`. A summary query may read and decode Primary/Backup, but it must
-not call `LoadSnapshot`, mutate `Current`, publish restore delegates, or write
-Staging/Primary/Backup.
+Existing files permitted only for the minimum authority/candidate seam,
+enhancement transaction, and development fixture:
 
-The projected summary contains only display-safe values:
+- `Source/HSR/Equipment/HSREquipmentTypes.h`
+- `Source/HSR/Equipment/HSREquipmentSubsystem.h`
+- `Source/HSR/Equipment/HSREquipmentSubsystem.cpp`
+- `Source/HSR/Inventory/HSRItemTypes.h`
+- `Source/HSR/Inventory/HSRInventorySubsystem.h`
+- `Source/HSR/Inventory/HSRInventorySubsystem.cpp`
+- `Source/HSR/Equipment/HSREquipmentDevelopmentHarness.h`
+- `Source/HSR/Equipment/HSREquipmentDevelopmentHarness.cpp`
 
-- stable `SlotName`;
-- `Empty`, `Ready`, `Recoverable`, or `Unavailable` display state;
-- `Generation` and envelope UTC timestamp when a trusted record exists;
-- saved `MapId`, party member count, and completed Challenge count when the
-  selected record is valid;
-- Primary/Backup presence and whether the displayed record came from Backup;
-- a typed diagnostic/result for `Unavailable` without exposing raw disk bytes.
+No other Source file is authorized. In particular, do not modify Character
+Shell C++, Character/Equipment Detail ViewModel, UIManager, HUD, Frontend
+Router/Root, Save/Migration/Schema, Battle, Party, Map, Quest, Challenge,
+Reward, Gacha, Config, Build.cs, `.uproject`, plugins, or `.claude/**`.
 
-Summary state precedence is:
+## User Editor UAsset allowlist
 
-1. neither physical record exists -> `Empty`;
-2. valid Primary -> `Ready`;
-3. invalid/untrusted Primary with a valid lineage-compatible Backup ->
-   `Recoverable`;
-4. physical data exists but neither record is safely usable, or the record is
-   unsupported/definition-invalid -> `Unavailable`.
+User may create:
 
-The summary is informational. It does not reserve a slot and does not change
-the authority's next generation.
+- `Content/UI/P17/Character/WBP_RelicEquipment_P17.uasset`
+- `Content/UI/P17/Character/WBP_RelicSlotEntry_P17.uasset`
+- `Content/UI/P17/Character/WBP_RelicCandidateEntry_P17.uasset`
+- `Content/Data/Equipment/DA_EquipmentEnhancementCatalog_P17.uasset`
 
-### Save and Overwrite
+User may edit only the following existing assets for wiring/data rows:
 
-- Save to an `Empty` slot calls `UHSRSaveSubsystem::SaveToSlot` exactly once
-  for that frontend intent.
-- Any physical Primary or Backup record, including a corrupt or unsupported
-  record, requires an explicit Overwrite confirmation. The pending intent stores
-  the stable slot name, not a widget pointer or a recomputed display label.
-- Overwrite Cancel clears the pending intent and performs zero disk writes,
-  zero capture, and zero generation changes.
-- Confirm Overwrite calls the existing atomic `SaveToSlot` path exactly once.
-  Staging/Primary/Backup ordering, cleanup, and rollback remain Save authority
-  behavior and are not duplicated in UI.
-- A completed Save/Overwrite is reported from the typed authority result. The
-  frontend action-acceptance enum must not be mistaken for a successful disk
-  write; `SaveFailed`, `LoadFailed`, and failure-stage diagnostics remain
-  visible to the Widget.
+- `Content/UI/P17/Character/WBP_CharacterShell_P17.uasset`, only to place
+  the Relic widget in the existing shell `ContentHost`/Relics content path
+  and forward the selected Character ID.
+- `Content/Data/Items/DA_ItemEquipmentMappingCatalog_P17.uasset`, only to add
+  missing explicit ItemId -> DefinitionId/Kind/Slot rows; existing rows are
+  not deleted or rewritten.
 
-### Load
+The formal Frontend route remains mounted through
+`WBP_FrontendModuleRoot_P17.ModuleContentHost`. No direct viewport mount is
+allowed for Character or Inventory. Codex does not binary-edit, delete,
+replace, or overwrite any UAsset.
 
-- Loading `Empty` returns typed `SlotNotFound`; loading `Unavailable` returns
-  the authority's typed failure and does not mutate the live runtime.
-- Load calls only `LoadFromSlot`. It must never call `LoadSnapshot` from UI.
-- Primary/Backup recovery is displayed as successful Load with
-  `bRecoveredFromBackup=true`, while the summary remains truthful about the
-  selected source.
-- Same-map Load completes in the current host. Cross-map Load may return an
-  accepted pending result while Map owns restore travel; the ViewModel must
-  remain pending until Save authority publishes the final arrival success or
-  failure.
-- Cross-map success rebuilds the normal Exploration HUD/Frontend host through
-  the existing UIManager/Map arrival flow. It does not resurrect a stale Save
-  Widget or directly re-add the old panel. The user can reopen Save with Pause
-  shortcut `1`.
-- Restore-travel failure clears the pending presentation, reports typed
-  `LoadFailed`, commits no non-Map candidate, and leaves the previous World,
-  input mode, and UI session usable.
-- A second Save/Load/Overwrite click while the same intent is pending is
-  rejected/consumed without a second disk transaction or restore travel. A
-  new Save after the previous operation has completed is a new user intent and
-  may legitimately advance the slot generation.
+## C++ / Blueprint boundary
 
-## Exact implementation allowlist after separate authorization
+- C++ owns catalog validation, candidate filtering, comparison/delta values,
+  expected revisions, OperationId creation/forwarding, authority result
+  mapping, committed snapshot refresh, typed unavailable/failure states, and
+  delegate bind/unbind.
+- Blueprint owns visual layout, slot/candidate entry widgets, selected-state
+  styling, focus order, button labels, and binding of pure-value snapshots.
+- Blueprint may call `SelectSlot`, `SelectCandidate`, `OpenEnhancement`,
+  `CommitSelectedMovement`, `CommitEnhancement`, and `Back`; it may not call
+  `AddToViewport`, mutate Inventory/Equipment, remove materials directly,
+  call `SetEnhancementLevel` for the P17 flow, apply GameplayEffects, save,
+  travel, or infer success from a button click.
 
-The following is the maximum proposed production/test write set. It is not an
-implementation grant until the user separately authorizes P17-011 production
-work:
+## Acceptance and failure matrix
 
-- `Source/HSR/Save/HSRSaveTypes.h`
-  - typed slot-summary projection and, if required by the existing deferred
-    restore seam, a typed Save-operation completion payload/delegate;
-  - no Save schema or envelope layout change.
-- `Source/HSR/Save/HSRSaveSubsystem.h`
-- `Source/HSR/Save/HSRSaveSubsystem.cpp`
-  - read-only slot summary query and final deferred Load completion publication;
-  - reuse existing validation/recovery/restore transaction; no new authority.
-- `Source/HSR/UI/HSRSaveViewModel.h`
-- `Source/HSR/UI/HSRSaveViewModel.cpp`
-  - project summaries, gate duplicate pending intents, retain overwrite
-    intent, and consume typed completion results.
-- `Source/HSR/UI/HSRSaveWidget.h`
-- `Source/HSR/UI/HSRSaveWidget.cpp`
-  - expose Blueprint-safe summary/result access and forward user intent only.
-- `Source/HSR/Tests/HSRSaveFrontendTests.cpp`
-  - focused Save UI contract tests listed below.
-- `tasks/execution-result.md`
-  - implementation and verification evidence only after authorized execution.
+- valid relic slot selection yields deterministic slot rows and bag candidates;
+  invalid slot/candidate/catalog/authority data yields typed unavailable;
+- candidate comparison is pure and does not mutate Inventory, Equipment,
+  materials, revisions, or Save data;
+- bag -> equip removes one matching unique item and places the same registry
+  instance exactly once;
+- occupied slot -> replace atomically returns the displaced instance to the
+  bag and places the incoming instance, with net capacity validation;
+- enhancement validates DefinitionId, Kind, target level, modifier snapshot,
+  material definition/cost, expected Inventory/Equipment revisions, and
+  expected current enhancement level;
+- successful enhancement consumes material once, updates Registry payload once,
+  advances Inventory and Equipment revisions once, and broadcasts once per
+  domain; same OperationId replay is cached/no-op;
+- stale revisions, wrong owner/slot, insufficient material, missing mapping,
+  invalid catalog row, target above cap, duplicate OperationId payload, and
+  injected preflight failure leave all old snapshots/revisions/selection intact;
+- ViewModel refreshes only from committed callbacks and unbinds cleanly on
+  shutdown/destruction; no duplicate or stale callback remains;
+- Build target is `HSREditor Win64 Development`; focused Automation covers
+  authority and ViewModel tests plus adjacent Equipment movement/detail tests;
+- user performs Save All, Editor close/reopen, and one single-resolution PIE
+  happy path. Failure PIE may be skipped after code/Automation wiring review
+  per user direction; 1920x1080/1280x720 comparison is `NOT VERIFIED` and
+  non-blocking in this task.
 
-Everything else is read-only unless a failing compile/test proves a directly
-necessary seam and the task is explicitly reopened. In particular, the
-following are excluded from the write set: `HSRSaveVersion.*`, `HSRSaveGame.*`,
-all Save schema DTO migration code, `HSRUIManagerSubsystem.*`, Frontend Router,
-Screen Stack, Map, Battle, Reward, Inventory, Party, Challenge, Input, Config,
-Build.cs, plugins, new modules, and all existing accepted production logic.
+## Explicit non-goals
 
-## User-owned Editor asset allowlist
+- Character level/ascension/trace/eidolon/outfit upgrades;
+- generic Inventory classification, consumable use, disassembly, or economy;
+- arbitrary Equipment/Relic stat generation, random rolls, set-bonus redesign,
+  currency creation, or Save schema/migration changes;
+- direct legacy `SetEnhancementLevel` UI use; the P17 flow uses the new
+  material-backed request contract;
+- Battle HUD, dialogue, reward, gacha, Party, Map, Quest, Challenge, or
+  Frontend routing changes;
+- Config, Build.cs, plugins, new modules, direct viewport mounting, or Git
+  commit/push.
 
-No new asset is required. If implementation is authorized, the user may edit
-only these existing assets for Save presentation and route wiring:
+## TDD and evidence gates
 
-- `Content/UI/P17/Frontend/WBP_FrontendShell_P17.uasset`
-- `Content/UI/P17/Frontend/WBP_FrontendModuleRoot_P17.uasset`
-- `Content/UI/P17/Frontend/WBP_HSRSavePanel_P17.uasset`
+1. Add `HSR.Equipment.Enhancement.*` and
+   `HSR.UI.RelicEquipment.ViewModel` tests first and obtain a valid RED from
+   the missing contract/implementation.
+2. Implement the smallest authority API and rerun the same tests to GREEN.
+3. Implement the pure-value ViewModel/Widget boundary and rerun focused tests.
+4. Run `HSREditor Win64 Development` Build, focused Automation, adjacent
+   regressions, `git diff --check`, and exact allowlist audit.
+5. Write only factual RED/GREEN/build/Automation evidence; do not claim PIE or
+   Editor persistence before user evidence is supplied.
+6. Stop at the User Editor Asset Gate. Do not create or edit UAsset files in
+   this implementation pass.
 
-The already accepted `ModuleContentHost` binding must remain present. The
-Save panel must be created/attached as ModuleRoot content in the existing
-`OnModuleChanged`/route path; no panel may independently use
-`AddToViewport`. No InputAction/IMC asset is in scope, and the Pause shortcut
-remains numeric `1`.
+## Current checkpoint
 
-## User Editor procedure after implementation authorization
-
-1. Open `WBP_FrontendShell_P17`; verify the Save Hub entry submits
-   `EHSRFrontendModule::Save` through the existing Frontend intent. Do not add
-   a direct SaveSubsystem call.
-2. Open `WBP_FrontendModuleRoot_P17`; keep `ModuleContentHost` as the existing
-   Overlay/CanvasPanel. For the Save module, create or display the existing
-   `WBP_HSRSavePanel_P17` under that host. Preserve Character, Inventory, Map,
-   Challenge, Quest, Back/X, and Battle Return branches unchanged.
-3. Open `WBP_HSRSavePanel_P17`; verify its C++ parent is `UHSRSaveWidget` and
-   bind Slot 1/2 to the stable names `p17_slot_01`/`p17_slot_02`. Bind Save and
-   Load buttons to the Widget forwarding functions, and bind overwrite Confirm
-   and Cancel to the existing confirmation controls.
-4. Bind the slot summary and `OnSaveResultChanged` projections to text/state
-   presentation. Empty, Ready, Recoverable, Unavailable, Pending, Success,
-   and typed failure must be visible without Blueprint-side business rules.
-5. Disable or guard conflicting Save/Load controls while a deferred Load or
-   Overwrite confirmation is pending. Cancel must restore the previous enabled
-   state without writing.
-6. Compile each WBP, Save All, close and reopen the Editor, then compile again.
-   Confirm the three asset references and `ModuleContentHost` survive reopen.
-7. In PIE, open Pause with numeric `1`, enter Save, complete the matrix below,
-   and after cross-map Load confirm the rebuilt HUD, input, Back/X, and numeric
-   `1` Pause path.
-
-## Required Automation and evidence matrix
-
-### Codex Build/Automation
-
-| Check | Required result |
-|---|---|
-| Fresh `HSREditor Win64 Development` Build | UHT, compile, link, metadata all pass |
-| `HSR.UI.SaveFrontend` | Focused summary, intent, overwrite, pending completion and failure tests pass |
-| `HSR.Save` | Existing Save tests remain green; no schema count or migration regression |
-| `HSR.Save.WriteTransaction` / `HSR.Save.LoadRecovery` | Existing Primary/Staging/Backup and recovery matrix remains green |
-| `HSR.ColdSave.*` | Existing cold primary/backup/idempotence tests remain green |
-| `HSR.UI.FrontendNavigation` | Existing 11 navigation tests remain green |
-| `HSR.UI.ScreenLifecycle.TravelRestore` and `HSR.Save.MapTravelMutualExclusion` | Existing integrated restore/UI lifecycle remains green |
-| `git diff --check` | Pass; `.claude/**` remains untracked and excluded |
-
-Minimum focused test cases:
-
-- both accepted slot summaries initially `Empty`;
-- valid Primary summary exposes generation/map/party/challenge projection;
-- valid Backup fallback is `Recoverable` and marks the displayed source;
-- corrupt/unsupported/definition-invalid data is `Unavailable`;
-- Save to Empty writes once and reports the authority result;
-- existing physical slot requires confirmation;
-- Overwrite Cancel performs no write and leaves generation/bytes unchanged;
-- Overwrite Confirm advances generation exactly once;
-- missing/invalid Load preserves the live snapshot and returns typed failure;
-- Map Travel Pending and Battle Return Pending reject before mutation;
-- deferred Load success/failure produces one final frontend result;
-- repeated pending Load/Save/Confirm produces no duplicate transaction or travel;
-- Widget receives result updates without direct SaveGame or Map calls.
-
-### User Editor/PIE
-
-| Case | Expected evidence |
-|---|---|
-| Fresh Pause -> Save open | numeric `1` opens Pause; Save panel appears under ModuleContentHost; no direct viewport host |
-| Empty slots | Slot 1/2 show `Empty`; no fabricated generation/map values |
-| Save Slot 1 | `p17_slot_01` becomes `Ready`; generation and saved summary appear |
-| Save Slot 2 | `p17_slot_02` independently saves and displays its own summary |
-| Overwrite Cancel | confirmation closes; no generation/result success and old UI remains usable |
-| Overwrite Confirm | one generation increment and one typed success; no duplicate write |
-| Missing/invalid Load | typed failure is visible; old World remains movable and Pause can reopen with `1` |
-| Same-map Load | saved runtime projection and UI result are coherent; no stale duplicate panel |
-| Cross-map Load | one Map-owned restore travel, arrival, host rebuild, saved transform/runtime; rebuilt HUD/input works |
-| Cross-map failure | old World/host/input remain usable and no partial Profile/Party/Inventory/Reward/Quest/Challenge commit occurs |
-| Editor reopen | Save All + close/reopen preserves parent classes, ModuleContentHost, route and slot bindings |
-| Regressions | Character, Inventory, Map, Challenge, Back/X, Battle Return and post-return numeric `1` Pause remain unchanged |
-
-The user-provided PIE log is evidence for visible Editor/PIE behavior; Codex
-must not relabel it as Automation. Standalone, Packaged, Shipping, physical
-controller, two-resolution visual coverage, and network behavior remain
-`NOT VERIFIED` unless separately demonstrated.
-
-## Explicit non-goals and stop conditions
-
-- No Delete button/API, cloud save, schema version, migration, serialization
-  layout, slot count expansion, new SaveGame class, or Config change.
-- No new reward grant, resource deduction, Buff, battle, party, challenge,
-  inventory, map travel, or UI root architecture.
-- No direct `USaveGame`/`UGameplayStatics::SaveGameToSlot` call from Widget or
-  Blueprint. The existing Save authority is the only disk path.
-- No restoration of Character/Inventory direct `AddToViewport`.
-- Stop and request a new Gate if implementation needs UIManager route changes,
-  a new cross-domain event not owned by Save, schema migration, new assets,
-  input changes, deletion, or a change to accepted P17-009/010 behavior.
-
-## Current Gate 0 decision
-
-The scope is adjacent to Phase 17, independently verifiable, and has a
-bounded implementation allowlist. The existing Save UI is a useful facade but
-does not yet satisfy real slot summaries and deferred failure presentation.
-The user authorized the implementation allowlist on 2026-08-06. The C++
-implementation and focused Automation are GREEN; final user-owned WBP wiring,
-Editor reopen, and PIE happy/failure evidence are still required before this
-task can be archived.
-
-## Implementation checkpoint
-
-- RED checkpoint: `8b75f86` (`test: add P17-011 save frontend red contract`).
-  The new test target failed only because the slot-summary and deferred-load
-  interfaces did not yet exist.
-- GREEN implementation is limited to the exact Source/test allowlist above:
-  read-only Primary/Backup summary, typed deferred Load completion, and
-  ViewModel/Widget projection. No Save schema or accepted domain logic was
-  reopened.
-- User Editor/PIE acceptance is not yet complete. Do not mark this task
-  archived until the existing Save Panel is wired under ModuleContentHost and
-  the required matrix is evidenced.
+- Authorization: complete.
+- Task card: this file, `TASK-P17-RELIC-EQUIPMENT-001`.
+- RED: confirmed by the intended missing `HSREquipmentEnhancementCatalog.h`
+  compile error after the external UBT-cache permission issue was bypassed.
+- GREEN: final `HSREditor Win64 Development` Build succeeded.
+- Focused Automation: enhancement ExactlyOnce, enhancement FailureMatrix, and
+  Relic ViewModel passed 3/3.
+- Adjacent regression: final Equipment/Equipment Detail/Character Shell/
+  Frontend Navigation plus Relic selection suite passed 31/31.
+- `git diff --check`: no whitespace errors; existing line-ending warnings only.
+- User Editor/PIE Asset Gate: pending. No User UAsset was created or modified.
+- Failure PIE is user-accepted non-blocking if not run; different resolutions
+  remain `NOT VERIFIED` and non-blocking.
+- Automatic Git commits: prohibited by user instruction.

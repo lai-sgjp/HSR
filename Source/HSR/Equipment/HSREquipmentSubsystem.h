@@ -7,6 +7,7 @@
 
 class UHSREquipmentDefinition;
 class UHSRRelicDefinition;
+class UHSREquipmentEnhancementCatalog;
 class UHSRInventorySubsystem;
 class UHSRItemEquipmentMappingCatalog;
 struct FHSREquipmentSaveDto;
@@ -47,6 +48,10 @@ public:
 		const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&);
 	DECLARE_DELEGATE_RetVal_TwoParams(bool, FMovementProjectionApply,
 		const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&);
+	DECLARE_DELEGATE_RetVal_TwoParams(bool, FEnhancementProjectionPreflight,
+		const FHSREquipmentEnhancementRequest&, const FHSREquipmentInstance&);
+	DECLARE_DELEGATE_TwoParams(FEnhancementProjectionCommit,
+		const FHSREquipmentEnhancementRequest&, const FHSREquipmentInstance&);
 
 	void ExportSaveData(TArray<struct FHSREquipmentSaveDto>& Out) const;
 	void ExportSaveData(TArray<struct FHSREquipmentRegistryDto>& OutRegistry, TArray<struct FHSREquipmentPlacementDto>& OutPlacements) const;
@@ -67,6 +72,8 @@ public:
 	EHSREquipmentOperationResult ReplaceById(const FGuid& CharacterId, const FGuid& InstanceId);
 	FHSREquipmentMovementResult ExecuteMovement(const FHSREquipmentMovementRequest& Request,
 		UHSRInventorySubsystem& Inventory, const UHSRItemEquipmentMappingCatalog& MappingCatalog);
+	FHSREquipmentEnhancementResult ExecuteEnhancement(const FHSREquipmentEnhancementRequest& Request,
+		UHSRInventorySubsystem& Inventory, const UHSREquipmentEnhancementCatalog& Catalog);
 	void SetMovementProjection(FMovementProjectionPreflight InPreflight, FMovementProjectionCommit InCommit)
 	{
 		MovementProjectionPreflight = MoveTemp(InPreflight);
@@ -77,6 +84,12 @@ public:
 	{
 		MovementProjectionPreflight=MoveTemp(InPreflight);MovementProjectionApply=MoveTemp(InApply);MovementProjectionCommit=MoveTemp(InCommit);
 	}
+	void SetEnhancementProjection(FEnhancementProjectionPreflight InPreflight,
+		FEnhancementProjectionCommit InCommit)
+	{
+		EnhancementProjectionPreflight = MoveTemp(InPreflight);
+		EnhancementProjectionCommit = MoveTemp(InCommit);
+	}
 
 	EHSREquipmentOperationResult Equip(const FGuid& CharacterId, const FHSREquipmentInstance& Instance);
 	EHSREquipmentOperationResult Replace(const FGuid& CharacterId, const FHSREquipmentInstance& Instance);
@@ -84,6 +97,7 @@ public:
 	EHSREquipmentOperationResult SetEnhancementLevel(const FGuid& CharacterId, const FGuid& InstanceId, int32 NewLevel);
 
 	bool GetLoadout(const FGuid& CharacterId, FHSREquipmentLoadout& OutLoadout, int32& OutRevision) const;
+	bool FindInstanceOwner(const FGuid& InstanceId, FGuid& OutCharacterId) const;
 	void GetRelicSetSnapshots(const FGuid& CharacterId, TArray<FHSRRelicSetSnapshot>& Out) const;
 	FHSREquipmentLoadoutChanged& OnLoadoutChanged() { return LoadoutChanged; }
 	const FHSREquipmentLoadoutChanged& OnLoadoutChanged() const { return LoadoutChanged; }
@@ -108,6 +122,11 @@ private:
 		FHSREquipmentMovementRequest Request;
 		FHSREquipmentMovementResult Result;
 	};
+	struct FEnhancementLedgerEntry
+	{
+		FHSREquipmentEnhancementRequest Request;
+		FHSREquipmentEnhancementResult Result;
+	};
 
 	bool IsValidInstance(const FHSREquipmentInstance& Instance) const;
 	bool IsValidModifiers(const TArray<FHSREquipmentModifier>& Modifiers) const;
@@ -119,6 +138,8 @@ private:
 	bool ResolveLoadout(const FLoadoutState& State, FHSREquipmentLoadout& OutLoadout) const;
 	static bool IsSamePayload(const FHSREquipmentInstance& A, const FHSREquipmentInstance& B);
 	static bool IsSameMovementRequest(const FHSREquipmentMovementRequest& A, const FHSREquipmentMovementRequest& B);
+	static bool IsSameEnhancementRequest(const FHSREquipmentEnhancementRequest& A,
+		const FHSREquipmentEnhancementRequest& B);
 
 	TMap<FName, FDefinitionRule> Definitions;
 	TMap<FGuid, FHSREquipmentInstance> InstanceRegistry;
@@ -128,7 +149,11 @@ private:
 	FHSREquipmentRestoreProjection RestoreProjection;
 	TMap<FGuid, FMovementLedgerEntry> MovementLedger;
 	TArray<FGuid> MovementLedgerOrder;
+	TMap<FGuid, FEnhancementLedgerEntry> EnhancementLedger;
+	TArray<FGuid> EnhancementLedgerOrder;
 	FMovementProjectionPreflight MovementProjectionPreflight;
 	FMovementProjectionApply MovementProjectionApply;
 	FMovementProjectionCommit MovementProjectionCommit;
+	FEnhancementProjectionPreflight EnhancementProjectionPreflight;
+	FEnhancementProjectionCommit EnhancementProjectionCommit;
 };

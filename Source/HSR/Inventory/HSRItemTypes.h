@@ -120,4 +120,11 @@ struct FHSRInventoryMovementCandidate
 	int64 NextRevision = 0;
 };
 
+struct FHSRInventoryEnhancementCandidate
+{
+	TMap<FName, int32> Stacks;
+	TMap<FGuid, FHSRItemInstance> UniqueItems;
+	int64 NextRevision = 0;
+};
+
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRInventoryChanged, int64 /* Revision */);

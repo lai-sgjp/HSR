@@ -64,9 +64,14 @@ private:
 	EHSRInventoryOperationResult PrepareEquipmentSwapCandidate(const FGuid& IncomingInstanceId, FName IncomingItemId,
 		const FGuid& DisplacedInstanceId, FName DisplacedItemId, int64 ExpectedRevision,
 		FHSRInventoryMovementCandidate& OutCandidate) const;
+	EHSRInventoryOperationResult PrepareEquipmentEnhancementCandidate(FName MaterialItemId, int32 MaterialCost,
+		int64 ExpectedRevision, FHSRInventoryEnhancementCandidate& OutCandidate) const;
 	void InstallEquipmentMovementCandidateNoFail(FHSRInventoryMovementCandidate&& Candidate);
 	void FinalizeEquipmentMovementRevisionNoFail(int64 PreparedRevision);
 	void PublishEquipmentMovementCommit(int64 PreparedRevision);
+	void InstallEquipmentEnhancementCandidateNoFail(FHSRInventoryEnhancementCandidate&& Candidate);
+	void FinalizeEquipmentEnhancementRevisionNoFail(int64 PreparedRevision);
+	void PublishEquipmentEnhancementCommit(int64 PreparedRevision);
 
 	TMap<FName, FDefinitionRule> Definitions;
 	TMap<FName, int32> Stacks;

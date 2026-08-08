@@ -495,6 +495,29 @@ EHSRInventoryOperationResult UHSRInventorySubsystem::PrepareEquipmentSwapCandida
 	return EHSRInventoryOperationResult::Success;
 }
 
+EHSRInventoryOperationResult UHSRInventorySubsystem::PrepareEquipmentEnhancementCandidate(
+	const FName MaterialItemId, const int32 MaterialCost, const int64 ExpectedRevision,
+	FHSRInventoryEnhancementCandidate& OutCandidate) const
+{
+	if (ExpectedRevision != Revision) return EHSRInventoryOperationResult::RevisionConflict;
+	if (MaterialItemId.IsNone()) return EHSRInventoryOperationResult::InvalidDefinitionId;
+	if (MaterialCost <= 0) return EHSRInventoryOperationResult::InvalidQuantity;
+	const FDefinitionRule* Rule = Definitions.Find(MaterialItemId);
+	if (!Rule) return EHSRInventoryOperationResult::UnknownDefinition;
+	if (Rule->StorageKind != EHSRItemStorageKind::Stackable) return EHSRInventoryOperationResult::StorageKindMismatch;
+	const int32 Existing = Stacks.FindRef(MaterialItemId);
+	if (Existing < MaterialCost) return EHSRInventoryOperationResult::InsufficientQuantity;
+	FHSRInventoryEnhancementCandidate Candidate;
+	Candidate.Stacks = Stacks;
+	Candidate.UniqueItems = UniqueItems;
+	const int32 Remaining = Existing - MaterialCost;
+	if (Remaining == 0) Candidate.Stacks.Remove(MaterialItemId);
+	else Candidate.Stacks.Add(MaterialItemId, Remaining);
+	Candidate.NextRevision = Revision + 1;
+	OutCandidate = MoveTemp(Candidate);
+	return EHSRInventoryOperationResult::Success;
+}
+
 void UHSRInventorySubsystem::InstallEquipmentMovementCandidateNoFail(FHSRInventoryMovementCandidate&& Candidate)
 {
 	Stacks = MoveTemp(Candidate.Stacks);
@@ -507,6 +530,24 @@ void UHSRInventorySubsystem::FinalizeEquipmentMovementRevisionNoFail(const int64
 }
 
 void UHSRInventorySubsystem::PublishEquipmentMovementCommit(const int64 PreparedRevision)
+{
+	check(Revision == PreparedRevision);
+	BroadcastRevision(PreparedRevision);
+}
+
+void UHSRInventorySubsystem::InstallEquipmentEnhancementCandidateNoFail(
+	FHSRInventoryEnhancementCandidate&& Candidate)
+{
+	Stacks = MoveTemp(Candidate.Stacks);
+	UniqueItems = MoveTemp(Candidate.UniqueItems);
+}
+
+void UHSRInventorySubsystem::FinalizeEquipmentEnhancementRevisionNoFail(const int64 PreparedRevision)
+{
+	Revision = PreparedRevision;
+}
+
+void UHSRInventorySubsystem::PublishEquipmentEnhancementCommit(const int64 PreparedRevision)
 {
 	check(Revision == PreparedRevision);
 	BroadcastRevision(PreparedRevision);
