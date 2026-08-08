@@ -1,6 +1,139 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-07-27
+> 最后更新：2026-08-09
+
+## 2026-08-09 TASK-P17-RELIC-EQUIPMENT-001 用户 PIE 收口
+
+- 用户确认 P17-007 遗器强化 PIE happy path 通过，无问题；任务按
+  `COMPLETE / USER ACCEPTED` 收口。
+- 修复了阻塞该验收的最后一个已知缺陷：开发 harness 以 999 数量发放
+  `Item.Material.LumenShard`，而 `DA_Item_LumenShard_P13.MaxStack = 99`。
+  `AddStack` 对超上限发放整体拒绝并返回 `StackLimitExceeded` 且不写入，
+  返回值被丢弃，因此玩家实际持有 0 个材料，12 个强化选项全部
+  `bAffordable=false`，`CommitEnhancement` 恒返回 `AuthorityRejected`(11)。
+  P13 生产 bootstrap 已在 PIE 启动时注册该 ItemId，故 harness 跳过自身
+  注册直接落到超上限 `AddStack`。目录规则消耗为 2-16，99 上限充足。
+- 同轮修复两处衍生问题：`Rebuild()` 的强化失败分支曾发布
+  `Stage=Enhancement` 但选项列表为空（与其上方 comparison 分支不一致），
+  导致 Blueprint 对 `EnhancementOptions[0]` 越界读取；新增
+  在 `UHSRRelicEquipmentWidget` 上新增
+  `GetEnhancementOption(Index, OutOption)`、`GetEnhancementOptionCount`、
+  `HasEnhancementOptions` 三个边界安全 BlueprintPure 访问器供 Blueprint 使用。
+- 诊断增强：`CommitEnhancement` 现逐项打印 option 命中/bAffordable/
+  bAvailable/CurrentInstance 及材料 id、消耗、实际持有量和原始子系统码。
+  此前 `MapEnhancementResult` 将 `InventoryRejected`、`EquipmentRejected`、
+  `InvalidRequest`、`ProjectionRejected`、`OperationIdConflict` 一律折叠为
+  `AuthorityRejected`(11)，无法区分来源。
+- `HSR.UI.RelicEquipment` 聚焦 Automation 4/4 通过，含两个新回归：
+  `MaterialGrantRespectsStackCap`、
+  `EmptySlotNeverPublishesEnhancementStage`。Build
+  `HSREditor Win64 Development` 通过，DLL 时间戳晚于全部改动源文件。
+- 本轮按用户明确指令提交（任务卡原有的禁止自动提交约束由该指令覆盖）。
+- 既有回归边界保持不变、不在本任务扩张：`HSR.UI.ScreenLifecycle` 的
+  CharacterDetail/Inventory/TravelRestore 3 个测试失败（已诊断为测试
+  fixture 的 `bFocusSucceeds=false` 配置错误加一处缺失的
+  `AttachForAutomation()` 自动化挂载 hook，非产品缺陷），以及
+  `HSR.UI.CharacterDetail.ViewModel` 的 5 个 Save fixture 断言失败。
+  两项需在 P17-016 收尾前清除。
+
+## 2026-08-07 TASK-P17-CHAR-SHELL-001 user closeout
+
+- 用户确认 Character Shell Editor/PIE 当前运行正常，并提供
+  `WBP_CharacterShellEntry_P17`、`WBP_CharacterShell_P17` 的 Designer/Graph
+  接线证据及 `Map_Exploration_P15_A` PIE 日志。
+- 证据显示 Frontend input 已绑定，数字 `1` 能打开 Pause，Character route
+  以 `Stack=2` 成功打开，Pause 可重复重开，探索输入 Context 在退出后恢复，
+  且提供的日志摘录没有 Error、Ensure 或 Blueprint Runtime Error。
+- 静态点击路径审查确认 Entry dispatcher、Character/Tab 选择、Shell
+  snapshot/unavailable 分支、`ModuleContentHost` 动态挂载、Back/X 和
+  生命周期解绑没有阻塞性问题。本次 closeout 审查未修改 Source、UAsset
+  或 Config；既有用户/任务 Source、UAsset 和 `.claude/**` 变化均保持原样。
+- 用户明确接受不执行失败路径 PIE 和双分辨率 PIE；两项分别记录为
+  `NOT RUN / NON-BLOCKING` 与 `NOT VERIFIED / NON-BLOCKING`，不阻塞本任务。
+- `TASK-P17-CHAR-SHELL-001` 按用户指令收口为 `COMPLETE / USER ACCEPTED`。
+- 保留两个非阻塞 follow-up：初始 Shell snapshot 存在一次冗余 presentation
+  回调；Entry dispatcher 后的本地 NameText 写入可能作用于已被同步重建的旧
+  Entry。当前均不影响权威状态或用户验收结果。
+
+## 2026-08-06 TASK-P17-CHAR-SHELL-001 implementation GREEN
+
+- 用户已授权新的无歧义任务 `TASK-P17-CHAR-SHELL-001 - Character Progression Shell`；实际 `TASK-P17-006` Quest Frontend 和实际 `TASK-P17-012` 五模块动态挂载均不改名、不重用。
+- 新增 Character Shell pure-value types/ViewModel/Widget 与 Character class slot 的 `UHSRScreenWidget` 兼容适配；Character 内容仍必须通过 `WBP_FrontendModuleRoot_P17.ModuleContentHost` 动态挂载。
+- TDD RED 已真实触发：新测试最初因缺少 `HSRCharacterShellViewModel.h` 编译失败；项目禁止自动 Git commit，因此未创建 checkpoint commit。
+- 最新 `HSREditor Win64 Development` Build 通过 UHT、Compile、Link、Metadata。
+- `HSR.UI.CharacterShell` 2/2；Frontend Dynamic Mount 3/3；Frontend Navigation 11/11；Equipment Detail 2/2；Profile Authority 1/1；Equipment Transactions 1/1，相关回归合计 20/20。
+- 现有 `HSR.UI.CharacterDetail.ViewModel` 仍有 5 个 Save fixture 断言失败；本任务未修改 Character Detail 或 Save authority，暂列既有回归边界，不以此扩张任务范围。
+- 用户 Editor UAsset 创建/保存、Editor 关闭重开、1920x1080/1280x720 PIE happy/failure 仍待完成；任务不可归档为 PASS。
+
+## 2026-08-06 TASK-P17-005 用户指令收口与 Phase 17 计划校准
+
+- 用户明确要求 TASK-P17-005 不再卡关，现按 `COMPLETE / USER ACCEPTED` 处理；
+  既有代码 Gate、Automation 与用户运行证据继续作为历史证据保留。
+- 本次没有修改 P17-005 Source 或用户 UAsset。此前未独立重跑的双分辨率、
+  Standalone、Packaged、Shipping、物理手柄及部分完整 Editor/PIE 证据仍为
+  `NOT VERIFIED`，但按用户指令不再阻塞 P17-005。
+- 对照 `docs/phase-17-execution-plan.md` 第 7 节，Phase 17 计划范围是
+  P17-005～P17-016，不是只到 P17-012。当前实际归档的 P17-006 是 Quest
+  Frontend，实际归档的 P17-012 是五模块统一动态挂载；它们分别不能替代计划
+  中的 Character 养成 Shell 与 Dialogue Presentation。
+- 因此下一唯一建议是执行计划语义下的 Character 养成 Shell；由于 `TASK-P17-006`
+  编号已被 Quest Frontend 使用，开始前必须创建新的无歧义任务编号与独立 Gate 0，
+  不得直接复用旧编号。
+
+## 2026-08-06 TASK-P17-010C 归档
+
+- `TASK-P17-010C - Challenge Directory Progression Projection` 已按用户确认收口，状态为 `USER ACCEPTED / INDEPENDENT REVIEW NOT RUN`。
+- Runtime progression authority、prerequisite projection、Save schema 8、victory settlement completion 以及 36/36 Combined Automation 均已通过；实现提交为 `82a0b98`。
+- 用户最新 PIE 日志确认 `Sources=3 Entries=3`，`Enc_Test_Phase5` 带 Stage Buff 胜利并返回，`Enc_Test_Phase5_locked` 解锁后正常进入、胜利并返回；此前的 `invalid buff` 不再出现。
+- 本轮未创建下一张活动任务卡；P17-005 最终 Editor/PIE 验收仍是独立事项。Standalone、Packaged、Shipping、物理控制器和网络行为继续保持 `NOT VERIFIED`。
+- 归档任务包位于 `tasks/archive/TASK-P17-010C-*`。`.claude/**` 继续保持未跟踪且排除在交付之外。
+
+## 2026-08-05 最新权威摘要
+
+- `TASK-P17-010A` 已归档为 `PASS / USER ACCEPTED`；其数据驱动目录 happy path 不再继续塞入新功能。
+- `TASK-P17-010B` 已按用户确认收口；实现、聚焦 Challenge Automation `3/3`、相邻回归 `21/21` 和 Development Editor Build 证据已归档。独立复核与新鲜 Editor/PIE Gate 未在本轮执行，仍标为 `NOT VERIFIED`。
+- `TASK-P17-009D - Pre-Battle Buff GameplayEffect and Resource Authority` 已完成，状态为 `COMPLETE / ENGINE AUTOMATION PASS / USER PIE PASS`。
+- 009D 承接已验收的 009C：Encounter-owned Stage Buff definitions 经 Transition registry 校验，Coordinator 对玩家 ASC exactly-once 应用 GE 后由 Inventory exactly-once 扣资源；构建失败回滚 GE 与已扣资源，正常 Reset 不退款。永久 Party、Reward/Save、Challenge 目录和已修复的前端输入链路未重新打开。
+- Development Editor 与 StageBuff 2/2、PreBattle 3/3、Admission 1/1、Challenge 3/3、Frontend 11/11、Map 5/5、BattleReturn 2/2 已通过；用户 PIE 进一步确认 Stage Buff 应用、战斗指令面板、胜利结算、战斗返回和返回后的 Pause 重开。Codex 未创建 UAsset。
+- `.claude/**` 仍为用户本地未跟踪文件，不属于本次文档交付。
+- 当前活动任务已切换为 `TASK-P17-005` 最终验收：Fresh Editor Build 与
+  Frontend/Party/Challenge/Map/BattleReturn/PreBattle/Admission 自动化均已
+  通过；用户 Editor Save All/reopen、PIE 路由/焦点/输入、返回后 `1` 键
+  Pause 与双分辨率证据仍为 `NOT VERIFIED`，因此不宣称最终 PASS。
+
+## 2026-08-01 最新权威摘要
+
+- `TASK-P17-PATCH-03H` 已归档为 `PASS WITH FOLLOW-UP / USER ACCEPTED`。
+- 冷启动 Load 缺陷已修复：RewardSubsystem 在 Save 预检前原子注册 P13 生产定义；Development Editor Build、冷启动 RED/GREEN、Save/Inventory/Reward/Map 以及相关 SaveFrontend/TravelRestore Automation 已验证。
+- 用户最终 PIE 日志确认 `p17_slot_01` 可成功跨图恢复至 Map.B 与 Map.A，包含 restore travel、TravelRestore Consume、ArrivalCommitted 和保存坐标恢复。
+- 保留 follow-up：完整 UI 族仍有四个既有生命周期失败；restore arrival failure/timeout 注入、完整 AC-008 gameplay chain、Editor reopen 与双分辨率矩阵未单独验证；HUD stale-host teardown Error 仍为非阻断项。
+- 当前未自动创建下一任务卡，等待用户选择后续范围。
+
+## 2026-07-31 最新权威摘要
+
+- `TASK-P17-PATCH-03F` Map Frontend and Travel Rebuild 已归档为 `PASS WITH FOLLOW-UP / USER PIE ACCEPTED`。C++ Build、Map/UI Automation 与最终 A -> B -> A PIE 均成立；HUD EndPlay 在预先 TravelFreeze 后的重复 teardown 日志保留为非阻断生命周期 follow-up。
+- 用户地图 UI 集成资产已作为独立 provenance commit `b9d992a` 提交：HUD/frontend 绑定、新 Map panel 和确认删除的旧 Pause WBP；未包含学习笔记、`.claude/**` 或 `Content/AI/**`。
+- 活动任务进入 `TASK-P17-PATCH-03G`：Save UI and Integrated Restore。该任务只冻结 Save Slot UI、结构化 Save/Load/Overwrite 结果与跨域冷恢复证据，不重写 Save schema 或扩展资产所有权。
+
+## 2026-07-29 最新权威摘要
+
+- `TASK-P17-PATCH-03R` Regression Compatibility 已完成并归档。Implementation commits `e3ecf06`、`28114c4`、`badae3e`；首次 Reviewer `REVISE`=`4572ef0`，最终 Reviewer `PASS`=`3321bf4`。
+- 03R 最终证据：真实 `HSREditor Win64 Development` 15/15 actions 成功；修订后 `HSR.Battle` 10/10，另有 Save 16/16、Party 1/1、Reward 6/6、QuestDialogue 1/1、Equipment Effect 1/1。`HSR.Status` 无匹配测试，记录为 `NOT APPLICABLE`，由 Battle `StatusGeneric` 覆盖现有 seam。
+- 活动任务已恢复为 `TASK-P17-PATCH-03E2` 的已授权 TDD 实现包；03R 没有修改 03E2 mapping catalog、Movement 测试或生产事务行为。
+- `TASK-P17-PATCH-03E1` 已完成并准备归档：Equipment Registry 永久拥有完整实例 payload，loadout 仅保存 InstanceId placement，Save schema 7 分离 Registry/Placement，schema 6 保守迁移且不推断 Inventory unique item。
+- Build、`HSR.Equipment.Registry` 3/3、`HSR.Equipment` 8/8、`HSR.Save` 16/16、`HSR.Inventory` 3/3、`HSR.UI.EquipmentDetail.ViewModel` 1/1 与最终 Independent Review 均 `PASS`。
+- 用户提供的 Editor/PIE 日志确认探索启动、Character possession、Enhanced Input 和正常 teardown。当前 Character/Inventory/Equipment 与 Save/Load UI 未完成，因此 UI 驱动的装备 payload 检查和 PIE save/load 对比为 `NOT APPLICABLE / NOT VERIFIED`，不外推为已验证。
+- 03E2 只允许准备 Task Gate；Inventory/Equipment 原子移动、OperationId、容量交换、ASC 动态投影和 UI 操作均未实施、未授权。
+
+## 2026-07-28 最新权威摘要
+
+- `TASK-P17-PATCH-03D2` 已完成：RED `3036609`、实现 `05c0549`、Editor/PIE 证据 `998ed6e`；胜利统一通过 SettlementAuthority 原子提交 Inventory/Profile/Reward，战败零结算，重复确认与返回 exactly-once。HSREditor、聚焦测试及 29/29 回归通过，最终复核 `PASS`。
+- 用户接受 Equipment Registry 所有权模型；03E 已拆为 03E1 ownership/persistence foundation 与 03E2 atomic equip/projection。03E1 Task Gate 已冻结 schema 7、ID-only placement、保守 schema-6 migration 与最小 allowlist并复核 `PASS`，当前等待用户单独确认实施。
+- P17-005 已暂停并形成 checkpoint commit `4ef49f7`：代码 Gate 与 11/11 窄域 Automation 通过，Input/WBP 资产存在，用户 PIE 已证明 Character route 可打开/返回；但 Character read model 返回 `PartySlotEmpty`，所以 P17-005 最终 PASS 不可用。
+- 用户要求把八子系统整合作为全新阶段 `P17-PATCH-03`。四角色 Gate 0 已在修订后收束为 PASS；03A 已完成实现、Code Gate 与用户 PIE 验收。
+- Patch 03 已拆成串行 03A、03B、03C、03D1、03D2、03E～03H；03A～03D2 已 PASS，下一相邻任务为 03E Task Gate。
+- P17-005 checkpoint 不代表 P17-005 完成；`PartySlotEmpty` 与 Exploration Pawn/Party/Profile/CharacterId 未统一是 03B 的前置事实。
+- 当前未授权 push。Enemy/Player Character、Enemy DataAsset、`Map_Phase1_Exploration`、`Content/AI/**`、`.claude/**`、`learn/SaveSystem.md` 与 Phase 20 存档演进改动继续按用户既有修改隔离。
 
 ## 2026-07-27 最新权威摘要
 
@@ -586,3 +719,40 @@
 - `SightRadius`、`LoseSightRadius`、`EncounterRadius` 已移入 `UHSREnemyDefinition`，兼容默认值为 `1000 / 1500 / 200`，并验证 LoseSight 归一、无 Definition fallback、负值 clamp 与配置零副作用。
 - Independent Reviewer 最终 commit `ff8f213`：`PASS WITH FOLLOW-UP`；半径 Addendum Reviewer commit `990d95d`。三件套归档至 `tasks/archive/TASK-P17-PATCH-02-*`。
 - 非阻断 follow-up：用户 `.uasset` 继续按 provenance 独立处理；未来调整三个半径后执行一次探索 smoke；历史失败日志继续保留。当前无活动任务，P17-005 尚未开始。
+
+# 2026-08-01 TASK-P17-006 Quest Frontend（已归档）
+
+- 接手前 03H/Save/Travel 工作已独立提交为 `1a14a6c`；Quest 子任务差异从该基线开始。
+- Quest 只读 ViewModel、Widget facade 与统一 `EHSRFrontendModule::Quest` route 已完成；QuestSubsystem 仍是唯一权威，UI 不暴露 Quest/Reward mutation。
+- Development Editor Build、`HSR.UI.Quest` 3/3、`HSR.QuestDialogue` 1/1、`HSR.UI.FrontendNavigation` 11/11、`HSR.UI.MapFrontend` 1/1 通过。
+- `HSR.UI.ScreenLifecycle` 保持既有基线：Boundaries、CandidateFailures、HostIdentity、TravelRestore 通过；CharacterDetail、HappyPath、Inventory ownership-count 用例失败，未出现 Quest 新失败。
+- 用户已完成 Quest UMG、Objective/Quest Entry 与 module-root 接线；PIE 确认 Empty、Back、A↔B 后重开均正常。任务以 `PASS WITH FOLLOW-UP / USER ACCEPTED` 归档。
+- FOLLOW-UP：当前生产 PIE 没有合法启动的 active Quest，Ready/Objective/Reward 展示链仍需在后续 Quest gameplay acceptance 子任务中验证；不得写成已验证。
+
+# 2026-08-04 TASK-P17-009A Party 只读投影（已归档）
+
+- Party 固定两槽只读 DTO/ViewModel/Widget 已完成，复用既有通用 Party route，不修改 Party authority。
+- Development Editor Build、`HSR.UI.Party` 3/3、`HSR.Party` 1/1、`HSR.UI.FrontendNavigation` 11/11 通过。
+- 用户创建 Party Panel/Slot Entry 并接入 module root；PIE 确认固定两槽、Character.A、Back/Close 与 A↔B 后重开均正常。
+- TASK-P17-009A 以 `PASS / USER ACCEPTED` 归档；该结论只覆盖只读投影，不代表权威计划中的 P17-009 已完成。Add/Remove/Replace/Swap、永久队伍候选确认、战前候选队伍/Buff 与 Encounter Request 仍未完成。
+
+# 2026-08-05 TASK-P17-010A 数据驱动 Challenge Directory
+
+- C++ 只读目录投影、稳定 ID 选择、锁定/无效/重复处理与前战模板门面已完成；Build、Challenge 2/2、PreBattle 3/3、Admission 1/1 通过。
+- 用户创建 Directory/Entry UMG 并配置三个 Source，最终日志为 `Sources=3 Entries=2 Result=0`，无 Blueprint Runtime Error/Accessed None/ensure；选择与锁定行为为 `USER ACCEPTED`。
+- 动态进度解锁、完成度 Save、成本、奖励和挑战分类不属于 010A。
+
+# 2026-08-05 TASK-P17-009C 前战面板纵向切片
+
+- `WBP_HSRPreBattlePanel_P17` 已由用户创建并完成候选角色、重复拒绝、Buff、快照、Confirm、Cancel 与诊断错误接线。
+- Shell 已恢复统一 Challenge route；独立 Challenge 模块的 Enter 入口通过 Encounter Definition 构建只读模板。前战 Widget 只生成纯 Request，并经 BattleTransition 提交，不直接调用 OpenLevel 或修改永久 Party。
+- 用户 PIE 确认前战面板覆盖 Pause、Cancel 返回 Pause、Confirm 提交 `Enc_Test_Phase5` 并进入战斗；日志无 Blueprint Runtime Error/Accessed None。
+- 用户 PIE 已确认 `Pause -> Challenge module -> Enter -> PreBattle -> Confirm -> Battle`；Buff 权威效果仍不在本纵向切片内。
+- Commandlet 回归 `HSR.UI.PreBattleCandidate` 3/3、`HSR.InteractionBattle.Admission` 1/1 通过；TASK-P17-009C 以 `PASS / USER ACCEPTED` 收尾，Buff GameplayEffect/资源消耗另立任务。
+
+# 2026-08-04 TASK-P17-009B Party 永久候选编辑与确认（已归档）
+
+- Party authority 增加 revision-aware atomic candidate commit；Profile 提供确定性只读角色列表。
+- Party ViewModel/Widget 支持候选 Set/Clear/Swap、Confirm、Cancel、重复/未知/stale 拒绝与蓝图转发；Widget 初始化顺序修复后 Construct 可读快照。
+- User Build、`HSR.Party` 2/2、`HSR.UI.Party` 4/4、`HSR.UI.FrontendNavigation` 11/11 与用户 PIE 均通过。
+- TASK-P17-009B 以 `PASS / USER ACCEPTED` 归档；P17-009C 战前候选队伍、Buff、Encounter Request 与取消零污染仍未完成。
