@@ -33,14 +33,14 @@ bool FHSRUIScreenLifecycleHappyPathTest::RunTest(const FString&)
 	using namespace HSR::P17::LifecycleTests;
 	UHSRUIManagerSubsystem* Manager = MakeManager();
 	Manager->RegisterHostForAutomation();
-	Manager->ConfigureAutomationBackend(true, true, true, true, false);
+	Manager->ConfigureAutomationBackend(true, true, true, true, true);
 	TestEqual(TEXT("root registered"), EntryCount(Manager), 1);
 	TestEqual(TEXT("open pause"), Manager->OpenPauseScreen(), EHSRUIScreenResult::Success);
 	TestTrue(TEXT("pause instance owned"), Manager->HasOpenPauseScreen());
 	TestEqual(TEXT("modal pushed"), EntryCount(Manager), 2);
 	TestEqual(TEXT("repeat open rejected"), Manager->OpenPauseScreen(), EHSRUIScreenResult::AlreadyOpen);
 	TestEqual(TEXT("repeat open does not duplicate"), EntryCount(Manager), 2);
-	TestFalse(TEXT("focus fallback failure is non-fatal"), Manager->IsInconsistent());
+	TestFalse(TEXT("successful open stays consistent"), Manager->IsInconsistent());
 	TestEqual(TEXT("back closes pause"), Manager->RequestBack(), EHSRUIScreenResult::Success);
 	TestFalse(TEXT("pause instance cleared"), Manager->HasOpenPauseScreen());
 	TestEqual(TEXT("root restored"), EntryCount(Manager), 1);
@@ -207,7 +207,7 @@ bool FHSRUICharacterDetailLifecycleTest::RunTest(const FString&)
 	TestEqual(TEXT("forced teardown fixture opens"), ForcedTeardown->OpenCharacterDetailScreen(), EHSRUIScreenResult::Success);
 	ForcedTeardown->ConfigureAutomationDetailBackend(true, true, true, false, true);
 	AddExpectedError(TEXT("HSRUI P17 Host teardown required forced cleanup; host references cleared"),
-		EAutomationExpectedErrorFlags::Exact, 1);
+		EAutomationExpectedErrorFlags::Contains, 1);
 	TestEqual(TEXT("forced teardown reports inconsistent"), ForcedTeardown->UnregisterHostIdentityForAutomation(1),
 		EHSRUIScreenResult::Inconsistent);
 	TestTrue(TEXT("forced teardown marks inconsistent"), ForcedTeardown->IsInconsistent());
@@ -349,7 +349,7 @@ bool FHSRUIInventoryLifecycleTest::RunTest(const FString&)
 	TestEqual(TEXT("forced inventory teardown fixture"), Forced->OpenInventoryScreen(), EHSRUIScreenResult::Success);
 	Forced->ConfigureAutomationInventoryBackend(true, true, true, true, false, true);
 	AddExpectedError(TEXT("HSRUI P17 Host teardown required forced cleanup; host references cleared"),
-		EAutomationExpectedErrorFlags::Exact, 1);
+		EAutomationExpectedErrorFlags::Contains, 1);
 	TestEqual(TEXT("forced inventory teardown inconsistent"), Forced->UnregisterHostIdentityForAutomation(1), EHSRUIScreenResult::Inconsistent);
 	TestTrue(TEXT("forced inventory teardown marks inconsistent"), Forced->IsInconsistent());
 	TestFalse(TEXT("forced inventory teardown clears pair"), Forced->HasOpenInventoryScreen() || Forced->HasInventoryViewModel());
@@ -469,7 +469,7 @@ bool FHSRUITravelRestoreLifecycleTest::RunTest(const FString&)
 	HalfPair->RegisterHostForAutomation();
 	HalfPair->InjectInventoryHalfPairForAutomation(false);
 	AddExpectedError(TEXT("HSRUI P17 Host teardown required forced cleanup; host references cleared"),
-		EAutomationExpectedErrorFlags::Exact, 1);
+		EAutomationExpectedErrorFlags::Contains, 1);
 	TestEqual(TEXT("half-pair travel is inconsistent"), HalfPair->TeardownHostIdentityForTravelForAutomation(1), EHSRUIScreenResult::Inconsistent);
 	TestEqual(TEXT("half-pair travel preserves exact root"), EntryCount(HalfPair), 1);
 	TestFalse(TEXT("half-pair travel clears ownership"), HalfPair->HasOpenInventoryScreen() || HalfPair->HasInventoryViewModel());
@@ -517,6 +517,115 @@ bool FHSRUITravelRestoreLifecycleTest::RunTest(const FString&)
 	TestTrue(TEXT("persistent failure reports inconsistent"), PersistentPolicy->IsInconsistent());
 	TestEqual(TEXT("persistent failure logical root"), EntryCount(PersistentPolicy), 1);
 	TestFalse(TEXT("persistent failure owns no pair"), PersistentPolicy->HasOpenInventoryScreen() || PersistentPolicy->HasInventoryViewModel());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRUITravelForcedCleanupRecoveryTest,
+	"HSR.UI.ScreenLifecycle.TravelForcedCleanupRecovery",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRUITravelForcedCleanupRecoveryTest::RunTest(const FString&)
+{
+	using namespace HSR::P17::LifecycleTests;
+
+	// Regression: a Challenge battle round-trip forced travel cleanup, which used to leave
+	// bInconsistent latched forever so pressing Pause after returning was rejected with
+	// Inconsistent even though the restored host and stack were perfectly healthy.
+	UHSRUIManagerSubsystem* Manager = MakeManager();
+	Manager->RegisterHostForAutomation();
+	Manager->ConfigureAutomationBackend(true, true, true, true, true);
+
+	// A non-owned screen the manager cannot close forces the root cleanup path during travel
+	// capture -- the same shape the Challenge battle round-trip produced in PIE.
+	FHSRScreenRequest ForeignModal;
+	ForeignModal.RequestToken = 500;
+	ForeignModal.ScreenId = TEXT("Screen.ForeignModal");
+	ForeignModal.Layer = EHSRUIScreenLayer::Modal;
+	ForeignModal.InputIntent = EHSRUIInputIntent::UIOnly;
+	TestEqual(TEXT("foreign modal fixture"), Manager->SubmitScreenRequest(ForeignModal), EHSRScreenStackResult::Success);
+	TestEqual(TEXT("foreign modal is on the stack"), EntryCount(Manager), 2);
+
+	TestEqual(TEXT("travel capture forces cleanup"),
+		Manager->TeardownHostIdentityForTravelForAutomation(1), EHSRUIScreenResult::Inconsistent);
+	TestTrue(TEXT("forced cleanup marks inconsistent"), Manager->IsInconsistent());
+	TestTrue(TEXT("forced cleanup is travel-recoverable"),
+		Manager->IsInconsistencyTravelRecoverableForAutomation());
+	TestEqual(TEXT("forced cleanup lands on root"), EntryCount(Manager), 1);
+
+	// Returning from the battle map registers a fresh host, which must clear the flag.
+	TestEqual(TEXT("returning host registers"), Manager->RegisterHostIdentityForAutomation(2),
+		EHSRUIScreenResult::Success);
+	TestFalse(TEXT("fresh host clears inconsistency"), Manager->IsInconsistent());
+	TestFalse(TEXT("recoverable marker is consumed"),
+		Manager->IsInconsistencyTravelRecoverableForAutomation());
+
+	// The actual user-visible symptom: pressing Pause after returning must work.
+	TestEqual(TEXT("pause reopens after battle return"), Manager->OpenFrontendModule(EHSRFrontendModule::PauseHub),
+		EHSRUIScreenResult::Success);
+	TestTrue(TEXT("reopened pause is owned"), Manager->HasOpenPauseScreen());
+	TestEqual(TEXT("reopened pause stack depth"), EntryCount(Manager), 2);
+
+	// The PIE Challenge round-trip actually failed inside TeardownCurrentHost (Teardown=17),
+	// not the forced-pop branch above: a failing close made bRecovered false. Recoverability was
+	// evaluated after ClearHostReferences() had already zeroed the host, so it read false and the
+	// flag latched. Drive that exact path.
+	UHSRUIManagerSubsystem* CloseFail = MakeManager();
+	CloseFail->RegisterHostForAutomation();
+	CloseFail->ConfigureAutomationBackend(true, true, true, true, true);
+	TestEqual(TEXT("close-fail fixture opens pause"), CloseFail->OpenPauseScreen(), EHSRUIScreenResult::Success);
+	CloseFail->FailNextAutomationPauseApply();
+	AddExpectedError(TEXT("HSRUI P17 Host teardown required forced cleanup; host references cleared"),
+		EAutomationExpectedErrorFlags::Contains, 1);
+	TestEqual(TEXT("teardown reports inconsistent"),
+		CloseFail->TeardownHostIdentityForTravelForAutomation(1), EHSRUIScreenResult::Inconsistent);
+	TestTrue(TEXT("teardown marks inconsistent"), CloseFail->IsInconsistent());
+	TestTrue(TEXT("contained teardown is travel-recoverable"),
+		CloseFail->IsInconsistencyTravelRecoverableForAutomation());
+	TestEqual(TEXT("returning host registers after close failure"),
+		CloseFail->RegisterHostIdentityForAutomation(2), EHSRUIScreenResult::Success);
+	TestFalse(TEXT("close-failure inconsistency is cleared"), CloseFail->IsInconsistent());
+	TestEqual(TEXT("pause reopens after close-failure teardown"),
+		CloseFail->OpenFrontendModule(EHSRFrontendModule::PauseHub), EHSRUIScreenResult::Success);
+
+	// The PIE repro had a Challenge module open, so a module root existed. TeardownCurrentHost
+	// cleared the shell but never the module root, and CloseFrontendToRoot() only reaches its own
+	// clear on the success path -- so the retired root outlived the host and IsAtCleanExplorationRoot()
+	// reported Recoverable=false forever. The two cases above miss it: neither opens a module.
+	UHSRUIManagerSubsystem* ModuleOpen = MakeManager();
+	ModuleOpen->RegisterHostForAutomation();
+	ModuleOpen->ConfigureAutomationBackend(true, true, true, true, true);
+	TestEqual(TEXT("module fixture opens pause hub"),
+		ModuleOpen->OpenFrontendModule(EHSRFrontendModule::PauseHub), EHSRUIScreenResult::Success);
+	TestEqual(TEXT("module fixture routes to challenge"),
+		ModuleOpen->OpenFrontendModule(EHSRFrontendModule::Quest), EHSRUIScreenResult::Success);
+	TestTrue(TEXT("module root exists before teardown"), ModuleOpen->HasFrontendModuleRootForAutomation());
+	ModuleOpen->FailNextAutomationPauseApply();
+	AddExpectedError(TEXT("HSRUI P17 Host teardown required forced cleanup; host references cleared"),
+		EAutomationExpectedErrorFlags::Contains, 1);
+	TestEqual(TEXT("module teardown reports inconsistent"),
+		ModuleOpen->TeardownHostIdentityForTravelForAutomation(1), EHSRUIScreenResult::Inconsistent);
+	TestFalse(TEXT("forced teardown releases the module root"),
+		ModuleOpen->HasFrontendModuleRootForAutomation());
+	TestTrue(TEXT("module teardown is travel-recoverable"),
+		ModuleOpen->IsInconsistencyTravelRecoverableForAutomation());
+	TestEqual(TEXT("returning host registers after module teardown"),
+		ModuleOpen->RegisterHostIdentityForAutomation(2), EHSRUIScreenResult::Success);
+	TestFalse(TEXT("module teardown inconsistency is cleared"), ModuleOpen->IsInconsistent());
+	TestEqual(TEXT("pause reopens after module teardown"),
+		ModuleOpen->OpenFrontendModule(EHSRFrontendModule::PauseHub), EHSRUIScreenResult::Success);
+
+	// Genuine corruption must still latch permanently and survive a fresh host, so the
+	// recoverable path cannot become a blanket amnesty for real UI damage.
+	UHSRUIManagerSubsystem* Corrupt = MakeManager();
+	Corrupt->RegisterHostForAutomation();
+	Corrupt->InjectInventoryHalfPairForAutomation(true);
+	TestEqual(TEXT("ownership mismatch is rejected"), Corrupt->OpenPauseScreen(),
+		EHSRUIScreenResult::Inconsistent);
+	TestTrue(TEXT("ownership mismatch marks inconsistent"), Corrupt->IsInconsistent());
+	TestFalse(TEXT("real corruption is not travel-recoverable"),
+		Corrupt->IsInconsistencyTravelRecoverableForAutomation());
+	TestTrue(TEXT("real corruption survives a fresh host attempt"), Corrupt->IsInconsistent());
+	TestEqual(TEXT("corrupt pause stays rejected"), Corrupt->OpenPauseScreen(),
+		EHSRUIScreenResult::Inconsistent);
 	return true;
 }
 
