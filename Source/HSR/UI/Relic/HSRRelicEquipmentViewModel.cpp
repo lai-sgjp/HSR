@@ -181,8 +181,13 @@ EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::CommitEnhancement(const in
 			Snapshot.CurrentInstanceId.IsValid() ? 1 : 0, *Option->MaterialItemId.ToString(),
 			Option->MaterialCost, GetHeldMaterialQuantity(Option->MaterialItemId),
 			Snapshot.CurrentEnhancementLevel);
-		PublishFailure(EHSRRelicEquipmentResult::AuthorityRejected);
-		return EHSRRelicEquipmentResult::AuthorityRejected;
+		// A shortfall is the one preflight failure the player can actually act on, so say so
+		// instead of collapsing it into a generic rejection.
+		const EHSRRelicEquipmentResult Reason = !Option->bAffordable
+			? EHSRRelicEquipmentResult::InsufficientMaterial
+			: EHSRRelicEquipmentResult::AuthorityRejected;
+		PublishFailure(Reason);
+		return Reason;
 	}
 	if (!EnhancementCatalog.IsValid())
 	{
@@ -278,10 +283,12 @@ void UHSRRelicEquipmentViewModel::Rebuild()
 	}
 	if (Stage == EHSRRelicEquipmentStage::Enhancement && !BuildEnhancementOptions())
 	{
-		Snapshot.bIsValid = false;
-		Snapshot.FailureReason = EHSRRelicEquipmentResult::NoEnhancementOption;
-		bHasSnapshot = true;
-		Broadcast();
+		// Match the comparison failure above: never publish Enhancement stage with no options,
+		// or a view can render an option list that does not exist.
+		Stage = EHSRRelicEquipmentStage::CandidateSelection;
+		Snapshot.Stage = Stage;
+		Snapshot.EnhancementOptions.Reset();
+		PublishFailure(EHSRRelicEquipmentResult::NoEnhancementOption);
 		return;
 	}
 	Snapshot.bIsValid = true;
@@ -499,6 +506,10 @@ EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::MapMovementResult(
 	}
 	if (Code == EHSREquipmentMovementResultCode::MappingRejected)
 		return EHSRRelicEquipmentResult::CatalogUnavailable;
+	if (Code == EHSREquipmentMovementResultCode::InvalidRequest)
+		return EHSRRelicEquipmentResult::InvalidRequest;
+	// InventoryRejected/EquipmentRejected/ProjectionRejected/OperationIdConflict all mean an
+	// authority refused the move; the player cannot act on the distinction.
 	return EHSRRelicEquipmentResult::AuthorityRejected;
 }
 
@@ -518,5 +529,12 @@ EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::MapEnhancementResult(
 	}
 	if (Code == EHSREquipmentEnhancementResultCode::CatalogRejected)
 		return EHSRRelicEquipmentResult::CatalogUnavailable;
+	// The only inventory gate in ExecuteEnhancement is PrepareEquipmentEnhancementCandidate,
+	// which fails when the player cannot pay the material cost -- an actionable message.
+	if (Code == EHSREquipmentEnhancementResultCode::InventoryRejected)
+		return EHSRRelicEquipmentResult::InsufficientMaterial;
+	if (Code == EHSREquipmentEnhancementResultCode::InvalidRequest)
+		return EHSRRelicEquipmentResult::InvalidRequest;
+	// EquipmentRejected/ProjectionRejected/OperationIdConflict: authority refused, not actionable.
 	return EHSRRelicEquipmentResult::AuthorityRejected;
 }
