@@ -8,17 +8,32 @@ All commands use UE5.6 UBT via the `.uproject` file association:
 
 ```bash
 # Build (Development Editor)
-"E:/Program Files/Epic Games/UE_5.6/Engine/Build/BatchFiles/Build.bat" HREditor Win64 Development -Project="E:/work/unreal_projects/HSR/HSR.uproject"
+"E:/programs/Epic Games/UE_5.6/Engine/Build/BatchFiles/Build.bat" HSREditor Win64 Development -Project="E:/work/unreal_projects/HSR/HSR.uproject"
 
 # Build verbosely (for diagnosing UHT/link errors)
-"E:/Program Files/Epic Games/UE_5.6/Engine/Build/BatchFiles/Build.bat" HREditor Win64 Development -Project="E:/work/unreal_projects/HSR/HSR.uproject" -verbose
+"E:/programs/Epic Games/UE_5.6/Engine/Build/BatchFiles/Build.bat" HSREditor Win64 Development -Project="E:/work/unreal_projects/HSR/HSR.uproject" -verbose
 
 # Generate project files
-"E:/Program Files/Epic Games/UE_5.6/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe" -ProjectFiles -Project="E:/work/unreal_projects/HSR/HSR.uproject" -Game
+"E:/programs/Epic Games/UE_5.6/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe" -ProjectFiles -Project="E:/work/unreal_projects/HSR/HSR.uproject" -Game
 
 # Run the editor
-start "" "E:/Program Files/Epic Games/UE_5.6/Engine/Binaries/Win64/UnrealEditor.exe" "E:/work/unreal_projects/HSR/HSR.uproject"
+start "" "E:/programs/Epic Games/UE_5.6/Engine/Binaries/Win64/UnrealEditor.exe" "E:/work/unreal_projects/HSR/HSR.uproject"
 ```
+
+Builds fail while the editor is open with Live Coding active (`Unable to build while Live Coding is active`). Close the editor or press `Ctrl+Alt+F11` first.
+
+## Tests
+
+Automation tests run headlessly via `UnrealEditor-Cmd.exe`:
+
+```bash
+# Run a suite (omit the filter to run everything under HSR)
+"E:/programs/Epic Games/UE_5.6/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "E:/work/unreal_projects/HSR/HSR.uproject" \
+  -ExecCmds="Automation RunTests HSR.UI.RelicEquipment; Quit" \
+  -unattended -nopause -nosplash -NullRHI -abslog="C:/temp/tests.log"
+```
+
+Results appear in the log as `LogAutomationController: ... Test Completed. Result={Success|Fail} Path={...}`. Note the process exits 0 even when tests fail, so grep the log rather than trusting the exit code.
 
 Project is a single `Runtime` module named `HSR` built with C++20 (confirmed via `_MSVC_LANG`). No Editor or other modules exist.
 
