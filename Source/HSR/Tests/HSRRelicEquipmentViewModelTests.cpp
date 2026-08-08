@@ -171,4 +171,90 @@ bool FHSRRelicEnhancementMaterialGrantTest::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FHSRRelicEnhancementUnaffordableTest,
+	"HSR.UI.RelicEquipment.UnaffordableEnhancementReportsRejection",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSRRelicEnhancementUnaffordableTest::RunTest(const FString&)
+{
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GetTransientPackage());
+	UHSRInventorySubsystem* Inventory = NewObject<UHSRInventorySubsystem>(GameInstance);
+	UHSREquipmentSubsystem* Equipment = NewObject<UHSREquipmentSubsystem>(GameInstance);
+	UHSRItemEquipmentMappingCatalog* MappingCatalog = NewObject<UHSRItemEquipmentMappingCatalog>(GameInstance);
+	UHSREquipmentEnhancementCatalog* EnhancementCatalog = NewObject<UHSREquipmentEnhancementCatalog>(GameInstance);
+	const FGuid CharacterId = FGuid::NewGuid();
+	const FGuid CurrentInstanceId = FGuid::NewGuid();
+
+	UHSRRelicDefinition* Relic = NewObject<UHSRRelicDefinition>(GameInstance);
+	Relic->DefinitionId = TEXT("Relic.Head.Unaffordable");
+	Relic->SetId = TEXT("Set.Unaffordable");
+	Relic->Slot = EHSRRelicSlot::Head;
+	Relic->EnhancementCap = 6;
+	TestEqual(TEXT("Relic definition registers"), Equipment->RegisterDefinition(*Relic),
+		EHSREquipmentOperationResult::Success);
+
+	FHSREquipmentEnhancementRule Rule;
+	Rule.DefinitionId = Relic->DefinitionId;
+	Rule.Kind = EHSREquipmentKind::Relic;
+	Rule.TargetLevel = 1;
+	Rule.MaterialItemId = TEXT("Item.Material.Unaffordable");
+	Rule.MaterialCost = 7;
+	Rule.TargetModifiers.Add({EHSREquipmentStat::Attack, 10.0f});
+	TestTrue(TEXT("Enhancement rule registers"), EnhancementCatalog->AddRule(Rule));
+
+	UHSRItemDefinition* Material = NewObject<UHSRItemDefinition>(GameInstance);
+	Material->ItemId = Rule.MaterialItemId;
+	Material->StorageKind = EHSRItemStorageKind::Stackable;
+	Material->MaxStack = 99;
+	TestEqual(TEXT("Material definition registers"), Inventory->RegisterDefinition(*Material),
+		EHSRInventoryOperationResult::Success);
+
+	FHSREquipmentInstance Current;
+	Current.InstanceId = CurrentInstanceId;
+	Current.DefinitionId = Relic->DefinitionId;
+	Current.Kind = EHSREquipmentKind::Relic;
+	Current.EnhancementLevel = 0;
+	Current.Modifiers.Add({EHSREquipmentStat::Attack, 5.0f});
+	TestEqual(TEXT("Current relic equips"), Equipment->Equip(CharacterId, Current),
+		EHSREquipmentOperationResult::Success);
+
+	UHSRRelicEquipmentViewModel* ViewModel = NewObject<UHSRRelicEquipmentViewModel>(GameInstance);
+	ViewModel->Initialize(Equipment, Inventory, MappingCatalog, EnhancementCatalog, CharacterId);
+	TestEqual(TEXT("Slot selection succeeds"), ViewModel->SelectSlot(EHSRRelicSlot::Head),
+		EHSRRelicEquipmentResult::Success);
+	TestEqual(TEXT("Enhancement stage opens"), ViewModel->OpenEnhancement(),
+		EHSRRelicEquipmentResult::Success);
+
+	FHSRRelicEquipmentSnapshot Snapshot;
+	TestTrue(TEXT("Enhancement snapshot available"), ViewModel->GetSnapshot(Snapshot));
+	TestEqual(TEXT("Option is listed"), Snapshot.EnhancementOptions.Num(), 1);
+	TestFalse(TEXT("Zero material makes the option unaffordable"),
+		Snapshot.EnhancementOptions[0].bAffordable);
+
+	// Reproduces the reported symptom: every click returned AuthorityRejected because
+	// the harness grant was silently rejected and no material was ever held.
+	TestEqual(TEXT("Unaffordable commit is rejected"), ViewModel->CommitEnhancement(1),
+		EHSRRelicEquipmentResult::AuthorityRejected);
+
+	EHSRItemStorageKind StorageKind = EHSRItemStorageKind::Unique;
+	int32 MaxStack = 0;
+	TestTrue(TEXT("Definition info is readable"),
+		Inventory->GetDefinitionInfo(Rule.MaterialItemId, StorageKind, MaxStack));
+	TestEqual(TEXT("Granting within the cap succeeds"),
+		Inventory->AddStack(Rule.MaterialItemId, FMath::Min(999, MaxStack)),
+		EHSRInventoryOperationResult::Success);
+
+	TestTrue(TEXT("Snapshot refreshes after the grant"), ViewModel->GetSnapshot(Snapshot));
+	TestTrue(TEXT("Capped grant makes the option affordable"),
+		Snapshot.EnhancementOptions[0].bAffordable);
+	TestEqual(TEXT("Commit now succeeds"), ViewModel->CommitEnhancement(1),
+		EHSRRelicEquipmentResult::Success);
+	TestTrue(TEXT("Committed snapshot available"), ViewModel->GetSnapshot(Snapshot));
+	TestEqual(TEXT("Enhancement level advanced"), Snapshot.CurrentEnhancementLevel, 1);
+
+	ViewModel->Shutdown();
+	return true;
+}
+
 #endif
