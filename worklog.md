@@ -1,5 +1,41 @@
 ﻿# HSR Worklog
 
+## 2026-08-09 - Phase 17 Inventory/Dialogue 子任务与 Phase 18 顺序规划
+
+- 用户将优先级调整为：先完成 Inventory UI、Dialogue Presentation 和 Phase 18，之后再制作 Demo。
+- 现有执行计划只定义 P17-008/P17-012 顶层产品结果；仓库没有 Inventory/Dialogue 的 `002` 等正式任务卡。
+- 规划 backlog 已拆为 `TASK-P17-INVENTORY-001`～`004` 和
+  `TASK-P17-DIALOGUE-001`～`004`，分别覆盖 Gate 0/RED、UI 投影、合法命令或
+  Authority 分支、生命周期与收口。
+- Phase 18 预规划为 `TASK-P18-PRESENTATION-001`～`004`，必须等待 P17-016
+  收尾 Gate；表现层只能消费事件，不能成为 Gameplay 规则真源。
+- 实际归档的 `TASK-P17-012` 仍代表五模块动态挂载，未被重新解释为 Dialogue。
+- 本次仅更新规划文档和状态文档；没有修改 Source、Content、Config，没有创建活动
+  `002` 任务卡，没有执行 Build/Automation/PIE，也没有 Git commit 或 push。
+
+## 2026-08-06 - TASK-P17-CHAR-SHELL-001 C++ and Automation GREEN
+
+- 用户授权了新的无歧义 Character Shell 任务；活动卡已从已归档的实际 P17-012 切换为 `TASK-P17-CHAR-SHELL-001`，未修改 P17-012 归档或 `.claude/**`。
+- TDD RED：新 `HSRCharacterShellTests.cpp` 首次 Build 进入测试编译后，因 `HSRCharacterShellViewModel.h` 尚不存在而失败；没有创建 Git checkpoint commit。
+- 新增纯值 Shell types、Character/Equipment snapshot composition、Character/Tab selection persistence、explicit unavailable-tab state、Widget lifecycle 和 focused Automation。
+- 将 HUD/UIManager 的 Character class slot/candidate 泛化为 `UHSRScreenWidget`，保留既有 Frontend Screen Stack、Pause、Focus、Back/X、Travel 和 ModuleContentHost 事务路径。
+- 最新 `HSREditor Win64 Development` Build 通过；`HSR.UI.CharacterShell` 2/2。
+- 相邻回归通过：`HSR.UI.FrontendDynamicMount` 3/3、`HSR.UI.FrontendNavigation` 11/11、`HSR.UI.EquipmentDetail` 2/2、`HSR.Progression.Profile.Authority` 1/1、`HSR.Equipment.Transactions` 1/1，合计 20/20。
+- 单独组合回归发现当前既有 `HSR.UI.CharacterDetail.ViewModel` 的 5 个 Save fixture 断言失败；未修改其生产代码，保留为已知基线边界。
+- `git diff --check` 通过；用户 WBP 创建、Save All/Editor 重开、PIE happy/failure 和双分辨率证据仍待用户完成。
+
+## 2026-08-06 - TASK-P17-005 用户指令收口与 Phase 17 计划对照
+
+- 用户明确要求 TASK-P17-005 不再作为阻塞项，任务状态按
+  `COMPLETE / USER ACCEPTED` 收口；没有修改 Source、Blueprint 或 UAsset。
+- 既有 P17-005 Code Gate/Automation 与用户运行证据继续有效；此前未独立重跑的
+  双分辨率、Standalone、Packaged、Shipping、物理手柄及部分完整 Editor/PIE
+  证据保留为 `NOT VERIFIED`，不再阻塞该任务。
+- 对照 `docs/phase-17-execution-plan.md` 第 7 节确认，计划范围为 P17-005～016。
+  当前实际归档编号与计划语义存在偏移：实际 P17-006 是 Quest Frontend，实际
+  P17-012 是五模块统一动态挂载；计划中的 Character 养成 Shell 与 Dialogue
+  Presentation 仍须作为独立未完成包处理。
+
 ## 2026-08-05 - TASK-P17-009D C++ and commandlet gates
 
 - Gate 0 frozen in code: `UHSRStageBuffDefinition` is Encounter-owned;
@@ -2382,3 +2418,26 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
   delivery; `.claude/**` remains excluded.
 - 010C is archived as `USER ACCEPTED / INDEPENDENT REVIEW NOT RUN`. No next
   task was created automatically.
+# 2026-08-07 | TASK-P17-CHAR-SHELL-001 user closeout
+
+- User supplied the Character Shell Entry/Shell Designer and Blueprint graph
+  hierarchy plus a PIE log from `Map_Exploration_P15_A`.
+- The supplied evidence shows Frontend input binding, numeric `1` Pause open,
+  Character route success at `Stack=2`, repeat Pause reopening, restoration of
+  exploration input context, and normal HUD teardown. No Error, Ensure, or
+  Blueprint Runtime Error appears in the supplied filtered evidence.
+- Read-only click-path audit found no blocking defect in dynamic
+  `ModuleContentHost` mounting, Entry dispatcher -> `SelectCharacter`, tab
+  buttons -> `SelectTab`, typed unavailable presentation, Back, native X, or
+  delegate teardown. Character/Inventory still do not use Blueprint
+  `AddToViewport`.
+- User explicitly accepted failure-path PIE and 1920x1080/1280x720 PIE as
+  non-blocking omissions. They remain `NOT RUN` / `NOT VERIFIED` rather than
+  being represented as passed evidence.
+- Two low-risk follow-ups are recorded without implementation: the initial
+  snapshot is presented once by `Initialize()` and once by the explicit
+  `GetSnapshot()` handoff, and Entry's local NameText write follows the
+  synchronous dispatcher-triggered Shell rebuild. Neither affects authority
+  state or the accepted user-visible result.
+- Task status is `COMPLETE / USER ACCEPTED`. No Git commit or `.claude/**`
+  change was made.

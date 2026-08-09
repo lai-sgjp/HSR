@@ -1,6 +1,13 @@
-# TASK-P17-005 — Frontend Shell、Router 与统一快捷导航（暂停归档）
+# TASK-P17-005 — Frontend Shell、Router 与统一快捷导航（完成归档）
 
-Status: `PAUSED / P17 CHECKPOINT — CODE GATE PASS / PARTIAL USER PIE / FINAL TASK PASS NOT AVAILABLE`
+Status: `ARCHIVED / COMPLETE / USER ACCEPTED — USER-DIRECTED CLOSEOUT`
+
+## 2026-08-06 用户指令收口
+
+用户明确要求 TASK-P17-005 不再作为 Phase 17 阻塞项，按已完成处理。既有
+Development Editor Build、Frontend/相关回归 Automation 与已提供的用户运行证据
+保留为任务证据；此前要求的独立分辨率、Standalone、Packaged、Shipping 和物理
+手柄证据没有被本次文档收口伪造，统一保留为非阻断 `NOT VERIFIED` 边界。
 
 ## Role Lock / 角色锁定
 

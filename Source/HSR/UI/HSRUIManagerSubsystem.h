@@ -10,13 +10,13 @@
 class UHSRInputModeCoordinator;
 class UHSRScreenStack;
 class UHSRScreenWidget;
-class UHSRCharacterDetailWidget;
 class UHSRInventoryWidget;
 class UHSRInventoryRewardViewModel;
 class UHSRUserWidget;
 class UHSRFrontendRouter;
 class UHSRFrontendShellWidget;
 class UHSRFrontendModuleRootWidget;
+class UUserWidget;
 class AHSRHUD;
 class AHSRPlayerController;
 class UWidget;
@@ -39,8 +39,13 @@ public:
 	EHSRUIScreenResult RegisterExplorationHost(AHSRHUD* HUD, AHSRPlayerController* PlayerController,
 		UHSRUserWidget* RootWidget, TSubclassOf<UHSRFrontendShellWidget> InFrontendShellClass,
 		TSubclassOf<UHSRFrontendModuleRootWidget> InFrontendModuleRootClass,
-		TSubclassOf<UHSRCharacterDetailWidget> InCharacterDetailWidgetClass,
-		TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass);
+		TSubclassOf<UHSRScreenWidget> InCharacterDetailWidgetClass,
+		TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass,
+		TSubclassOf<UUserWidget> InPartyWidgetClass,
+		TSubclassOf<UUserWidget> InMapWidgetClass,
+		TSubclassOf<UUserWidget> InChallengeWidgetClass,
+		TSubclassOf<UUserWidget> InQuestWidgetClass,
+		TSubclassOf<UUserWidget> InSaveWidgetClass);
 	EHSRUIScreenResult UnregisterExplorationHost(AHSRHUD* HUD, AHSRPlayerController* PlayerController);
 	EHSRUIScreenResult TeardownExplorationHostForTravel(AHSRHUD* HUD, AHSRPlayerController* PlayerController);
 	EHSRUIScreenResult PrepareExplorationTravel();
@@ -116,6 +121,9 @@ public:
 	bool HasFrontendModuleRootForAutomation() const { return FrontendModuleRootInstance != nullptr; }
 	int64 GetHostGenerationForAutomation() const { return ActiveHostGeneration; }
 	void FailNextAutomationInventoryPolicyApply() { bAutomationFailNextInventoryPolicyApply = true; }
+	void ConfigureAutomationFrontendModuleBackend(bool bHasClass, bool bCreateSucceeds, bool bAttachSucceeds);
+	int32 GetFrontendModuleContentCountForAutomation() const;
+	EHSRFrontendModule GetFrontendModuleContentModuleForAutomation() const;
 #endif
 
 private:
@@ -146,13 +154,18 @@ private:
 	/** Clears a travel-scoped inconsistency once a fresh host proves the UI is coherent again. */
 	void TryClearRecoverableInconsistency();
 	void ClearHostReferences();
+	TSubclassOf<UUserWidget> GetFrontendModuleWidgetClass(EHSRFrontendModule Module) const;
+	UUserWidget* CreateFrontendModuleContentCandidate(AHSRPlayerController* PlayerController,
+		EHSRFrontendModule Module);
+	bool AttachFrontendModuleContentCandidate(UHSRFrontendModuleRootWidget* RootCandidate, UUserWidget* ContentCandidate);
+	void ReleaseFrontendModuleContent();
 	bool IsBackendHostValid(AHSRPlayerController* PlayerController, UHSRUserWidget* RootWidget, UWorld* World) const;
 	bool IsBackendExploration(AHSRPlayerController* PlayerController) const;
 	bool IsBackendPaused(UWorld* World) const;
 	bool IsTravelPending() const;
 	UHSRFrontendShellWidget* CreatePauseCandidate(AHSRPlayerController* PlayerController);
 	UHSRFrontendModuleRootWidget* CreateFrontendModuleRootCandidate(AHSRPlayerController* PlayerController);
-	UHSRCharacterDetailWidget* CreateCharacterDetailCandidate(AHSRPlayerController* PlayerController);
+	UHSRScreenWidget* CreateCharacterDetailCandidate(AHSRPlayerController* PlayerController);
 	UHSRInventoryWidget* CreateInventoryCandidate(AHSRPlayerController* PlayerController);
 	UHSRInventoryRewardViewModel* CreateInventoryViewModelCandidate();
 	bool AttachPauseCandidate(UHSRFrontendShellWidget* Candidate);
@@ -192,10 +205,10 @@ private:
 	TSubclassOf<UHSRFrontendModuleRootWidget> FrontendModuleRootClass;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UHSRCharacterDetailWidget> CharacterDetailWidgetInstance;
+	TObjectPtr<UHSRScreenWidget> CharacterDetailWidgetInstance;
 
 	UPROPERTY(Transient)
-	TSubclassOf<UHSRCharacterDetailWidget> CharacterDetailWidgetClass;
+	TSubclassOf<UHSRScreenWidget> CharacterDetailWidgetClass;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRInventoryWidget> InventoryWidgetInstance;
@@ -205,6 +218,26 @@ private:
 
 	UPROPERTY(Transient)
 	TSubclassOf<UHSRInventoryWidget> InventoryWidgetClass;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UUserWidget> PartyWidgetClass;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UUserWidget> MapWidgetClass;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UUserWidget> ChallengeWidgetClass;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UUserWidget> QuestWidgetClass;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UUserWidget> SaveWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> FrontendModuleContentInstance;
+
+	EHSRFrontendModule FrontendModuleContentModule = EHSRFrontendModule::None;
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AHSRHUD> RegisteredHUD;
@@ -267,6 +300,9 @@ private:
 	bool bAutomationDetailFocusSucceeds = true;
 	bool bAutomationFailNextDetailPolicyApply = false;
 	bool bAutomationHasInventoryClass = true;
+	bool bAutomationHasFrontendModuleClass = true;
+	bool bAutomationFrontendModuleCreateSucceeds = true;
+	bool bAutomationFrontendModuleAttachSucceeds = true;
 	bool bAutomationInventoryCreateSucceeds = true;
 	bool bAutomationInventoryViewModelSucceeds = true;
 	bool bAutomationInventoryDependenciesSucceed = true;

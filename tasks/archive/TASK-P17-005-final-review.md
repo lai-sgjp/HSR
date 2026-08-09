@@ -1,6 +1,13 @@
-# TASK-P17-005 Independent Review（暂停归档）
+# TASK-P17-005 Independent Review（完成归档）
 
-Current review status: `ASSET GATE READY — CODE GATE PASS / FINAL TASK PASS NOT YET AVAILABLE`
+Current review status: `USER-DIRECTED CLOSEOUT — COMPLETE / USER ACCEPTED`
+
+## 2026-08-06 closeout boundary
+
+本文件的历史 Independent Review 结论仍是代码 Gate/Asset Gate 结论，未被改写为
+新的独立复核。用户本轮明确要求将 P17-005 标记完成，因此任务状态按用户接受收口；
+Standalone、Packaged、Shipping、物理手柄、双分辨率及未重跑的完整 Editor/PIE
+项目继续标记为 `NOT VERIFIED`，不作为本次完成状态的阻塞项。
 
 Review role: Independent Reviewer
 Review date: 2026-07-28

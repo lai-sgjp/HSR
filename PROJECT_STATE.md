@@ -1,6 +1,68 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-08-06
+> 最后更新：2026-08-09
+
+## 2026-08-09 Phase 17 Inventory/Dialogue 子任务与 Phase 18 顺序规划
+
+- 用户决定先完成 Inventory UI、Dialogue Presentation 和 Phase 18，再制作 Demo；
+  Demo 不再作为当前阶段的优先交付物。
+- Relic/Equipment 用户 PIE 已接受，相关本地提交为 `65ba365`，尚未 push；本次
+  文档更新不改变该提交，也不处理工作区其他任务改动。
+- 计划语义 P17-008 使用无歧义任务前缀
+  `TASK-P17-INVENTORY-001`～`004`；计划语义 P17-012 使用
+  `TASK-P17-DIALOGUE-001`～`004`。实际归档的 `TASK-P17-012` 仍是动态挂载，
+  不得复用。
+- Inventory 顺序为：Gate 0/RED → 分类详情投影 → 合法命令与失败保持 →
+  Editor/PIE 收口。Dialogue 顺序为：Gate 0/RED → 对话 Presentation →
+  Authority 分支 exactly-once → 生命周期/Editor/PIE 收口。
+- Phase 18 必须在 P17-016 收尾门禁之后另建 Gate 0；暂定为授权与回退、动画/镜头/UI
+  动效、Audio/VFX/Cue、性能/收口四个表现工作包。
+- 本条仅记录规划，未创建 `002` 活动任务卡，未修改 Source、Content、Config，
+  未执行 Build/Automation/PIE。
+
+## 2026-08-07 TASK-P17-CHAR-SHELL-001 user closeout
+
+- 用户确认 Character Shell Editor/PIE 当前运行正常，并提供
+  `WBP_CharacterShellEntry_P17`、`WBP_CharacterShell_P17` 的 Designer/Graph
+  接线证据及 `Map_Exploration_P15_A` PIE 日志。
+- 证据显示 Frontend input 已绑定，数字 `1` 能打开 Pause，Character route
+  以 `Stack=2` 成功打开，Pause 可重复重开，探索输入 Context 在退出后恢复，
+  且提供的日志摘录没有 Error、Ensure 或 Blueprint Runtime Error。
+- 静态点击路径审查确认 Entry dispatcher、Character/Tab 选择、Shell
+  snapshot/unavailable 分支、`ModuleContentHost` 动态挂载、Back/X 和
+  生命周期解绑没有阻塞性问题。本次 closeout 审查未修改 Source、UAsset
+  或 Config；既有用户/任务 Source、UAsset 和 `.claude/**` 变化均保持原样。
+- 用户明确接受不执行失败路径 PIE 和双分辨率 PIE；两项分别记录为
+  `NOT RUN / NON-BLOCKING` 与 `NOT VERIFIED / NON-BLOCKING`，不阻塞本任务。
+- `TASK-P17-CHAR-SHELL-001` 按用户指令收口为 `COMPLETE / USER ACCEPTED`。
+- 保留两个非阻塞 follow-up：初始 Shell snapshot 存在一次冗余 presentation
+  回调；Entry dispatcher 后的本地 NameText 写入可能作用于已被同步重建的旧
+  Entry。当前均不影响权威状态或用户验收结果。
+
+## 2026-08-06 TASK-P17-CHAR-SHELL-001 implementation GREEN
+
+- 用户已授权新的无歧义任务 `TASK-P17-CHAR-SHELL-001 - Character Progression Shell`；实际 `TASK-P17-006` Quest Frontend 和实际 `TASK-P17-012` 五模块动态挂载均不改名、不重用。
+- 新增 Character Shell pure-value types/ViewModel/Widget 与 Character class slot 的 `UHSRScreenWidget` 兼容适配；Character 内容仍必须通过 `WBP_FrontendModuleRoot_P17.ModuleContentHost` 动态挂载。
+- TDD RED 已真实触发：新测试最初因缺少 `HSRCharacterShellViewModel.h` 编译失败；项目禁止自动 Git commit，因此未创建 checkpoint commit。
+- 最新 `HSREditor Win64 Development` Build 通过 UHT、Compile、Link、Metadata。
+- `HSR.UI.CharacterShell` 2/2；Frontend Dynamic Mount 3/3；Frontend Navigation 11/11；Equipment Detail 2/2；Profile Authority 1/1；Equipment Transactions 1/1，相关回归合计 20/20。
+- 现有 `HSR.UI.CharacterDetail.ViewModel` 仍有 5 个 Save fixture 断言失败；本任务未修改 Character Detail 或 Save authority，暂列既有回归边界，不以此扩张任务范围。
+- 用户 Editor UAsset 创建/保存、Editor 关闭重开、1920x1080/1280x720 PIE happy/failure 仍待完成；任务不可归档为 PASS。
+
+## 2026-08-06 TASK-P17-005 用户指令收口与 Phase 17 计划校准
+
+- 用户明确要求 TASK-P17-005 不再卡关，现按 `COMPLETE / USER ACCEPTED` 处理；
+  既有代码 Gate、Automation 与用户运行证据继续作为历史证据保留。
+- 本次没有修改 P17-005 Source 或用户 UAsset。此前未独立重跑的双分辨率、
+  Standalone、Packaged、Shipping、物理手柄及部分完整 Editor/PIE 证据仍为
+  `NOT VERIFIED`，但按用户指令不再阻塞 P17-005。
+- 对照 `docs/phase-17-execution-plan.md` 第 7 节，Phase 17 计划范围是
+  P17-005～P17-016，不是只到 P17-012。当前实际归档的 P17-006 是 Quest
+  Frontend，实际归档的 P17-012 是五模块统一动态挂载；它们分别不能替代计划
+  中的 Character 养成 Shell 与 Dialogue Presentation。
+- 因此下一唯一建议是执行计划语义下的 Character 养成 Shell；由于 `TASK-P17-006`
+  编号已被 Quest Frontend 使用，开始前必须创建新的无歧义任务编号与独立 Gate 0，
+  不得直接复用旧编号。
 
 ## 2026-08-06 TASK-P17-010C 归档
 

@@ -1,6 +1,15 @@
-# TASK-P17-005 Execution Result（暂停归档）
+# TASK-P17-005 Execution Result（完成归档）
 
-Status: `P17 CHECKPOINT / CODE EVIDENCE PASS / PARTIAL USER PIE / FINAL REVIEW DEFERRED`
+Status: `ARCHIVED / COMPLETE / USER ACCEPTED — USER-DIRECTED CLOSEOUT`
+
+## 2026-08-06 final status correction
+
+- 用户明确要求不再以 P17-005 的历史证据缺口阻塞 Phase 17，任务按
+  `COMPLETE / USER ACCEPTED` 收口。
+- 本次只更新任务状态文档，没有修改 Source、Blueprint、UAsset 或输入资产。
+- 历史未验证边界仍然有效：独立双分辨率、Standalone、Packaged、Shipping、
+  物理手柄及部分完整 Editor/PIE 矩阵未由本次重跑证明；它们不再阻塞用户指定的
+  P17-005 完成状态。
 
 ## 2026-07-28 user Editor checkpoint
 

@@ -1,8 +1,10 @@
 ﻿# HSR Todo Plan
 
-> 当前状态：P17-005 已恢复最终验收；P17-PATCH-03A～03H 与 P17-006/P17-009/P17-010A～010C 已按各自证据归档。010B 已按用户确认收口；009D 已归档。P17-005 代码/自动化已通过，等待用户 Editor/PIE 最终证据。
+> 当前状态：按用户明确指令，P17-005 已收口为 `COMPLETE / USER ACCEPTED`。P17-PATCH-03A～03H 与 P17-006/P17-009/P17-010A～010C 已按各自证据归档；010B 已按用户确认收口；009D 已归档。
 
-> Latest state (2026-08-06): TASK-P17-010C is user-confirmed complete and archived with C++ Build, 36/36 Combined Automation, and fresh user PIE evidence. Independent review, Standalone, Packaged, Shipping, physical controller, and network behavior remain unverified. TASK-P17-005 remains reopened for separate final acceptance after Party bootstrap; no new active task was created automatically.
+> Latest state (2026-08-09): TASK-P17-010C and TASK-P17-CHAR-SHELL-001 remain user-confirmed complete. Relic/Equipment user PIE is accepted and the local implementation commit is `65ba365` (not pushed). User has chosen to complete Inventory, Dialogue Presentation and Phase 18 before Demo; the subtask backlog is recorded below, but no `002` task card is active yet.
+
+> 当前活动任务：Relic/Equipment 任务卡仍保留在 `tasks/active-task.md` 作为 closeout/资产证据入口；本轮仅更新 Inventory/Dialogue/Phase 18 backlog，尚未创建 `TASK-P17-INVENTORY-001` 或任何 `002` 活动任务卡。
 
 ## 已完成的规划工作
 
@@ -11,7 +13,7 @@
 - [x] TASK-P17-PATCH-01C：完整行动距离模型（Reviewer `PASS`=`28d3213`；Build、9 项 Battle Automation、diff-check 通过，已归档）。
 - [x] TASK-P17-PATCH-01D：Patch 01 最终回归、证据汇总与归档（Reviewer `PASS WITH FOLLOW-UP`=`56380dc`，已归档）。
 - [x] TASK-P17-PATCH-02：Behavior Tree/Blackboard 探索敌人迁移已完成最终复核；其用户资产改动仍按真实 provenance 隔离，不等同于 P17-005。
-- [x] P17-005 当前进度 checkpoint：commit `4ef49f7`（仅表示暂停点，不表示任务完成或最终 PASS）。
+- [x] TASK-P17-005：按用户明确指令收口为 `COMPLETE / USER ACCEPTED`；历史未验证证据保留为非阻断边界。
 - [x] P17-PATCH-03 Gate 0：四角色最终 PASS；已冻结八子系统所有权、稳定 ID、事务、生命周期、失败矩阵、Editor exercise 与串行包。
 - [x] TASK-P17-PATCH-03A：Frontend Boundary Contract Reconciliation；Build、11/11 Automation 与用户 X 返回探索 PIE 通过，双分辨率为 `USER ACCEPTED / NOT VERIFIED`。
 - [x] TASK-P17-PATCH-03B：Production Bootstrap and Character Identity（Code Gate、Automation、happy/unavailable PIE 与最终 Blueprint Save/reopen 均 PASS，已归档）。
@@ -346,6 +348,32 @@
 - [x] P17-010A 数据驱动 Challenge Directory：只读 Source 投影、稳定 ID 选择、锁定/无效/重复处理、模板门面、Build/Automation 与用户 PIE 通过；动态解锁/完成度/成本/奖励另立任务。
 - [x] P17-010B Challenge Directory 失败矩阵与正式收口：用户确认完成。
 - [x] P17-010C Challenge Directory Progression Projection：runtime progression authority、prerequisite/status 投影、Save schema 8、Settlement completion、36/36 Automation 与用户 Available/Completed/unlock PIE 均通过，已按用户确认归档；Independent Review、Standalone、Packaged、Shipping、物理控制器和网络行为保留为 `NOT VERIFIED`。
+- [x] TASK-P17-011 Save UI：用户 Save/Load 验收通过并已归档。
+- [x] TASK-P17-012（实际任务）：Party、Map、Challenge、Quest、Save 五模块统一动态挂载；Build、聚焦 Automation 与用户 PIE 已通过并已归档。
+- [x] TASK-P17-CHAR-SHELL-001：Character Progression Shell；C++/UHT/Build、Shell 2/2、相邻 20/20 Automation 与用户 Editor/PIE 已收口。失败路径 PIE 与双分辨率按用户决定记录为非阻塞未执行项。
+- [x] 计划 P17-006 Character 养成 Shell：实际 P17-006 仍是 Quest Frontend；本计划语义的 Character Detail/Weapon/Traces/Relics/Eidolon/Information/Outfit Shell 已由无歧义任务 `TASK-P17-CHAR-SHELL-001` 用户验收。
+- [x] 计划 P17-007 Relic/Equipment 多级选择与强化：用户 PIE 已接受；本地实现提交 `65ba365`，正式 closeout 文档/provenance 仍需同步。
+- [ ] 计划 P17-008 Inventory 分类、详情与合法操作：未发现对应完成归档。
+- [ ] 计划 P17-012 Dialogue Presentation：当前实际 P17-012 是动态挂载，不能替代本计划对话展示包。
+- [ ] 计划 P17-013 Battle HUD、只读详情与两阶段指令：未发现对应完成归档。
+- [ ] 计划 P17-014 Battle Pause、Restart/Exit 与 Reward Presentation：未发现对应完成归档。
+- [ ] 计划 P17-015 Gacha UI Contract：未发现对应完成归档。
+- [ ] 计划 P17-016 Phase 17 收尾：尚未开始；需等待上述计划包状态明确后再执行阶段收尾门。
+
+### Phase 17 Inventory/Dialogue 子任务 backlog（规划，不代表完成）
+
+- [ ] `TASK-P17-INVENTORY-001`：Gate 0、Authority/数据合同与真实 RED。
+- [ ] `TASK-P17-INVENTORY-002`：分类、详情、筛选、排序、稳定选择和只读 ViewModel/Widget 投影。
+- [ ] `TASK-P17-INVENTORY-003`：Equip/Enhance 合法命令、失败快照保持；Use/Disassemble 无 Authority 时 typed unavailable。
+- [ ] `TASK-P17-INVENTORY-004`：用户 Editor 集成、B/Back/X、旅行 teardown、PIE 与收口。
+- [ ] `TASK-P17-DIALOGUE-001`：Gate 0、Interaction/Dialogue 合同与真实 RED。
+- [ ] `TASK-P17-DIALOGUE-002`：事件驱动对话 Overlay、说话者、正文、选项、选择和退出。
+- [ ] `TASK-P17-DIALOGUE-003`：稳定 Node/Choice ID 与 Quest/Encounter/Reward Authority exactly-once 转发。
+- [ ] `TASK-P17-DIALOGUE-004`：生命周期、焦点、旅行恢复、Editor/PIE 与收口。
+- [ ] Phase 18 Gate 0 及 `TASK-P18-PRESENTATION-001`～`004`：在 P17-016 后建立，不提前实施。
+
+> 串行规则：一次只保留一个活动任务卡；完成前一包的 Build/Automation/PIE/文档
+> 证据后才进入下一包。实际归档的 `TASK-P17-012` 和计划编号 P17-008 均不复用。
 
 ## Phase 18：表现与模型导入
 

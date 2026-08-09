@@ -27,6 +27,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "HSR|UI|Frontend")
 	EHSRFrontendModule GetPresentedModule() const { return PresentedModule; }
 
+#if WITH_DEV_AUTOMATION_TESTS
+	void SetModuleContentHostForAutomation(class UPanelWidget* InHost) { ModuleContentHost = InHost; }
+#endif
+
 private:
 	UPROPERTY(meta = (BindWidgetOptional), Transient)
 	TObjectPtr<class UPanelWidget> ModuleContentHost;

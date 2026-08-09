@@ -33,14 +33,14 @@ bool FHSRUIScreenLifecycleHappyPathTest::RunTest(const FString&)
 	using namespace HSR::P17::LifecycleTests;
 	UHSRUIManagerSubsystem* Manager = MakeManager();
 	Manager->RegisterHostForAutomation();
-	Manager->ConfigureAutomationBackend(true, true, true, true, false);
+	Manager->ConfigureAutomationBackend(true, true, true, true, true);
 	TestEqual(TEXT("root registered"), EntryCount(Manager), 1);
 	TestEqual(TEXT("open pause"), Manager->OpenPauseScreen(), EHSRUIScreenResult::Success);
 	TestTrue(TEXT("pause instance owned"), Manager->HasOpenPauseScreen());
 	TestEqual(TEXT("modal pushed"), EntryCount(Manager), 2);
 	TestEqual(TEXT("repeat open rejected"), Manager->OpenPauseScreen(), EHSRUIScreenResult::AlreadyOpen);
 	TestEqual(TEXT("repeat open does not duplicate"), EntryCount(Manager), 2);
-	TestFalse(TEXT("focus fallback failure is non-fatal"), Manager->IsInconsistent());
+	TestFalse(TEXT("successful open stays consistent"), Manager->IsInconsistent());
 	TestEqual(TEXT("back closes pause"), Manager->RequestBack(), EHSRUIScreenResult::Success);
 	TestFalse(TEXT("pause instance cleared"), Manager->HasOpenPauseScreen());
 	TestEqual(TEXT("root restored"), EntryCount(Manager), 1);

@@ -1,64 +1,113 @@
-# TASK-P17-011 Execution Result
+# TASK-P17-012 Execution Result
 
-Status: `IMPLEMENTATION GREEN / USER EDITOR-PIE PENDING`
+Status: `PASS / USER ACCEPTED`
+
+## Sole observable outcome
+
+Party, Map, Challenge, Quest, and Save can be created by
+`UHSRUIManagerSubsystem` and mounted as the single active child of
+`ModuleContentHost`. The frontend root no longer needs pre-placed instances
+or Visibility switching for those modules. Character and Inventory keep their
+existing dedicated content paths.
 
 ## Delivered
 
-- Added `EHSRSaveSlotState` and Blueprint-safe `FHSRSaveSlotSummary` without
-  changing Save schema or envelope layout.
-- Added read-only Primary/Backup summary projection in `UHSRSaveSubsystem`.
-  It reports Empty, Ready, Recoverable, and Unavailable, preserves legacy
-  primary classification, and never calls `LoadSnapshot` or writes disk data.
-- Added Save-owned deferred Load completion delegate for restore arrival and
-  restore travel failure.
-- Extended Save ViewModel/Widget projection with slot identity, summaries,
-  duplicate-pending guards, and deferred result callbacks. Widget remains a
-  forwarding/presentation facade and does not own disk or World operations.
-- Added focused tests for Empty/Ready slot summaries and deferred failure
-  projection.
+- Added five module class references to `AHSRHUD` and forwarded them through
+  `RegisterExplorationHost`.
+- Added generic module class lookup, widget creation, root attachment, focus,
+  route submission, replacement, close, and travel teardown cleanup to
+  `UHSRUIManagerSubsystem`.
+- Kept content ownership explicit: one active dynamic content widget and one
+  recorded `EHSRFrontendModule` identity. Create, attach, focus, and route
+  failures roll back the candidate and preserve the previous route/content.
+- Extended `HSRFrontendModuleRootWidget::SetModuleContent` to configure the
+  runtime-created child Slot. Overlay hosts now use Fill alignment and zero
+  padding; CanvasPanel hosts now use full anchors, zero offsets, and no
+  autosize. Dynamically mounted content is also forced to `Visible`, so a
+  module WBP that was previously hidden as a pre-placed instance cannot leave
+  the root showing only Back/Close. This preserves the same behavior for
+  either accepted host type.
+- Added focused Automation coverage in
+  `Source/HSR/Tests/HSRFrontendNavigationTests.cpp`.
+- No Party, Map, Challenge, Quest, Save, Reward, Buff, BattleTransition, Save
+  schema, or Pause input business logic was changed.
 
-## TDD evidence
+## TDD and build evidence
 
-- RED checkpoint: commit `8b75f86`.
-- RED Build failed on the intended missing `FHSRSaveSlotSummary`,
-  `UHSRSaveSubsystem::GetSlotSummary`, and
-  `UHSRSaveSubsystem::OnLoadCompleted` interfaces.
-- GREEN Build command:
+- RED: the SlotLayout regression test was run before the Slot fix and the
+  Build failed only because the test-only host injection seam was absent from
+  `UHSRFrontendModuleRootWidget`; this was the intended missing-interface RED.
+  No Git checkpoint commit was created because commit authorization was not
+  granted.
+- RED: after the original dynamic-mount implementation compiled, the new
+  visibility assertion failed because a collapsed content widget remained
+  collapsed after `SetModuleContent`.
+- A first post-implementation Automation run exposed a test-double issue: the
+  automation backend created abstract `UUserWidget` objects. The test
+  substitute was corrected to the existing concrete `UHSRUserWidget`; this was
+  not a runtime business failure.
+- Build command:
   `E:\programs\Epic Games\UE_5.6\Engine\Build\BatchFiles\Build.bat HSREditor Win64 Development E:\work\unreal_projects\HSR\HSR.uproject -NoHotReload -WaitMutex`
-- GREEN Build result: UHT generated reflection code, SaveSubsystem,
-  SaveViewModel, SaveWidget and test sources compiled, HSR lib/dll linked,
-  metadata written, `Result: Succeeded`.
-- Focused Automation:
-  `HSR.UI.SaveFrontend` found 3 tests and passed 3/3:
-  `Intent`, `SlotSummary`, `DeferredResult`.
-- Independent regression Automation:
-  `HSR.Save+HSR.UI.FrontendNavigation+HSR.Save.MapTravelMutualExclusion`
-  found 28 tests and passed 28/28.
-- `git diff --check`: passed; LF/CRLF notices are Git working-copy notices,
-  not whitespace errors.
+- Build result: `Result: Succeeded`. The fresh GREEN run completed UHT,
+  compilation, linking, and metadata generation. A follow-up run reported
+  `Target is up to date` and also returned `Result: Succeeded`.
+- `HSR.UI.FrontendDynamicMount`: 3 tests passed. In addition to lifecycle,
+  replacement, single-child ownership, close, missing class, create failure,
+  attach failure, focus failure, route failure, and compensation, SlotLayout
+  proves dynamic visibility, Overlay Fill/zero-padding, and CanvasPanel
+  full-anchor/zero-offset runtime layout.
+- `HSR.UI.ChallengeDirectory+HSR.UI.FrontendNavigation`: 14 tests passed,
+  exit code 0, including Challenge projection/selection failure matrix and
+  all frontend navigation regressions.
+- `git diff --check`: passed.
 
-## Known regression boundaries
+## User Editor/PIE acceptance
 
-- A combined 34-test invocation was not accepted as the regression result:
-  existing `HSR.ColdSave.*` tests were discovered alphabetically, so Cleanup
-  and CorruptPrimary ran before their Seed fixture; `TravelRestore` then ran
-  after that failed state. This is preserved as the first combined failure.
-- Isolated `HSR.UI.ScreenLifecycle.TravelRestore` still reproduces the existing
-  `fresh inventory binds once = 0` failure from the P17-PATCH-03H UI lifecycle
-  follow-up. This task did not modify UIManager, Inventory, or ScreenLifecycle.
-- Ordered ColdSave rerun reaches the existing schema-8 fixture failure in
-  `HSRSaveColdRecoveryTests.cpp` (`one equipment` expected 1, actual 0). The
-  task does not modify Save schema, ColdSave tests, or migration logic.
-- Standalone, Packaged, Shipping, physical controller, two-resolution visual
-  coverage, Editor reopen, and user PIE are `NOT VERIFIED`.
+The user confirmed that Party, Map, Challenge, Quest, and Save all work
+through the unified dynamic mount path. This closes the TASK-P17-012 user
+Editor/PIE acceptance boundary. No additional module business-logic change is
+claimed from this confirmation.
 
-## User Editor/PIE handoff still required
+## Regression boundary
 
-The user must wire the existing
-`Content/UI/P17/Frontend/WBP_HSRSavePanel_P17.uasset` under
-`WBP_FrontendModuleRoot_P17`'s accepted `ModuleContentHost`, compile/save/reopen
-the three existing WBP assets, and provide PIE evidence for Empty/Ready,
-Save/Overwrite/Cancel, missing or invalid Load, same-map Load, cross-map Load,
-and the old-World failure path. Pause remains numeric `1`.
+The isolated command
+`Automation RunTests HSR.UI.ScreenLifecycle.TravelRestore; Quit` was rerun.
+It still fails with the existing assertions:
 
-No `.claude/**` file is part of this result.
+- `Expected 'fresh inventory binds once' to be 1, but it was 0.`
+- `pause opens before travel: The two values are not equal.`
+
+The log shows the existing travel freeze/arrival/restore matrix executing, but
+the failure is in `HSRUIScreenLifecycleTests.cpp` and predates this task. 012
+does not modify UI lifecycle, Inventory, or ScreenLifecycle logic, so this is
+recorded as a known residual regression rather than attributed to dynamic
+mounting.
+
+## User Editor/PIE acceptance
+
+The user confirmed that Party, Map, Challenge, Quest, and Save all work
+through the unified dynamic mount path in Editor/PIE. Codex does not claim
+independent Editor, Packaged/Shipping, physical-controller, multi-resolution,
+network, or independent-review verification.
+
+## Allowlist audit
+
+012 source/test changes are limited to:
+
+- `Source/HSR/UI/HSRUIManagerSubsystem.h`
+- `Source/HSR/UI/HSRUIManagerSubsystem.cpp`
+- `Source/HSR/UI/HSRHUD.h`
+- `Source/HSR/UI/HSRHUD.cpp`
+- `Source/HSR/Tests/HSRFrontendNavigationTests.cpp`
+- `tasks/active-task.md`
+- `tasks/execution-result.md`
+
+Preserved but excluded from the 012 implementation deliverable:
+
+- `Content/UI/P17/Frontend/WBP_HSRSavePanel_P17.uasset`, the user Save
+  acceptance change from TASK-P17-011.
+- `.claude/**`, all untracked local state.
+- `tasks/archive/TASK-P17-011-closeout.md` and
+  `tasks/archive/TASK-P17-011-execution-result.md`, prior-task archive files.
+
+No Git commit or staging was performed.

@@ -2,8 +2,14 @@
 
 #include "Misc/AutomationTest.h"
 #include "../UI/Frontend/HSRFrontendRouter.h"
+#include "../UI/Frontend/HSRFrontendModuleRootWidget.h"
+#include "../UI/HSRUserWidget.h"
 #include "../UI/HSRScreenWidget.h"
 #include "../UI/HSRUIManagerSubsystem.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/Overlay.h"
+#include "Components/OverlaySlot.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/Engine.h"
 #include "../Player/HSRPlayerController.h"
@@ -356,6 +362,144 @@ bool FHSRFrontendRecoveryMatrixTest::RunTest(const FString&)
 	RootPolicy->FailNextAutomationPolicyApply(); RootPolicy->FailSecondAutomationPolicyApply();
 	TestEqual(TEXT("X primary policy plus failed old-policy recovery"), RootPolicy->CloseFrontendToRoot(), EHSRUIScreenResult::CompensationFailed);
 	TestTrue(TEXT("X old-policy recovery failure inconsistent"), RootPolicy->IsInconsistent()); RootPolicy->DeinitializeForAutomation();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRFrontendDynamicModuleMountTest, "HSR.UI.FrontendDynamicMount.Lifecycle",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRFrontendDynamicModuleMountTest::RunTest(const FString&)
+{
+	ULocalPlayer* LocalPlayer = NewObject<ULocalPlayer>(GEngine);
+	UHSRUIManagerSubsystem* Manager = NewObject<UHSRUIManagerSubsystem>(LocalPlayer);
+	Manager->InitializeForAutomation();
+	Manager->RegisterHostForAutomation(true, true);
+	Manager->ConfigureAutomationBackend(true, true, true, true, true, false);
+	Manager->ConfigureAutomationFrontendModuleBackend(true, true, true);
+
+	const EHSRFrontendModule Modules[] =
+	{
+		EHSRFrontendModule::Party,
+		EHSRFrontendModule::Map,
+		EHSRFrontendModule::Challenge,
+		EHSRFrontendModule::Quest,
+		EHSRFrontendModule::Save
+	};
+	for (const EHSRFrontendModule Module : Modules)
+	{
+		TestEqual(TEXT("module opens through dynamic content path"),
+			Manager->OpenFrontendModule(Module), EHSRUIScreenResult::Success);
+		TestEqual(TEXT("one dynamic content child is owned"),
+			Manager->GetFrontendModuleContentCountForAutomation(), 1);
+		TestEqual(TEXT("dynamic content matches route"),
+			Manager->GetFrontendModuleContentModuleForAutomation(), Module);
+	}
+
+	TestEqual(TEXT("dynamic content closes with frontend root"),
+		Manager->CloseFrontendToRoot(), EHSRUIScreenResult::Success);
+	TestEqual(TEXT("close releases dynamic content"),
+		Manager->GetFrontendModuleContentCountForAutomation(), 0);
+	TestEqual(TEXT("frontend depth returns to exploration root"), Manager->GetLogicalScreenCount(), 1);
+	Manager->DeinitializeForAutomation();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRFrontendDynamicModuleMountFailureTest, "HSR.UI.FrontendDynamicMount.Failures",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRFrontendDynamicModuleMountFailureTest::RunTest(const FString&)
+{
+	auto MakeManager = []()
+	{
+		ULocalPlayer* LocalPlayer = NewObject<ULocalPlayer>(GEngine);
+		UHSRUIManagerSubsystem* Manager = NewObject<UHSRUIManagerSubsystem>(LocalPlayer);
+		Manager->InitializeForAutomation();
+		Manager->RegisterHostForAutomation(true, true);
+		Manager->ConfigureAutomationBackend(true, true, true, true, true, false);
+		return Manager;
+	};
+
+	UHSRUIManagerSubsystem* MissingClass = MakeManager();
+	MissingClass->ConfigureAutomationFrontendModuleBackend(false, true, true);
+	TestEqual(TEXT("missing module class is rejected"),
+		MissingClass->OpenFrontendModule(EHSRFrontendModule::Party), EHSRUIScreenResult::MissingWidgetClass);
+	TestEqual(TEXT("missing class restores exact root"), MissingClass->GetLogicalScreenCount(), 1);
+	TestEqual(TEXT("missing class owns no content"),
+		MissingClass->GetFrontendModuleContentCountForAutomation(), 0);
+	MissingClass->DeinitializeForAutomation();
+
+	UHSRUIManagerSubsystem* CreateFailure = MakeManager();
+	CreateFailure->ConfigureAutomationFrontendModuleBackend(true, false, true);
+	TestEqual(TEXT("module create failure is reported"),
+		CreateFailure->OpenFrontendModule(EHSRFrontendModule::Map), EHSRUIScreenResult::WidgetCreationFailed);
+	TestEqual(TEXT("create failure restores exact root"), CreateFailure->GetLogicalScreenCount(), 1);
+	CreateFailure->DeinitializeForAutomation();
+
+	UHSRUIManagerSubsystem* AttachFailure = MakeManager();
+	AttachFailure->ConfigureAutomationFrontendModuleBackend(true, true, false);
+	TestEqual(TEXT("module attach failure is reported"),
+		AttachFailure->OpenFrontendModule(EHSRFrontendModule::Quest), EHSRUIScreenResult::ViewportAttachFailed);
+	TestEqual(TEXT("attach failure owns no content"),
+		AttachFailure->GetFrontendModuleContentCountForAutomation(), 0);
+	AttachFailure->DeinitializeForAutomation();
+
+	UHSRUIManagerSubsystem* ReplaceFailure = MakeManager();
+	ReplaceFailure->ConfigureAutomationFrontendModuleBackend(true, true, true);
+	TestEqual(TEXT("failure fixture opens Map"),
+		ReplaceFailure->OpenFrontendModule(EHSRFrontendModule::Map), EHSRUIScreenResult::Success);
+	ReplaceFailure->ConfigureAutomationBackend(true, true, true, true, false, false);
+	TestEqual(TEXT("focus failure is reported"),
+		ReplaceFailure->OpenFrontendModule(EHSRFrontendModule::Save), EHSRUIScreenResult::FocusApplyFailed);
+	TestEqual(TEXT("focus failure preserves Map route"),
+		ReplaceFailure->GetFrontendRouter()->GetSnapshot().GetActiveRoute().Module, EHSRFrontendModule::Map);
+	TestEqual(TEXT("focus failure preserves Map content"),
+		ReplaceFailure->GetFrontendModuleContentModuleForAutomation(), EHSRFrontendModule::Map);
+	ReplaceFailure->ConfigureAutomationBackend(true, true, true, true, true, true);
+	ReplaceFailure->FailNextAutomationRouteSubmit();
+	TestEqual(TEXT("route failure is reported"),
+		ReplaceFailure->OpenFrontendModule(EHSRFrontendModule::Save), EHSRUIScreenResult::StackRejected);
+	TestEqual(TEXT("route failure preserves Map content"),
+		ReplaceFailure->GetFrontendModuleContentModuleForAutomation(), EHSRFrontendModule::Map);
+	ReplaceFailure->DeinitializeForAutomation();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRFrontendDynamicModuleSlotLayoutTest, "HSR.UI.FrontendDynamicMount.SlotLayout",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRFrontendDynamicModuleSlotLayoutTest::RunTest(const FString&)
+{
+	UHSRFrontendModuleRootWidget* Root = NewObject<UHSRFrontendModuleRootWidget>();
+	UOverlay* Host = NewObject<UOverlay>(Root);
+	UHSRUserWidget* Content = NewObject<UHSRUserWidget>(Root);
+	Content->SetVisibility(ESlateVisibility::Collapsed);
+	Root->SetModuleContentHostForAutomation(Host);
+
+	TestTrue(TEXT("dynamic content is attached to the host"), Root->SetModuleContent(Content));
+	TestEqual(TEXT("host owns exactly one dynamic child"), Host->GetChildrenCount(), 1);
+	TestEqual(TEXT("dynamic content is visible when mounted"), Content->GetVisibility(), ESlateVisibility::Visible);
+	UPanelSlot* MountedSlot = Host->GetSlots().Num() == 1 ? Host->GetSlots()[0] : nullptr;
+	UOverlaySlot* OverlaySlot = Cast<UOverlaySlot>(MountedSlot);
+	TestNotNull(TEXT("dynamic content receives an OverlaySlot"), OverlaySlot);
+	if (OverlaySlot)
+	{
+		TestEqual(TEXT("dynamic content fills horizontally"), OverlaySlot->GetHorizontalAlignment(), HAlign_Fill);
+		TestEqual(TEXT("dynamic content fills vertically"), OverlaySlot->GetVerticalAlignment(), VAlign_Fill);
+		TestEqual(TEXT("dynamic content has no runtime padding"), OverlaySlot->GetPadding(), FMargin(0.f));
+	}
+
+	UHSRFrontendModuleRootWidget* CanvasRoot = NewObject<UHSRFrontendModuleRootWidget>();
+	UCanvasPanel* CanvasHost = NewObject<UCanvasPanel>(CanvasRoot);
+	UHSRUserWidget* CanvasContent = NewObject<UHSRUserWidget>(CanvasRoot);
+	CanvasRoot->SetModuleContentHostForAutomation(CanvasHost);
+	TestTrue(TEXT("dynamic content attaches to a CanvasPanel host"), CanvasRoot->SetModuleContent(CanvasContent));
+	UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(CanvasHost->GetSlots().Num() == 1 ? CanvasHost->GetSlots()[0] : nullptr);
+	TestNotNull(TEXT("dynamic content receives a CanvasPanelSlot"), CanvasSlot);
+	if (CanvasSlot)
+	{
+		const FAnchors Anchors = CanvasSlot->GetAnchors();
+		TestEqual(TEXT("CanvasPanel content anchors at the top left"), Anchors.Minimum, FVector2D::ZeroVector);
+		TestEqual(TEXT("CanvasPanel content anchors at the bottom right"), Anchors.Maximum, FVector2D::UnitVector);
+		TestEqual(TEXT("CanvasPanel content uses zero offsets"), CanvasSlot->GetOffsets(), FMargin(0.f));
+		TestEqual(TEXT("CanvasPanel content is not auto-sized"), CanvasSlot->GetAutoSize(), false);
+	}
 	return true;
 }
 

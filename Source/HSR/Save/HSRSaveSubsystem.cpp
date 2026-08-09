@@ -161,8 +161,9 @@ void UHSRSaveSubsystem::InitializeForDevelopmentTest(UHSRCharacterProfileSubsyst
 {
 	Profiles = InProfiles;
 	Party = InParty;
-	Equipment = InEquipment;
 	UGameInstance* OwnerGameInstance = GetGameInstance() ? GetGameInstance() : Cast<UGameInstance>(GetOuter());
+	DevelopmentEquipment = InEquipment ? InEquipment : NewObject<UHSREquipmentSubsystem>(OwnerGameInstance);
+	Equipment = DevelopmentEquipment;
 	DevelopmentInventory = InInventory ? InInventory : NewObject<UHSRInventorySubsystem>(OwnerGameInstance);
 	DevelopmentReward = InReward ? InReward : NewObject<UHSRRewardSubsystem>(OwnerGameInstance);
 	DevelopmentQuest = InQuest ? InQuest : NewObject<UHSRQuestSubsystem>(OwnerGameInstance);

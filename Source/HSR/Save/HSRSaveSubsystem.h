@@ -70,6 +70,8 @@ private:
 	TObjectPtr<UHSRMapSubsystem> DevelopmentMap;
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRChallengeProgressionSubsystem> DevelopmentChallengeProgression;
+	UPROPERTY(Transient)
+	TObjectPtr<UHSREquipmentSubsystem> DevelopmentEquipment;
 #endif
 	int64 RestoreTransactionRevision=0;
 	FHSRRestoreCommitted RestoreCommitted;
