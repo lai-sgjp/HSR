@@ -2204,6 +2204,22 @@ const auto RunP10001CommandHarnessLocal = [this]()
 	}
 	if (APlayerController* PlayerController = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
 	{
+		// Battle is a fixed-camera command UI: switch to UI-only input so the mouse
+		// drives the command buttons instead of orbiting the camera, and stop the
+		// exploration pawn from consuming look input.
+		if (AHSRPlayerController* HSRPlayerController = Cast<AHSRPlayerController>(PlayerController))
+		{
+			HSRPlayerController->SetControlMode(EHSRPlayerControlMode::UIOnly);
+		}
+		else
+		{
+			FInputModeUIOnly InputMode;
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			PlayerController->SetInputMode(InputMode);
+			PlayerController->bShowMouseCursor = true;
+			PlayerController->SetIgnoreMoveInput(true);
+			PlayerController->SetIgnoreLookInput(true);
+		}
 		EnableInput(PlayerController);
 		if (InputComponent)
 		{

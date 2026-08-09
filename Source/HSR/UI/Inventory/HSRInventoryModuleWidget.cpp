@@ -419,19 +419,37 @@ void UHSRInventoryModuleWidget::PopulateListRows()
 		UButton* RowButton = NewObject<UButton>(this);
 		if (!RowButton) continue;
 		RowButton->SetVisibility(ESlateVisibility::Visible);
+		const bool bSelected = Row.Key == CurrentSnapshot.SelectedKey;
+		// Selected row: gold-tinted fill + bright text; otherwise subtle dark fill + muted text.
+		RowButton->SetBackgroundColor(bSelected
+			? FLinearColor(0.78f, 0.61f, 0.24f, 0.35f)
+			: FLinearColor(1.0f, 1.0f, 1.0f, 0.05f));
 		if (UVerticalBoxSlot* RowSlot = Cast<UVerticalBoxSlot>(Host->AddChild(RowButton)))
 		{
 			RowSlot->SetHorizontalAlignment(HAlign_Fill);
+			RowSlot->SetPadding(FMargin(4.0f, 3.0f, 4.0f, 3.0f));
 		}
 		UHorizontalBox* RowBox = NewObject<UHorizontalBox>(RowButton);
 		if (!RowBox) continue;
 		RowButton->SetContent(RowBox);
 		UTextBlock* NameText = NewObject<UTextBlock>(RowButton);
 		NameText->SetText(Row.DisplayName);
+		NameText->SetColorAndOpacity(bSelected
+			? FSlateColor(FLinearColor(1.0f, 1.0f, 1.0f, 1.0f))
+			: FSlateColor(FLinearColor(0.60f, 0.64f, 0.71f, 1.0f)));
+		FSlateFontInfo NameFont = NameText->GetFont();
+		NameFont.Size = 16;
+		NameText->SetFont(NameFont);
 		RowBox->AddChild(NameText);
 		UTextBlock* QtyText = NewObject<UTextBlock>(RowButton);
 		QtyText->SetText(FText::Format(NSLOCTEXT("HSRInventory", "RowQty", "x{0}"),
 			FText::AsNumber(Row.Quantity)));
+		QtyText->SetColorAndOpacity(bSelected
+			? FSlateColor(FLinearColor(1.0f, 1.0f, 1.0f, 1.0f))
+			: FSlateColor(FLinearColor(0.60f, 0.64f, 0.71f, 1.0f)));
+		FSlateFontInfo QtyFont = QtyText->GetFont();
+		QtyFont.Size = 14;
+		QtyText->SetFont(QtyFont);
 		RowBox->AddChild(QtyText);
 		UHSRInventoryRowClickBridge* Bridge = NewObject<UHSRInventoryRowClickBridge>(this);
 		Bridge->Initialize(this, Index);
