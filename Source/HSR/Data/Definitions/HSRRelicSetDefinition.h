@@ -14,7 +14,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Relic Set")
 	FName SetId;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Relic Set", meta = (ClampMin = "2", ClampMax = "2"))
+	// Piece count required to activate the set.  Authored per set; the resolver and the equipment
+	// subsystem both read this field rather than assuming the 2-piece default.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Relic Set", meta = (ClampMin = "1", ClampMax = "6"))
 	int32 Threshold = 2;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Relic Set")

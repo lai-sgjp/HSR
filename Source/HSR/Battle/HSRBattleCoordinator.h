@@ -63,6 +63,19 @@ public:
 	const TArray<FHSRBattleParticipant>& GetParticipants() const { return Participants; }
 	UHSRTurnManager* GetTurnManager() const { return TurnManager; }
 
+	/** Participant with this id, or nullptr.  The single lookup used across the battle layer;
+	 * callers must not re-open-code the predicate, since Participants is reallocated on spawn
+	 * and every copy of the search would need to agree on the id-matching rule. */
+	const FHSRBattleParticipant* FindParticipant(FName ParticipantId) const;
+	FHSRBattleParticipant* FindParticipant(FName ParticipantId);
+
+	/** First participant on the given team, or nullptr.  Team order is roster order. */
+	const FHSRBattleParticipant* FindFirstOfTeam(EHSRBattleParticipantTeam Team) const;
+
+	/** Id of the given team's leader (roster slot 0).  Use this rather than the literal "Player":
+	 * the naming rule lives in MakeParticipantId and slot 0 only happens to be unsuffixed. */
+	static FName GetLeaderParticipantId(EHSRBattleParticipantTeam Team) { return MakeParticipantId(Team, 0); }
+
 	/** Requests one synchronous basic attack. Only a current participant may attack an opposing valid target. */
 	bool RequestBasicAttack(FName AttackerParticipantId, FName TargetParticipantId);
 	FHSRAbilityResolution RequestAction(const FHSRBattleActionCommand& Command);

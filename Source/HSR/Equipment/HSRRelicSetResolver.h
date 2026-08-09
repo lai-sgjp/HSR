@@ -16,6 +16,10 @@ struct FHSRRelicSetResolution
 class HSR_API FHSRRelicSetResolver
 {
 public:
+	// Piece count a set activates at when no other threshold is available.  Mirrors the authored
+	// default on UHSRRelicSetDefinition::Threshold.
+	static constexpr int32 DefaultThreshold = 2;
+
 	static TMap<FName, FHSRRelicSetResolution> Resolve(
 		const FHSREquipmentLoadout& Loadout,
 		const TArray<UHSRRelicDefinition*>& RelicDefinitions,

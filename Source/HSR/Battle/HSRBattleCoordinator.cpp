@@ -23,6 +23,7 @@
 #include "../Status/HSRStatusComponent.h"
 #include "../Data/Definitions/HSRStatusDefinition.h"
 #include "../Equipment/HSREquipmentStatAggregator.h"
+#include "../Equipment/HSRRelicSetResolver.h"
 #include "HSRBattleTransitionSubsystem.h"
 #include "../Data/Definitions/HSRStageBuffDefinition.h"
 #include "../Inventory/HSRInventorySubsystem.h"
@@ -111,6 +112,8 @@ bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRe
 	return true;
 }
 
+// Deliberately not FindFirstOfTeam: this needs the first player participant that actually has an
+// ASC, so a leader without one must fall through to the next slot rather than fail the lookup.
 const FHSRBattleParticipant* UHSRBattleCoordinator::FindStageBuffPlayerParticipant() const
 {
 	return Participants.FindByPredicate([](const FHSRBattleParticipant& Participant)
@@ -588,13 +591,13 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		return Reject(EHSRAbilityFailureReason::DefinitionMissing);
 	}
 
-	const FHSRBattleParticipant* Attacker = Participants.FindByPredicate([&Command](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == Command.ActorParticipantId; });
+	const FHSRBattleParticipant* Attacker = FindParticipant(Command.ActorParticipantId);
 	if (!Attacker || !Attacker->IsAlive()
 		|| !FHSRTargetingPolicy::ValidateTargetIds(*ResolvedSkillDefinition, *Attacker, Participants, Command.TargetParticipantIds))
 	{
 		return Reject(EHSRAbilityFailureReason::InvalidTarget);
 	}
-	FHSRBattleParticipant* Target = Participants.FindByPredicate([&Command](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == Command.TargetParticipantIds[0]; });
+	FHSRBattleParticipant* Target = FindParticipant(Command.TargetParticipantIds[0]);
 	if (!Target || !Target->AbilitySystemComponent.IsValid())
 	{
 		return Reject(EHSRAbilityFailureReason::InvalidTarget);
@@ -1006,7 +1009,7 @@ void UHSRBattleCoordinator::RecordEnemyTurnIfCurrent(UHSRTurnManager* SourceMana
 	{
 		return;
 	}
-	const FHSRBattleParticipant* Participant = Participants.FindByPredicate([&Event](const FHSRBattleParticipant& P) { return P.ParticipantId == Event.ParticipantId; });
+	const FHSRBattleParticipant* Participant = FindParticipant(Event.ParticipantId);
 	if (!Participant || Participant->Team != EHSRBattleParticipantTeam::Enemy || !Participant->IsAlive()
 		|| SourceManager->GetCurrentParticipantId() != Event.ParticipantId
 		|| SourceManager->GetBattleEpoch() != Event.BattleEpoch || SourceManager->GetTurnSequence() != Event.TurnSequence)
@@ -1062,8 +1065,7 @@ void UHSRBattleCoordinator::DrainPendingEnemyTurns()
 			// authored skill set changes its AI behaviour with no code change.
 			const UHSRSkillDefinition* EnemyAttack = nullptr;
 			{
-				const FHSRBattleParticipant* Actor = Participants.FindByPredicate(
-					[EnemyId](const FHSRBattleParticipant& P) { return P.ParticipantId == EnemyId; });
+				const FHSRBattleParticipant* Actor = FindParticipant(EnemyId);
 				if (Actor)
 				{
 					for (const TObjectPtr<UHSRSkillDefinition>& Candidate : GetSkillLoadoutFor(Actor->ParticipantId))
@@ -1076,7 +1078,7 @@ void UHSRBattleCoordinator::DrainPendingEnemyTurns()
 					}
 				}
 			}
-		const FHSRBattleParticipant* Enemy = Participants.FindByPredicate([EnemyId](const FHSRBattleParticipant& P) { return P.ParticipantId == EnemyId; });
+		const FHSRBattleParticipant* Enemy = FindParticipant(EnemyId);
 		if (!Enemy || Enemy->Team != EHSRBattleParticipantTeam::Enemy || !Enemy->IsAlive() || !EnemyAttack)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("P10-001A EnemyTurn ConsumedWithoutAction Key=%s"), *QueuedKey);
@@ -1139,10 +1141,7 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 			for (int32 Offset = 0; Offset < OrderedParticipants.Num(); ++Offset)
 			{
 				const FName ParticipantId = OrderedParticipants[(CurrentIndex + Offset) % OrderedParticipants.Num()].ParticipantId;
-				const FHSRBattleParticipant* Participant = Participants.FindByPredicate([ParticipantId](const FHSRBattleParticipant& Candidate)
-				{
-					return Candidate.ParticipantId == ParticipantId;
-				});
+				const FHSRBattleParticipant* Participant = FindParticipant(ParticipantId);
 				if (Participant && Participant->IsAlive())
 				{
 					State.TurnOrderParticipantIds.Add(ParticipantId);
@@ -1192,7 +1191,7 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 		return State;
 	}
 
-	const FHSRBattleParticipant* Actor = Participants.FindByPredicate([&State](const FHSRBattleParticipant& P) { return P.ParticipantId == State.CurrentActorId; });
+	const FHSRBattleParticipant* Actor = FindParticipant(State.CurrentActorId);
 	if (!Actor || !Actor->AbilitySystemComponent.IsValid())
 	{
 		return State;
@@ -1264,7 +1263,7 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 		{
 			FGameplayAbilitySpec* Spec = Actor->AbilitySystemComponent->FindAbilitySpecFromClass(Definition->AbilityClass);
 			UHSRGameplayAbilityBase* Ability = Spec ? Cast<UHSRGameplayAbilityBase>(Spec->GetPrimaryInstance()) : nullptr;
-			const FHSRBattleParticipant* Candidate = Participants.FindByPredicate([&View](const FHSRBattleParticipant& P) { return P.ParticipantId == View.CandidateTargetIds[0]; });
+			const FHSRBattleParticipant* Candidate = FindParticipant(View.CandidateTargetIds[0]);
 			if (!Ability || !Candidate || !Candidate->AbilitySystemComponent.IsValid())
 			{
 				View.bAvailable = false; View.DisabledReason = EHSRAbilityFailureReason::AbilityUnavailable;
@@ -1304,6 +1303,30 @@ bool UHSRBattleCoordinator::GetBattleResultForPresentation(FHSRBattleResult& Out
 	if (!bBattleResultProduced || bBattleResultConsumed || !BattleResult.IsValid()) return false;
 	OutResult = BattleResult;
 	return true;
+}
+
+const FHSRBattleParticipant* UHSRBattleCoordinator::FindParticipant(FName ParticipantId) const
+{
+	return Participants.FindByPredicate([ParticipantId](const FHSRBattleParticipant& Value)
+	{
+		return Value.ParticipantId == ParticipantId;
+	});
+}
+
+FHSRBattleParticipant* UHSRBattleCoordinator::FindParticipant(FName ParticipantId)
+{
+	return Participants.FindByPredicate([ParticipantId](const FHSRBattleParticipant& Value)
+	{
+		return Value.ParticipantId == ParticipantId;
+	});
+}
+
+const FHSRBattleParticipant* UHSRBattleCoordinator::FindFirstOfTeam(EHSRBattleParticipantTeam Team) const
+{
+	return Participants.FindByPredicate([Team](const FHSRBattleParticipant& Value)
+	{
+		return Value.Team == Team;
+	});
 }
 
 FName UHSRBattleCoordinator::MakeParticipantId(EHSRBattleParticipantTeam Team, int32 RosterIndex)
@@ -1489,8 +1512,8 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticip
 {
 	FHSRDamageResult Failure; Failure.ActionId = ActionId; Failure.DamageType = Definition ? Definition->DamageType : FGameplayTag();
 	if (!Definition || Definition->EffectKind != EHSRStatusEffectKind::DamageOverTime) { Failure.Result = EHSRDamageResultType::MissingDamageRule; return Failure; }
-	const FHSRBattleParticipant* Source = Participants.FindByPredicate([SourceParticipantId](const FHSRBattleParticipant& P){ return P.ParticipantId == SourceParticipantId; });
-	const FHSRBattleParticipant* Target = Participants.FindByPredicate([TargetParticipantId](const FHSRBattleParticipant& P){ return P.ParticipantId == TargetParticipantId; });
+	const FHSRBattleParticipant* Source = FindParticipant(SourceParticipantId);
+	const FHSRBattleParticipant* Target = FindParticipant(TargetParticipantId);
 	const UHSRDamageRuleDefinition* Rule = Definition->DamageRule.LoadSynchronous();
 	if (CurrentState != EHSRBattleCoordinatorState::Spawned) { Failure.Result = EHSRDamageResultType::BattleTerminal; return Failure; }
 	if (!ActionId.IsValid()) { Failure.Result = EHSRDamageResultType::DuplicateAction; return Failure; }
@@ -1574,9 +1597,9 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveDevelopmentExecutionDamage(FName 
 	const auto CacheFailure = [this, &ActionId](FHSRDamageResult Result) { if (ActionId.IsValid()) { DevelopmentDamageResults.Add(ActionId, Result); } return Result; };
 	if (CurrentState != EHSRBattleCoordinatorState::Spawned) { Failure.Result = EHSRDamageResultType::BattleTerminal; return CacheFailure(Failure); }
 	if (!ActionId.IsValid()) { Failure.Result = EHSRDamageResultType::DuplicateAction; return Failure; }
-	const FHSRBattleParticipant* Source = Participants.FindByPredicate([SourceParticipantId](const FHSRBattleParticipant& P) { return P.ParticipantId == SourceParticipantId; });
+	const FHSRBattleParticipant* Source = FindParticipant(SourceParticipantId);
 	if (!Source || !Source->AbilitySystemComponent.IsValid()) { Failure.Result = EHSRDamageResultType::InvalidSource; return CacheFailure(Failure); }
-	const FHSRBattleParticipant* Target = Participants.FindByPredicate([TargetParticipantId](const FHSRBattleParticipant& P) { return P.ParticipantId == TargetParticipantId; });
+	const FHSRBattleParticipant* Target = FindParticipant(TargetParticipantId);
 	if (!Target || !Target->AbilitySystemComponent.IsValid()) { Failure.Result = EHSRDamageResultType::InvalidTarget; return CacheFailure(Failure); }
 	if (!Rule || !Rule->IsValidRuleDefinition()) { Failure.Result = EHSRDamageResultType::MissingDamageRule; return CacheFailure(Failure); }
 	if (!DamageType.IsValid() || !FMath::IsFinite(AbilityMultiplier) || AbilityMultiplier <= 0.0f || AbilityMultiplier > 100.0f) { Failure.Result = EHSRDamageResultType::InvalidDamageType; return CacheFailure(Failure); }
@@ -1667,10 +1690,7 @@ void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
 		return;
 	}
 
-	FHSRBattleParticipant* Defeated = Participants.FindByPredicate([DefeatedParticipantId](const FHSRBattleParticipant& Participant)
-	{
-		return Participant.ParticipantId == DefeatedParticipantId;
-	});
+	FHSRBattleParticipant* Defeated = FindParticipant(DefeatedParticipantId);
 	if (!Defeated)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::ResolveDefeat - REJECTED unknown participant=%s"), *DefeatedParticipantId.ToString());
@@ -1912,10 +1932,7 @@ int32 UHSRBattleCoordinator::RouteSourceInvalid(FName SourceParticipantId)
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 EHSRStatusOperationResult UHSRBattleCoordinator::AddStatusForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId)
 {
-	const FHSRBattleParticipant* Source = Participants.FindByPredicate([SourceParticipantId](const FHSRBattleParticipant& Participant)
-	{
-		return Participant.ParticipantId == SourceParticipantId;
-	});
+	const FHSRBattleParticipant* Source = FindParticipant(SourceParticipantId);
 	if (!Source || !Source->IsAlive())
 	{
 		return EHSRStatusOperationResult::InvalidSource;
@@ -1927,10 +1944,7 @@ EHSRStatusOperationResult UHSRBattleCoordinator::AddStatusForDevelopmentTest(FNa
 
 EHSRStatusOperationResult UHSRBattleCoordinator::AddDamageOverTimeForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId)
 {
-	const FHSRBattleParticipant* Source = Participants.FindByPredicate([SourceParticipantId](const FHSRBattleParticipant& Participant)
-	{
-		return Participant.ParticipantId == SourceParticipantId;
-	});
+	const FHSRBattleParticipant* Source = FindParticipant(SourceParticipantId);
 	if (!Source || !Source->IsAlive())
 	{
 		return EHSRStatusOperationResult::InvalidSource;
@@ -2156,7 +2170,7 @@ bool UHSRBattleCoordinator::RefreshCharacterProgression(FName ParticipantId,cons
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	++ProgressionRefreshCountForTest;bLastProgressionRefreshResultForTest=false;
 #endif
-	const FHSRBattleParticipant* Participant=Participants.FindByPredicate([ParticipantId](const FHSRBattleParticipant& P){return P.ParticipantId==ParticipantId;});if(!Participant||Participant->Team==EHSRBattleParticipantTeam::Enemy)return false;
+	const FHSRBattleParticipant* Participant=FindParticipant(ParticipantId);if(!Participant||Participant->Team==EHSRBattleParticipantTeam::Enemy)return false;
 	const FHSRCharacterProgressionContext* Existing=CharacterProgressionContexts.Find(ParticipantId);const TOptional<FHSRCharacterProgressionContext> Previous=Existing?TOptional<FHSRCharacterProgressionContext>(*Existing):TOptional<FHSRCharacterProgressionContext>();CharacterProgressionContexts.Add(ParticipantId,Context);if(ApplyCharacterProgressionGameplayEffect(*Participant)){
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	bLastProgressionRefreshResultForTest=true;
@@ -2167,7 +2181,7 @@ bool UHSRBattleCoordinator::RefreshCharacterProgression(FName ParticipantId,cons
 bool UHSRBattleCoordinator::ApplyEquipmentSource(FName ParticipantId,const FGuid& InstanceId,const FHSREquipmentAggregate& Aggregate,int64 Revision)
 {
 	if (!EquipmentGameplayEffect || !InstanceId.IsValid() || Revision < 0) return false;
-	const FHSRBattleParticipant* P=Participants.FindByPredicate([&](const FHSRBattleParticipant& V){return V.ParticipantId==ParticipantId;});
+	const FHSRBattleParticipant* P=FindParticipant(ParticipantId);
 	if (!P || !P->AbilitySystemComponent.IsValid()) return false;
 	FHSREquipmentAggregate A=Aggregate; A.Revision=Revision;
 	if (!EquipmentEffectBridge) EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
@@ -2176,13 +2190,13 @@ bool UHSRBattleCoordinator::ApplyEquipmentSource(FName ParticipantId,const FGuid
 bool UHSRBattleCoordinator::RemoveEquipmentSource(FName ParticipantId,const FGuid& InstanceId)
 {
 	if (!EquipmentEffectBridge) return false;
-	const FHSRBattleParticipant* P=Participants.FindByPredicate([&](const FHSRBattleParticipant& V){return V.ParticipantId==ParticipantId;});
+	const FHSRBattleParticipant* P=FindParticipant(ParticipantId);
 	return P && EquipmentEffectBridge->Remove(InstanceId);
 }
 bool UHSRBattleCoordinator::ApplyEquipmentSetSource(FName ParticipantId,FName SetSourceId,const FHSREquipmentAggregate& Aggregate,int64 Revision)
 {
 	if (!RelicSetGameplayEffect || SetSourceId.IsNone() || Revision < 0) return false;
-	const FHSRBattleParticipant* P=Participants.FindByPredicate([&](const FHSRBattleParticipant& V){return V.ParticipantId==ParticipantId;});
+	const FHSRBattleParticipant* P=FindParticipant(ParticipantId);
 	if (!P || !P->AbilitySystemComponent.IsValid()) return false;
 	if (!EquipmentEffectBridge) EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
 	FHSREquipmentAggregate A=Aggregate; A.Revision=Revision;
@@ -2191,7 +2205,7 @@ bool UHSRBattleCoordinator::ApplyEquipmentSetSource(FName ParticipantId,FName Se
 bool UHSRBattleCoordinator::RemoveEquipmentSetSource(FName ParticipantId,FName SetSourceId)
 {
 	if (SetSourceId.IsNone() || !EquipmentEffectBridge) return false;
-	const FHSRBattleParticipant* P=Participants.FindByPredicate([&](const FHSRBattleParticipant& V){return V.ParticipantId==ParticipantId;});
+	const FHSRBattleParticipant* P=FindParticipant(ParticipantId);
 	return P && EquipmentEffectBridge->RemoveSetSource(SetSourceId);
 }
 void UHSRBattleCoordinator::BindEquipmentMovementProjection(UHSREquipmentSubsystem& Equipment)
@@ -2205,8 +2219,11 @@ void UHSRBattleCoordinator::BindEquipmentMovementProjection(UHSREquipmentSubsyst
 bool UHSRBattleCoordinator::CanProjectEquipmentMovement(const FHSREquipmentMovementRequest& Request,const FHSREquipmentLoadout& Candidate) const
 {
 	if(Request.CharacterId!=HSRCharacterGuidFromProfileName(PlayerCharacterId)||!EquipmentGameplayEffect)return false;
-	const FHSRBattleParticipant* Participant=Participants.FindByPredicate([](const FHSRBattleParticipant& Value){return Value.ParticipantId==TEXT("Player");});
-	if(!Participant||!Participant->AbilitySystemComponent.IsValid())return false;
+	const FHSRBattleParticipant* Participant = FindParticipant(GetLeaderParticipantId(EHSRBattleParticipantTeam::Player));
+	if (!Participant || !Participant->AbilitySystemComponent.IsValid())
+	{
+		return false;
+	}
 	UHSREquipmentEffectBridge* Bridge=EquipmentEffectBridge.Get();
 	if(!Bridge)return false;
 	TSet<FGuid> DesiredIds;for(const auto& Pair:Candidate.Equipment)DesiredIds.Add(Pair.Value.InstanceId);for(const auto& Pair:Candidate.Relics)DesiredIds.Add(Pair.Value.InstanceId);
@@ -2229,24 +2246,64 @@ void UHSRBattleCoordinator::SetEquipmentMovementProjectionCommitFailureForDevelo
 #endif
 bool UHSRBattleCoordinator::ApplyEquipmentMovementProjection(const FHSREquipmentMovementRequest& Request,const FHSREquipmentLoadout& Candidate)
 {
-	if(Request.Intent==EHSREquipmentMovementIntent::Unequip)
+	const FName LeaderId = GetLeaderParticipantId(EHSRBattleParticipantTeam::Player);
+	if (Request.Intent == EHSREquipmentMovementIntent::Unequip)
 	{
-		if(!RemoveEquipmentSource(TEXT("Player"),Request.InstanceId))return false;
+		if (!RemoveEquipmentSource(LeaderId, Request.InstanceId))
+		{
+			return false;
+		}
 		EquipmentProjectionStates.Remove(Request.InstanceId);
 		EquipmentProjectionParticipants.Remove(Request.InstanceId);
 		return true;
 	}
+
 	TSet<FGuid> DesiredIds;
-	for(const auto& Pair:Candidate.Equipment)DesiredIds.Add(Pair.Value.InstanceId);
-	for(const auto& Pair:Candidate.Relics)DesiredIds.Add(Pair.Value.InstanceId);
+	for (const auto& Pair : Candidate.Equipment)
+	{
+		DesiredIds.Add(Pair.Value.InstanceId);
+	}
+	for (const auto& Pair : Candidate.Relics)
+	{
+		DesiredIds.Add(Pair.Value.InstanceId);
+	}
+
 	FHSREquipmentAggregate Aggregate;
-	if(!UHSREquipmentStatAggregator::Aggregate(Candidate,Request.ExpectedEquipmentRevision+1,Aggregate)||!ApplyEquipmentSource(TEXT("Player"),Request.InstanceId,Aggregate,Aggregate.Revision))return false;
+	if (!UHSREquipmentStatAggregator::Aggregate(Candidate, Request.ExpectedEquipmentRevision + 1, Aggregate)
+		|| !ApplyEquipmentSource(LeaderId, Request.InstanceId, Aggregate, Aggregate.Revision))
+	{
+		return false;
+	}
+
 	TArray<FGuid> RemovedIds;
-	if(Request.Intent==EHSREquipmentMovementIntent::Replace)for(const auto& Existing:EquipmentProjectionStates)if(!DesiredIds.Contains(Existing.Key))RemovedIds.Add(Existing.Key);
-	for(const FGuid& RemovedId:RemovedIds)if(!RemoveEquipmentSource(TEXT("Player"),RemovedId)){RemoveEquipmentSource(TEXT("Player"),Request.InstanceId);return false;}
-	for(const FGuid& RemovedId:RemovedIds){EquipmentProjectionStates.Remove(RemovedId);EquipmentProjectionParticipants.Remove(RemovedId);}
-	EquipmentProjectionStates.Add(Request.InstanceId,Aggregate);
-	EquipmentProjectionParticipants.Add(Request.InstanceId,TEXT("Player"));
+	if (Request.Intent == EHSREquipmentMovementIntent::Replace)
+	{
+		for (const auto& Existing : EquipmentProjectionStates)
+		{
+			if (!DesiredIds.Contains(Existing.Key))
+			{
+				RemovedIds.Add(Existing.Key);
+			}
+		}
+	}
+
+	for (const FGuid& RemovedId : RemovedIds)
+	{
+		if (!RemoveEquipmentSource(LeaderId, RemovedId))
+		{
+			// Roll the just-applied source back so a partial failure leaves no projection behind.
+			RemoveEquipmentSource(LeaderId, Request.InstanceId);
+			return false;
+		}
+	}
+	for (const FGuid& RemovedId : RemovedIds)
+	{
+		EquipmentProjectionStates.Remove(RemovedId);
+		EquipmentProjectionParticipants.Remove(RemovedId);
+	}
+
+	EquipmentProjectionStates.Add(Request.InstanceId, Aggregate);
+	EquipmentProjectionParticipants.Add(Request.InstanceId, LeaderId);
 	return true;
 }
 bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipmentRestoreState>& Candidate)
@@ -2267,13 +2324,30 @@ bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipme
 	{
 		const FGuid PlayerCharacterGuid = HSRCharacterGuidFromProfileName(PlayerCharacterId);
 		const FHSRBattleParticipant* Participant = Pair.Key == PlayerCharacterGuid
-			? Participants.FindByPredicate([](const FHSRBattleParticipant& P) { return P.ParticipantId == FName(TEXT("Player")); })
+			? FindParticipant(GetLeaderParticipantId(EHSRBattleParticipantTeam::Player))
 			: nullptr;
-		if (!Participant || !Participant->AbilitySystemComponent.IsValid()) continue;
+		if (!Participant || !Participant->AbilitySystemComponent.IsValid())
+		{
+			continue;
+		}
 		const auto AddInstance=[&](const FHSREquipmentInstance& Instance){FHSREquipmentLoadout Single; if(Instance.Kind==EHSREquipmentKind::Equipment)Single.Equipment.Add(EHSREquipmentSlot::Weapon,Instance);else Single.Relics.Add(EHSRRelicSlot::Head,Instance);FHSREquipmentAggregate Aggregate;if(!UHSREquipmentStatAggregator::Aggregate(Single,Pair.Value.Revision,Aggregate))return false;DesiredStates.Add(Instance.InstanceId,Aggregate);DesiredParticipants.Add(Instance.InstanceId,Participant->ParticipantId);return true;};
 		for(const auto& Item:Pair.Value.Loadout.Equipment)if(!AddInstance(Item.Value))return false;
 		for(const auto& Item:Pair.Value.Loadout.Relics)if(!AddInstance(Item.Value))return false;
-		for(const auto& Set:Pair.Value.RelicSetCounts)if(Set.Value>=2){FHSREquipmentAggregate Aggregate;Aggregate.Revision=Pair.Value.Revision;DesiredSetStates.Add(Set.Key,Aggregate);DesiredSetParticipants.Add(Set.Key,Participant->ParticipantId);}
+		// The restore DTO carries piece counts but not per-set thresholds, and the equipment
+		// subsystem holds no set definitions to look them up from, so this path can only apply the
+		// default.  Sets authored with a non-default Threshold will not project correctly here
+		// until set definitions are injected into the subsystem.
+		for (const auto& Set : Pair.Value.RelicSetCounts)
+		{
+			if (Set.Value < FHSRRelicSetResolver::DefaultThreshold)
+			{
+				continue;
+			}
+			FHSREquipmentAggregate Aggregate;
+			Aggregate.Revision = Pair.Value.Revision;
+			DesiredSetStates.Add(Set.Key, Aggregate);
+			DesiredSetParticipants.Add(Set.Key, Participant->ParticipantId);
+		}
 	}
 	const auto RestoreOld=[&](){for(const auto& Old:OldStates)ApplyEquipmentSource(OldParticipants.FindRef(Old.Key),Old.Key,Old.Value,Old.Value.Revision);for(const auto& Old:OldSetStates)ApplyEquipmentSetSource(OldSetParticipants.FindRef(Old.Key),Old.Key,Old.Value,Old.Value.Revision);for(const auto& Desired:DesiredStates)if(!OldStates.Contains(Desired.Key))RemoveEquipmentSource(DesiredParticipants.FindRef(Desired.Key),Desired.Key);for(const auto& Desired:DesiredSetStates)if(!OldSetStates.Contains(Desired.Key))RemoveEquipmentSetSource(DesiredSetParticipants.FindRef(Desired.Key),Desired.Key);};
 	int32 CompletedOperations=0;
