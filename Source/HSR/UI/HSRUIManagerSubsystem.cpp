@@ -131,11 +131,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
 	TSubclassOf<UHSRFrontendModuleRootWidget> InFrontendModuleRootClass,
 	TSubclassOf<UHSRScreenWidget> InCharacterDetailWidgetClass,
 	TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass,
-	TSubclassOf<UUserWidget> InPartyWidgetClass,
-	TSubclassOf<UUserWidget> InMapWidgetClass,
-	TSubclassOf<UUserWidget> InChallengeWidgetClass,
-	TSubclassOf<UUserWidget> InQuestWidgetClass,
-	TSubclassOf<UUserWidget> InSaveWidgetClass)
+	const TMap<EHSRFrontendModule, TSubclassOf<UUserWidget>>& InModuleWidgetClasses)
 {
 	if (!bInitialized || !ScreenStack || !InputModeCoordinator)
 	{
@@ -158,11 +154,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
 		FrontendModuleRootClass = InFrontendModuleRootClass;
 		CharacterDetailWidgetClass = InCharacterDetailWidgetClass;
 		InventoryWidgetClass = InInventoryWidgetClass;
-		PartyWidgetClass = InPartyWidgetClass;
-		MapWidgetClass = InMapWidgetClass;
-		ChallengeWidgetClass = InChallengeWidgetClass;
-		QuestWidgetClass = InQuestWidgetClass;
-		SaveWidgetClass = InSaveWidgetClass;
+		FrontendModuleWidgetClasses = InModuleWidgetClasses;
 		return EHSRUIScreenResult::NoOp;
 	}
 	if (RegisteredHUD.IsValid() || FrontendShellInstance || FrontendModuleContentInstance
@@ -191,11 +183,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
 	FrontendModuleRootClass = InFrontendModuleRootClass;
 	CharacterDetailWidgetClass = InCharacterDetailWidgetClass;
 	InventoryWidgetClass = InInventoryWidgetClass;
-	PartyWidgetClass = InPartyWidgetClass;
-	MapWidgetClass = InMapWidgetClass;
-	ChallengeWidgetClass = InChallengeWidgetClass;
-	QuestWidgetClass = InQuestWidgetClass;
-	SaveWidgetClass = InSaveWidgetClass;
+	FrontendModuleWidgetClasses = InModuleWidgetClasses;
 	// Clear before restoring: a travel-scoped inconsistency would otherwise reject the restore
 	// and every later OpenFrontendModule call on this otherwise-healthy host.
 	TryClearRecoverableInconsistency();
@@ -767,8 +755,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 	}
 	const EHSRFrontendModule ActiveFrontendModule = FrontendRouter
 		? FrontendRouter->GetSnapshot().GetActiveRoute().Module : EHSRFrontendModule::None;
-	if (FrontendModuleRootInstance || (ActiveFrontendModule >= EHSRFrontendModule::Party
-		&& ActiveFrontendModule <= EHSRFrontendModule::Save))
+	if (FrontendModuleRootInstance || HSRFrontendModule::UsesSharedModuleRoot(ActiveFrontendModule))
 	{
 		const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter->GetSnapshot();
 		const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
@@ -1347,11 +1334,7 @@ void UHSRUIManagerSubsystem::ClearHostReferences()
 	FrontendModuleRootClass = nullptr;
 	CharacterDetailWidgetClass = nullptr;
 	InventoryWidgetClass = nullptr;
-	PartyWidgetClass = nullptr;
-	MapWidgetClass = nullptr;
-	ChallengeWidgetClass = nullptr;
-	QuestWidgetClass = nullptr;
-	SaveWidgetClass = nullptr;
+	FrontendModuleWidgetClasses.Reset();
 	FrontendModuleContentInstance = nullptr;
 	FrontendModuleContentModule = EHSRFrontendModule::None;
 	ActiveHostGeneration = 0;
@@ -1664,15 +1647,8 @@ bool UHSRUIManagerSubsystem::AttachFrontendModuleRootCandidate(UHSRFrontendModul
 
 TSubclassOf<UUserWidget> UHSRUIManagerSubsystem::GetFrontendModuleWidgetClass(const EHSRFrontendModule Module) const
 {
-	switch (Module)
-	{
-	case EHSRFrontendModule::Party: return PartyWidgetClass;
-	case EHSRFrontendModule::Map: return MapWidgetClass;
-	case EHSRFrontendModule::Challenge: return ChallengeWidgetClass;
-	case EHSRFrontendModule::Quest: return QuestWidgetClass;
-	case EHSRFrontendModule::Save: return SaveWidgetClass;
-	default: return nullptr;
-	}
+	const TSubclassOf<UUserWidget>* Found = FrontendModuleWidgetClasses.Find(Module);
+	return Found ? *Found : nullptr;
 }
 
 UUserWidget* UHSRUIManagerSubsystem::CreateFrontendModuleContentCandidate(

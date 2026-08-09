@@ -6,6 +6,7 @@
 #include "GameplayEffect.h"
 #include "GameplayTagContainer.h"
 #include "../GAS/Ability/HSRAbilityTypes.h"
+#include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "../GAS/Damage/HSRDamageRuleDefinition.h"
 #include "HSRBreakTypes.h"
 #include "HSRSkillDefinition.generated.h"
@@ -47,6 +48,14 @@ public:
 	 * commit; the DataAsset remains static configuration. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Costs", meta = (DisplayName = "Cost Gameplay Effect Class", ToolTip = "Ultimate Energy Cost only. GAS applies this Gameplay Effect; BattleCoordinator never writes Energy."))
 	TSoftClassPtr<UGameplayEffect> CostGameplayEffectClass;
+
+	/**
+	 * Energy this skill consumes, for display only -- GAS still applies CostGameplayEffectClass and
+	 * remains the authority on the actual spend. Leave at 0 to have the cost read back off that
+	 * effect's modifiers instead, which is what pre-existing assets rely on.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Costs", meta = (ClampMin = "0.0"))
+	float DisplayEnergyCost = 0.0f;
 
 	/** Instant positive-Energy GAS compensation used only when an Ultimate
 	 * cost committed but its prepared damage application failed. */
@@ -168,6 +177,65 @@ public:
 	{
 		const int32 Delta = GetSkillPointDelta();
 		return Delta < 0 ? -Delta : 0;
+	}
+
+	/**
+	 * Energy cost for display, and whether it is actually known.
+	 *
+	 * Prefers the authored DisplayEnergyCost. Falling back to reading CostGameplayEffectClass's
+	 * modifiers keeps assets authored before that field working, but it can only answer for the
+	 * unambiguous shape: exactly one additive Energy modifier with a static negative magnitude.
+	 * A curve-backed, SetByCaller, or multi-modifier cost has no single display value, and a
+	 * soft class that has not been loaded cannot be inspected at all -- both report false rather
+	 * than a fabricated zero, because a UI that renders "0" for an unknown cost reads as free.
+	 */
+	bool TryGetDisplayEnergyCost(float& OutCost) const
+	{
+		if (DisplayEnergyCost > 0.0f)
+		{
+			OutCost = DisplayEnergyCost;
+			return true;
+		}
+
+		const UClass* LoadedCostClass = CostGameplayEffectClass.Get();
+		const UGameplayEffect* CostEffect = LoadedCostClass ? LoadedCostClass->GetDefaultObject<UGameplayEffect>() : nullptr;
+		if (!CostEffect)
+		{
+			return false;
+		}
+
+		int32 EnergyModifierCount = 0;
+		float StaticEnergyMagnitude = 0.0f;
+		bool bUnambiguous = true;
+		for (const FGameplayModifierInfo& Modifier : CostEffect->Modifiers)
+		{
+			if (Modifier.Attribute != UHSRCoreAttributeSet::GetEnergyAttribute())
+			{
+				continue;
+			}
+
+			++EnergyModifierCount;
+			float Magnitude = 0.0f;
+			const bool bStaticNegativeAdditive = Modifier.ModifierOp == EGameplayModOp::Additive
+				&& Modifier.ModifierMagnitude.GetStaticMagnitudeIfPossible(1.0f, Magnitude)
+				&& Magnitude < 0.0f;
+			if (bStaticNegativeAdditive)
+			{
+				StaticEnergyMagnitude = Magnitude;
+			}
+			else
+			{
+				bUnambiguous = false;
+			}
+		}
+
+		if (EnergyModifierCount != 1 || !bUnambiguous)
+		{
+			return false;
+		}
+
+		OutCost = -StaticEnergyMagnitude;
+		return true;
 	}
 
 	/**

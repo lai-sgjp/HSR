@@ -41,11 +41,7 @@ public:
 		TSubclassOf<UHSRFrontendModuleRootWidget> InFrontendModuleRootClass,
 		TSubclassOf<UHSRScreenWidget> InCharacterDetailWidgetClass,
 		TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass,
-		TSubclassOf<UUserWidget> InPartyWidgetClass,
-		TSubclassOf<UUserWidget> InMapWidgetClass,
-		TSubclassOf<UUserWidget> InChallengeWidgetClass,
-		TSubclassOf<UUserWidget> InQuestWidgetClass,
-		TSubclassOf<UUserWidget> InSaveWidgetClass);
+		const TMap<EHSRFrontendModule, TSubclassOf<UUserWidget>>& InModuleWidgetClasses);
 	EHSRUIScreenResult UnregisterExplorationHost(AHSRHUD* HUD, AHSRPlayerController* PlayerController);
 	EHSRUIScreenResult TeardownExplorationHostForTravel(AHSRHUD* HUD, AHSRPlayerController* PlayerController);
 	EHSRUIScreenResult PrepareExplorationTravel();
@@ -229,20 +225,14 @@ private:
 	UPROPERTY(Transient)
 	TSubclassOf<UHSRInventoryWidget> InventoryWidgetClass;
 
+	/**
+	 * Content widget class per shared-ModuleRoot module. This replaced five parallel named
+	 * properties plus a switch that mapped each module to one of them: adding a module meant
+	 * touching the property block, the switch, the registration signature, and every caller.
+	 * A new module is now one more entry in the map the host passes in.
+	 */
 	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> PartyWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> MapWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> ChallengeWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> QuestWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> SaveWidgetClass;
+	TMap<EHSRFrontendModule, TSubclassOf<UUserWidget>> FrontendModuleWidgetClasses;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> FrontendModuleContentInstance;

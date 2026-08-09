@@ -1265,38 +1265,9 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 		View.bDescriptionIsPlaceholder = Definition->Description.IsEmpty();
 		View.SkillPointCost = Definition->GetSkillPointCost();
 		View.SkillPointDelta = Definition->GetSkillPointDelta();
-		if (Definition->Category == EHSRSkillCategory::Ultimate)
-		{
-			const UClass* LoadedCostClass = Definition->CostGameplayEffectClass.Get();
-			const UGameplayEffect* CostEffect = LoadedCostClass ? LoadedCostClass->GetDefaultObject<UGameplayEffect>() : nullptr;
-			if (CostEffect)
-			{
-				int32 EnergyModifierCount = 0;
-				float StaticEnergyMagnitude = 0.0f;
-				bool bStaticNegativeAdditiveEnergyOnly = true;
-				for (const FGameplayModifierInfo& Modifier : CostEffect->Modifiers)
-				{
-					if (Modifier.Attribute == UHSRCoreAttributeSet::GetEnergyAttribute())
-					{
-						++EnergyModifierCount;
-						float Magnitude = 0.0f;
-						if (Modifier.ModifierOp != EGameplayModOp::Additive || !Modifier.ModifierMagnitude.GetStaticMagnitudeIfPossible(1.0f, Magnitude) || Magnitude >= 0.0f)
-						{
-							bStaticNegativeAdditiveEnergyOnly = false;
-						}
-						else
-						{
-							StaticEnergyMagnitude = Magnitude;
-						}
-					}
-				}
-				if (EnergyModifierCount == 1 && bStaticNegativeAdditiveEnergyOnly)
-				{
-					View.EnergyCost = -StaticEnergyMagnitude;
-					View.bEnergyCostIsKnown = true;
-				}
-			}
-		}
+		float DisplayEnergyCost = 0.0f;
+		View.bEnergyCostIsKnown = Definition->TryGetDisplayEnergyCost(DisplayEnergyCost);
+		View.EnergyCost = View.bEnergyCostIsKnown ? DisplayEnergyCost : 0.0f;
 		View.CandidateTargetIds = FHSRTargetingPolicy::BuildCandidateTargetIds(*Definition, *Actor, Participants);
 		View.bAvailable = Definition->IsValidDefinition() && View.CandidateTargetIds.Num() > 0;
 		if (!Definition->IsValidDefinition()) View.DisabledReason = EHSRAbilityFailureReason::DefinitionMissing;

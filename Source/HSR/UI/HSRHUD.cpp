@@ -52,6 +52,17 @@ void AHSRHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+TMap<EHSRFrontendModule, TSubclassOf<UUserWidget>> AHSRHUD::BuildFrontendModuleWidgetClasses() const
+{
+	TMap<EHSRFrontendModule, TSubclassOf<UUserWidget>> Classes;
+	Classes.Add(EHSRFrontendModule::Party, PartyWidgetClass);
+	Classes.Add(EHSRFrontendModule::Map, MapWidgetClass);
+	Classes.Add(EHSRFrontendModule::Challenge, ChallengeWidgetClass);
+	Classes.Add(EHSRFrontendModule::Quest, QuestWidgetClass);
+	Classes.Add(EHSRFrontendModule::Save, SaveWidgetClass);
+	return Classes;
+}
+
 void AHSRHUD::ShowExplorationHUD()
 {
 	if (ExplorationWidgetInstance)
@@ -88,7 +99,7 @@ void AHSRHUD::ShowExplorationHUD()
 			{
 				UIManager->RegisterExplorationHost(this, HSRPC, ExplorationWidgetInstance, FrontendShellClass,
 					FrontendModuleRootClass, CharacterDetailWidgetClass, InventoryWidgetClass,
-					PartyWidgetClass, MapWidgetClass, ChallengeWidgetClass, QuestWidgetClass, SaveWidgetClass);
+					BuildFrontendModuleWidgetClasses());
 			}
 		}
 	}

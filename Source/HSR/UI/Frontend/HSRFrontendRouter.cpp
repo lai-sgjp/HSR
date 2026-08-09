@@ -2,7 +2,7 @@
 
 bool UHSRFrontendRouter::IsValidModule(const EHSRFrontendModule Module)
 {
-	return Module >= EHSRFrontendModule::PauseHub && Module <= EHSRFrontendModule::Save;
+	return HSRFrontendModule::IsAddressable(Module);
 }
 
 EHSRFrontendRouteResult UHSRFrontendRouter::Validate(const FHSRFrontendRouteRequest& Request)
