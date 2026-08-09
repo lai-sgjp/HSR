@@ -27,6 +27,10 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category="HSR|Character Detail")
 	void OnDetailSnapshotChanged(const FHSRCharacterDetailSnapshot& Snapshot);
 
+	/** Implement in the WBP to present an unavailable state without inventing a character snapshot. */
+	UFUNCTION(BlueprintImplementableEvent, Category="HSR|Character Detail")
+	void OnDetailUnavailable(EHSRCharacterDetailResult Result);
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
