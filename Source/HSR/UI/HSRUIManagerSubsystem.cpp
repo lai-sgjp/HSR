@@ -8,8 +8,12 @@
 #include "../Inventory/HSRInventorySubsystem.h"
 #include "../Reward/HSRRewardSubsystem.h"
 #include "../Map/HSRMapSubsystem.h"
+#include "../Battle/HSRBattleTransitionSubsystem.h"
 #include "HSRUserWidget.h"
 #include "HSRHUD.h"
+#include "Frontend/HSRFrontendRouter.h"
+#include "Frontend/HSRFrontendShellWidget.h"
+#include "Frontend/HSRFrontendModuleRootWidget.h"
 #include "../Player/HSRPlayerController.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/LocalPlayer.h"
@@ -32,9 +36,12 @@ void UHSRUIManagerSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	Super::Initialize(Collection);
 	ScreenStack = NewObject<UHSRScreenStack>(this);
 	InputModeCoordinator = NewObject<UHSRInputModeCoordinator>(this);
+	FrontendRouter = NewObject<UHSRFrontendRouter>(this);
 	NextRequestToken = 1;
+	NextFrontendRequestToken = 1;
 	bInitialized = true;
 	bInconsistent = false;
+	bInconsistencyIsTravelRecoverable = false;
 	if (UGameInstance* GameInstance = GetLocalPlayer() ? GetLocalPlayer()->GetGameInstance() : nullptr)
 	{
 		if (UHSRMapSubsystem* Maps = GameInstance->GetSubsystem<UHSRMapSubsystem>())
@@ -73,10 +80,16 @@ void UHSRUIManagerSubsystem::Deinitialize()
 		CharacterDetailWidgetInstance->RemoveFromParent();
 		CharacterDetailWidgetInstance = nullptr;
 	}
-	if (PauseWidgetInstance)
+	if (FrontendShellInstance)
 	{
-		PauseWidgetInstance->RemoveFromParent();
-		PauseWidgetInstance = nullptr;
+		FrontendShellInstance->RemoveFromParent();
+		FrontendShellInstance = nullptr;
+	}
+	if (FrontendModuleRootInstance)
+	{
+		ReleaseFrontendModuleContent();
+		FrontendModuleRootInstance->RemoveFromParent();
+		FrontendModuleRootInstance = nullptr;
 	}
 	if (PauseOwnerToken.IsValid())
 	{
@@ -91,6 +104,7 @@ void UHSRUIManagerSubsystem::Deinitialize()
 	PauseOwnerToken.Invalidate();
 	ClearHostReferences();
 	InputModeCoordinator = nullptr;
+	FrontendRouter = nullptr;
 	ScreenStack = nullptr;
 	bInitialized = false;
 	Super::Deinitialize();
@@ -112,9 +126,16 @@ int32 UHSRUIManagerSubsystem::GetLogicalScreenCount() const
 }
 
 EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
-	AHSRPlayerController* PlayerController, UHSRUserWidget* RootWidget, TSubclassOf<UHSRScreenWidget> InPauseWidgetClass,
-	TSubclassOf<UHSRCharacterDetailWidget> InCharacterDetailWidgetClass,
-	TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass)
+	AHSRPlayerController* PlayerController, UHSRUserWidget* RootWidget,
+	TSubclassOf<UHSRFrontendShellWidget> InFrontendShellClass,
+	TSubclassOf<UHSRFrontendModuleRootWidget> InFrontendModuleRootClass,
+	TSubclassOf<UHSRScreenWidget> InCharacterDetailWidgetClass,
+	TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass,
+	TSubclassOf<UUserWidget> InPartyWidgetClass,
+	TSubclassOf<UUserWidget> InMapWidgetClass,
+	TSubclassOf<UUserWidget> InChallengeWidgetClass,
+	TSubclassOf<UUserWidget> InQuestWidgetClass,
+	TSubclassOf<UUserWidget> InSaveWidgetClass)
 {
 	if (!bInitialized || !ScreenStack || !InputModeCoordinator)
 	{
@@ -127,18 +148,25 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
 	if (HasInventoryOwnershipMismatch())
 	{
 		bInconsistent = true;
+		bInconsistencyIsTravelRecoverable = false;
 		return EHSRUIScreenResult::Inconsistent;
 	}
 	if (RegisteredHUD.Get() == HUD && RegisteredPlayerController.Get() == PlayerController
 		&& RegisteredRootWidget.Get() == RootWidget)
 	{
-		PauseWidgetClass = InPauseWidgetClass;
+		FrontendShellClass = InFrontendShellClass;
+		FrontendModuleRootClass = InFrontendModuleRootClass;
 		CharacterDetailWidgetClass = InCharacterDetailWidgetClass;
 		InventoryWidgetClass = InInventoryWidgetClass;
+		PartyWidgetClass = InPartyWidgetClass;
+		MapWidgetClass = InMapWidgetClass;
+		ChallengeWidgetClass = InChallengeWidgetClass;
+		QuestWidgetClass = InQuestWidgetClass;
+		SaveWidgetClass = InSaveWidgetClass;
 		return EHSRUIScreenResult::NoOp;
 	}
-	if (RegisteredHUD.IsValid() || PauseWidgetInstance || CharacterDetailWidgetInstance || InventoryWidgetInstance
-		|| InventoryViewModelInstance)
+	if (RegisteredHUD.IsValid() || FrontendShellInstance || FrontendModuleContentInstance
+		|| CharacterDetailWidgetInstance || InventoryWidgetInstance || InventoryViewModelInstance)
 	{
 		return EHSRUIScreenResult::InvalidHost;
 	}
@@ -159,9 +187,18 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
 	RegisteredPlayerController = PlayerController;
 	RegisteredRootWidget = RootWidget;
 	ActiveHostGeneration = NextHostGeneration++;
-	PauseWidgetClass = InPauseWidgetClass;
+	FrontendShellClass = InFrontendShellClass;
+	FrontendModuleRootClass = InFrontendModuleRootClass;
 	CharacterDetailWidgetClass = InCharacterDetailWidgetClass;
 	InventoryWidgetClass = InInventoryWidgetClass;
+	PartyWidgetClass = InPartyWidgetClass;
+	MapWidgetClass = InMapWidgetClass;
+	ChallengeWidgetClass = InChallengeWidgetClass;
+	QuestWidgetClass = InQuestWidgetClass;
+	SaveWidgetClass = InSaveWidgetClass;
+	// Clear before restoring: a travel-scoped inconsistency would otherwise reject the restore
+	// and every later OpenFrontendModule call on this otherwise-healthy host.
+	TryClearRecoverableInconsistency();
 	TryRestoreTravelDescriptor();
 	return EHSRUIScreenResult::Success;
 }
@@ -183,11 +220,32 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownExplorationHostForTravel(AHSR
 	return CaptureAndTeardownTravelHost();
 }
 
+EHSRUIScreenResult UHSRUIManagerSubsystem::PrepareExplorationTravel()
+{
+	if (!bInitialized || bInconsistent)
+	{
+		return EHSRUIScreenResult::Inconsistent;
+	}
+	if (ActiveHostGeneration == 0)
+	{
+		return EHSRUIScreenResult::Success;
+	}
+	if (bTravelRestorePending)
+	{
+		return EHSRUIScreenResult::InvalidHost;
+	}
+	return CaptureAndTeardownTravelHost();
+}
+
 EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownCurrentHost()
 {
 	bool bRecovered = true;
 	AHSRPlayerController* PC = RegisteredPlayerController.Get();
 	UWorld* World = PC ? PC->GetWorld() : nullptr;
+	if (FrontendShellInstance)
+	{
+		bRecovered &= CloseFrontendToRoot() == EHSRUIScreenResult::Success;
+	}
 	if (InventoryWidgetInstance || InventoryViewModelInstance)
 	{
 		const EHSRUIScreenResult CloseResult = CloseInventoryScreen();
@@ -205,10 +263,6 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownCurrentHost()
 				InventoryViewModelInstance->Shutdown();
 				InventoryViewModelInstance = nullptr;
 			}
-			if (ScreenStack && ScreenStack->GetSnapshot().Entries.Num() > 1)
-			{
-				bRecovered &= ScreenStack->SubmitRequest(MakePopRequest(AllocateRequestToken())) == EHSRScreenStackResult::Success;
-			}
 			bRecovered &= ApplyInventoryPolicyBackend(PC, GetResolvedInputPolicy(), EHSRPlayerControlMode::Exploration);
 		}
 	}
@@ -220,21 +274,33 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownCurrentHost()
 		{
 			CharacterDetailWidgetInstance->RemoveFromParent();
 			CharacterDetailWidgetInstance = nullptr;
-			if (ScreenStack && ScreenStack->GetSnapshot().Entries.Num() > 1)
-			{
-				bRecovered &= ScreenStack->SubmitRequest(MakePopRequest(AllocateRequestToken())) == EHSRScreenStackResult::Success;
-			}
 			bRecovered &= ApplyCharacterDetailPolicyBackend(PC, GetResolvedInputPolicy(), EHSRPlayerControlMode::Exploration);
 		}
 	}
-	if (PauseWidgetInstance)
+	if (FrontendShellInstance)
 	{
 		const EHSRUIScreenResult CloseResult = RequestBack();
 		bRecovered &= CloseResult == EHSRUIScreenResult::Success;
-		if (PauseWidgetInstance)
+		if (FrontendShellInstance)
 		{
-			PauseWidgetInstance->RemoveFromParent();
-			PauseWidgetInstance = nullptr;
+			FrontendShellInstance->RemoveFromParent();
+			FrontendShellInstance = nullptr;
+			// The shell owns the module root; CloseFrontendToRoot() only reaches its own
+			// clear on the success path, so a forced shell teardown must release it here or
+			// the retired module root outlives the host and blocks every later recovery.
+			if (FrontendModuleRootInstance)
+			{
+				ReleaseFrontendModuleContent();
+				FrontendModuleRootInstance->RemoveFromParent();
+				FrontendModuleRootInstance = nullptr;
+			}
+			if (FrontendRouter)
+			{
+				FHSRFrontendRouteRequest ForcedClose;
+				ForcedClose.RequestToken = AllocateFrontendRequestToken();
+				ForcedClose.Operation = EHSRFrontendRouteOperation::CloseToRoot;
+				FrontendRouter->Submit(ForcedClose);
+			}
 			if (ScreenStack && ScreenStack->GetSnapshot().Entries.Num() > 1)
 			{
 				bRecovered &= ScreenStack->SubmitRequest(MakePopRequest(AllocateRequestToken())) == EHSRScreenStackResult::Success;
@@ -247,6 +313,9 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownCurrentHost()
 		}
 	}
 	PauseOwnerToken.Invalidate();
+	// Evaluate containment while the retired host is still observable: ClearHostReferences()
+	// zeroes ActiveHostGeneration, and IsAtCleanExplorationRoot() would then read a torn state.
+	const bool bContainedToRetiredHost = IsAtCleanExplorationRoot();
 	ClearHostReferences();
 #if WITH_DEV_AUTOMATION_TESTS
 	AutomationHostIdentity = 0;
@@ -255,7 +324,12 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownCurrentHost()
 	if (!bRecovered)
 	{
 		bInconsistent = true;
-		UE_LOG(LogTemp, Error, TEXT("HSRUI P17 Host teardown required forced cleanup; host references cleared"));
+		// Host references and module instances are cleared above, so if the stack is back at a
+		// clean root the damage is contained to the retired host and a fresh one can recover.
+		bInconsistencyIsTravelRecoverable = bContainedToRetiredHost;
+		UE_LOG(LogTemp, Error,
+			TEXT("HSRUI P17 Host teardown required forced cleanup; host references cleared Recoverable=%s Stack=%d"),
+			bContainedToRetiredHost ? TEXT("true") : TEXT("false"), GetLogicalScreenCount());
 		return EHSRUIScreenResult::Inconsistent;
 	}
 	return EHSRUIScreenResult::Success;
@@ -271,12 +345,13 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenPauseScreen()
 	{
 		return EHSRUIScreenResult::Inconsistent;
 	}
+	if (IsTravelPending()) return EHSRUIScreenResult::InvalidHost;
 	if (HasInventoryOwnershipMismatch())
 	{
 		bInconsistent = true;
 		return EHSRUIScreenResult::Inconsistent;
 	}
-	if (PauseWidgetInstance || CharacterDetailWidgetInstance || InventoryWidgetInstance)
+	if (FrontendShellInstance || CharacterDetailWidgetInstance || InventoryWidgetInstance)
 	{
 		return EHSRUIScreenResult::AlreadyOpen;
 	}
@@ -301,7 +376,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenPauseScreen()
 	{
 		return EHSRUIScreenResult::ExternalPause;
 	}
-	if (!PauseWidgetClass
+	if (!FrontendShellClass
 #if WITH_DEV_AUTOMATION_TESTS
 		&& !(bUseAutomationBackend && bAutomationHasPauseClass)
 #endif
@@ -310,13 +385,15 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenPauseScreen()
 		return EHSRUIScreenResult::MissingWidgetClass;
 	}
 
-	UHSRScreenWidget* Candidate = CreatePauseCandidate(PC);
+	UHSRFrontendShellWidget* Candidate = CreatePauseCandidate(PC);
 	if (!Candidate)
 	{
 		return EHSRUIScreenResult::WidgetCreationFailed;
 	}
 	Candidate->SetOwningUIManager(this);
 	const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
+	const FHSRScreenStackSnapshot OldStack = ScreenStack->GetSnapshot();
+	const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter ? FrontendRouter->GetSnapshot() : FHSRFrontendRouteSnapshot{};
 	const int64 OpenToken = AllocateRequestToken();
 	if (ScreenStack->SubmitRequest(MakePauseRequest(OpenToken)) != EHSRScreenStackResult::Success)
 	{
@@ -341,14 +418,43 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenPauseScreen()
 	}
 
 	PauseOwnerToken = FGuid::NewGuid();
-	PauseWidgetInstance = Candidate;
 	const EHSRFocusApplyResult FocusResult = ApplyFocusBackend(PC, Candidate->GetPreferredFocusWidget(), Candidate);
+	if (FocusResult == EHSRFocusApplyResult::Unavailable)
+	{
+		const bool bPauseRestored = ApplyPauseBackend(World, false);
+		const bool bPolicyRestored = ApplyPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::Exploration);
+		Candidate->RemoveFromParent();
+		ScreenStack->RestoreSnapshotForTransaction(OldStack);
+		if (FrontendRouter) FrontendRouter->RestoreSnapshotForTransaction(OldRoute);
+		PauseOwnerToken.Invalidate();
+		return ResolveCompensation(bPauseRestored && bPolicyRestored, EHSRUIScreenResult::FocusApplyFailed);
+	}
+	FHSRFrontendRouteRequest RouteRequest;
+	RouteRequest.RequestToken = AllocateFrontendRequestToken();
+	RouteRequest.Route.Module = EHSRFrontendModule::PauseHub;
+	if (!FrontendRouter || FrontendRouter->Submit(RouteRequest) != EHSRFrontendRouteResult::Success)
+	{
+		const bool bPauseRestored = ApplyPauseBackend(World, false);
+		const bool bPolicyRestored = ApplyPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::Exploration);
+		Candidate->RemoveFromParent();
+		ScreenStack->RestoreSnapshotForTransaction(OldStack);
+		if (FrontendRouter) FrontendRouter->RestoreSnapshotForTransaction(OldRoute);
+		PauseOwnerToken.Invalidate();
+		return ResolveCompensation(bPauseRestored && bPolicyRestored, EHSRUIScreenResult::StackRejected);
+	}
+	FrontendShellInstance = Candidate;
+	Candidate->PresentRoute(FrontendRouter->GetSnapshot());
 	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 OpenPause Success Token=%lld Stack=%d FocusResult=%d"),
 		OpenToken, GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
 	return EHSRUIScreenResult::Success;
 }
 
 EHSRUIScreenResult UHSRUIManagerSubsystem::OpenCharacterDetailScreen()
+{
+	return OpenFrontendModule(EHSRFrontendModule::Character);
+}
+
+EHSRUIScreenResult UHSRUIManagerSubsystem::OpenCharacterDetailInternal()
 {
 	if (!bInitialized || !ScreenStack || !InputModeCoordinator)
 	{
@@ -363,7 +469,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenCharacterDetailScreen()
 		bInconsistent = true;
 		return EHSRUIScreenResult::Inconsistent;
 	}
-	if (CharacterDetailWidgetInstance || PauseWidgetInstance || InventoryWidgetInstance)
+	if (CharacterDetailWidgetInstance)
 	{
 		return EHSRUIScreenResult::AlreadyOpen;
 	}
@@ -374,60 +480,114 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenCharacterDetailScreen()
 	{
 		return EHSRUIScreenResult::InvalidHost;
 	}
-	if (!IsBackendExploration(PC))
+	if (!IsBackendExploration(PC) && !PauseOwnerToken.IsValid())
 	{
 		return EHSRUIScreenResult::NotExploration;
 	}
 	const FHSRScreenStackSnapshot PreflightSnapshot = ScreenStack->GetSnapshot();
-	if (PreflightSnapshot.Entries.Num() != 1 || PreflightSnapshot.Entries[0].ScreenId != ExplorationRootId)
+	if (PreflightSnapshot.Entries.Num() != 2
+		|| PreflightSnapshot.Entries[0].ScreenId != ExplorationRootId
+		|| PreflightSnapshot.Entries.Last().ScreenId != PauseScreenId)
 	{
 		bInconsistent = true;
 		return EHSRUIScreenResult::Inconsistent;
 	}
-	if (!CharacterDetailWidgetClass
-#if WITH_DEV_AUTOMATION_TESTS
-		&& !(bUseAutomationBackend && bAutomationHasDetailClass)
-#endif
-	)
+	if (!HasModuleRootClass() || !HasCharacterDetailClass())
 	{
 		return EHSRUIScreenResult::MissingWidgetClass;
 	}
-	UHSRCharacterDetailWidget* Candidate = CreateCharacterDetailCandidate(PC);
+	UHSRScreenWidget* Candidate = CreateCharacterDetailCandidate(PC);
 	if (!Candidate)
 	{
 		return EHSRUIScreenResult::WidgetCreationFailed;
 	}
 	Candidate->SetOwningUIManager(this);
-	const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
-	const int64 OpenToken = AllocateRequestToken();
-	if (ScreenStack->SubmitRequest(MakeCharacterDetailRequest(OpenToken)) != EHSRScreenStackResult::Success)
+	UHSRFrontendModuleRootWidget* RootCandidate = CreateFrontendModuleRootCandidate(PC);
+	if (!RootCandidate)
 	{
-		return EHSRUIScreenResult::StackRejected;
+		return EHSRUIScreenResult::WidgetCreationFailed;
 	}
-	if (!AttachCharacterDetailCandidate(Candidate))
+	RootCandidate->SetOwningUIManager(this);
+	RootCandidate->PresentModule(EHSRFrontendModule::Character);
+	const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
+	const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter->GetSnapshot();
+	bool bContentAttached = false;
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend)
 	{
+		bContentAttached = bAutomationDetailAttachSucceeds;
+	}
+	else
+#endif
+	{
+		bContentAttached = RootCandidate->SetModuleContent(Candidate);
+	}
+	if (!bContentAttached || !AttachFrontendModuleRootCandidate(RootCandidate))
+	{
+		RootCandidate->ClearModuleContent();
+		RootCandidate->RemoveFromParent();
 		Candidate->RemoveFromParent();
-		const bool bPop = ScreenStack->SubmitRequest(MakePopRequest(AllocateRequestToken())) == EHSRScreenStackResult::Success;
-		const bool bRestore = ApplyCharacterDetailPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::Exploration);
-		if (!bPop || !bRestore) { bInconsistent = true; return EHSRUIScreenResult::CompensationFailed; }
+		const bool bRestore = ApplyCharacterDetailPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+		if (!bRestore) { bInconsistent = true; return EHSRUIScreenResult::CompensationFailed; }
 		return EHSRUIScreenResult::ViewportAttachFailed;
 	}
 	if (!ApplyCharacterDetailPolicyBackend(PC, GetResolvedInputPolicy(), EHSRPlayerControlMode::UIOnly))
 	{
+		RootCandidate->ClearModuleContent();
+		RootCandidate->RemoveFromParent();
 		Candidate->RemoveFromParent();
-		const bool bPop = ScreenStack->SubmitRequest(MakePopRequest(AllocateRequestToken())) == EHSRScreenStackResult::Success;
-		const bool bRestore = ApplyCharacterDetailPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::Exploration);
-		if (!bPop || !bRestore) { bInconsistent = true; return EHSRUIScreenResult::CompensationFailed; }
+		const bool bRestore = ApplyCharacterDetailPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+		if (!bRestore) { bInconsistent = true; return EHSRUIScreenResult::CompensationFailed; }
 		return EHSRUIScreenResult::PolicyApplyFailed;
 	}
-	CharacterDetailWidgetInstance = Candidate;
 	const EHSRFocusApplyResult FocusResult = ApplyCharacterDetailFocusBackend(PC, Candidate->GetPreferredFocusWidget(), Candidate);
-	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 CharacterDetail Open Success Token=%lld Stack=%d FocusResult=%d"),
-		OpenToken, GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
+	if (FocusResult == EHSRFocusApplyResult::Unavailable)
+	{
+		RootCandidate->ClearModuleContent();
+		RootCandidate->RemoveFromParent();
+		Candidate->RemoveFromParent();
+		const bool bPolicyRestored = ApplyCharacterDetailPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+		return ResolveCompensation(bPolicyRestored, EHSRUIScreenResult::FocusApplyFailed);
+	}
+	if (FrontendRouter && FrontendShellInstance)
+	{
+		FHSRFrontendRouteRequest RouteRequest; RouteRequest.RequestToken = AllocateFrontendRequestToken(); RouteRequest.Route.Module = EHSRFrontendModule::Character;
+		if (SubmitFrontendRoute(RouteRequest) != EHSRFrontendRouteResult::Success)
+		{
+			RootCandidate->ClearModuleContent();
+			RootCandidate->RemoveFromParent();
+			Candidate->RemoveFromParent();
+			FrontendRouter->RestoreSnapshotForTransaction(OldRoute);
+			const bool bPolicyRestored = ApplyCharacterDetailPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+			const bool bFocusRestored = RestoreFrontendModuleFocus(PC, OldRoute.GetActiveRoute().Module);
+			return ResolveCompensation(bPolicyRestored && bFocusRestored, EHSRUIScreenResult::StackRejected);
+		}
+		FrontendShellInstance->PresentRoute(FrontendRouter->GetSnapshot());
+	}
+	if (FrontendModuleRootInstance)
+	{
+		ReleaseFrontendModuleContent();
+		FrontendModuleRootInstance->RemoveFromParent();
+		FrontendModuleRootInstance = nullptr;
+	}
+	if (InventoryWidgetInstance)
+	{
+		InventoryWidgetInstance->SetViewModel(nullptr); InventoryWidgetInstance->RemoveFromParent(); InventoryWidgetInstance = nullptr;
+		UHSRInventoryRewardViewModel* OldVM = InventoryViewModelInstance; InventoryViewModelInstance = nullptr; ShutdownInventoryViewModelCandidate(OldVM);
+	}
+	FrontendModuleRootInstance = RootCandidate;
+	CharacterDetailWidgetInstance = Candidate;
+	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 CharacterDetail Open Success Stack=%d FocusResult=%d"),
+		GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
 	return EHSRUIScreenResult::Success;
 }
 
 EHSRUIScreenResult UHSRUIManagerSubsystem::OpenInventoryScreen()
+{
+	return OpenFrontendModule(EHSRFrontendModule::Inventory);
+}
+
+EHSRUIScreenResult UHSRUIManagerSubsystem::OpenInventoryInternal()
 {
 	if (!bInitialized || !ScreenStack || !InputModeCoordinator) return EHSRUIScreenResult::NotInitialized;
 	if (bInconsistent) return EHSRUIScreenResult::Inconsistent;
@@ -436,23 +596,24 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenInventoryScreen()
 		bInconsistent = true;
 		return EHSRUIScreenResult::Inconsistent;
 	}
-	if (PauseWidgetInstance || CharacterDetailWidgetInstance || InventoryWidgetInstance) return EHSRUIScreenResult::AlreadyOpen;
+	if (InventoryWidgetInstance) return EHSRUIScreenResult::AlreadyOpen;
 	AHSRPlayerController* PC = RegisteredPlayerController.Get();
 	UHSRUserWidget* RootWidget = RegisteredRootWidget.Get();
 	UWorld* World = PC ? PC->GetWorld() : nullptr;
 	if (!IsBackendHostValid(PC, RootWidget, World)) return EHSRUIScreenResult::InvalidHost;
-	if (!IsBackendExploration(PC)) return EHSRUIScreenResult::NotExploration;
+	if (!IsBackendExploration(PC) && !PauseOwnerToken.IsValid()) return EHSRUIScreenResult::NotExploration;
 	const FHSRScreenStackSnapshot Preflight = ScreenStack->GetSnapshot();
-	if (Preflight.Entries.Num() != 1 || Preflight.Entries[0].ScreenId != ExplorationRootId)
+	if (Preflight.Entries.Num() != 2
+		|| Preflight.Entries[0].ScreenId != ExplorationRootId
+		|| Preflight.Entries.Last().ScreenId != PauseScreenId)
 	{
 		bInconsistent = true;
 		return EHSRUIScreenResult::Inconsistent;
 	}
-	if (!InventoryWidgetClass
-#if WITH_DEV_AUTOMATION_TESTS
-		&& !(bUseAutomationBackend && bAutomationHasInventoryClass)
-#endif
-	) return EHSRUIScreenResult::MissingWidgetClass;
+	if (!HasModuleRootClass() || !HasInventoryClass())
+	{
+		return EHSRUIScreenResult::MissingWidgetClass;
+	}
 
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend && !bAutomationInventoryDependenciesSucceed)
@@ -497,34 +658,90 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenInventoryScreen()
 	}
 	Candidate->SetOwningUIManager(this);
 	Candidate->SetViewModel(ViewModelCandidate);
-	const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
-	const int64 OpenToken = AllocateRequestToken();
-	if (ScreenStack->SubmitRequest(MakeInventoryRequest(OpenToken)) != EHSRScreenStackResult::Success)
+#if WITH_DEV_AUTOMATION_TESTS
+	// Automation widgets are NewObject'd and never enter the UMG construct path, so
+	// SetViewModel's IsConstructed() guard skips the bind. Real attach reaches it via
+	// NativeConstruct; mirror that here so bind/unbind accounting matches production.
+	if (bUseAutomationBackend)
 	{
-		ReleaseInventoryCandidates(Candidate, ViewModelCandidate);
-		return EHSRUIScreenResult::StackRejected;
+		Candidate->AttachForAutomation();
 	}
-	if (!AttachInventoryCandidate(Candidate))
+#endif
+	UHSRFrontendModuleRootWidget* RootCandidate = CreateFrontendModuleRootCandidate(PC);
+	if (!RootCandidate)
 	{
 		ReleaseInventoryCandidates(Candidate, ViewModelCandidate);
-		const bool bPop = ScreenStack->SubmitRequest(MakePopRequest(AllocateRequestToken())) == EHSRScreenStackResult::Success;
-		const bool bRestore = ApplyInventoryPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::Exploration);
-		if (!bPop || !bRestore) { bInconsistent = true; return EHSRUIScreenResult::CompensationFailed; }
+		return EHSRUIScreenResult::WidgetCreationFailed;
+	}
+	RootCandidate->SetOwningUIManager(this);
+	RootCandidate->PresentModule(EHSRFrontendModule::Inventory);
+	const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
+	const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter->GetSnapshot();
+	bool bContentAttached = false;
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend)
+	{
+		bContentAttached = bAutomationInventoryAttachSucceeds;
+	}
+	else
+#endif
+	{
+		bContentAttached = RootCandidate->SetModuleContent(Candidate);
+	}
+	if (!bContentAttached || !AttachFrontendModuleRootCandidate(RootCandidate))
+	{
+		RootCandidate->ClearModuleContent();
+		RootCandidate->RemoveFromParent();
+		ReleaseInventoryCandidates(Candidate, ViewModelCandidate);
+		const bool bRestore = ApplyInventoryPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+		if (!bRestore) { bInconsistent = true; return EHSRUIScreenResult::CompensationFailed; }
 		return EHSRUIScreenResult::ViewportAttachFailed;
 	}
 	if (!ApplyInventoryPolicyBackend(PC, GetResolvedInputPolicy(), EHSRPlayerControlMode::UIOnly))
 	{
+		RootCandidate->ClearModuleContent();
+		RootCandidate->RemoveFromParent();
 		ReleaseInventoryCandidates(Candidate, ViewModelCandidate);
-		const bool bPop = ScreenStack->SubmitRequest(MakePopRequest(AllocateRequestToken())) == EHSRScreenStackResult::Success;
-		const bool bRestore = ApplyInventoryPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::Exploration);
-		if (!bPop || !bRestore) { bInconsistent = true; return EHSRUIScreenResult::CompensationFailed; }
+		const bool bRestore = ApplyInventoryPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+		if (!bRestore) { bInconsistent = true; return EHSRUIScreenResult::CompensationFailed; }
 		return EHSRUIScreenResult::PolicyApplyFailed;
 	}
+	const EHSRFocusApplyResult FocusResult = ApplyInventoryFocusBackend(PC, Candidate->GetPreferredFocusWidget(), Candidate);
+	if (FocusResult == EHSRFocusApplyResult::Unavailable)
+	{
+		RootCandidate->ClearModuleContent();
+		RootCandidate->RemoveFromParent();
+		ReleaseInventoryCandidates(Candidate, ViewModelCandidate);
+		const bool bPolicyRestored = ApplyInventoryPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+		return ResolveCompensation(bPolicyRestored, EHSRUIScreenResult::FocusApplyFailed);
+	}
+	if (FrontendRouter && FrontendShellInstance)
+	{
+		FHSRFrontendRouteRequest RouteRequest; RouteRequest.RequestToken = AllocateFrontendRequestToken(); RouteRequest.Route.Module = EHSRFrontendModule::Inventory;
+		if (SubmitFrontendRoute(RouteRequest) != EHSRFrontendRouteResult::Success)
+		{
+			RootCandidate->ClearModuleContent();
+			RootCandidate->RemoveFromParent();
+			ReleaseInventoryCandidates(Candidate, ViewModelCandidate);
+			FrontendRouter->RestoreSnapshotForTransaction(OldRoute);
+			const bool bPolicyRestored = ApplyInventoryPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+			const bool bFocusRestored = RestoreFrontendModuleFocus(PC, OldRoute.GetActiveRoute().Module);
+			return ResolveCompensation(bPolicyRestored && bFocusRestored, EHSRUIScreenResult::StackRejected);
+		}
+		FrontendShellInstance->PresentRoute(FrontendRouter->GetSnapshot());
+	}
+	if (FrontendModuleRootInstance)
+	{
+		ReleaseFrontendModuleContent();
+		FrontendModuleRootInstance->RemoveFromParent();
+		FrontendModuleRootInstance = nullptr;
+	}
+	if (CharacterDetailWidgetInstance) { CharacterDetailWidgetInstance->RemoveFromParent(); CharacterDetailWidgetInstance = nullptr; }
+	FrontendModuleRootInstance = RootCandidate;
 	InventoryWidgetInstance = Candidate;
 	InventoryViewModelInstance = ViewModelCandidate;
-	const EHSRFocusApplyResult FocusResult = ApplyInventoryFocusBackend(PC, Candidate->GetPreferredFocusWidget(), Candidate);
-	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Inventory Open Success Token=%lld Stack=%d FocusResult=%d"),
-		OpenToken, GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
+	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Inventory Open Success Stack=%d FocusResult=%d"),
+		GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
 	return EHSRUIScreenResult::Success;
 }
 
@@ -548,60 +765,330 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 	{
 		return EHSRUIScreenResult::NothingOpen;
 	}
+	const EHSRFrontendModule ActiveFrontendModule = FrontendRouter
+		? FrontendRouter->GetSnapshot().GetActiveRoute().Module : EHSRFrontendModule::None;
+	if (FrontendModuleRootInstance || (ActiveFrontendModule >= EHSRFrontendModule::Party
+		&& ActiveFrontendModule <= EHSRFrontendModule::Save))
+	{
+		const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter->GetSnapshot();
+		const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
+		const auto ApplyActiveModulePolicy = [this, ActiveFrontendModule](const FHSRInputModePolicy& Policy)
+		{
+			switch (ActiveFrontendModule)
+			{
+			case EHSRFrontendModule::Character:
+				return ApplyCharacterDetailPolicyBackend(RegisteredPlayerController.Get(), Policy, EHSRPlayerControlMode::UIOnly);
+			case EHSRFrontendModule::Inventory:
+				return ApplyInventoryPolicyBackend(RegisteredPlayerController.Get(), Policy, EHSRPlayerControlMode::UIOnly);
+			default:
+				return ApplyPolicyBackend(RegisteredPlayerController.Get(), Policy, EHSRPlayerControlMode::UIOnly);
+			}
+		};
+		const auto ApplyActiveModuleFocus = [this, ActiveFrontendModule]()
+		{
+			switch (ActiveFrontendModule)
+			{
+			case EHSRFrontendModule::Character:
+				return ApplyCharacterDetailFocusBackend(RegisteredPlayerController.Get(), FrontendShellInstance, FrontendShellInstance);
+			case EHSRFrontendModule::Inventory:
+				return ApplyInventoryFocusBackend(RegisteredPlayerController.Get(), FrontendShellInstance, FrontendShellInstance);
+			default:
+				return ApplyFocusBackend(RegisteredPlayerController.Get(), FrontendShellInstance->GetPreferredFocusWidget(), FrontendShellInstance);
+			}
+		};
+		if (!ApplyActiveModulePolicy(GetResolvedInputPolicy()))
+		{
+			const bool bPolicyRestored = ApplyActiveModulePolicy(OldPolicy);
+			return ResolveCompensation(bPolicyRestored, EHSRUIScreenResult::PolicyApplyFailed);
+		}
+		if (ApplyActiveModuleFocus() == EHSRFocusApplyResult::Unavailable)
+		{
+			const bool bPolicyRestored = ApplyActiveModulePolicy(OldPolicy);
+			return ResolveCompensation(bPolicyRestored, EHSRUIScreenResult::FocusApplyFailed);
+		}
+		FHSRFrontendRouteRequest RouteRequest;
+		RouteRequest.RequestToken = AllocateFrontendRequestToken();
+		RouteRequest.Operation = EHSRFrontendRouteOperation::Back;
+		if (!FrontendRouter || SubmitFrontendRoute(RouteRequest) != EHSRFrontendRouteResult::Success)
+		{
+			if (FrontendRouter) FrontendRouter->RestoreSnapshotForTransaction(OldRoute);
+			const bool bPolicyRestored = ApplyActiveModulePolicy(OldPolicy);
+			const bool bFocusRestored = RestoreFrontendModuleFocus(RegisteredPlayerController.Get(), ActiveFrontendModule);
+			return ResolveCompensation(bPolicyRestored && bFocusRestored, EHSRUIScreenResult::StackRejected);
+		}
+		if (FrontendModuleRootInstance)
+		{
+			ReleaseFrontendModuleContent();
+			FrontendModuleRootInstance->RemoveFromParent();
+		}
+		FrontendModuleRootInstance = nullptr;
+		FrontendModuleContentModule = EHSRFrontendModule::None;
+		if (ActiveFrontendModule == EHSRFrontendModule::Character)
+		{
+			CharacterDetailWidgetInstance = nullptr;
+		}
+		else if (ActiveFrontendModule == EHSRFrontendModule::Inventory)
+		{
+			if (InventoryWidgetInstance)
+			{
+				InventoryWidgetInstance->SetViewModel(nullptr);
+#if WITH_DEV_AUTOMATION_TESTS
+				LastReleasedInventoryBindCount = InventoryWidgetInstance->GetBindCountForAutomation();
+				LastReleasedInventoryUnbindCount = InventoryWidgetInstance->GetUnbindCountForAutomation();
+#endif
+				InventoryWidgetInstance = nullptr;
+			}
+			UHSRInventoryRewardViewModel* ViewModelToShutdown = InventoryViewModelInstance;
+			InventoryViewModelInstance = nullptr;
+			ShutdownInventoryViewModelCandidate(ViewModelToShutdown);
+		}
+		FrontendShellInstance->PresentRoute(FrontendRouter->GetSnapshot());
+		// A module reopened by travel restore has no shell layer beneath it to fall back to, so
+		// backing out of it must land on the root rather than leaving the shell on the stack.
+		if (bTravelRestoredModule)
+		{
+			bTravelRestoredModule = false;
+			return CloseFrontendToRoot();
+		}
+		return EHSRUIScreenResult::Success;
+	}
+	if (ActiveFrontendModule == EHSRFrontendModule::Inventory)
+	{
+		if (!InventoryWidgetInstance || !InventoryViewModelInstance || CharacterDetailWidgetInstance)
+		{
+			bInconsistent = true;
+			return EHSRUIScreenResult::Inconsistent;
+		}
+		const EHSRUIScreenResult Result = CloseInventoryScreen();
+		if (Result == EHSRUIScreenResult::Success && bTravelRestoredModule)
+		{
+			bTravelRestoredModule = false;
+			return CloseFrontendToRoot();
+		}
+		return Result;
+	}
+	if (ActiveFrontendModule == EHSRFrontendModule::Character)
+	{
+		if (!CharacterDetailWidgetInstance || InventoryWidgetInstance)
+		{
+			bInconsistent = true;
+			return EHSRUIScreenResult::Inconsistent;
+		}
+		const EHSRUIScreenResult Result = CloseCharacterDetailScreen();
+		if (Result == EHSRUIScreenResult::Success && bTravelRestoredModule)
+		{
+			bTravelRestoredModule = false;
+			return CloseFrontendToRoot();
+		}
+		return Result;
+	}
 	const FName TopId = Snapshot.Entries.Last().ScreenId;
-	if (TopId == InventoryScreenId)
-	{
-		if (!InventoryWidgetInstance || !InventoryViewModelInstance || PauseWidgetInstance || CharacterDetailWidgetInstance)
-		{
-			bInconsistent = true;
-			return EHSRUIScreenResult::Inconsistent;
-		}
-		return CloseInventoryScreen();
-	}
-	if (TopId == CharacterDetailScreenId)
-	{
-		if (!CharacterDetailWidgetInstance || PauseWidgetInstance || InventoryWidgetInstance)
-		{
-			bInconsistent = true;
-			return EHSRUIScreenResult::Inconsistent;
-		}
-		return CloseCharacterDetailScreen();
-	}
-	if (TopId != PauseScreenId || !PauseWidgetInstance || !PauseOwnerToken.IsValid()
+	if (TopId != PauseScreenId || ActiveFrontendModule != EHSRFrontendModule::PauseHub
+		|| !FrontendShellInstance || !PauseOwnerToken.IsValid()
 		|| CharacterDetailWidgetInstance || InventoryWidgetInstance)
 	{
+		UE_LOG(LogTemp, Error, TEXT("HSRUI Frontend hub close invariant Top=%s Shell=%s PauseOwner=%s Character=%s Inventory=%s"),
+			*TopId.ToString(), FrontendShellInstance ? TEXT("true") : TEXT("false"),
+			PauseOwnerToken.IsValid() ? TEXT("true") : TEXT("false"),
+			CharacterDetailWidgetInstance ? TEXT("true") : TEXT("false"), InventoryWidgetInstance ? TEXT("true") : TEXT("false"));
 		bInconsistent = true;
 		return EHSRUIScreenResult::Inconsistent;
 	}
+	return CloseFrontendToRoot();
+}
+
+EHSRUIScreenResult UHSRUIManagerSubsystem::OpenFrontendModule(const EHSRFrontendModule Module)
+{
+	if (Module == EHSRFrontendModule::None) return EHSRUIScreenResult::StackRejected;
+	bool bOpenedShell = false;
+	if (!FrontendShellInstance)
+	{
+		const EHSRUIScreenResult ShellResult = OpenPauseScreen();
+		if (ShellResult != EHSRUIScreenResult::Success) return ShellResult;
+		bOpenedShell = true;
+	}
+	if (Module == EHSRFrontendModule::PauseHub)
+	{
+		if (bOpenedShell) return EHSRUIScreenResult::Success;
+		return FrontendRouter && FrontendRouter->GetSnapshot().GetActiveRoute().Module == EHSRFrontendModule::PauseHub
+			? EHSRUIScreenResult::NoOp : RequestBack();
+	}
+	if (FrontendRouter && FrontendRouter->GetSnapshot().GetActiveRoute().Module == Module)
+	{
+		FHSRFrontendRouteRequest NoOpRequest; NoOpRequest.RequestToken = AllocateFrontendRequestToken(); NoOpRequest.Route.Module = Module;
+		return FrontendRouter->Submit(NoOpRequest) == EHSRFrontendRouteResult::NoOp
+			? EHSRUIScreenResult::NoOp : EHSRUIScreenResult::StackRejected;
+	}
+	const auto CompleteModuleAttempt = [this, bOpenedShell](const EHSRUIScreenResult Result)
+	{
+		if (bOpenedShell && Result != EHSRUIScreenResult::Success && Result != EHSRUIScreenResult::NoOp)
+		{
+			if (CloseFrontendToRoot() != EHSRUIScreenResult::Success)
+			{
+				bInconsistent = true;
+				return EHSRUIScreenResult::CompensationFailed;
+			}
+		}
+		return Result;
+	};
+	switch (Module)
+	{
+	case EHSRFrontendModule::Character:
+		return CompleteModuleAttempt(OpenCharacterDetailInternal());
+	case EHSRFrontendModule::Inventory:
+		return CompleteModuleAttempt(OpenInventoryInternal());
+	case EHSRFrontendModule::Party:
+	case EHSRFrontendModule::Map:
+	case EHSRFrontendModule::Challenge:
+	case EHSRFrontendModule::Quest:
+	case EHSRFrontendModule::Save:
+	{
+#if WITH_DEV_AUTOMATION_TESTS
+		if ((!bUseAutomationBackend && (!FrontendModuleRootClass || !GetFrontendModuleWidgetClass(Module)))
+			|| (bUseAutomationBackend && !bAutomationHasFrontendModuleClass))
+#else
+		if (!FrontendModuleRootClass || !GetFrontendModuleWidgetClass(Module))
+#endif
+		{
+			return CompleteModuleAttempt(EHSRUIScreenResult::MissingWidgetClass);
+		}
+		UHSRFrontendModuleRootWidget* RootCandidate = CreateFrontendModuleRootCandidate(RegisteredPlayerController.Get());
+		if (!RootCandidate) return CompleteModuleAttempt(EHSRUIScreenResult::WidgetCreationFailed);
+		UUserWidget* ContentCandidate = CreateFrontendModuleContentCandidate(RegisteredPlayerController.Get(), Module);
+		if (!ContentCandidate)
+		{
+			RootCandidate->RemoveFromParent();
+			return CompleteModuleAttempt(EHSRUIScreenResult::WidgetCreationFailed);
+		}
+		RootCandidate->SetOwningUIManager(this);
+		if (UHSRScreenWidget* ScreenContent = Cast<UHSRScreenWidget>(ContentCandidate))
+		{
+			ScreenContent->SetOwningUIManager(this);
+		}
+		RootCandidate->PresentModule(Module);
+		const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter->GetSnapshot();
+		const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
+		if (!AttachFrontendModuleContentCandidate(RootCandidate, ContentCandidate)
+			|| !AttachFrontendModuleRootCandidate(RootCandidate))
+		{
+			RootCandidate->ClearModuleContent();
+			RootCandidate->RemoveFromParent();
+			ContentCandidate->RemoveFromParent();
+			return CompleteModuleAttempt(EHSRUIScreenResult::ViewportAttachFailed);
+		}
+		if (!ApplyPolicyBackend(RegisteredPlayerController.Get(), GetResolvedInputPolicy(), EHSRPlayerControlMode::UIOnly))
+		{
+			RootCandidate->ClearModuleContent();
+			RootCandidate->RemoveFromParent();
+			ContentCandidate->RemoveFromParent();
+			const bool bPolicyRestored = ApplyPolicyBackend(RegisteredPlayerController.Get(), OldPolicy, EHSRPlayerControlMode::UIOnly);
+			return CompleteModuleAttempt(ResolveCompensation(bPolicyRestored, EHSRUIScreenResult::PolicyApplyFailed));
+		}
+		if (ApplyFocusBackend(RegisteredPlayerController.Get(), RootCandidate->GetPreferredFocusWidget(), RootCandidate) == EHSRFocusApplyResult::Unavailable)
+		{
+			RootCandidate->ClearModuleContent();
+			RootCandidate->RemoveFromParent();
+			ContentCandidate->RemoveFromParent();
+			const bool bPolicyRestored = ApplyPolicyBackend(RegisteredPlayerController.Get(), OldPolicy, EHSRPlayerControlMode::UIOnly);
+			return CompleteModuleAttempt(ResolveCompensation(bPolicyRestored, EHSRUIScreenResult::FocusApplyFailed));
+		}
+		FHSRFrontendRouteRequest RouteRequest;
+		RouteRequest.RequestToken = AllocateFrontendRequestToken();
+		RouteRequest.Route.Module = Module;
+		const EHSRFrontendRouteResult RouteResult = SubmitFrontendRoute(RouteRequest);
+		if (RouteResult != EHSRFrontendRouteResult::Success && RouteResult != EHSRFrontendRouteResult::NoOp)
+		{
+			RootCandidate->ClearModuleContent();
+			RootCandidate->RemoveFromParent();
+			ContentCandidate->RemoveFromParent();
+			FrontendRouter->RestoreSnapshotForTransaction(OldRoute);
+			const bool bPolicyRestored = ApplyPolicyBackend(RegisteredPlayerController.Get(), OldPolicy, EHSRPlayerControlMode::UIOnly);
+			const bool bFocusRestored = RestoreFrontendModuleFocus(
+				RegisteredPlayerController.Get(), OldRoute.GetActiveRoute().Module);
+			return CompleteModuleAttempt(ResolveCompensation(
+				bPolicyRestored && bFocusRestored, EHSRUIScreenResult::StackRejected));
+		}
+		ReleaseFrontendModuleContent();
+		if (FrontendModuleRootInstance)
+		{
+			FrontendModuleRootInstance->RemoveFromParent();
+			FrontendModuleRootInstance = nullptr;
+		}
+		if (CharacterDetailWidgetInstance) { CharacterDetailWidgetInstance->RemoveFromParent(); CharacterDetailWidgetInstance = nullptr; }
+		if (InventoryWidgetInstance)
+		{
+			InventoryWidgetInstance->SetViewModel(nullptr); InventoryWidgetInstance->RemoveFromParent(); InventoryWidgetInstance = nullptr;
+			UHSRInventoryRewardViewModel* OldVM = InventoryViewModelInstance; InventoryViewModelInstance = nullptr; ShutdownInventoryViewModelCandidate(OldVM);
+		}
+		FrontendModuleRootInstance = RootCandidate;
+		FrontendModuleContentInstance = ContentCandidate;
+		FrontendModuleContentModule = Module;
+		FrontendShellInstance->PresentRoute(FrontendRouter->GetSnapshot());
+		return RouteResult == EHSRFrontendRouteResult::NoOp ? EHSRUIScreenResult::NoOp : EHSRUIScreenResult::Success;
+	}
+	case EHSRFrontendModule::None:
+	default:
+		return EHSRUIScreenResult::StackRejected;
+	}
+}
+
+EHSRUIScreenResult UHSRUIManagerSubsystem::CloseFrontendToRoot()
+{
+	if (!FrontendShellInstance) return EHSRUIScreenResult::NothingOpen;
 	AHSRPlayerController* PC = RegisteredPlayerController.Get();
 	UHSRUserWidget* RootWidget = RegisteredRootWidget.Get();
 	UWorld* World = PC ? PC->GetWorld() : nullptr;
-	if (!IsBackendHostValid(PC, RootWidget, World))
-	{
-		return EHSRUIScreenResult::InvalidHost;
-	}
-
-	const int64 CloseToken = AllocateRequestToken();
-	if (ScreenStack->SubmitRequest(MakePopRequest(CloseToken)) != EHSRScreenStackResult::Success)
-	{
+	if (!IsBackendHostValid(PC, RootWidget, World)) return EHSRUIScreenResult::InvalidHost;
+	const FHSRScreenStackSnapshot OldStack = ScreenStack->GetSnapshot();
+	const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter ? FrontendRouter->GetSnapshot() : FHSRFrontendRouteSnapshot{};
+	const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
+	const FHSRScreenRequest CloseRequest{AllocateRequestToken(), EHSRScreenStackOperation::CloseToRoot};
+	const EHSRScreenStackResult StackResult = ScreenStack->SubmitRequest(CloseRequest);
+	if (StackResult != EHSRScreenStackResult::Success && StackResult != EHSRScreenStackResult::NoOp)
 		return EHSRUIScreenResult::StackRejected;
-	}
-	const FHSRInputModePolicy RootPolicy = GetResolvedInputPolicy();
-	if (!ApplyPolicyBackend(PC, RootPolicy, EHSRPlayerControlMode::Exploration))
+	if (!ApplyPolicyBackend(PC, GetResolvedInputPolicy(), EHSRPlayerControlMode::Exploration))
 	{
-		return CompensatePausePush(PC) ? EHSRUIScreenResult::PolicyApplyFailed : EHSRUIScreenResult::CompensationFailed;
+		ScreenStack->RestoreSnapshotForTransaction(OldStack);
+		const bool bPolicyRestored = ApplyPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+		return ResolveCompensation(bPolicyRestored, EHSRUIScreenResult::PolicyApplyFailed);
 	}
-	if (IsBackendPaused(World) && !ApplyPauseBackend(World, false))
+	if (PauseOwnerToken.IsValid() && IsBackendPaused(World) && !ApplyPauseBackend(World, false))
 	{
-		return CompensatePausePush(PC) ? EHSRUIScreenResult::PauseApplyFailed : EHSRUIScreenResult::CompensationFailed;
+		ScreenStack->RestoreSnapshotForTransaction(OldStack);
+		const bool bPolicyRestored = ApplyPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+		return ResolveCompensation(bPolicyRestored, EHSRUIScreenResult::PauseApplyFailed);
 	}
-
-	PauseWidgetInstance->RemoveFromParent();
-	PauseWidgetInstance = nullptr;
+	if (ApplyFocusBackend(PC, RootWidget, RootWidget) == EHSRFocusApplyResult::Unavailable)
+	{
+		const bool bPauseRestored = ApplyPauseBackend(World, true); ScreenStack->RestoreSnapshotForTransaction(OldStack);
+		const bool bPolicyRestored = ApplyPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+		return ResolveCompensation(bPauseRestored && bPolicyRestored, EHSRUIScreenResult::FocusApplyFailed);
+	}
+	FHSRFrontendRouteRequest RouteRequest;
+	RouteRequest.RequestToken = AllocateFrontendRequestToken();
+	RouteRequest.Operation = EHSRFrontendRouteOperation::CloseToRoot;
+	if (!FrontendRouter || (FrontendRouter->Submit(RouteRequest) != EHSRFrontendRouteResult::Success
+		&& FrontendRouter->GetSnapshot().IsOpen()))
+	{
+		const bool bPauseRestored = ApplyPauseBackend(World, true); ScreenStack->RestoreSnapshotForTransaction(OldStack);
+		if (FrontendRouter) FrontendRouter->RestoreSnapshotForTransaction(OldRoute);
+		const bool bPolicyRestored = ApplyPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+		return ResolveCompensation(bPauseRestored && bPolicyRestored, EHSRUIScreenResult::StackRejected);
+	}
+	if (FrontendModuleRootInstance)
+	{
+		ReleaseFrontendModuleContent();
+		FrontendModuleRootInstance->RemoveFromParent();
+		FrontendModuleRootInstance = nullptr;
+	}
+	if (CharacterDetailWidgetInstance) { CharacterDetailWidgetInstance->RemoveFromParent(); CharacterDetailWidgetInstance = nullptr; }
+	if (InventoryWidgetInstance)
+	{
+		InventoryWidgetInstance->SetViewModel(nullptr); InventoryWidgetInstance->RemoveFromParent(); InventoryWidgetInstance = nullptr;
+		UHSRInventoryRewardViewModel* OldVM = InventoryViewModelInstance; InventoryViewModelInstance = nullptr; ShutdownInventoryViewModelCandidate(OldVM);
+	}
+	FrontendShellInstance->RemoveFromParent(); FrontendShellInstance = nullptr;
 	PauseOwnerToken.Invalidate();
-	const EHSRFocusApplyResult FocusResult = ApplyFocusBackend(PC, RootWidget, RootWidget);
-	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 ClosePause Success Token=%lld Stack=%d FocusResult=%d"),
-		CloseToken, GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
 	return EHSRUIScreenResult::Success;
 }
 
@@ -614,21 +1101,32 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::CloseCharacterDetailScreen()
 	{
 		return EHSRUIScreenResult::InvalidHost;
 	}
-	const int64 CloseToken = AllocateRequestToken();
-	if (ScreenStack->SubmitRequest(MakePopRequest(CloseToken)) != EHSRScreenStackResult::Success)
+	const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter->GetSnapshot();
+	const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
+	if (!ApplyCharacterDetailPolicyBackend(PC, GetResolvedInputPolicy(), FrontendShellInstance ? EHSRPlayerControlMode::UIOnly : EHSRPlayerControlMode::Exploration))
 	{
-		return EHSRUIScreenResult::StackRejected;
+		if (!ApplyCharacterDetailPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly)) { bInconsistent = true; return EHSRUIScreenResult::CompensationFailed; }
+		return EHSRUIScreenResult::PolicyApplyFailed;
 	}
-	if (!ApplyCharacterDetailPolicyBackend(PC, GetResolvedInputPolicy(), EHSRPlayerControlMode::Exploration))
+	const EHSRFocusApplyResult FocusResult = ApplyCharacterDetailFocusBackend(PC, FrontendShellInstance, FrontendShellInstance);
+	if (FocusResult == EHSRFocusApplyResult::Unavailable)
 	{
-		return CompensateCharacterDetailPush(PC) ? EHSRUIScreenResult::PolicyApplyFailed
-			: EHSRUIScreenResult::CompensationFailed;
+		if (!ApplyCharacterDetailPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly)) { bInconsistent = true; return EHSRUIScreenResult::CompensationFailed; }
+		return EHSRUIScreenResult::FocusApplyFailed;
 	}
-	CharacterDetailWidgetInstance->RemoveFromParent();
-	CharacterDetailWidgetInstance = nullptr;
-	const EHSRFocusApplyResult FocusResult = ApplyCharacterDetailFocusBackend(PC, RootWidget, RootWidget);
-	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 CharacterDetail Close Success Token=%lld Stack=%d FocusResult=%d"),
-		CloseToken, GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
+	FHSRFrontendRouteRequest RouteRequest; RouteRequest.RequestToken = AllocateFrontendRequestToken(); RouteRequest.Operation = EHSRFrontendRouteOperation::Back;
+	if (SubmitFrontendRoute(RouteRequest) != EHSRFrontendRouteResult::Success)
+	{
+		FrontendRouter->RestoreSnapshotForTransaction(OldRoute);
+		const bool bPolicyRestored = ApplyCharacterDetailPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+		const bool bFocusRestored = ApplyCharacterDetailFocusBackend(PC,
+			CharacterDetailWidgetInstance->GetPreferredFocusWidget(), CharacterDetailWidgetInstance) != EHSRFocusApplyResult::Unavailable;
+		return ResolveCompensation(bPolicyRestored && bFocusRestored, EHSRUIScreenResult::StackRejected);
+	}
+	CharacterDetailWidgetInstance->RemoveFromParent(); CharacterDetailWidgetInstance = nullptr;
+	FrontendShellInstance->PresentRoute(FrontendRouter->GetSnapshot());
+	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 CharacterDetail Close Success Stack=%d FocusResult=%d"),
+		GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
 	return EHSRUIScreenResult::Success;
 }
 
@@ -639,13 +1137,27 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::CloseInventoryScreen()
 	UWorld* World = PC ? PC->GetWorld() : nullptr;
 	if (!InventoryWidgetInstance || !InventoryViewModelInstance || !IsBackendHostValid(PC, RootWidget, World))
 		return EHSRUIScreenResult::InvalidHost;
-	const int64 CloseToken = AllocateRequestToken();
-	if (ScreenStack->SubmitRequest(MakePopRequest(CloseToken)) != EHSRScreenStackResult::Success)
-		return EHSRUIScreenResult::StackRejected;
-	if (!ApplyInventoryPolicyBackend(PC, GetResolvedInputPolicy(), EHSRPlayerControlMode::Exploration))
+	const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter->GetSnapshot();
+	const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
+	if (!ApplyInventoryPolicyBackend(PC, GetResolvedInputPolicy(), FrontendShellInstance ? EHSRPlayerControlMode::UIOnly : EHSRPlayerControlMode::Exploration))
 	{
-		return CompensateInventoryPush(PC) ? EHSRUIScreenResult::PolicyApplyFailed
-			: EHSRUIScreenResult::CompensationFailed;
+		if (!ApplyInventoryPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly)) { bInconsistent = true; return EHSRUIScreenResult::CompensationFailed; }
+		return EHSRUIScreenResult::PolicyApplyFailed;
+	}
+	const EHSRFocusApplyResult FocusResult = ApplyInventoryFocusBackend(PC, FrontendShellInstance, FrontendShellInstance);
+	if (FocusResult == EHSRFocusApplyResult::Unavailable)
+	{
+		if (!ApplyInventoryPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly)) { bInconsistent = true; return EHSRUIScreenResult::CompensationFailed; }
+		return EHSRUIScreenResult::FocusApplyFailed;
+	}
+	FHSRFrontendRouteRequest RouteRequest; RouteRequest.RequestToken = AllocateFrontendRequestToken(); RouteRequest.Operation = EHSRFrontendRouteOperation::Back;
+	if (SubmitFrontendRoute(RouteRequest) != EHSRFrontendRouteResult::Success)
+	{
+		FrontendRouter->RestoreSnapshotForTransaction(OldRoute);
+		const bool bPolicyRestored = ApplyInventoryPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::UIOnly);
+		const bool bFocusRestored = ApplyInventoryFocusBackend(PC,
+			InventoryWidgetInstance->GetPreferredFocusWidget(), InventoryWidgetInstance) != EHSRFocusApplyResult::Unavailable;
+		return ResolveCompensation(bPolicyRestored && bFocusRestored, EHSRUIScreenResult::StackRejected);
 	}
 	InventoryWidgetInstance->SetViewModel(nullptr);
 #if WITH_DEV_AUTOMATION_TESTS
@@ -657,9 +1169,9 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::CloseInventoryScreen()
 	UHSRInventoryRewardViewModel* ViewModelToShutdown = InventoryViewModelInstance;
 	InventoryViewModelInstance = nullptr;
 	ShutdownInventoryViewModelCandidate(ViewModelToShutdown);
-	const EHSRFocusApplyResult FocusResult = ApplyInventoryFocusBackend(PC, RootWidget, RootWidget);
-	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Inventory Close Success Token=%lld Stack=%d FocusResult=%d"),
-		CloseToken, GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
+	FrontendShellInstance->PresentRoute(FrontendRouter->GetSnapshot());
+	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Inventory Close Success Stack=%d FocusResult=%d"),
+		GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
 	return EHSRUIScreenResult::Success;
 }
 
@@ -670,6 +1182,69 @@ int64 UHSRUIManagerSubsystem::AllocateRequestToken()
 		NextRequestToken = FMath::Max(NextRequestToken, ScreenStack->GetSnapshot().LastProcessedRequestToken + 1);
 	}
 	return NextRequestToken++;
+}
+
+bool UHSRUIManagerSubsystem::RestoreFrontendModuleFocus(AHSRPlayerController* PlayerController,
+	const EHSRFrontendModule Module)
+{
+	switch (Module)
+	{
+	case EHSRFrontendModule::Character:
+		return CharacterDetailWidgetInstance
+			&& ApplyCharacterDetailFocusBackend(PlayerController,
+				CharacterDetailWidgetInstance->GetPreferredFocusWidget(), CharacterDetailWidgetInstance)
+				!= EHSRFocusApplyResult::Unavailable;
+	case EHSRFrontendModule::Inventory:
+		return InventoryWidgetInstance
+			&& ApplyInventoryFocusBackend(PlayerController,
+				InventoryWidgetInstance->GetPreferredFocusWidget(), InventoryWidgetInstance)
+				!= EHSRFocusApplyResult::Unavailable;
+	case EHSRFrontendModule::Party:
+	case EHSRFrontendModule::Map:
+	case EHSRFrontendModule::Challenge:
+	case EHSRFrontendModule::Quest:
+	case EHSRFrontendModule::Save:
+		return FrontendModuleRootInstance
+			&& ApplyFocusBackend(PlayerController, FrontendModuleRootInstance->GetPreferredFocusWidget(),
+				FrontendModuleRootInstance) != EHSRFocusApplyResult::Unavailable;
+	case EHSRFrontendModule::PauseHub:
+		return FrontendShellInstance
+			&& ApplyFocusBackend(PlayerController, FrontendShellInstance->GetPreferredFocusWidget(),
+				FrontendShellInstance) != EHSRFocusApplyResult::Unavailable;
+	case EHSRFrontendModule::None:
+	default:
+		return false;
+	}
+}
+
+int64 UHSRUIManagerSubsystem::AllocateFrontendRequestToken()
+{
+	if (FrontendRouter)
+		NextFrontendRequestToken = FMath::Max(NextFrontendRequestToken,
+			FrontendRouter->GetSnapshot().LastProcessedRequestToken + 1);
+	return NextFrontendRequestToken++;
+}
+
+EHSRFrontendRouteResult UHSRUIManagerSubsystem::SubmitFrontendRoute(const FHSRFrontendRouteRequest& Request)
+{
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend && bAutomationFailNextRouteSubmit)
+	{
+		bAutomationFailNextRouteSubmit = false;
+		return EHSRFrontendRouteResult::InvalidRequest;
+	}
+#endif
+	return FrontendRouter ? FrontendRouter->Submit(Request) : EHSRFrontendRouteResult::InvalidRequest;
+}
+
+EHSRUIScreenResult UHSRUIManagerSubsystem::ResolveCompensation(const bool bRecovered,
+	const EHSRUIScreenResult OriginalFailure)
+{
+	if (bRecovered) return OriginalFailure;
+	// A failed compensation left the backend in an unknown state; never auto-clear this.
+	bInconsistent = true;
+	bInconsistencyIsTravelRecoverable = false;
+	return EHSRUIScreenResult::CompensationFailed;
 }
 
 FHSRScreenRequest UHSRUIManagerSubsystem::MakeRootRequest(const int64 Token) const
@@ -690,28 +1265,6 @@ FHSRScreenRequest UHSRUIManagerSubsystem::MakePauseRequest(const int64 Token) co
 	Request.Layer = EHSRUIScreenLayer::Modal;
 	Request.InputIntent = EHSRUIInputIntent::UIOnly;
 	Request.FocusToken = PauseFocusToken;
-	return Request;
-}
-
-FHSRScreenRequest UHSRUIManagerSubsystem::MakeCharacterDetailRequest(const int64 Token) const
-{
-	FHSRScreenRequest Request;
-	Request.RequestToken = Token;
-	Request.ScreenId = CharacterDetailScreenId;
-	Request.Layer = EHSRUIScreenLayer::Menu;
-	Request.InputIntent = EHSRUIInputIntent::UIOnly;
-	Request.FocusToken = CharacterDetailFocusToken;
-	return Request;
-}
-
-FHSRScreenRequest UHSRUIManagerSubsystem::MakeInventoryRequest(const int64 Token) const
-{
-	FHSRScreenRequest Request;
-	Request.RequestToken = Token;
-	Request.ScreenId = InventoryScreenId;
-	Request.Layer = EHSRUIScreenLayer::Menu;
-	Request.InputIntent = EHSRUIInputIntent::UIOnly;
-	Request.FocusToken = InventoryFocusToken;
 	return Request;
 }
 
@@ -745,32 +1298,6 @@ bool UHSRUIManagerSubsystem::CompensatePausePush(AHSRPlayerController* PlayerCon
 {
 	const EHSRScreenStackResult PushResult = ScreenStack->SubmitRequest(MakePauseRequest(AllocateRequestToken()));
 	const bool bPolicyRestored = ApplyPolicyBackend(PlayerController, GetResolvedInputPolicy(),
-		EHSRPlayerControlMode::UIOnly);
-	if (PushResult != EHSRScreenStackResult::Success || !bPolicyRestored)
-	{
-		bInconsistent = true;
-		return false;
-	}
-	return true;
-}
-
-bool UHSRUIManagerSubsystem::CompensateCharacterDetailPush(AHSRPlayerController* PlayerController)
-{
-	const EHSRScreenStackResult PushResult = ScreenStack->SubmitRequest(MakeCharacterDetailRequest(AllocateRequestToken()));
-	const bool bPolicyRestored = ApplyCharacterDetailPolicyBackend(PlayerController, GetResolvedInputPolicy(),
-		EHSRPlayerControlMode::UIOnly);
-	if (PushResult != EHSRScreenStackResult::Success || !bPolicyRestored)
-	{
-		bInconsistent = true;
-		return false;
-	}
-	return true;
-}
-
-bool UHSRUIManagerSubsystem::CompensateInventoryPush(AHSRPlayerController* PlayerController)
-{
-	const EHSRScreenStackResult PushResult = ScreenStack->SubmitRequest(MakeInventoryRequest(AllocateRequestToken()));
-	const bool bPolicyRestored = ApplyInventoryPolicyBackend(PlayerController, GetResolvedInputPolicy(),
 		EHSRPlayerControlMode::UIOnly);
 	if (PushResult != EHSRScreenStackResult::Success || !bPolicyRestored)
 	{
@@ -816,9 +1343,17 @@ void UHSRUIManagerSubsystem::ClearHostReferences()
 	RegisteredHUD.Reset();
 	RegisteredPlayerController.Reset();
 	RegisteredRootWidget.Reset();
-	PauseWidgetClass = nullptr;
+	FrontendShellClass = nullptr;
+	FrontendModuleRootClass = nullptr;
 	CharacterDetailWidgetClass = nullptr;
 	InventoryWidgetClass = nullptr;
+	PartyWidgetClass = nullptr;
+	MapWidgetClass = nullptr;
+	ChallengeWidgetClass = nullptr;
+	QuestWidgetClass = nullptr;
+	SaveWidgetClass = nullptr;
+	FrontendModuleContentInstance = nullptr;
+	FrontendModuleContentModule = EHSRFrontendModule::None;
 	ActiveHostGeneration = 0;
 }
 
@@ -826,18 +1361,48 @@ FName UHSRUIManagerSubsystem::SelectRestorableScreenId() const
 {
 	if (!ScreenStack || bInconsistent || HasInventoryOwnershipMismatch()) return NAME_None;
 	const FHSRScreenStackSnapshot Snapshot = ScreenStack->GetSnapshot();
-	if (Snapshot.Entries.Num() != 2) return NAME_None;
-	const FName TopId = Snapshot.Entries.Last().ScreenId;
-	if (TopId == CharacterDetailScreenId && CharacterDetailWidgetInstance && !PauseWidgetInstance
-		&& !InventoryWidgetInstance && !InventoryViewModelInstance) return TopId;
-	if (TopId == InventoryScreenId && InventoryWidgetInstance && InventoryViewModelInstance
-		&& !PauseWidgetInstance && !CharacterDetailWidgetInstance) return TopId;
+	if (Snapshot.Entries.Num() < 2 || Snapshot.Entries[0].ScreenId != ExplorationRootId)
+	{
+		return NAME_None;
+	}
+	const EHSRFrontendModule ActiveModule = FrontendRouter
+		? FrontendRouter->GetSnapshot().GetActiveRoute().Module : EHSRFrontendModule::None;
+	if (ActiveModule == EHSRFrontendModule::Character && CharacterDetailWidgetInstance
+		&& !InventoryWidgetInstance && !InventoryViewModelInstance) return CharacterDetailScreenId;
+	if (ActiveModule == EHSRFrontendModule::Inventory && InventoryWidgetInstance && InventoryViewModelInstance
+		&& !CharacterDetailWidgetInstance) return InventoryScreenId;
 	return NAME_None;
+}
+
+bool UHSRUIManagerSubsystem::IsAtCleanExplorationRoot() const
+{
+	if (!ScreenStack || HasInventoryOwnershipMismatch()) return false;
+	if (FrontendShellInstance || FrontendModuleRootInstance || FrontendModuleContentInstance
+		|| FrontendModuleContentModule != EHSRFrontendModule::None || CharacterDetailWidgetInstance
+		|| InventoryWidgetInstance || InventoryViewModelInstance) return false;
+	const FHSRScreenStackSnapshot Snapshot = ScreenStack->GetSnapshot();
+	return Snapshot.Entries.Num() == 1 && Snapshot.Entries[0].ScreenId == ExplorationRootId;
+}
+
+void UHSRUIManagerSubsystem::TryClearRecoverableInconsistency()
+{
+	if (!bInconsistent || !bInconsistencyIsTravelRecoverable) return;
+	// Only a live registered host plus an exact, unowned root proves the UI is coherent again.
+	AHSRPlayerController* PC = RegisteredPlayerController.Get();
+	if (ActiveHostGeneration == 0
+		|| !IsBackendHostValid(PC, RegisteredRootWidget.Get(), PC ? PC->GetWorld() : nullptr)
+		|| !IsAtCleanExplorationRoot()) return;
+	bInconsistent = false;
+	bInconsistencyIsTravelRecoverable = false;
+	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Inconsistency cleared by fresh host HostGeneration=%lld Stack=%d"),
+		ActiveHostGeneration, GetLogicalScreenCount());
 }
 
 EHSRUIScreenResult UHSRUIManagerSubsystem::CaptureAndTeardownTravelHost()
 {
 	const int64 CapturedHost = ActiveHostGeneration;
+	// Capture ownership while the old host is still alive; teardown releases the
+	// widget/view-model pair that SelectRestorableScreenId validates.
 	const FName Restorable = SelectRestorableScreenId();
 	AHSRPlayerController* CapturedPC = RegisteredPlayerController.Get();
 	int64 ArrivalBaseline = LastObservedArrivalCommitGeneration;
@@ -867,8 +1432,12 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::CaptureAndTeardownTravelHost()
 	if (bForcedRootCleanup)
 	{
 		bInconsistent = true;
+		// Travel cleanup that still lands on an exact root is recoverable: the next host
+		// registration re-validates the stack and clears the flag. Anything else is real corruption.
+		bInconsistencyIsTravelRecoverable = bAtExactRoot;
 		Result = EHSRUIScreenResult::Inconsistent;
-		UE_LOG(LogTemp, Warning, TEXT("HSRUI P17 TravelFreeze forced non-owned stack cleanup to root"));
+		UE_LOG(LogTemp, Warning, TEXT("HSRUI P17 TravelFreeze forced non-owned stack cleanup to root Recoverable=%s"),
+			bInconsistencyIsTravelRecoverable ? TEXT("true") : TEXT("false"));
 	}
 	TravelRestoreGeneration = NextTravelRestoreGeneration++;
 	TravelCapturedHostGeneration = CapturedHost;
@@ -910,14 +1479,32 @@ void UHSRUIManagerSubsystem::TryRestoreTravelDescriptor()
 	LatchedArrivalCommitGeneration = 0;
 	TravelRestoreScreenId = NAME_None;
 	EHSRUIScreenResult Result = EHSRUIScreenResult::Success;
-	if (ScreenId == CharacterDetailScreenId) Result = OpenCharacterDetailScreen();
-	else if (ScreenId == InventoryScreenId) Result = OpenInventoryScreen();
+	if (!ScreenId.IsNone())
+	{
+		if (ScreenId == CharacterDetailScreenId)
+		{
+			Result = OpenFrontendModule(EHSRFrontendModule::Character);
+		}
+		else if (ScreenId == InventoryScreenId)
+		{
+			Result = OpenFrontendModule(EHSRFrontendModule::Inventory);
+		}
+		else
+		{
+			Result = EHSRUIScreenResult::Inconsistent;
+		}
+	}
 	else
 	{
 		AHSRPlayerController* PC = RegisteredPlayerController.Get();
 		Result = ApplyPolicyBackend(PC, GetResolvedInputPolicy(), EHSRPlayerControlMode::Exploration)
 			? EHSRUIScreenResult::Success : EHSRUIScreenResult::PolicyApplyFailed;
 		ApplyFocusBackend(PC, RegisteredRootWidget.Get(), RegisteredRootWidget.Get());
+	}
+	bTravelRestoredModule = Result == EHSRUIScreenResult::Success && !ScreenId.IsNone();
+	if (Result == EHSRUIScreenResult::CompensationFailed || Result == EHSRUIScreenResult::Inconsistent)
+	{
+		bInconsistent = true;
 	}
 	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 TravelRestore Consume Generation=%lld NewHostGeneration=%lld Screen=%s Result=%d Stack=%d"),
 		DescriptorGeneration, ActiveHostGeneration, *ScreenId.ToString(), static_cast<int32>(Result), GetLogicalScreenCount());
@@ -957,18 +1544,73 @@ bool UHSRUIManagerSubsystem::IsBackendPaused(UWorld* World) const
 	return World && World->IsPaused();
 }
 
-UHSRScreenWidget* UHSRUIManagerSubsystem::CreatePauseCandidate(AHSRPlayerController* PlayerController)
+bool UHSRUIManagerSubsystem::HasModuleRootClass() const
 {
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend)
 	{
-		return bAutomationCreateSucceeds ? NewObject<UHSRScreenWidget>(this) : nullptr;
+		return true;
 	}
 #endif
-	return CreateWidget<UHSRScreenWidget>(PlayerController, PauseWidgetClass);
+	return FrontendModuleRootClass != nullptr;
 }
 
-UHSRCharacterDetailWidget* UHSRUIManagerSubsystem::CreateCharacterDetailCandidate(AHSRPlayerController* PlayerController)
+bool UHSRUIManagerSubsystem::HasCharacterDetailClass() const
+{
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend)
+	{
+		return bAutomationHasDetailClass;
+	}
+#endif
+	return CharacterDetailWidgetClass != nullptr;
+}
+
+bool UHSRUIManagerSubsystem::HasInventoryClass() const
+{
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend)
+	{
+		return bAutomationHasInventoryClass;
+	}
+#endif
+	return InventoryWidgetClass != nullptr;
+}
+
+bool UHSRUIManagerSubsystem::IsTravelPending() const
+{
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend) return false;
+#endif
+	UGameInstance* GameInstance = GetLocalPlayer() ? GetLocalPlayer()->GetGameInstance() : nullptr;
+	const UHSRMapSubsystem* Maps = GameInstance ? GameInstance->GetSubsystem<UHSRMapSubsystem>() : nullptr;
+	const UHSRBattleTransitionSubsystem* Battle = GameInstance ? GameInstance->GetSubsystem<UHSRBattleTransitionSubsystem>() : nullptr;
+	return (Maps && Maps->HasPendingTravel()) || (Battle && (Battle->HasPending() || Battle->HasReturnPending()));
+}
+
+UHSRFrontendShellWidget* UHSRUIManagerSubsystem::CreatePauseCandidate(AHSRPlayerController* PlayerController)
+{
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend)
+	{
+		return bAutomationCreateSucceeds ? NewObject<UHSRFrontendShellWidget>(this) : nullptr;
+	}
+#endif
+	return CreateWidget<UHSRFrontendShellWidget>(PlayerController, FrontendShellClass);
+}
+
+UHSRFrontendModuleRootWidget* UHSRUIManagerSubsystem::CreateFrontendModuleRootCandidate(AHSRPlayerController* PlayerController)
+{
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend)
+	{
+		return bAutomationCreateSucceeds ? NewObject<UHSRFrontendModuleRootWidget>(this) : nullptr;
+	}
+#endif
+	return CreateWidget<UHSRFrontendModuleRootWidget>(PlayerController, FrontendModuleRootClass);
+}
+
+UHSRScreenWidget* UHSRUIManagerSubsystem::CreateCharacterDetailCandidate(AHSRPlayerController* PlayerController)
 {
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend)
@@ -976,7 +1618,7 @@ UHSRCharacterDetailWidget* UHSRUIManagerSubsystem::CreateCharacterDetailCandidat
 		return bAutomationDetailCreateSucceeds ? NewObject<UHSRCharacterDetailWidget>(this) : nullptr;
 	}
 #endif
-	return CreateWidget<UHSRCharacterDetailWidget>(PlayerController, CharacterDetailWidgetClass);
+	return CreateWidget<UHSRScreenWidget>(PlayerController, CharacterDetailWidgetClass);
 }
 
 UHSRInventoryWidget* UHSRUIManagerSubsystem::CreateInventoryCandidate(AHSRPlayerController* PlayerController)
@@ -996,7 +1638,7 @@ UHSRInventoryRewardViewModel* UHSRUIManagerSubsystem::CreateInventoryViewModelCa
 	return NewObject<UHSRInventoryRewardViewModel>(this);
 }
 
-bool UHSRUIManagerSubsystem::AttachPauseCandidate(UHSRScreenWidget* Candidate)
+bool UHSRUIManagerSubsystem::AttachPauseCandidate(UHSRFrontendShellWidget* Candidate)
 {
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend)
@@ -1008,29 +1650,72 @@ bool UHSRUIManagerSubsystem::AttachPauseCandidate(UHSRScreenWidget* Candidate)
 	return Candidate->IsInViewport();
 }
 
-bool UHSRUIManagerSubsystem::AttachCharacterDetailCandidate(UHSRCharacterDetailWidget* Candidate)
+bool UHSRUIManagerSubsystem::AttachFrontendModuleRootCandidate(UHSRFrontendModuleRootWidget* Candidate)
 {
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend)
 	{
-		return bAutomationDetailAttachSucceeds;
+		return bAutomationAttachSucceeds;
 	}
 #endif
-	Candidate->AddToViewport(50);
+	Candidate->AddToViewport(110);
 	return Candidate->IsInViewport();
 }
 
-bool UHSRUIManagerSubsystem::AttachInventoryCandidate(UHSRInventoryWidget* Candidate)
+TSubclassOf<UUserWidget> UHSRUIManagerSubsystem::GetFrontendModuleWidgetClass(const EHSRFrontendModule Module) const
+{
+	switch (Module)
+	{
+	case EHSRFrontendModule::Party: return PartyWidgetClass;
+	case EHSRFrontendModule::Map: return MapWidgetClass;
+	case EHSRFrontendModule::Challenge: return ChallengeWidgetClass;
+	case EHSRFrontendModule::Quest: return QuestWidgetClass;
+	case EHSRFrontendModule::Save: return SaveWidgetClass;
+	default: return nullptr;
+	}
+}
+
+UUserWidget* UHSRUIManagerSubsystem::CreateFrontendModuleContentCandidate(
+	AHSRPlayerController* PlayerController, const EHSRFrontendModule Module)
 {
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend)
 	{
-		if (bAutomationInventoryAttachSucceeds) Candidate->AttachForAutomation();
-		return bAutomationInventoryAttachSucceeds;
+		return bAutomationFrontendModuleCreateSucceeds ? NewObject<UHSRUserWidget>(this) : nullptr;
 	}
 #endif
-	Candidate->AddToViewport(50);
-	return Candidate->IsInViewport();
+	const TSubclassOf<UUserWidget> WidgetClass = GetFrontendModuleWidgetClass(Module);
+	return WidgetClass ? CreateWidget<UUserWidget>(PlayerController, WidgetClass) : nullptr;
+}
+
+bool UHSRUIManagerSubsystem::AttachFrontendModuleContentCandidate(
+	UHSRFrontendModuleRootWidget* RootCandidate, UUserWidget* ContentCandidate)
+{
+	if (!RootCandidate || !ContentCandidate)
+	{
+		return false;
+	}
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend)
+	{
+		return bAutomationFrontendModuleAttachSucceeds;
+	}
+#endif
+	return RootCandidate->SetModuleContent(ContentCandidate);
+}
+
+void UHSRUIManagerSubsystem::ReleaseFrontendModuleContent()
+{
+	if (FrontendModuleRootInstance)
+	{
+		FrontendModuleRootInstance->ClearModuleContent();
+	}
+	if (FrontendModuleContentInstance)
+	{
+		FrontendModuleContentInstance->RemoveFromParent();
+		FrontendModuleContentInstance = nullptr;
+	}
+	FrontendModuleContentModule = EHSRFrontendModule::None;
 }
 
 bool UHSRUIManagerSubsystem::ApplyPolicyBackend(AHSRPlayerController* PlayerController,
@@ -1039,6 +1724,8 @@ bool UHSRUIManagerSubsystem::ApplyPolicyBackend(AHSRPlayerController* PlayerCont
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend)
 	{
+		if (AutomationPolicyCallsUntilFailure > 0 && --AutomationPolicyCallsUntilFailure == 0) return false;
+		if (bAutomationFailNextPolicyApply) { bAutomationFailNextPolicyApply = false; return false; }
 		return bAutomationPolicySucceeds;
 	}
 #endif
@@ -1050,6 +1737,9 @@ bool UHSRUIManagerSubsystem::ApplyPauseBackend(UWorld* World, const bool bPaused
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend)
 	{
+		if (AutomationPauseCallsUntilFailure > 0 && --AutomationPauseCallsUntilFailure == 0) return false;
+		if (bPaused && bAutomationFailPauseRestore) { bAutomationFailPauseRestore = false; return false; }
+		if (bAutomationFailNextPauseApply) { bAutomationFailNextPauseApply = false; return false; }
 		if (!bAutomationPauseSucceeds)
 		{
 			return false;
@@ -1101,10 +1791,9 @@ EHSRFocusApplyResult UHSRUIManagerSubsystem::ApplyFocusBackend(AHSRPlayerControl
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend)
 	{
-		const EHSRFocusApplyResult Choice = UHSRInputModeCoordinator::ChooseFocusTarget(true,
-			Preferred && Preferred->GetIsEnabled() && Preferred->IsVisible(),
-			Fallback && Fallback->GetIsEnabled() && Fallback->IsVisible());
-		return bAutomationFocusSucceeds ? Choice : EHSRFocusApplyResult::Unavailable;
+		if (bAutomationFailNextFocusApply) { bAutomationFailNextFocusApply = false; return EHSRFocusApplyResult::Unavailable; }
+		LastAutomationFocusModule = Preferred == FrontendShellInstance ? EHSRFrontendModule::PauseHub : EHSRFrontendModule::None;
+		return bAutomationFocusSucceeds ? EHSRFocusApplyResult::Preferred : EHSRFocusApplyResult::Unavailable;
 	}
 #endif
 	return InputModeCoordinator->ApplyFocus(PlayerController, Preferred, Fallback);
@@ -1116,10 +1805,17 @@ EHSRFocusApplyResult UHSRUIManagerSubsystem::ApplyCharacterDetailFocusBackend(AH
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend)
 	{
-		const EHSRFocusApplyResult Choice = UHSRInputModeCoordinator::ChooseFocusTarget(true,
-			Preferred && Preferred->GetIsEnabled() && Preferred->IsVisible(),
-			Fallback && Fallback->GetIsEnabled() && Fallback->IsVisible());
-		return bAutomationDetailFocusSucceeds ? Choice : EHSRFocusApplyResult::Unavailable;
+		if (bAutomationFailOldModuleFocusRestore && (Preferred == CharacterDetailWidgetInstance || Fallback == CharacterDetailWidgetInstance))
+		{
+			bAutomationFailOldModuleFocusRestore = false; return EHSRFocusApplyResult::Unavailable;
+		}
+		LastAutomationFocusModule = (Preferred == CharacterDetailWidgetInstance || Fallback == CharacterDetailWidgetInstance) ? EHSRFrontendModule::Character : EHSRFrontendModule::PauseHub;
+		const bool bIsCloseFocus = FrontendShellInstance && Preferred == FrontendShellInstance;
+		if (bIsCloseFocus && !bAutomationDetailCloseFocusSucceeds)
+		{
+			return EHSRFocusApplyResult::Unavailable;
+		}
+		return bAutomationDetailFocusSucceeds ? EHSRFocusApplyResult::Preferred : EHSRFocusApplyResult::Unavailable;
 	}
 #endif
 	return InputModeCoordinator->ApplyFocus(PlayerController, Preferred, Fallback);
@@ -1131,10 +1827,17 @@ EHSRFocusApplyResult UHSRUIManagerSubsystem::ApplyInventoryFocusBackend(AHSRPlay
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend)
 	{
-		const EHSRFocusApplyResult Choice = UHSRInputModeCoordinator::ChooseFocusTarget(true,
-			Preferred && Preferred->GetIsEnabled() && Preferred->IsVisible(),
-			Fallback && Fallback->GetIsEnabled() && Fallback->IsVisible());
-		return bAutomationInventoryFocusSucceeds ? Choice : EHSRFocusApplyResult::Unavailable;
+		if (bAutomationFailOldModuleFocusRestore && (Preferred == InventoryWidgetInstance || Fallback == InventoryWidgetInstance))
+		{
+			bAutomationFailOldModuleFocusRestore = false; return EHSRFocusApplyResult::Unavailable;
+		}
+		LastAutomationFocusModule = (Preferred == InventoryWidgetInstance || Fallback == InventoryWidgetInstance) ? EHSRFrontendModule::Inventory : EHSRFrontendModule::PauseHub;
+		const bool bIsCloseFocus = FrontendShellInstance && Preferred == FrontendShellInstance;
+		if (bIsCloseFocus && !bAutomationInventoryCloseFocusSucceeds)
+		{
+			return EHSRFocusApplyResult::Unavailable;
+		}
+		return bAutomationInventoryFocusSucceeds ? EHSRFocusApplyResult::Preferred : EHSRFocusApplyResult::Unavailable;
 	}
 #endif
 	return InputModeCoordinator->ApplyFocus(PlayerController, Preferred, Fallback);
@@ -1147,7 +1850,9 @@ void UHSRUIManagerSubsystem::InitializeForAutomation()
 	{
 		ScreenStack = NewObject<UHSRScreenStack>(this);
 		InputModeCoordinator = NewObject<UHSRInputModeCoordinator>(this);
+		FrontendRouter = NewObject<UHSRFrontendRouter>(this);
 		NextRequestToken = 1;
+		NextFrontendRequestToken = 1;
 		bInitialized = true;
 		bInconsistent = false;
 	}
@@ -1169,6 +1874,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterHostIdentityForAutomation(con
 	if (HasInventoryOwnershipMismatch())
 	{
 		bInconsistent = true;
+		bInconsistencyIsTravelRecoverable = false;
 		return EHSRUIScreenResult::Inconsistent;
 	}
 	if (AutomationHostIdentity == HostIdentity)
@@ -1177,8 +1883,8 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterHostIdentityForAutomation(con
 		bAutomationHasPauseClass = bHasPauseClass;
 		return EHSRUIScreenResult::NoOp;
 	}
-	if (AutomationHostIdentity != 0 || PauseWidgetInstance || CharacterDetailWidgetInstance || InventoryWidgetInstance
-		|| InventoryViewModelInstance)
+	if (AutomationHostIdentity != 0 || FrontendShellInstance || FrontendModuleContentInstance
+		|| CharacterDetailWidgetInstance || InventoryWidgetInstance || InventoryViewModelInstance)
 	{
 		return EHSRUIScreenResult::InvalidHost;
 	}
@@ -1194,6 +1900,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterHostIdentityForAutomation(con
 	bAutomationHasPauseClass = bHasPauseClass;
 	bAutomationHasDetailClass = true;
 	bAutomationHasInventoryClass = true;
+	TryClearRecoverableInconsistency();
 	TryRestoreTravelDescriptor();
 	return EHSRUIScreenResult::Success;
 }
@@ -1235,6 +1942,25 @@ void UHSRUIManagerSubsystem::ConfigureAutomationBackend(const bool bCreateSuccee
 	bAutomationPaused = bInitiallyPaused;
 }
 
+void UHSRUIManagerSubsystem::ConfigureAutomationFrontendModuleBackend(
+	const bool bHasClass, const bool bCreateSucceeds, const bool bAttachSucceeds)
+{
+	bUseAutomationBackend = true;
+	bAutomationHasFrontendModuleClass = bHasClass;
+	bAutomationFrontendModuleCreateSucceeds = bCreateSucceeds;
+	bAutomationFrontendModuleAttachSucceeds = bAttachSucceeds;
+}
+
+int32 UHSRUIManagerSubsystem::GetFrontendModuleContentCountForAutomation() const
+{
+	return FrontendModuleContentInstance ? 1 : 0;
+}
+
+EHSRFrontendModule UHSRUIManagerSubsystem::GetFrontendModuleContentModuleForAutomation() const
+{
+	return FrontendModuleContentModule;
+}
+
 void UHSRUIManagerSubsystem::ConfigureAutomationDetailBackend(const bool bHasClass, const bool bCreateSucceeds,
 	const bool bAttachSucceeds, const bool bPolicySucceeds, const bool bFocusSucceeds)
 {
@@ -1244,6 +1970,19 @@ void UHSRUIManagerSubsystem::ConfigureAutomationDetailBackend(const bool bHasCla
 	bAutomationDetailAttachSucceeds = bAttachSucceeds;
 	bAutomationDetailPolicySucceeds = bPolicySucceeds;
 	bAutomationDetailFocusSucceeds = bFocusSucceeds;
+	bAutomationDetailCloseFocusSucceeds = bFocusSucceeds;
+}
+
+void UHSRUIManagerSubsystem::ConfigureAutomationDetailCloseFocus(const bool bCloseFocusSucceeds)
+{
+	bUseAutomationBackend = true;
+	bAutomationDetailCloseFocusSucceeds = bCloseFocusSucceeds;
+}
+
+void UHSRUIManagerSubsystem::ConfigureAutomationInventoryCloseFocus(const bool bCloseFocusSucceeds)
+{
+	bUseAutomationBackend = true;
+	bAutomationInventoryCloseFocusSucceeds = bCloseFocusSucceeds;
 }
 
 void UHSRUIManagerSubsystem::ConfigureAutomationInventoryBackend(const bool bHasClass, const bool bCreateSucceeds,
@@ -1258,6 +1997,7 @@ void UHSRUIManagerSubsystem::ConfigureAutomationInventoryBackend(const bool bHas
 	bAutomationInventoryAttachSucceeds = bAttachSucceeds;
 	bAutomationInventoryPolicySucceeds = bPolicySucceeds;
 	bAutomationInventoryFocusSucceeds = bFocusSucceeds;
+	bAutomationInventoryCloseFocusSucceeds = bFocusSucceeds;
 }
 
 void UHSRUIManagerSubsystem::ConfigureAutomationInventoryViewModelStages(const bool bDependenciesSucceed,
@@ -1283,7 +2023,8 @@ int32 UHSRUIManagerSubsystem::GetInventoryBindCountForAutomation() const
 
 void UHSRUIManagerSubsystem::DeinitializeForAutomation()
 {
-	PauseWidgetInstance = nullptr;
+	FrontendShellInstance = nullptr;
+	FrontendModuleRootInstance = nullptr;
 	CharacterDetailWidgetInstance = nullptr;
 	if (InventoryWidgetInstance) InventoryWidgetInstance->SetViewModel(nullptr);
 	InventoryWidgetInstance = nullptr;
@@ -1292,8 +2033,11 @@ void UHSRUIManagerSubsystem::DeinitializeForAutomation()
 	PauseOwnerToken.Invalidate();
 	ClearHostReferences();
 	InputModeCoordinator = nullptr;
+	FrontendRouter = nullptr;
 	ScreenStack = nullptr;
 	bInitialized = false;
+	bInconsistent = false;
+	bInconsistencyIsTravelRecoverable = false;
 	bUseAutomationBackend = false;
 	bAutomationHostValid = false;
 	AutomationHostIdentity = 0;
