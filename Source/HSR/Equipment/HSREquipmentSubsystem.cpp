@@ -3,7 +3,9 @@
 #include "../Data/Definitions/HSREquipmentDefinition.h"
 #include "../Data/Definitions/HSREquipmentEnhancementCatalog.h"
 #include "../Data/Definitions/HSRRelicDefinition.h"
+#include "../Data/Definitions/HSRRelicSetDefinition.h"
 #include "../Data/Definitions/HSRItemEquipmentMappingCatalog.h"
+#include "HSRRelicSetResolver.h"
 #include "../Inventory/HSRInventorySubsystem.h"
 #include "../Save/HSRSaveTypes.h"
 
@@ -121,6 +123,32 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UH
 	Rule.SetId = Definition.SetId;
 	Definitions.Add(Definition.DefinitionId, Rule);
 	return EHSREquipmentOperationResult::Success;
+}
+
+EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterSetDefinition(const UHSRRelicSetDefinition& Definition)
+{
+	if (Definition.SetId.IsNone())
+	{
+		return EHSREquipmentOperationResult::InvalidDefinitionId;
+	}
+	if (Definition.Threshold <= 0)
+	{
+		return EHSREquipmentOperationResult::InvalidEnhancementLevel;
+	}
+	if (SetThresholds.Contains(Definition.SetId))
+	{
+		return EHSREquipmentOperationResult::DuplicateDefinitionId;
+	}
+
+	SetThresholds.Add(Definition.SetId, Definition.Threshold);
+	return EHSREquipmentOperationResult::Success;
+}
+
+int32 UHSREquipmentSubsystem::GetSetThreshold(const FName SetId) const
+{
+	// Unregistered sets keep the historical two-piece behaviour rather than becoming unactivatable.
+	const int32* Authored = SetThresholds.Find(SetId);
+	return Authored ? *Authored : FHSRRelicSetResolver::DefaultThreshold;
 }
 
 bool UHSREquipmentSubsystem::IsDefinitionCompatible(const FName DefinitionId,const EHSREquipmentKind Kind,const int32 Slot) const
@@ -611,7 +639,18 @@ void UHSREquipmentSubsystem::GetRelicSetSnapshots(const FGuid& CharacterId, TArr
 	if(!State)return;
 	TMap<FName,int32> Counts;
 	for(const auto& Pair:State->Relics)if(const FHSREquipmentInstance* Instance=InstanceRegistry.Find(Pair.Value))if(const FDefinitionRule* Rule=Definitions.Find(Instance->DefinitionId))if(!Rule->SetId.IsNone())++Counts.FindOrAdd(Rule->SetId);
-	for(const auto& Pair:Counts){FHSRRelicSetSnapshot Row;Row.SetId=Pair.Key;Row.EquippedCount=Pair.Value;Row.bActive=Row.EquippedCount>=Row.Threshold;Row.SetSourceId=Row.bActive?Row.SetId:NAME_None;Out.Add(Row);}
+	// Row.Threshold used to be compared before it was ever assigned, so this always tested against
+	// the struct's two-piece default and ignored the authored value.
+	for (const auto& Pair : Counts)
+	{
+		FHSRRelicSetSnapshot Row;
+		Row.SetId = Pair.Key;
+		Row.EquippedCount = Pair.Value;
+		Row.Threshold = GetSetThreshold(Pair.Key);
+		Row.bActive = Row.EquippedCount >= Row.Threshold;
+		Row.SetSourceId = Row.bActive ? Row.SetId : NAME_None;
+		Out.Add(Row);
+	}
 	Out.Sort([](const FHSRRelicSetSnapshot& A,const FHSRRelicSetSnapshot& B){return A.SetId.LexicalLess(B.SetId);});
 }
 

@@ -2377,6 +2377,8 @@ bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipme
 	if (bForceEquipmentRestoreProjectionFailure) return false;
 #endif
 	if (!EquipmentGameplayEffect || !RelicSetGameplayEffect) return false;
+	const UGameInstance* GameInstance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	const UHSREquipmentSubsystem* Equipment = GameInstance ? GameInstance->GetSubsystem<UHSREquipmentSubsystem>() : nullptr;
 	const TMap<FGuid,FHSREquipmentAggregate> OldStates=EquipmentProjectionStates;
 	const TMap<FGuid,FName> OldParticipants=EquipmentProjectionParticipants;
 	const TMap<FName,FHSREquipmentAggregate> OldSetStates=EquipmentSetProjectionStates;
@@ -2398,13 +2400,11 @@ bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipme
 		const auto AddInstance=[&](const FHSREquipmentInstance& Instance){FHSREquipmentLoadout Single; if(Instance.Kind==EHSREquipmentKind::Equipment)Single.Equipment.Add(EHSREquipmentSlot::Weapon,Instance);else Single.Relics.Add(EHSRRelicSlot::Head,Instance);FHSREquipmentAggregate Aggregate;if(!UHSREquipmentStatAggregator::Aggregate(Single,Pair.Value.Revision,Aggregate))return false;DesiredStates.Add(Instance.InstanceId,Aggregate);DesiredParticipants.Add(Instance.InstanceId,Participant->ParticipantId);return true;};
 		for(const auto& Item:Pair.Value.Loadout.Equipment)if(!AddInstance(Item.Value))return false;
 		for(const auto& Item:Pair.Value.Loadout.Relics)if(!AddInstance(Item.Value))return false;
-		// The restore DTO carries piece counts but not per-set thresholds, and the equipment
-		// subsystem holds no set definitions to look them up from, so this path can only apply the
-		// default.  Sets authored with a non-default Threshold will not project correctly here
-		// until set definitions are injected into the subsystem.
+		// The restore DTO carries piece counts but not thresholds, so ask the subsystem that owns
+		// the registered set definitions.  Sets it never saw fall back to the two-piece default.
 		for (const auto& Set : Pair.Value.RelicSetCounts)
 		{
-			if (Set.Value < FHSRRelicSetResolver::DefaultThreshold)
+			if (Set.Value < (Equipment ? Equipment->GetSetThreshold(Set.Key) : FHSRRelicSetResolver::DefaultThreshold))
 			{
 				continue;
 			}

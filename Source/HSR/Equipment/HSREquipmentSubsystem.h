@@ -7,6 +7,7 @@
 
 class UHSREquipmentDefinition;
 class UHSRRelicDefinition;
+class UHSRRelicSetDefinition;
 class UHSREquipmentEnhancementCatalog;
 class UHSRInventorySubsystem;
 class UHSRItemEquipmentMappingCatalog;
@@ -64,6 +65,17 @@ public:
 	bool ProjectRestore(const FHSREquipmentRestoreMap& Candidate) const { return !RestoreProjection.IsBound() || RestoreProjection.Execute(Candidate); }
 	EHSREquipmentOperationResult RegisterDefinition(const UHSREquipmentDefinition& Definition);
 	EHSREquipmentOperationResult RegisterDefinition(const UHSRRelicDefinition& Definition);
+
+	/**
+	 * Registers a relic set's authored activation threshold.  Relic definitions only carry a SetId,
+	 * so without this the subsystem has no way to read Threshold off UHSRRelicSetDefinition and every
+	 * consumer falls back to the two-piece default -- raising a set's Threshold would then be honoured
+	 * in some code paths and silently ignored in others.
+	 */
+	EHSREquipmentOperationResult RegisterSetDefinition(const UHSRRelicSetDefinition& Definition);
+
+	/** Authored threshold for a set, or the two-piece default when the set was never registered. */
+	int32 GetSetThreshold(FName SetId) const;
 	bool HasDefinition(FName DefinitionId) const { return Definitions.Contains(DefinitionId); }
 	bool IsDefinitionCompatible(FName DefinitionId,EHSREquipmentKind Kind,int32 Slot) const;
 	EHSREquipmentOperationResult RegisterInstance(const FHSREquipmentInstance& Instance);
@@ -158,6 +170,7 @@ private:
 		const FHSREquipmentEnhancementRequest& B);
 
 	TMap<FName, FDefinitionRule> Definitions;
+	TMap<FName, int32> SetThresholds;
 	TMap<FGuid, FHSREquipmentInstance> InstanceRegistry;
 	TMap<FGuid, FLoadoutState> Loadouts;
 	TMap<FGuid, FGuid> InstanceOwners;
