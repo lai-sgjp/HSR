@@ -221,7 +221,10 @@ void UHSRTurnManager::BroadcastLifecycleEvent(EHSRTurnLifecycleEventType Type, F
 	if (Type == EHSRTurnLifecycleEventType::TurnStarted) TurnStarted.Broadcast(Event); else TurnEnded.Broadcast(Event);
 }
 bool UHSRTurnManager::IsCurrentParticipantValid() const { return OrderedParticipants.IsValidIndex(CurrentTurnIndex) && IsParticipantTurnEligible(OrderedParticipants[CurrentTurnIndex]); }
-bool UHSRTurnManager::IsParticipantTurnEligible(const FHSRBattleParticipant& P) { return P.IsValid() && P.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) > 0.0f; }
+bool UHSRTurnManager::IsParticipantTurnEligible(const FHSRBattleParticipant& P)
+{
+	return P.IsAlive();
+}
 TArray<FHSRTurnForecastEntry> UHSRTurnManager::BuildTurnForecast(int32 SlotCount) const
 {
 	TArray<FHSRTurnForecastEntry> Forecast;

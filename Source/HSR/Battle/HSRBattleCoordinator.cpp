@@ -589,7 +589,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 	}
 
 	const FHSRBattleParticipant* Attacker = Participants.FindByPredicate([&Command](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == Command.ActorParticipantId; });
-	if (!Attacker || !Attacker->IsValid() || Attacker->bDefeated
+	if (!Attacker || !Attacker->IsAlive()
 		|| !FHSRTargetingPolicy::ValidateTargetIds(*ResolvedSkillDefinition, *Attacker, Participants, Command.TargetParticipantIds))
 	{
 		return Reject(EHSRAbilityFailureReason::InvalidTarget);
@@ -1004,7 +1004,7 @@ void UHSRBattleCoordinator::RecordEnemyTurnIfCurrent(UHSRTurnManager* SourceMana
 		return;
 	}
 	const FHSRBattleParticipant* Participant = Participants.FindByPredicate([&Event](const FHSRBattleParticipant& P) { return P.ParticipantId == Event.ParticipantId; });
-	if (!Participant || Participant->Team != EHSRBattleParticipantTeam::Enemy || Participant->bDefeated
+	if (!Participant || Participant->Team != EHSRBattleParticipantTeam::Enemy || !Participant->IsAlive()
 		|| SourceManager->GetCurrentParticipantId() != Event.ParticipantId
 		|| SourceManager->GetBattleEpoch() != Event.BattleEpoch || SourceManager->GetTurnSequence() != Event.TurnSequence)
 	{
@@ -1074,7 +1074,7 @@ void UHSRBattleCoordinator::DrainPendingEnemyTurns()
 				}
 			}
 		const FHSRBattleParticipant* Enemy = Participants.FindByPredicate([EnemyId](const FHSRBattleParticipant& P) { return P.ParticipantId == EnemyId; });
-		if (!Enemy || Enemy->Team != EHSRBattleParticipantTeam::Enemy || Enemy->bDefeated || !Enemy->AbilitySystemComponent.IsValid() || !EnemyAttack)
+		if (!Enemy || Enemy->Team != EHSRBattleParticipantTeam::Enemy || !Enemy->IsAlive() || !EnemyAttack)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("P10-001A EnemyTurn ConsumedWithoutAction Key=%s"), *QueuedKey);
 			continue;
@@ -1140,8 +1140,7 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 				{
 					return Candidate.ParticipantId == ParticipantId;
 				});
-				if (Participant && Participant->IsValid() && !Participant->bDefeated
-					&& Participant->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) > 0.0f)
+				if (Participant && Participant->IsAlive())
 				{
 					State.TurnOrderParticipantIds.Add(ParticipantId);
 				}
@@ -1647,9 +1646,12 @@ bool UHSRBattleCoordinator::IsTeamWiped(EHSRBattleParticipantTeam Team) const
 	{
 		if (Participant.Team != Team) continue;
 		bFoundMember = true;
-		// bDefeated is authoritative here; an ASC that has gone away counts as down so a
-		// destroyed pawn cannot keep a wiped team nominally alive.
-		if (!Participant.bDefeated && UHSRTurnManager::IsParticipantTurnEligible(Participant)) return false;
+		// An ASC that has gone away counts as down, so a destroyed pawn cannot keep a wiped
+		// team nominally alive.
+		if (Participant.IsAlive())
+		{
+			return false;
+		}
 	}
 	return bFoundMember;
 }
@@ -1911,8 +1913,7 @@ EHSRStatusOperationResult UHSRBattleCoordinator::AddStatusForDevelopmentTest(FNa
 	{
 		return Participant.ParticipantId == SourceParticipantId;
 	});
-	if (!Source || !Source->IsValid()) return EHSRStatusOperationResult::InvalidSource;
-	if (Source->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) <= 0.0f)
+	if (!Source || !Source->IsAlive())
 	{
 		return EHSRStatusOperationResult::InvalidSource;
 	}
@@ -1927,7 +1928,7 @@ EHSRStatusOperationResult UHSRBattleCoordinator::AddDamageOverTimeForDevelopment
 	{
 		return Participant.ParticipantId == SourceParticipantId;
 	});
-	if (!Source || !Source->IsValid() || Source->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) <= 0.0f)
+	if (!Source || !Source->IsAlive())
 	{
 		return EHSRStatusOperationResult::InvalidSource;
 	}
