@@ -11,6 +11,14 @@ struct FHSRBattleParticipant
 {
 	FName ParticipantId;
 	FName DefinitionId;
+
+	/**
+	 * Presentation copied off the authored definition at spawn. Held as plain values so the view
+	 * build stays a pure read: resolving a definition asset per publish would put an asset lookup
+	 * on a path that runs on every state change.
+	 */
+	FText DisplayName;
+	TSoftObjectPtr<UTexture2D> Portrait;
 	EHSRBattleParticipantTeam Team = EHSRBattleParticipantTeam::Player;
 	FGameplayTagContainer WeaknessTags;
 

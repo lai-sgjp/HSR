@@ -402,6 +402,8 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		FHSRBattleParticipant Participant;
 		Participant.ParticipantId = Def.ParticipantId;
 		Participant.DefinitionId = Def.DefinitionId;
+		Participant.DisplayName = Def.DisplayName;
+		Participant.Portrait = Def.Portrait;
 		Participant.Team = Def.Team;
 		Participant.Actor = SpawnedActor;
 		Participant.AbilitySystemComponent = SpawnedActor->FindComponentByClass<UAbilitySystemComponent>();
@@ -413,6 +415,17 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		}
 		if (Def.Team == EHSRBattleParticipantTeam::Enemy)
 		{
+			// Enemies reach here with the definition asset already resolved, so fill presentation
+			// from it. Only when the roster left it empty: an authored roster entry is the more
+			// specific source and must win over the shared definition.
+			if (Participant.DisplayName.IsEmpty())
+			{
+				Participant.DisplayName = EnemyDefinition->DisplayName;
+			}
+			if (Participant.Portrait.IsNull())
+			{
+				Participant.Portrait = EnemyDefinition->Portrait;
+			}
 			Participant.WeaknessTags = EnemyDefinition->WeaknessTags;
 			Participant.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxToughnessAttribute(), EnemyDefinition->InitialMaxToughness);
 			Participant.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetToughnessAttribute(), EnemyDefinition->InitialToughness);
@@ -1188,6 +1201,8 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 		}
 		FHSRBattleParticipantView& View = State.Participants.AddDefaulted_GetRef();
 		View.ParticipantId = Participant.ParticipantId;
+		View.DisplayName = Participant.DisplayName;
+		View.Portrait = Participant.Portrait;
 		View.bPlayerTeam = Participant.Team == EHSRBattleParticipantTeam::Player;
 		View.bDefeated = Participant.bDefeated;
 		for (const FGameplayTag& WeaknessTag : Participant.WeaknessTags)
@@ -1398,6 +1413,8 @@ void UHSRBattleCoordinator::AppendRosterDefinitions(const TArray<FHSRBattleRoste
 		Def.DefinitionId = Roster[Index].CharacterId;
 		Def.Team = Team;
 		Def.PawnClass = Roster[Index].PawnClass;
+		Def.DisplayName = Roster[Index].DisplayName;
+		Def.Portrait = Roster[Index].Portrait;
 		OutDefinitions.Add(Def);
 	}
 }

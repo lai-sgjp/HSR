@@ -48,14 +48,14 @@ const FHSRBattleCommandSkillView* UHSRBattleCommandViewModel::FindSelectedSkill(
 
 void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
 {
-	CurrentActorText = FText::Format(NSLOCTEXT("HSRCommand", "CurrentActor", "Actor: {0}"), FText::FromName(State.CurrentActorId));
+	CurrentActorText = FText::Format(NSLOCTEXT("HSRCommand", "CurrentActor", "Actor: {0}"), State.GetParticipantLabel(State.CurrentActorId));
 	EnergyText = FText::Format(NSLOCTEXT("HSRCommand", "Energy", "Energy: {0} / {1}"), FText::AsNumber(FMath::RoundToInt(State.Energy)), FText::AsNumber(FMath::RoundToInt(State.MaxEnergy)));
 	SkillPointsText = FText::Format(NSLOCTEXT("HSRCommand", "SkillPoints", "Skill Points: {0} / {1}"), FText::AsNumber(State.SkillPoints), FText::AsNumber(State.MaxSkillPoints));
 	LastResolutionText = FText::Format(NSLOCTEXT("HSRCommand", "Resolution", "Last Resolution: {0} ({1})"), FText::AsNumber(static_cast<int32>(State.LastResolution.Status)), FText::AsNumber(static_cast<int32>(State.LastResolution.FailureReason)));
 	TArray<FString> StatusLines;
 	for (const FHSRStatusPublicSnapshot& Status : State.Statuses)
 	{
-		StatusLines.Add(FString::Printf(TEXT("%s | %s | %s | %s | x%d | %d"), *Status.TargetParticipantId.ToString(), *Status.StatusId.ToString(), *Status.DisplayName.ToString(),
+		StatusLines.Add(FString::Printf(TEXT("%s | %s | %s | %s | x%d | %d"), *State.GetParticipantLabel(Status.TargetParticipantId).ToString(), *Status.StatusId.ToString(), *Status.DisplayName.ToString(),
 			Status.Classification == EHSRStatusClassification::Buff ? TEXT("Buff") : TEXT("Debuff"), Status.Stacks, Status.RemainingTurns));
 	}
 	StatusText = FText::FromString(FString::Join(StatusLines, TEXT("\n")));
@@ -64,7 +64,10 @@ void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
 		? FText::FromString(FString::Printf(TEXT("%s | %s | op=%d | result=%d | #%lld"), *Operation.TargetParticipantId.ToString(), *Operation.StatusId.ToString(), static_cast<int32>(Operation.Operation), static_cast<int32>(Operation.Result), Operation.Sequence))
 		: FText::GetEmpty();
 	TArray<FString> OrderLines;
-	for (const FName ParticipantId : State.TurnOrderParticipantIds) OrderLines.Add(ParticipantId.ToString());
+	for (const FName ParticipantId : State.TurnOrderParticipantIds)
+	{
+		OrderLines.Add(State.GetParticipantLabel(ParticipantId).ToString());
+	}
 	TurnOrderText = FText::FromString(FString::Join(OrderLines, TEXT(" -> ")));
 	TArray<FString> ParticipantLines;
 	for (const FHSRBattleParticipantView& Participant : State.Participants)
@@ -77,15 +80,20 @@ void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
 		WeaknessNames.Sort();
 		const FString ParticipantWeaknessText = WeaknessNames.IsEmpty() ? TEXT("None") : FString::Join(WeaknessNames, TEXT(", "));
 		ParticipantLines.Add(FString::Printf(TEXT("%s | HP %.0f/%.0f | Energy %.0f/%.0f | Toughness %.0f/%.0f | Weakness %s%s"),
-			*Participant.ParticipantId.ToString(), Participant.Health, Participant.MaxHealth, Participant.Energy, Participant.MaxEnergy,
+			*Participant.GetDisplayLabel().ToString(), Participant.Health, Participant.MaxHealth, Participant.Energy, Participant.MaxEnergy,
 			Participant.Toughness, Participant.MaxToughness, *ParticipantWeaknessText, Participant.bDefeated ? TEXT(" | Defeated") : TEXT("")));
 	}
 	ParticipantsText = FText::FromString(FString::Join(ParticipantLines, TEXT("\n")));
 	TArray<FString> PresentationLines;
 	for (const FHSRBattlePresentationEvent& Event : State.PresentationEvents)
 	{
-		const TCHAR* Label = Event.EventType == EHSRPresentationEventType::Damage ? TEXT("Damage") : Event.EventType == EHSRPresentationEventType::Toughness ? TEXT("Toughness") : Event.EventType == EHSRPresentationEventType::Break ? TEXT("Break") : TEXT("Heal");
-		PresentationLines.Add(FString::Printf(TEXT("%s -> %s | %s %.0f%s%s"), *Event.SourceParticipantId.ToString(), *Event.TargetParticipantId.ToString(), Label, Event.Value, Event.bCritical ? TEXT(" | Critical") : TEXT(""), Event.bBreak ? TEXT(" | Break") : TEXT("")));
+		PresentationLines.Add(FString::Printf(TEXT("%s -> %s | %s %.0f%s%s"),
+			*State.GetParticipantLabel(Event.SourceParticipantId).ToString(),
+			*State.GetParticipantLabel(Event.TargetParticipantId).ToString(),
+			*Event.GetEventTypeLabel().ToString(),
+			Event.Value,
+			Event.bCritical ? TEXT(" | Critical") : TEXT(""),
+			Event.bBreak ? TEXT(" | Break") : TEXT("")));
 	}
 	PresentationText = FText::FromString(FString::Join(PresentationLines, TEXT("\n")));
 

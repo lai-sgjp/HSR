@@ -55,6 +55,17 @@ struct FHSRBattleRosterEntry
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle")
 	TSubclassOf<APawn> PawnClass;
 
+	/**
+	 * Presentation resolved by whoever assembles the roster, because that caller is the one holding
+	 * the character definition. Empty is valid and means "no authored name"; the UI falls back to
+	 * the participant id. Keeping it on the entry lets the Coordinator stay free of asset lookups.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FText DisplayName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	TSoftObjectPtr<UTexture2D> Portrait;
+
 	FHSRBattleRosterEntry() = default;
 	FHSRBattleRosterEntry(FName InCharacterId, TSubclassOf<APawn> InPawnClass)
 		: CharacterId(InCharacterId), PawnClass(InPawnClass) {}
@@ -90,6 +101,12 @@ struct FHSRBattleParticipantDefinition
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle")
 	TSubclassOf<APawn> PawnClass;
 
+	/** Carried through from the roster entry; see FHSRBattleRosterEntry::DisplayName. */
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FText DisplayName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	TSoftObjectPtr<UTexture2D> Portrait;
 
 	FHSRBattleParticipantDefinition() = default;
 };

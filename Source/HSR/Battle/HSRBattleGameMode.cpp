@@ -1716,7 +1716,12 @@ void AHSRBattleGameMode::BeginPlay()
 			continue;
 		}
 
-		PlayerRoster.Add(FHSRBattleRosterEntry{ MemberId, MemberClass });
+		// Resolve presentation here, where the definition is already loaded, so the Coordinator and
+		// the UI never have to reach for a character asset.
+		FHSRBattleRosterEntry MemberEntry{ MemberId, MemberClass };
+		MemberEntry.DisplayName = MemberDefinition->DisplayName;
+		MemberEntry.Portrait = MemberDefinition->Portrait;
+		PlayerRoster.Add(MemberEntry);
 		MemberLoadouts.Add(MemberId, ResolveAuthoredLoadout(*MemberDefinition));
 	}
 

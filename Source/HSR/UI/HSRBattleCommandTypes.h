@@ -9,10 +9,10 @@
 UENUM(BlueprintType)
 enum class EHSRPresentationEventType : uint8
 {
-	Damage,
-	Toughness,
-	Break,
-	Heal
+	Damage UMETA(DisplayName = "Damage"),
+	Toughness UMETA(DisplayName = "Toughness"),
+	Break UMETA(DisplayName = "Break"),
+	Heal UMETA(DisplayName = "Heal")
 };
 
 USTRUCT(BlueprintType)
@@ -27,6 +27,22 @@ struct FHSRBattlePresentationEvent
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Presentation") float Value = 0.0f;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Presentation") bool bCritical = false;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Presentation") bool bBreak = false;
+
+	/**
+	 * Display label for EventType, read from the UENUM's DisplayName metadata rather than a
+	 * hand-written switch. A new event kind gets a label from its own UMETA the moment it is
+	 * declared, so no UI site has to be edited to keep up. Returns the raw numeric value when
+	 * reflection is unavailable, which is visibly wrong rather than silently mislabelled -- the
+	 * ternary chain this replaced fell through to "Heal" for every unrecognised kind.
+	 */
+	FText GetEventTypeLabel() const
+	{
+		if (const UEnum* EnumType = StaticEnum<EHSRPresentationEventType>())
+		{
+			return EnumType->GetDisplayNameTextByValue(static_cast<int64>(EventType));
+		}
+		return FText::AsNumber(static_cast<int32>(EventType));
+	}
 };
 
 /** Read-only terminal result for the result panel. It contains no runtime objects or return authority. */
@@ -97,6 +113,15 @@ struct FHSRBattleParticipantView
 {
 	GENERATED_BODY()
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") FName ParticipantId;
+
+	/**
+	 * Authored player-facing name, empty when the definition left it unset. Read it through
+	 * GetDisplayLabel() rather than directly so the id fallback stays in one place.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") FText DisplayName;
+
+	/** Authored portrait, unset when the definition has none. The UI decides what to show then. */
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") TSoftObjectPtr<UTexture2D> Portrait;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") bool bPlayerTeam = false;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") bool bDefeated = false;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") float Health = 0.0f;
@@ -108,6 +133,16 @@ struct FHSRBattleParticipantView
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") TArray<FGameplayTag> WeaknessTags;
 	/** False means the numeric fields above were never read from an ASC, not that they are zero. */
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") bool bHasAttributes = false;
+
+	/**
+	 * Name to render: the authored DisplayName, or the participant id when none was authored. Every
+	 * UI site should call this instead of choosing a fallback itself, so an unauthored definition
+	 * degrades to a readable id in exactly one way.
+	 */
+	FText GetDisplayLabel() const
+	{
+		return DisplayName.IsEmpty() ? FText::FromName(ParticipantId) : DisplayName;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -139,6 +174,25 @@ struct FHSRBattleCommandViewState
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") bool bCommandPending = false;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") bool bPresentationLocked = false;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FGuid PendingActionId;
+
+	/** Participant lookup by id, or null when the id is not in this snapshot. */
+	const FHSRBattleParticipantView* FindParticipant(FName ParticipantId) const
+	{
+		return Participants.FindByPredicate([ParticipantId](const FHSRBattleParticipantView& Candidate)
+		{
+			return Candidate.ParticipantId == ParticipantId;
+		});
+	}
+
+	/**
+	 * Name to render for a participant id. Falls back to the raw id when the id is absent from the
+	 * snapshot, which happens for a participant that left the battle between publishes.
+	 */
+	FText GetParticipantLabel(FName ParticipantId) const
+	{
+		const FHSRBattleParticipantView* Participant = FindParticipant(ParticipantId);
+		return Participant ? Participant->GetDisplayLabel() : FText::FromName(ParticipantId);
+	}
 
 	/** Skill lookup by stable id. Prefer this over category matching: a loadout may hold several
 	    skills of the same category, and only the id distinguishes them. */
