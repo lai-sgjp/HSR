@@ -1,10 +1,82 @@
 ﻿# HSR Todo Plan
 
+## 2026-08-09 TASK-P17-INVENTORY-004 Editor/core PIE closeout pending visual acceptance
+
+- [x] 用户创建并保存 DA_InventoryCatalog_P17、WBP_Inventory_P17，并完成
+  Catalog/MappingCatalog/EnhancementCatalog、HUD、Input 与动态列表接线。
+- [x] 允许清单内 C++ Blueprint seam、急切初始化、动态行点击桥接、详情和
+  Action enablement 已完成；没有修改 Inventory/Equipment Authority。
+- [x] 用户提供 Map_Exploration_P15_A 核心 PIE 证据：B 打开、Back 返回 Pause
+  Hub、X 返回探索；无 Blueprint Runtime Error、Ensure 或 invalid snapshot 日志。
+- [x] Build Succeeded、HSR.UI.Inventory 9/9、HSR.UI.FrontendNavigation 11/11、
+  git diff --check 通过。
+- [ ] 用户手动鼠标/手柄体验分类、筛选、排序、选择、Equip/Enhance/不可用操作、
+  正常旅行 restore 与失败快照保持；完成后再标记 USER ACCEPTED。
+
+> 当前状态：代码、Editor 集成和核心 PIE 已完成；视觉/完整交互验收仍待用户确认。
+> 未 stage/commit/push，.claude/** 和其他用户脏工作树修改保持原样。
+
+---
+
+## 2026-08-09 TASK-P17-INVENTORY-004 code gate complete / Editor-PIE pending
+
+- [x] 独立 Gate 0：冻结共享 Frontend Shell/Router/UIManager 与
+  ModuleContentHost 挂载路径、P13 fallback、Authority 边界、动态焦点和旅行
+  teardown/restore 约束。
+- [x] TDD RED：动态路由测试真实触发缺失
+  ConfigureAutomationInventoryModuleBackend seam 的编译失败。
+- [x] GREEN：完成 HUD/UIManager 动态 Inventory 接入、P17 Widget screen/focus/
+  close seam、Back/X、travel restore、party slot-0 context 与 snapshot guard。
+- [x] Development Editor Build、HSR.UI.Inventory 9/9、
+  HSR.UI.FrontendNavigation 11/11、git diff --check 通过。
+- [ ] 用户 Editor：创建/接线 WBP_Inventory_P17、catalog、UMG、preferred focus、
+  BP_HSRHUD Class Defaults，Save All 并关闭重开 Editor。
+- [ ] 用户 PIE：B、分类/筛选/排序/选择、合法/不可用操作、Back/X、travel
+  teardown/restore、失败快照保持；完成后再决定 USER ACCEPTED 或修复首个真实失败。
+
+> 当前状态：004 代码门禁完成，但不能声称 PIE/UAsset 已通过。.claude/**、
+> 其他用户脏工作树修改以及 Git 历史均保持不变，未 stage/commit/push。
+
+---
+
+## 2026-08-09 TASK-P17-INVENTORY-003 code gate complete
+
+- [x] 用户授权与独立 Gate 0：冻结 Equipment Authority command context、稳定
+  InstanceId、真实双 revision、OperationId、typed unavailable 和失败快照保持。
+- [x] TDD RED：新增命令测试并真实触发预期的缺失 command seam 编译失败。
+- [x] TASK-P17-INVENTORY-003 GREEN：仅修改活动任务卡 allowlist 内的 Inventory UI
+  types/ViewModel/Widget 和测试；不得修改 Authority 或 Content。
+- [x] Development Editor Build、7/7 Inventory Automation、`git diff --check` 与
+  exact allowlist audit 通过。
+
+> 当前状态：`TASK-P17-INVENTORY-003` 代码门禁完成；不包含 B/Back/X、UIManager/ModuleContentHost、UAsset、PIE 或 Git 操作。下一包 `TASK-P17-INVENTORY-004` 需用户另行授权。
+
+## 2026-08-09 TASK-P17-INVENTORY-002 GREEN / code gate complete
+
+- [x] 继承并保留 TASK-P17-INVENTORY-001 的真实 TDD RED 证据。
+- [x] 实现显式 Inventory catalog、纯值 snapshot、分类/筛选/确定性排序、稳定 key
+  选择、stack/unique 详情与只读 ViewModel/Widget delegate。
+- [x] Development Editor Build 通过；`HSR.UI.Inventory` Automation 发现 4 项并
+  通过 4/4，包含既有 `HSR.UI.InventoryReward.Lifecycle` 回归。
+- [x] 更新 active task、execution result、TDD evidence、PROJECT_STATE、worklog。
+- [x] TASK-P17-INVENTORY-003：合法命令与失败快照保持（代码门禁完成，Build/7 项 Automation 通过）。
+
+> 历史状态：`TASK-P17-INVENTORY-002` 已完成代码门禁并由 003 替换活动卡；002 不包含 B/Back/X、UIManager/ModuleContentHost 接入、UAsset、PIE 或合法命令。
+
+## 2026-08-09 TASK-P17-INVENTORY-001
+
+- [x] Gate 0：冻结显式 Inventory UI catalog、Authority 所有权、稳定 key、排序/筛选、
+  失败快照和 ModuleContentHost 边界。
+- [x] TDD RED：Source/HSR/Tests/HSRInventoryViewModelTests.cpp 已被真实 UBT 编译并
+  在缺失 HSRInventoryCatalog.h contract 处失败。
+- [x] TASK-P17-INVENTORY-002：分类、详情、筛选、排序、稳定选择与只读 ViewModel/Widget
+  投影；Development Build 与聚焦 Automation 通过。
+
 > 当前状态：按用户明确指令，P17-005 已收口为 `COMPLETE / USER ACCEPTED`。P17-PATCH-03A～03H 与 P17-006/P17-009/P17-010A～010C 已按各自证据归档；010B 已按用户确认收口；009D 已归档。
 
-> Latest state (2026-08-09): TASK-P17-010C and TASK-P17-CHAR-SHELL-001 remain user-confirmed complete. Relic/Equipment user PIE is accepted and the local implementation commit is `65ba365` (not pushed). User has chosen to complete Inventory, Dialogue Presentation and Phase 18 before Demo; the subtask backlog is recorded below, but no `002` task card is active yet.
+> Latest state (2026-08-09): TASK-P17-010C and TASK-P17-CHAR-SHELL-001 remain user-confirmed complete. Relic/Equipment user PIE is accepted and the local implementation commit is `65ba365` (not pushed). User has chosen to complete Inventory, Dialogue Presentation and Phase 18 before Demo. `TASK-P17-INVENTORY-001` Gate 0/RED and `TASK-P17-INVENTORY-002` code gate are complete; `003` is the next package and still requires separate authorization.
 
-> 当前活动任务：Relic/Equipment 任务卡仍保留在 `tasks/active-task.md` 作为 closeout/资产证据入口；本轮仅更新 Inventory/Dialogue/Phase 18 backlog，尚未创建 `TASK-P17-INVENTORY-001` 或任何 `002` 活动任务卡。
+> 当前活动任务：`TASK-P17-INVENTORY-002` 已完成代码门禁，活动卡、执行结果和 TDD 证据已同步；`003` 尚未授权。`.claude/**` 仍为用户本地状态，不纳入交付。
 
 ## 已完成的规划工作
 
@@ -353,7 +425,7 @@
 - [x] TASK-P17-CHAR-SHELL-001：Character Progression Shell；C++/UHT/Build、Shell 2/2、相邻 20/20 Automation 与用户 Editor/PIE 已收口。失败路径 PIE 与双分辨率按用户决定记录为非阻塞未执行项。
 - [x] 计划 P17-006 Character 养成 Shell：实际 P17-006 仍是 Quest Frontend；本计划语义的 Character Detail/Weapon/Traces/Relics/Eidolon/Information/Outfit Shell 已由无歧义任务 `TASK-P17-CHAR-SHELL-001` 用户验收。
 - [x] 计划 P17-007 Relic/Equipment 多级选择与强化：用户 PIE 已接受；本地实现提交 `65ba365`，正式 closeout 文档/provenance 仍需同步。
-- [ ] 计划 P17-008 Inventory 分类、详情与合法操作：未发现对应完成归档。
+- [x] 计划 P17-008 Inventory 分类、详情与合法操作：003 代码门禁完成；Editor/UMG、B/Back/X、旅行 teardown 与 PIE 收口仍属 004。
 - [ ] 计划 P17-012 Dialogue Presentation：当前实际 P17-012 是动态挂载，不能替代本计划对话展示包。
 - [ ] 计划 P17-013 Battle HUD、只读详情与两阶段指令：未发现对应完成归档。
 - [ ] 计划 P17-014 Battle Pause、Restart/Exit 与 Reward Presentation：未发现对应完成归档。
@@ -363,8 +435,8 @@
 ### Phase 17 Inventory/Dialogue 子任务 backlog（规划，不代表完成）
 
 - [ ] `TASK-P17-INVENTORY-001`：Gate 0、Authority/数据合同与真实 RED。
-- [ ] `TASK-P17-INVENTORY-002`：分类、详情、筛选、排序、稳定选择和只读 ViewModel/Widget 投影。
-- [ ] `TASK-P17-INVENTORY-003`：Equip/Enhance 合法命令、失败快照保持；Use/Disassemble 无 Authority 时 typed unavailable。
+- [x] `TASK-P17-INVENTORY-002`：分类、详情、筛选、排序、稳定选择和只读 ViewModel/Widget 投影；Build/Automation 通过。
+- [x] `TASK-P17-INVENTORY-003`：Equip/Enhance 合法命令、失败快照保持；Use/Disassemble 无 Authority 时 typed unavailable；Build/7 项 Automation 通过。
 - [ ] `TASK-P17-INVENTORY-004`：用户 Editor 集成、B/Back/X、旅行 teardown、PIE 与收口。
 - [ ] `TASK-P17-DIALOGUE-001`：Gate 0、Interaction/Dialogue 合同与真实 RED。
 - [ ] `TASK-P17-DIALOGUE-002`：事件驱动对话 Overlay、说话者、正文、选项、选择和退出。
@@ -410,3 +482,23 @@
 - [x] P11-006：fresh Build、8 项 HSR Automation、失败注入、Editor 重开 Load、完整战斗返回、C/蓝图按钮 UI 切换与归档完成。
 - [ ] Follow-up：Standalone `Esc` 返回；详情页打开时终局自动显示 ResultView；完整 Phase 2/5～10 专项回归。
 - [ ] Phase 11 提交前 provenance/allowlist 审计及阶段收尾 commit；不得提交 `.claude/settings.local.json`、插件 `__pycache__`、Binaries、Intermediate 或 Saved。
+## 2026-08-09 TASK-P17-INVENTORY-004 code gate complete / Editor-PIE pending
+
+- [x] 独立 Gate 0：冻结共享 Frontend Shell/Router/UIManager 与
+  `ModuleContentHost` 挂载路径、P13 fallback、Authority 边界、动态焦点和旅行
+  teardown/restore 约束。
+- [x] TDD RED：动态路由测试真实触发缺失
+  `ConfigureAutomationInventoryModuleBackend` seam 的编译失败。
+- [x] GREEN：完成 HUD/UIManager 动态 Inventory 接入、P17 Widget screen/focus/
+  close seam、Back/X、travel restore、party slot-0 context 与 snapshot guard。
+- [x] Development Editor Build、`HSR.UI.Inventory` 9/9、
+  `HSR.UI.FrontendNavigation` 11/11、`git diff --check` 通过。
+- [ ] 用户 Editor：创建/接线 `WBP_Inventory_P17`、catalog、UMG、preferred focus、
+  `BP_HSRHUD` Class Defaults，Save All 并关闭重开 Editor。
+- [ ] 用户 PIE：B、分类/筛选/排序/选择、合法/不可用操作、Back/X、travel
+  teardown/restore、失败快照保持；完成后再决定 `USER ACCEPTED` 或修复首个真实失败。
+
+> 当前状态：004 代码门禁完成，但不能声称 PIE/UAsset 已通过。`.claude/**`、
+> 其他用户脏工作树修改以及 Git 历史均保持不变，未 stage/commit/push。
+
+---

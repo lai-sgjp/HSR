@@ -12,6 +12,7 @@ class UHSRRewardSummaryWidget;
 class UHSRScreenWidget;
 class UHSRFrontendShellWidget;
 class UHSRFrontendModuleRootWidget;
+class UHSRInventoryModuleWidget;
 class UUserWidget;
 
 UCLASS()
@@ -66,6 +67,8 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P13")
 	TSubclassOf<UHSRInventoryWidget> InventoryWidgetClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
+	TSubclassOf<UHSRInventoryModuleWidget> InventoryModuleWidgetClass;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
 	TSubclassOf<UUserWidget> PartyWidgetClass;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")

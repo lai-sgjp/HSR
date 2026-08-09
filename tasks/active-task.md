@@ -1,200 +1,286 @@
-# TASK-P17-RELIC-EQUIPMENT-001 - Relic/Equipment Selection and Enhancement
+# TASK-P17-INVENTORY-004 — Editor 集成、PIE 与收口
+Status: IN PROGRESS / CODE + EDITOR + CORE PIE COMPLETE / USER VISUAL ACCEPTANCE PENDING
 
-Status: `C++/AUTOMATION COMPLETE / USER EDITOR ASSET GATE`
+This is the current active task. The detailed 004 contract is recorded in the
+004 section below; the preceding Inventory-003 block is historical context only.
+The user has supplied Editor integration and core PIE evidence. The only
+remaining work is manual visual/interaction experience and final acceptance.
+
+---
+
+# TASK-P17-INVENTORY-003 — 合法命令与失败保持
+
+Status: `COMPLETE / GATE 0 PASS / TDD RED CONFIRMED / GREEN PASS / FOCUSED AUTOMATION PASS`
 
 ## Scope identity
 
-This task implements the Phase 17 execution-plan meaning of P17-007. It must
-not be labeled `TASK-P17-006`: the repository task with that number is the
-archived Quest Frontend. It must not be labeled `TASK-P17-012`: the repository
-task with that number is the archived five-module dynamic mount. This new
-unambiguous task name is the only active identity for the implementation.
+This is the unambiguous implementation identity for the Phase 17 execution
+plan meaning of P17-008. It is not `TASK-P17-008`, and it must not reuse the
+archived meanings of `TASK-P17-006` (Quest Frontend) or `TASK-P17-012` (five-
+module dynamic mounting).
 
-User authorization: 2026-08-07, explicit authorization for
-`TASK-P17-RELIC-EQUIPMENT-001`.
+User authorization: the user's `授权` response to the immediately preceding
+Inventory-002 handoff is interpreted as authorization for the next explicitly
+named package, `TASK-P17-INVENTORY-003`, on 2026-08-09.
 
 ## Sole observable outcome
 
-From the accepted Character Shell Relics tab, the player can enter one
-Relic/Equipment flow, select a relic slot, inspect bag candidates, compare a
-candidate with the committed relic, equip or replace through one authoritative
-movement request, open enhancement choices, and confirm one material-backed
-enhancement transaction. Back returns one presentation level at a time; X and
-the existing Frontend route retain their existing semantics.
+The Inventory ViewModel can submit Equip and Enhance only through the existing
+Equipment Authority, carrying the selected stable unique `InstanceId`, the real
+Inventory/Equipment revisions, the selected character, and a fresh operation
+ID. Use and Disassemble remain typed unavailable because no corresponding
+Authority exists. Authority rejection, revision conflict, missing mapping or
+definition, empty candidate/option data, and duplicate-operation rejection do
+not mutate Inventory/Equipment and do not replace the last complete UI
+snapshot with an empty failure stage.
 
-The only committed domain result is an authoritative Equipment/Inventory state
-with exactly-once revisions/publication. A rejected request keeps the previous
-Inventory snapshot, Equipment registry/loadout, revisions, materials, and UI
-selection state intact. Missing catalog or authority data is a typed
-unavailable state, not a Blueprint-created success.
+This package does not wire B/Back/X, UIManager, Frontend route mounting,
+`ModuleContentHost`, UAsset assets, travel teardown, or PIE. Those remain
+Inventory-004 and user Editor work.
 
-The Exploration Pause shortcut remains numeric `1`. Character and Inventory
-remain dynamically mounted and must not use direct `AddToViewport`.
+## Frozen contracts inherited from Inventory-002
 
-## Ownership and data-flow contract
+1. `UHSRInventorySubsystem` remains the authority for stack/unique possession,
+   capacity, and Inventory revision/publication. `UHSREquipmentSubsystem`
+   remains the authority for equipment ownership, placement, and enhancement.
+2. Inventory rows use `ItemId + invalid InstanceId` for stacks and
+   `ItemId + committed InstanceId` for unique items. Array indices never become
+   command identity.
+3. The ViewModel reads committed snapshots and delegates; the Widget forwards
+   intent and reads pure values. Neither may call `RemoveStack`, mutate
+   SaveGame, apply GameplayEffects, or own viewport state.
+4. Every failed command preserves the complete committed snapshot and emits no
+   synthetic empty stage. A successful Authority publication is the only source
+   of the subsequent rebuilt snapshot.
 
-1. `UHSREquipmentSubsystem` owns the complete equipment/relic instance payload,
-   placement, owner mapping, Equipment revision, and enhancement transaction
-   ledger.
-2. `UHSRInventorySubsystem` owns bag membership, stackable material quantity,
-   capacity, Inventory revision, and Inventory publication.
-3. `UHSREquipmentEnhancementCatalog` owns static editor-authored target-level
-   rules. It is not Save data and it does not perform a transaction.
-4. The aggregate enhancement seam prepares an immutable Inventory candidate and
-   Registry/loadout candidate, validates both expected revisions and the
-   expected current enhancement level, installs both only after preflight,
-   advances each revision once, then publishes once per domain. OperationId
-   replay returns the cached result without a second side effect; a changed
-   payload under the same OperationId is rejected.
-5. `UHSRRelicEquipmentViewModel` owns only transient selected character/slot,
-   selected candidate, stage, comparison values, and enhancement options. It
-   reads committed snapshots and forwards UI intent; it is not domain or Save
-   authority.
-6. `UHSRRelicEquipmentWidget` owns delegate lifecycle and Blueprint event
-   forwarding. Blueprint owns layout, styling, focus, entry visuals, and
-   snapshot binding only.
-7. Existing Character Shell, Frontend root/router/UIManager, Save schema,
-   Party/Map/BattleReturn/Quest/Challenge/Inventory reward logic, and accepted
-   009D/010A/010B/010C behavior are regression inputs, not implementation
-   targets.
+## Implementation contract
 
-## Codex Source allowlist
+- Extend the Inventory command seam with an explicit Equipment command context:
+  `UHSREquipmentSubsystem`, `UHSRItemEquipmentMappingCatalog`,
+  `UHSREquipmentEnhancementCatalog`, and a valid `CharacterId`.
+- Equip resolves the selected unique row through the mapping catalog, chooses
+  the Authority-supported Equip/Replace intent, and submits a
+  `FHSREquipmentMovementRequest` with the snapshot's real Inventory revision,
+  current Equipment revision, stable `InstanceId`, and a new `OperationId`.
+- Enhance accepts an explicit target level and submits a
+  `FHSREquipmentEnhancementRequest` only when the selected stable instance and
+  command context are valid. It never removes material directly.
+- Use and Disassemble return `AuthorityUnavailable` without calling Inventory.
+  Missing command context is also typed unavailable; mapping/catalog failures,
+  Authority rejection, stale revisions, and invalid target levels remain
+  distinguishable at the ViewModel boundary. Raw subsystem result codes must be
+  retained in logs when mapped.
+- Subscribe to the Equipment loadout delegate for the configured character and
+  include its revision in the pure snapshot. Keep all Blueprint accessors
+  bounds-safe.
 
-New files:
+## TDD gates
 
-- `Source/HSR/Data/Definitions/HSREquipmentEnhancementCatalog.h`
-- `Source/HSR/Data/Definitions/HSREquipmentEnhancementCatalog.cpp`
-- `Source/HSR/UI/Relic/HSRRelicEquipmentTypes.h`
-- `Source/HSR/UI/Relic/HSRRelicEquipmentViewModel.h`
-- `Source/HSR/UI/Relic/HSRRelicEquipmentViewModel.cpp`
-- `Source/HSR/UI/Relic/HSRRelicEquipmentWidget.h`
-- `Source/HSR/UI/Relic/HSRRelicEquipmentWidget.cpp`
-- `Source/HSR/Tests/HSREquipmentEnhancementTests.cpp`
-- `Source/HSR/Tests/HSRRelicEquipmentViewModelTests.cpp`
-- `docs/testing/TASK-P17-RELIC-EQUIPMENT-001.tdd.md`
+1. Gate 0: complete. The Authority ownership, command context, stable IDs,
+   revision contract, failure matrix, and allowlist are frozen here.
+2. RED: complete. New command tests were compiled and reached the intended
+   missing command seam/compiler failures before production changes.
+3. GREEN: complete. The allowlisted Inventory UI/types/test files were
+   implemented and the same focused Automation target passed all discovered
+   tests.
+4. Refactor and verify: complete for the code gate. Development Build,
+   focused Inventory UI Automation, `git diff --check`, and exact allowlist
+   audit passed. Do not claim PIE.
 
-Existing files permitted only for the minimum authority/candidate seam,
-enhancement transaction, and development fixture:
+## Allowed files
 
-- `Source/HSR/Equipment/HSREquipmentTypes.h`
-- `Source/HSR/Equipment/HSREquipmentSubsystem.h`
-- `Source/HSR/Equipment/HSREquipmentSubsystem.cpp`
-- `Source/HSR/Inventory/HSRItemTypes.h`
-- `Source/HSR/Inventory/HSRInventorySubsystem.h`
-- `Source/HSR/Inventory/HSRInventorySubsystem.cpp`
-- `Source/HSR/Equipment/HSREquipmentDevelopmentHarness.h`
-- `Source/HSR/Equipment/HSREquipmentDevelopmentHarness.cpp`
+Production files:
 
-No other Source file is authorized. In particular, do not modify Character
-Shell C++, Character/Equipment Detail ViewModel, UIManager, HUD, Frontend
-Router/Root, Save/Migration/Schema, Battle, Party, Map, Quest, Challenge,
-Reward, Gacha, Config, Build.cs, `.uproject`, plugins, or `.claude/**`.
+- `Source/HSR/UI/Inventory/HSRInventoryTypes.h`
+- `Source/HSR/UI/Inventory/HSRInventoryViewModel.h`
+- `Source/HSR/UI/Inventory/HSRInventoryViewModel.cpp`
+- `Source/HSR/UI/Inventory/HSRInventoryModuleWidget.h`
+- `Source/HSR/UI/Inventory/HSRInventoryModuleWidget.cpp`
 
-## User Editor UAsset allowlist
+Test and evidence files:
 
-User may create:
+- `Source/HSR/Tests/HSRInventoryViewModelTests.cpp`
+- `tasks/active-task.md`
+- `tasks/execution-result.md`
+- `docs/testing/TASK-P17-INVENTORY-003.tdd.md`
+- `PROJECT_STATE.md`
+- `worklog.md`
+- `todo_plan.md` (only for real progress)
+- `tasks/archive/TASK-P17-INVENTORY-002-active-task.md`
+- `tasks/archive/TASK-P17-INVENTORY-002-execution-result.md`
 
-- `Content/UI/P17/Character/WBP_RelicEquipment_P17.uasset`
-- `Content/UI/P17/Character/WBP_RelicSlotEntry_P17.uasset`
-- `Content/UI/P17/Character/WBP_RelicCandidateEntry_P17.uasset`
-- `Content/Data/Equipment/DA_EquipmentEnhancementCatalog_P17.uasset`
+Existing Authority, catalog, mapping, Save, Router, UIManager, HUD, Content,
+Config, Build.cs, `.uproject`, plugin, generated, and `.claude/**` files are
+outside this package.
 
-User may edit only the following existing assets for wiring/data rows:
+## Explicit prohibitions
 
-- `Content/UI/P17/Character/WBP_CharacterShell_P17.uasset`, only to place
-  the Relic widget in the existing shell `ContentHost`/Relics content path
-  and forward the selected Character ID.
-- `Content/Data/Items/DA_ItemEquipmentMappingCatalog_P17.uasset`, only to add
-  missing explicit ItemId -> DefinitionId/Kind/Slot rows; existing rows are
-  not deleted or rewritten.
+- Do not modify Inventory or Equipment Authority implementation.
+- Do not call `RemoveStack` as a substitute for Use/Disassemble or Enhance.
+- Do not create or edit UAsset, Config, Build.cs, `.uproject`, plugins, or
+  generated/build outputs.
+- Do not wire B/Back/X, UIManager, Router, `ModuleContentHost`, travel, or PIE.
+- Do not stage, commit, push, reset, clean, delete, or rewrite Git history.
 
-The formal Frontend route remains mounted through
-`WBP_FrontendModuleRoot_P17.ModuleContentHost`. No direct viewport mount is
-allowed for Character or Inventory. Codex does not binary-edit, delete,
-replace, or overwrite any UAsset.
+## User Editor work
 
-## C++ / Blueprint boundary
+None in 003. Mapping/enhancement catalog asset assignment and Inventory UMG
+integration remain deferred to 004 after this code/Automation gate.
 
-- C++ owns catalog validation, candidate filtering, comparison/delta values,
-  expected revisions, OperationId creation/forwarding, authority result
-  mapping, committed snapshot refresh, typed unavailable/failure states, and
-  delegate bind/unbind.
-- Blueprint owns visual layout, slot/candidate entry widgets, selected-state
-  styling, focus order, button labels, and binding of pure-value snapshots.
-- Blueprint may call `SelectSlot`, `SelectCandidate`, `OpenEnhancement`,
-  `CommitSelectedMovement`, `CommitEnhancement`, and `Back`; it may not call
-  `AddToViewport`, mutate Inventory/Equipment, remove materials directly,
-  call `SetEnhancementLevel` for the P17 flow, apply GameplayEffects, save,
-  travel, or infer success from a button click.
+## Verification evidence
 
-## Acceptance and failure matrix
+- RED: the real UBT run failed at the intended missing command seam with
+  `SetCommandContext is not a member`, `SubmitAction does not take 2
+  arguments`, and `AuthorityRejected undeclared`.
+- GREEN: `HSREditor Win64 Development` returned `Result: Succeeded`.
+- Focused Automation found 7 tests under `HSR.UI.Inventory`; all 7 completed
+  with `Result={Success}`, including the Inventory-002 and Reward lifecycle
+  regressions.
+- `git diff --check` passed. No UAsset, PIE, Git, or `.claude/**` operation was
+  performed.
 
-- valid relic slot selection yields deterministic slot rows and bag candidates;
-  invalid slot/candidate/catalog/authority data yields typed unavailable;
-- candidate comparison is pure and does not mutate Inventory, Equipment,
-  materials, revisions, or Save data;
-- bag -> equip removes one matching unique item and places the same registry
-  instance exactly once;
-- occupied slot -> replace atomically returns the displaced instance to the
-  bag and places the incoming instance, with net capacity validation;
-- enhancement validates DefinitionId, Kind, target level, modifier snapshot,
-  material definition/cost, expected Inventory/Equipment revisions, and
-  expected current enhancement level;
-- successful enhancement consumes material once, updates Registry payload once,
-  advances Inventory and Equipment revisions once, and broadcasts once per
-  domain; same OperationId replay is cached/no-op;
-- stale revisions, wrong owner/slot, insufficient material, missing mapping,
-  invalid catalog row, target above cap, duplicate OperationId payload, and
-  injected preflight failure leave all old snapshots/revisions/selection intact;
-- ViewModel refreshes only from committed callbacks and unbinds cleanly on
-  shutdown/destruction; no duplicate or stale callback remains;
-- Build target is `HSREditor Win64 Development`; focused Automation covers
-  authority and ViewModel tests plus adjacent Equipment movement/detail tests;
-- user performs Save All, Editor close/reopen, and one single-resolution PIE
-  happy path. Failure PIE may be skipped after code/Automation wiring review
-  per user direction; 1920x1080/1280x720 comparison is `NOT VERIFIED` and
-  non-blocking in this task.
+The existing Equipment Authority only enhances instances it owns. Inventory
+bag rows that are not Authority-owned therefore return the typed
+`AuthorityRejected` result without inventing ownership or consuming material;
+this boundary is covered by the enhancement failure test and is not a claim
+of a successful enhancement PIE path.
 
-## Explicit non-goals
+## Historical records
 
-- Character level/ascension/trace/eidolon/outfit upgrades;
-- generic Inventory classification, consumable use, disassembly, or economy;
-- arbitrary Equipment/Relic stat generation, random rolls, set-bonus redesign,
-  currency creation, or Save schema/migration changes;
-- direct legacy `SetEnhancementLevel` UI use; the P17 flow uses the new
-  material-backed request contract;
-- Battle HUD, dialogue, reward, gacha, Party, Map, Quest, Challenge, or
-  Frontend routing changes;
-- Config, Build.cs, plugins, new modules, direct viewport mounting, or Git
-  commit/push.
+Inventory-002 is preserved in `tasks/archive/` and its TDD evidence. Earlier
+Inventory-001 and Relic/Equipment history remain in their existing archives.
+# TASK-P17-INVENTORY-004 — Editor 集成、PIE 与收口
+Status: `IN PROGRESS / GATE 0 PASS / TDD RED CONFIRMED / GREEN PASS / FOCUSED AUTOMATION PASS / PIE PENDING`
 
-## TDD and evidence gates
+## Scope identity
 
-1. Add `HSR.Equipment.Enhancement.*` and
-   `HSR.UI.RelicEquipment.ViewModel` tests first and obtain a valid RED from
-   the missing contract/implementation.
-2. Implement the smallest authority API and rerun the same tests to GREEN.
-3. Implement the pure-value ViewModel/Widget boundary and rerun focused tests.
-4. Run `HSREditor Win64 Development` Build, focused Automation, adjacent
-   regressions, `git diff --check`, and exact allowlist audit.
-5. Write only factual RED/GREEN/build/Automation evidence; do not claim PIE or
-   Editor persistence before user evidence is supplied.
-6. Stop at the User Editor Asset Gate. Do not create or edit UAsset files in
-   this implementation pass.
+This is the unambiguous implementation identity for the Phase 17 execution-plan
+meaning of P17-008. It is not `TASK-P17-008`, and it does not reuse the archived
+meanings of `TASK-P17-006` (Quest Frontend) or `TASK-P17-012` (five-module dynamic
+mounting).
 
-## Current checkpoint
+User authorization: the user's explicit authorization for
+`TASK-P17-INVENTORY-004` on 2026-08-09 covers this code gate and the handoff for
+user-owned Editor/UAsset and PIE work.
 
-- Authorization: complete.
-- Task card: this file, `TASK-P17-RELIC-EQUIPMENT-001`.
-- RED: confirmed by the intended missing `HSREquipmentEnhancementCatalog.h`
-  compile error after the external UBT-cache permission issue was bypassed.
-- GREEN: final `HSREditor Win64 Development` Build succeeded.
-- Focused Automation: enhancement ExactlyOnce, enhancement FailureMatrix, and
-  Relic ViewModel passed 3/3.
-- Adjacent regression: final Equipment/Equipment Detail/Character Shell/
-  Frontend Navigation plus Relic selection suite passed 31/31.
-- `git diff --check`: no whitespace errors; existing line-ending warnings only.
-- User Editor/PIE Asset Gate: pending. No User UAsset was created or modified.
-- Failure PIE is user-accepted non-blocking if not run; different resolutions
-  remain `NOT VERIFIED` and non-blocking.
-- Automatic Git commits: prohibited by user instruction.
+## Sole observable outcome
+
+Pressing `B` opens the categorized Inventory through the existing Frontend Shell
+and `WBP_FrontendModuleRoot_P17.ModuleContentHost`; filtering, sorting, and
+selection remain stable; Consumable Use and Equip/Enhance/Disassemble are
+submitted only when their corresponding Authority supports them; Back/X and
+travel teardown/restore preserve a coherent route, focus, and input policy; any
+failure preserves the last complete snapshot and consistent UI.
+
+## Gate 0 decisions
+
+1. The shared Frontend Shell, Router, UIManager, and `ModuleContentHost` remain
+   the only route/mount path. The old P13 Inventory widget remains a fallback
+   when the P17 module class is not assigned.
+2. `UHSRInventorySubsystem` remains the Inventory authority and
+   `UHSREquipmentSubsystem` remains the Equip/Enhance authority. This package
+   does not add Use or Disassemble authority and never calls `RemoveStack` as a
+   substitute for either operation.
+3. Inventory rows keep stable identity: `ItemId` plus an invalid `InstanceId`
+   for stacks, or `ItemId` plus the committed unique `InstanceId` for unique
+   items. The UI reads pure-value snapshots and uses bounds-safe accessors.
+4. Route failure, missing/invalid snapshot, focus failure, travel teardown, and
+   restore failure must not publish an empty success stage or silently replace a
+   complete committed snapshot.
+
+## Implemented code contract
+
+- `AHSRHUD` accepts `InventoryModuleWidgetClass` under `HUD|P17` and passes it
+  to `UHSRUIManagerSubsystem` while retaining the legacy P13 class.
+- Inventory opens through the shared dynamic module-root path and attaches the
+  P17 widget to `ModuleContentHost`; no second viewport path is introduced.
+- `UHSRInventoryModuleWidget` derives from `UHSRScreenWidget`, exposes snapshot,
+  row, action-state, intent, close-to-root, and preferred-focus seams for UMG,
+  and forwards command context from the party slot-0 character.
+- Dynamic Inventory ownership participates in HasOpen, Back/X, focus restore,
+  travel teardown, arrival restore, and host-generation consistency checks.
+- Existing Inventory-001/002/003 projection and command contracts remain in the
+  same focused regression target.
+
+## TDD gates
+
+1. Gate 0: complete. Authority ownership, shared mount path, legacy fallback,
+   lifecycle boundaries, failure matrix, and Editor allowlist are frozen here.
+2. RED: complete. The new dynamic-route test reached the intended missing
+   `ConfigureAutomationInventoryModuleBackend` compiler seam before production
+   integration was present.
+3. GREEN: complete. The seam, dynamic route, focus fallback, Back/X lifecycle,
+   travel restore, and production snapshot guard compile and pass focused
+   Automation.
+4. Editor/PIE closeout: pending user action. UAsset creation, Blueprint wiring,
+   Editor reopen, and happy/failure PIE evidence must be supplied by the user;
+   this task card does not claim those results.
+
+## Allowed files
+
+Production files:
+
+- `Source/HSR/UI/HSRHUD.h`
+- `Source/HSR/UI/HSRHUD.cpp`
+- `Source/HSR/UI/HSRUIManagerSubsystem.h`
+- `Source/HSR/UI/HSRUIManagerSubsystem.cpp`
+- `Source/HSR/UI/Inventory/HSRInventoryModuleWidget.h`
+- `Source/HSR/UI/Inventory/HSRInventoryModuleWidget.cpp`
+
+Test and evidence files:
+
+- `Source/HSR/Tests/HSRInventoryViewModelTests.cpp`
+- `tasks/active-task.md`
+- `tasks/execution-result.md`
+- `docs/testing/TASK-P17-INVENTORY-004.tdd.md`
+- `PROJECT_STATE.md`
+- `worklog.md`
+- `todo_plan.md`
+
+User-owned Editor files are limited to the requested P17 Inventory Blueprint,
+UMG layout, catalog asset assignments, and the existing HUD/root Blueprint
+Class Defaults. The agent does not create or edit those UAssets.
+
+## Explicit prohibitions
+
+- Do not modify Inventory, Equipment, Party, Save, Travel, or Reward Authority
+  implementations for this UI integration.
+- Do not call `RemoveStack` as a substitute for Use, Disassemble, or Enhance.
+- Do not create or edit UAsset, Config, Build.cs, `.uproject`, plugin, generated,
+  or build-output files.
+- Do not add a second viewport/mount path or call `AddToViewport` from Inventory.
+- Do not stage, commit, push, reset, clean, delete, or rewrite Git history.
+- Do not claim PIE, Editor reopen, or UAsset provenance evidence before the user
+  performs and reports those steps.
+
+## User Editor work
+
+The user must create `/Game/UI/P17/Inventory/WBP_Inventory_P17` with parent
+`UHSRInventoryModuleWidget`, assign the Inventory Catalog, Item Equipment Mapping
+Catalog, and Equipment Enhancement Catalog, build the category/list/detail/action
+UMG, set a focusable preferred widget, and assign the class to
+`BP_HSRHUD.InventoryModuleWidgetClass`. Detailed steps are in the 004 handoff
+and TDD evidence report.
+
+## Verification boundary
+
+The code gate is complete: Development Editor Build succeeded, Inventory
+Automation is 9/9, FrontendNavigation Automation is 11/11, and `git diff --check`
+passed. Existing `HSR.UI.ScreenLifecycle` CharacterDetail/Inventory/
+TravelRestore fixture failures remain a known pre-task baseline and were not
+reclassified as product failures. UAsset creation, Editor reopen, and PIE are
+`NOT VERIFIED` until user evidence is supplied.
+
+---
+## Latest user-provided closeout update — 2026-08-09
+
+The earlier code-gate-only Editor/PIE boundary in this file is superseded by
+the user's latest delivery. DA_InventoryCatalog_P17 and WBP_Inventory_P17 now
+exist and are saved; the Widget is parented to UHSRInventoryModuleWidget,
+catalog references are assigned, BP_HSRHUD and frontend input are configured,
+and the allowlisted C++ Blueprint seams/dynamic row projection are present.
+
+Core PIE evidence from Map_Exploration_P15_A confirms Inventory open, Back to
+Pause Hub, X to exploration, and no Blueprint Runtime Error, Ensure, or invalid
+snapshot log. The only remaining item is manual visual/gamepad experience and
+final USER ACCEPTED confirmation.

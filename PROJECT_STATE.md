@@ -2,6 +2,120 @@
 
 > 最后更新：2026-08-09
 
+## 2026-08-09 TASK-P17-INVENTORY-004 Editor integration and core PIE verified / visual acceptance pending
+
+- 用户已完成并保存 /Game/Data/Items/DA_InventoryCatalog_P17 与
+  /Game/UI/P17/Inventory/WBP_Inventory_P17。Inventory Catalog 含 12 个真实
+  ItemId，无重复、DisplayName 非空、SortOrder 已设置，Validate() 通过。
+- WBP_Inventory_P17 已 reparent 为 UHSRInventoryModuleWidget，完成 HSR 风格
+  41 控件布局；Class Defaults 已绑定 Catalog、MappingCatalog 和
+  EnhancementCatalog。BP EventGraph 保留分类与搜索入口，Back/Close/操作/
+  列表/详情由 C++ 接管，避免重复触发。
+- BP_HSRHUD 已将 InventoryModuleWidgetClass 指向 P17 Widget，并保留 P13
+  fallback；BP_HSRPlayerController 与 IMC_FrontendNavigation 已确认
+  Inventory=B、CloseToRoot=X。
+- 为解决 MCP 无法稳定创建 Make/BreakStruct 图节点，用户授权清单内的
+  HSRInventoryModuleWidget 增加了纯值 Blueprint seam、动态列表行桥接、
+  详情/按钮投影和急切初始化；未改变 Inventory/Equipment Authority。
+- 用户提供的 Map_Exploration_P15_A PIE 核心证据确认 Inventory 打开、
+  Back 返回 Pause Hub、X 返回探索，且无 Blueprint Runtime Error、Ensure
+  或 invalid snapshot 日志。自动化与 Build 证据仍为 Inventory 9/9、
+  FrontendNavigation 11/11、Build Succeeded、diff-check 通过。
+- 剩余事项仅为用户手动鼠标/手柄体验分类、筛选、排序、选择、操作、旅行
+  restore 和失败保持；任务暂不标记为最终 USER ACCEPTED。未 stage/commit/push，
+  .claude/** 未修改。
+
+---
+
+## 2026-08-09 TASK-P17-INVENTORY-004 code gate complete / Editor-PIE pending
+
+- TASK-P17-INVENTORY-004 completed its independent Gate 0, real TDD RED, and
+  GREEN code gate without reusing TASK-P17-008, archived Quest TASK-P17-006, or
+  archived dynamic-mount TASK-P17-012.
+- P17 Inventory now has an explicit HUD class slot and routes through the shared
+  Frontend Shell/UIManager and WBP_FrontendModuleRoot_P17.ModuleContentHost; the
+  old P13 Inventory path remains a fallback when the P17 class is unset.
+- Dynamic Inventory participates in Back/X, preferred focus, travel teardown and
+  arrival restore, host-generation consistency, party slot-0 character context,
+  and production snapshot validity checks. Inventory/Equipment Authority and
+  typed command/failure contracts were not replaced or bypassed.
+- Final Development Editor Build returned Result: Succeeded after fixing the new
+  Inventory focus-restore switch scope. HSR.UI.Inventory discovered 9 tests and
+  passed 9/9; HSR.UI.FrontendNavigation discovered 11 and passed 11/11;
+  git diff --check passed.
+- UAsset/UMG creation, catalog assignment, Editor Save All/reopen, and happy /
+  failure PIE remain user-owned NOT VERIFIED. Existing ScreenLifecycle
+  CharacterDetail/Inventory/TravelRestore fixture failures remain a known
+  baseline and are not claimed as P17-004 product failures.
+- No .claude/** change, stage, commit, push, reset, clean, or UAsset operation
+  was performed. The next action is the detailed user Editor/PIE handoff.
+
+---
+
+## 2026-08-09 TASK-P17-INVENTORY-003 code gate complete
+
+- `TASK-P17-INVENTORY-003` 已完成独立 Gate 0、真实 TDD RED、Inventory command
+  seam 实现与 GREEN 验证。Equip/Enhance 只通过现有 Equipment Authority，携带
+  稳定 `InstanceId`、真实双 revision、`CharacterId` 和新 `OperationId`；UI 不用
+  `RemoveStack` 冒充 Use/Disassemble/Enhance。
+- 修复后的聚焦 `Automation RunTests HSR.UI.Inventory` 发现 7 项，7/7
+  `Result={Success}`；覆盖 Equip delegation、Enhance 失败完整快照、typed
+  unavailable、002 分类/选择、Widget 生命周期和 InventoryReward 回归。
+- `HSREditor Win64 Development` Build 返回 `Result: Succeeded`（target up to date），
+  `git diff --check` 通过；未执行 PIE、未创建/接线 UAsset，`.claude/**` 和其他
+  用户脏工作树修改保持原样，未 stage/commit/push。
+- Equipment Authority 仅允许已归属角色的实例强化；背包中未归属实例按 typed
+  `AuthorityRejected` 保持完整快照，不伪造 ownership、不隐式 Equip、不扣材料。
+- 003 代码门禁完成；下一包为 `TASK-P17-INVENTORY-004`，需用户另行授权，负责
+  Editor 资产/UMG 接入、B/Back/X、旅行 teardown 与 PIE 收口。
+
+## 2026-08-09 TASK-P17-INVENTORY-003 Gate 0
+
+- 用户已授权继续执行 `TASK-P17-INVENTORY-003`；活动卡已从已收口的
+  Inventory-002 切换为本包，编号仍不复用计划语义 `P17-008`。
+- Gate 0 冻结：Equip/Enhance 只能通过现有 Equipment Authority，携带稳定
+  `InstanceId`、真实 Inventory/Equipment revision、`CharacterId` 和新
+  `OperationId`；Use/Disassemble 在没有 Authority 时必须 typed unavailable，
+  不得用 `RemoveStack` 冒充业务成功。
+- Authority 拒绝、并发冲突、缺 Mapping/Definition、空选项和重复操作均不得
+  替换完整旧快照；原始子系统结果码至少打入日志。该 Gate 0 随后已进入真实
+  RED/GREEN 实现，结果见顶部 code-gate 记录。
+- 本包不包含 B/Back/X、UIManager/`ModuleContentHost`、UAsset、旅行 teardown
+  或 PIE；003 RED/GREEN 代码门禁已完成，004 负责后续 Editor/PIE 收口。
+
+## 2026-08-09 TASK-P17-INVENTORY-002 GREEN / code gate complete
+
+- 用户已授权并完成无歧义任务 `TASK-P17-INVENTORY-002`；它对应执行计划
+  P17-008 的分类、详情、筛选、排序、稳定选择与只读 ViewModel/Widget 投影，
+  不复用归档的 `TASK-P17-008`、实际 Quest `TASK-P17-006` 或实际动态挂载
+  `TASK-P17-012` 编号。
+- 新增显式 `UHSRInventoryCatalog`、纯值 Inventory snapshot/types、
+  `UHSRInventoryViewModel` 与只读 `UHSRInventoryModuleWidget`。Inventory
+  Authority、Equipment Authority、Reward Summary、UIManager、Router、Save
+  和 `.claude/**` 均未修改。
+- TDD RED 继承并保留在 Inventory-001 归档证据；GREEN 的 Development Editor
+  Build 已通过。聚焦 `Automation RunTests HSR.UI.Inventory` 发现 4 项，4/4
+  `Result={Success}`，Editor-Cmd exit code 0。
+- 本包明确不包含 B/Back/X、`ModuleContentHost`/UIManager 接入、合法命令、
+  UAsset/PIE 或旅行 teardown；这些仍分别属于 Inventory-003/004 和用户
+  Editor 验收边界。下一 serial package 为 `TASK-P17-INVENTORY-003`。
+
+## 2026-08-09 TASK-P17-INVENTORY-001 Gate 0 / TDD RED
+
+- 用户已明确授权开始无歧义任务 `TASK-P17-INVENTORY-001`；活动任务卡已从
+  Relic/Equipment closeout 切换为本任务，Relic 历史保留在归档卡和 TDD 证据中。
+- Gate 0 已冻结：Inventory 分类来自显式 `UHSRInventoryCatalog` UI catalog；
+  Inventory Authority 继续拥有 stack/unique、capacity、revision，Equipment
+  Authority 继续拥有 Equip/Enhance；当前没有 Consumable Use/Disassemble
+  Authority，UI 必须返回 typed unavailable，不得用 `RemoveStack` 冒充成功。
+- 新增 `Source/HSR/Tests/HSRInventoryViewModelTests.cpp`，覆盖分类/排序/稳定选择
+  和 unsupported action 失败快照保持，符合 `WITH_DEV_AUTOMATION_TESTS`、
+  `EditorContext | EngineFilter` 约束。
+- 真实 RED 已确认：默认 sandbox 构建先因 UBT 外部 cache 权限失败；授权重跑后进入
+  新测试编译并在预期缺失的 `../Data/Definitions/HSRInventoryCatalog.h` 处停止。
+- 本轮没有修改生产 Source、Content、Config、UAsset，没有执行 GREEN、PIE，也没有
+  stage/commit/push；下一包 `TASK-P17-INVENTORY-002` 尚未获授权。
+
 ## 2026-08-09 Phase 17 Inventory/Dialogue 子任务与 Phase 18 顺序规划
 
 - 用户决定先完成 Inventory UI、Dialogue Presentation 和 Phase 18，再制作 Demo；
@@ -740,3 +854,27 @@
 - Party ViewModel/Widget 支持候选 Set/Clear/Swap、Confirm、Cancel、重复/未知/stale 拒绝与蓝图转发；Widget 初始化顺序修复后 Construct 可读快照。
 - User Build、`HSR.Party` 2/2、`HSR.UI.Party` 4/4、`HSR.UI.FrontendNavigation` 11/11 与用户 PIE 均通过。
 - TASK-P17-009B 以 `PASS / USER ACCEPTED` 归档；P17-009C 战前候选队伍、Buff、Encounter Request 与取消零污染仍未完成。
+## 2026-08-09 TASK-P17-INVENTORY-004 code gate complete / Editor-PIE pending
+
+- `TASK-P17-INVENTORY-004` completed its independent Gate 0, real TDD RED, and
+  GREEN code gate without reusing `TASK-P17-008`, archived Quest `TASK-P17-006`,
+  or archived dynamic-mount `TASK-P17-012`.
+- P17 Inventory now has an explicit HUD class slot and routes through the shared
+  Frontend Shell/UIManager and `WBP_FrontendModuleRoot_P17.ModuleContentHost`.
+  The old P13 Inventory path remains a fallback when the P17 class is unset.
+- Dynamic Inventory participates in Back/X, preferred focus, travel teardown and
+  arrival restore, host-generation consistency, party slot-0 character context,
+  and production snapshot validity checks. Inventory/Equipment Authority and the
+  existing typed command/failure contracts were not replaced or bypassed.
+- Final Development Editor Build returned `Result: Succeeded` after fixing the
+  new Inventory focus-restore switch scope. `HSR.UI.Inventory` discovered 9
+  tests and passed 9/9; `HSR.UI.FrontendNavigation` discovered 11 and passed
+  11/11; `git diff --check` passed.
+- UAsset/UMG creation, catalog assignment, Editor Save All/reopen, and happy /
+  failure PIE remain user-owned `NOT VERIFIED`. Existing ScreenLifecycle
+  CharacterDetail/Inventory/TravelRestore fixture failures remain a known
+  baseline and are not claimed as P17-004 product failures.
+- No `.claude/**` change, stage, commit, push, reset, clean, or UAsset operation
+  was performed. The next action is the detailed user Editor/PIE handoff.
+
+---

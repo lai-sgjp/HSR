@@ -11,6 +11,7 @@ class UHSRInputModeCoordinator;
 class UHSRScreenStack;
 class UHSRScreenWidget;
 class UHSRInventoryWidget;
+class UHSRInventoryModuleWidget;
 class UHSRInventoryRewardViewModel;
 class UHSRUserWidget;
 class UHSRFrontendRouter;
@@ -41,6 +42,7 @@ public:
 		TSubclassOf<UHSRFrontendModuleRootWidget> InFrontendModuleRootClass,
 		TSubclassOf<UHSRScreenWidget> InCharacterDetailWidgetClass,
 		TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass,
+		TSubclassOf<UHSRInventoryModuleWidget> InInventoryModuleWidgetClass,
 		TSubclassOf<UUserWidget> InPartyWidgetClass,
 		TSubclassOf<UUserWidget> InMapWidgetClass,
 		TSubclassOf<UUserWidget> InChallengeWidgetClass,
@@ -76,7 +78,12 @@ public:
 	bool HasOpenCharacterDetailScreen() const { return CharacterDetailWidgetInstance != nullptr; }
 
 	UFUNCTION(BlueprintPure, Category = "HSR|UI")
-	bool HasOpenInventoryScreen() const { return InventoryWidgetInstance != nullptr; }
+	bool HasOpenInventoryScreen() const
+	{
+		return InventoryWidgetInstance != nullptr
+			|| (FrontendModuleContentModule == EHSRFrontendModule::Inventory
+				&& FrontendModuleContentInstance != nullptr);
+	}
 	bool HasInventoryViewModel() const { return InventoryViewModelInstance != nullptr; }
 
 	UFUNCTION(BlueprintPure, Category = "HSR|UI")
@@ -122,6 +129,8 @@ public:
 	int64 GetHostGenerationForAutomation() const { return ActiveHostGeneration; }
 	void FailNextAutomationInventoryPolicyApply() { bAutomationFailNextInventoryPolicyApply = true; }
 	void ConfigureAutomationFrontendModuleBackend(bool bHasClass, bool bCreateSucceeds, bool bAttachSucceeds);
+	void ConfigureAutomationInventoryModuleBackend(bool bHasClass, bool bCreateSucceeds,
+		bool bAttachSucceeds);
 	int32 GetFrontendModuleContentCountForAutomation() const;
 	EHSRFrontendModule GetFrontendModuleContentModuleForAutomation() const;
 #endif
@@ -154,6 +163,7 @@ private:
 	/** Clears a travel-scoped inconsistency once a fresh host proves the UI is coherent again. */
 	void TryClearRecoverableInconsistency();
 	void ClearHostReferences();
+	FGuid ResolveInventoryCharacterGuid() const;
 	TSubclassOf<UUserWidget> GetFrontendModuleWidgetClass(EHSRFrontendModule Module) const;
 	UUserWidget* CreateFrontendModuleContentCandidate(AHSRPlayerController* PlayerController,
 		EHSRFrontendModule Module);
@@ -218,6 +228,9 @@ private:
 
 	UPROPERTY(Transient)
 	TSubclassOf<UHSRInventoryWidget> InventoryWidgetClass;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UHSRInventoryModuleWidget> InventoryModuleWidgetClass;
 
 	UPROPERTY(Transient)
 	TSubclassOf<UUserWidget> PartyWidgetClass;
@@ -303,6 +316,9 @@ private:
 	bool bAutomationHasFrontendModuleClass = true;
 	bool bAutomationFrontendModuleCreateSucceeds = true;
 	bool bAutomationFrontendModuleAttachSucceeds = true;
+	bool bAutomationUseInventoryModuleContent = false;
+	bool bAutomationInventoryModuleCreateSucceeds = true;
+	bool bAutomationInventoryModuleAttachSucceeds = true;
 	bool bAutomationInventoryCreateSucceeds = true;
 	bool bAutomationInventoryViewModelSucceeds = true;
 	bool bAutomationInventoryDependenciesSucceed = true;

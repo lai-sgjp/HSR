@@ -4,6 +4,7 @@
 #include "HSRInteractionViewModel.h"
 #include "HSRInventoryRewardViewModel.h"
 #include "HSRInventoryRewardWidget.h"
+#include "Inventory/HSRInventoryModuleWidget.h"
 #include "../Inventory/HSRInventorySubsystem.h"
 #include "../Reward/HSRRewardSubsystem.h"
 #include "../Interaction/HSRInteractionComponent.h"
@@ -88,6 +89,7 @@ void AHSRHUD::ShowExplorationHUD()
 			{
 				UIManager->RegisterExplorationHost(this, HSRPC, ExplorationWidgetInstance, FrontendShellClass,
 					FrontendModuleRootClass, CharacterDetailWidgetClass, InventoryWidgetClass,
+					InventoryModuleWidgetClass,
 					PartyWidgetClass, MapWidgetClass, ChallengeWidgetClass, QuestWidgetClass, SaveWidgetClass);
 			}
 		}

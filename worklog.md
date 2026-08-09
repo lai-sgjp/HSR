@@ -1,5 +1,44 @@
 ﻿# HSR Worklog
 
+## 2026-08-09 - TASK-P17-INVENTORY-003 Gate 0
+
+- 用户授权下一 serial package `TASK-P17-INVENTORY-003`；活动卡从已收口的
+  Inventory-002 切换，本轮不复用 `P17-008` 编号。
+- Gate 0 冻结现有 Inventory/Equipment Authority 所有权、稳定 InstanceId、真实
+  双 revision、OperationId、typed unavailable 和完整快照保持边界；没有修改生产
+  Source，尚未开始 RED。
+- 明确普通背包实例没有 Equipment owner 时，Enhance 不得在 UI 中补造持有关系；
+  由 Authority 真实拒绝/不可用并保持快照。Use/Disassemble 不得调用 RemoveStack。
+- 003 不包含 B/Back/X、动态 Host 接入、UAsset、旅行 teardown 或 PIE；下一步是
+  添加并运行真实失败的命令测试。
+
+## 2026-08-09 - TASK-P17-INVENTORY-002 GREEN / code gate complete
+
+- 用户授权继续执行 Inventory-002；沿用 001 的真实 RED，不复用计划编号
+  `P17-008` 或归档任务编号。
+- 新增显式 Inventory catalog、纯值 snapshot/types、分类/筛选/确定性排序/稳定键
+  ViewModel，以及只读 Widget delegate boundary；未修改 Inventory/Equipment
+  Authority、Reward Summary、UIManager、Router、Save、Content 或 `.claude/**`。
+- Development Editor Build 通过；聚焦 `HSR.UI.Inventory` Automation 发现 4 项，
+  4/4 `Result={Success}`，Editor-Cmd exit code 0。首次运行发现测试 fixture 的
+  `beta` 同时命中显示名和另一个 ItemId，已将测试查询收窄为 `beta relic` 后复跑通过。
+- `SameSnapshot` 已覆盖详情、数量/上限、排序序号、Unique payload、选择、revision、
+  validity、failure reason 和全部 action states。
+- 002 不包含 B/Back/X、ModuleContentHost/UIManager 接入、合法操作、UAsset 或 PIE；
+  下一包为 `TASK-P17-INVENTORY-003`。本轮没有 Git stage/commit/push。
+
+## 2026-08-09 - TASK-P17-INVENTORY-001 Gate 0 / TDD RED
+
+- 用户授权开始 Inventory 无歧义任务；活动卡从 Relic closeout 切换，Relic 历史保留在
+  `tasks/archive/TASK-P17-RELIC-EQUIPMENT-001-active-task.md` 和既有 TDD 证据中。
+- Gate 0 选择显式 `UHSRInventoryCatalog` 作为分类/展示元数据来源；没有扩展现有
+  Inventory Authority 定义规则，也没有猜测 ItemId 前缀。稳定键、排序/筛选、失败快照
+  保持、Authority gating 和 `ModuleContentHost` 边界已写入活动任务卡。
+- 新增 `Source/HSR/Tests/HSRInventoryViewModelTests.cpp`。默认 Build 因 UBT 外部 cache
+  权限先失败；同命令授权重跑后实际编译测试，并在缺失
+  `HSRInventoryCatalog.h` 处得到预期 RED。
+- 本轮只完成 Gate 0/RED；没有修改生产 Source、Content、Config 或 UAsset，没有 Git
+  stage/commit/push。下一步是用户另行授权 `TASK-P17-INVENTORY-002`。
 ## 2026-08-09 - Phase 17 Inventory/Dialogue 子任务与 Phase 18 顺序规划
 
 - 用户将优先级调整为：先完成 Inventory UI、Dialogue Presentation 和 Phase 18，之后再制作 Demo。
@@ -2441,3 +2480,67 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
   state or the accepted user-visible result.
 - Task status is `COMPLETE / USER ACCEPTED`. No Git commit or `.claude/**`
   change was made.
+
+# 2026-08-09 | TASK-P17-INVENTORY-003 code gate complete
+
+- Continued the user-authorized Inventory-003 package after its independent
+  Gate 0. The TDD command tests reached the intended RED compiler failures
+  (`SetCommandContext` missing, two-argument `SubmitAction` missing, and
+  `AuthorityRejected` missing) before the production seam was implemented.
+- Added the allowlisted Inventory command context and Equip/Enhance forwarding:
+  stable `InstanceId`, real Inventory/Equipment revisions, `CharacterId`, fresh
+  `OperationId`, Equipment loadout refresh, typed result mapping/logging,
+  enhancement options, and bounds-safe Widget accessors. Use/Disassemble remain
+  typed unavailable; no direct Inventory mutation was added.
+- The first sandboxed UE launch hit the known Zen access-denied startup failure;
+  the identical local command then ran with the required controlled permission.
+  `HSR.UI.Inventory` discovered 7 tests and all 7 returned `Result={Success}`.
+  Development Editor Build returned `Result: Succeeded` (target up to date), and
+  `git diff --check` passed.
+- The Equipment Authority only enhances owned instances. Inventory-003 reports
+  a non-owned bag item as typed `AuthorityRejected` without inventing ownership,
+  consuming material, or replacing the complete snapshot. Editor/UMG, B/Back/X,
+  travel teardown and PIE remain the separately authorized Inventory-004 gate.
+- No UAsset, Config, Authority, `.claude/**`, stage, commit, push, reset, clean,
+  or history rewrite was performed.
+
+# 2026-08-09 | TASK-P17-INVENTORY-004 code gate complete
+
+- Continued the explicitly authorized Inventory-004 package from the completed
+  Inventory-003 command seam. Gate 0 froze the shared Frontend Shell/UIManager/
+  `ModuleContentHost` path, P13 fallback, dynamic focus/lifecycle behavior, and
+  the existing Inventory/Equipment Authority boundaries.
+- Added the P17 Inventory class slot to HUD host registration, routed the module
+  through the shared dynamic root, added production snapshot validity checking,
+  preferred-content focus, party slot-0 character context, Back/X close-to-root,
+  and dynamic travel teardown/arrival restore. The P13 widget remains available
+  when the new class is not assigned.
+- TDD RED reached the intended missing
+  `ConfigureAutomationInventoryModuleBackend` compiler seam. The first real
+  GREEN build exposed a switch-scope error in the new Inventory focus fallback;
+  a minimal case scope fixed it, and the subsequent Build returned
+  `Result: Succeeded`.
+- Headless UE5.6 Automation discovered 9 Inventory tests and passed 9/9,
+  including DynamicRoute and DynamicTravelRestore. FrontendNavigation discovered
+  11 tests and passed 11/11. `git diff --check` passed.
+- UAsset/UMG, Editor Save All/reopen, and PIE remain user-owned and unverified.
+  Known ScreenLifecycle fixture failures remain outside this package's product
+  claim. No Authority, `.claude/**`, stage, commit, push, reset, clean, or UAsset
+  operation was performed.
+# 2026-08-09 | TASK-P17-INVENTORY-004 Editor/core PIE closeout
+
+- User completed and saved DA_InventoryCatalog_P17 and WBP_Inventory_P17. The
+  catalog contains 12 real ItemIds, validates successfully, and the Widget is
+  parented to UHSRInventoryModuleWidget with the 41-control HSR-style layout.
+- User assigned the three catalog references in the Widget, connected the P17
+  HUD class while retaining the P13 fallback, and confirmed Inventory=B and
+  CloseToRoot=X in the existing frontend input setup.
+- The authorized Inventory widget C++ additions provide pure-value Blueprint
+  seams, eager initialization, dynamic row creation/click bridging, detail
+  projection, and action enablement. Authority ownership remains unchanged.
+- User-provided Map_Exploration_P15_A PIE evidence confirms Inventory open,
+  Back to Pause Hub, X to exploration, and no Blueprint Runtime Error, Ensure,
+  or invalid snapshot log. SortBox glyph warning was fixed.
+- Remaining work is manual visual/gamepad experience of the complete list,
+  details, actions, travel restore, and failure preservation. No stage, commit,
+  push, or .claude/** modification was performed.
