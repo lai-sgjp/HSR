@@ -40,6 +40,26 @@ enum class EHSRBattleInitFailureType : uint8
 	InitFailed UMETA(DisplayName = "ASC Init Failed")
 };
 
+/** One authored slot on a side's roster, before ParticipantIds are minted.  The Coordinator
+ * turns each entry into exactly one participant, so roster length drives battle width. */
+USTRUCT(BlueprintType)
+struct FHSRBattleRosterEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FName CharacterId;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle")
+	TSubclassOf<APawn> PawnClass;
+
+	FHSRBattleRosterEntry() = default;
+	FHSRBattleRosterEntry(FName InCharacterId, TSubclassOf<APawn> InPawnClass)
+		: CharacterId(InCharacterId), PawnClass(InPawnClass) {}
+
+	bool IsValid() const { return !CharacterId.IsNone(); }
+};
+
 USTRUCT(BlueprintType)
 struct FHSRBattleParticipantDefinition
 {

@@ -22,6 +22,10 @@
 #include "GameplayEffect.h"
 #include "../Status/HSRStatusComponent.h"
 #include "../Data/Definitions/HSRStatusDefinition.h"
+#include "../Equipment/HSREquipmentStatAggregator.h"
+#include "HSRBattleTransitionSubsystem.h"
+#include "../Data/Definitions/HSRStageBuffDefinition.h"
+#include "../Inventory/HSRInventorySubsystem.h"
 
 bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRequest)
 {
@@ -64,6 +68,19 @@ bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRe
 		return false;
 	}
 
+	if (!InRequest.BuffIds.IsEmpty())
+	{
+		UHSRBattleTransitionSubsystem* Transition = GetWorld() && GetWorld()->GetGameInstance()
+			? GetWorld()->GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>() : nullptr;
+		if (!Transition || !Transition->ValidateStageBuffIds(InRequest.EncounterId, InRequest.BuffIds))
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("UHSRBattleCoordinator::SubmitBattleRequest - REJECTED invalid Stage Buff selection RequestId=%s"),
+				*InRequest.RequestId.ToString());
+			return false;
+		}
+	}
+
 	// Build pure-value ReturnContext from the consumed request
 	FHSRBattleReturnContext RetCtx;
 	RetCtx.RequestId = InRequest.RequestId;
@@ -74,11 +91,14 @@ bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRe
 	CurrentRequestId = InRequest.RequestId;
 	CurrentEncounterId = InRequest.EncounterId;
 	CurrentEnemyDefinitionId = InRequest.EnemyDefinitionId;
+	CurrentStageBuffIds = InRequest.BuffIds;
+	AppliedStageBuffHandles.Reset();
+	AppliedStageBuffCosts.Reset();
 	CurrentRewardDefinitionId = InRequest.RewardDefinitionId;
 	CurrentRewardSeed = InRequest.RewardSeed;
 	ReturnContext = RetCtx;
 	CurrentState = EHSRBattleCoordinatorState::Consuming;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	LastSubmittedRequestForDevelopment = InRequest;
 #endif
 
@@ -89,6 +109,174 @@ bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRe
 		*InRequest.ExplorationMapPath.ToString());
 
 	return true;
+}
+
+const FHSRBattleParticipant* UHSRBattleCoordinator::FindStageBuffPlayerParticipant() const
+{
+	return Participants.FindByPredicate([](const FHSRBattleParticipant& Participant)
+	{
+		return Participant.Team == EHSRBattleParticipantTeam::Player
+			&& Participant.AbilitySystemComponent.IsValid();
+	});
+}
+
+bool UHSRBattleCoordinator::ApplyStageBuffs(UWorld* BattleWorld)
+{
+	if (CurrentStageBuffIds.IsEmpty())
+	{
+		return true;
+	}
+	if (!BattleWorld || !BattleWorld->GetGameInstance())
+	{
+		UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: missing BattleWorld or GameInstance"));
+		return false;
+	}
+
+	const FHSRBattleParticipant* Player = FindStageBuffPlayerParticipant();
+	if (!Player)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("P17-009D Stage Buff application failed: no player-team participant with valid ASC CharacterId=%s"),
+			*PlayerCharacterId.ToString());
+		return false;
+	}
+
+	UHSRBattleTransitionSubsystem* Transition =
+		BattleWorld->GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>();
+	UHSRInventorySubsystem* Inventory =
+		BattleWorld->GetGameInstance()->GetSubsystem<UHSRInventorySubsystem>();
+	if (!Transition || !Inventory || !Transition->ValidateStageBuffIds(CurrentEncounterId, CurrentStageBuffIds))
+	{
+		UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: invalid Transition, Inventory, or Buff IDs"));
+		return false;
+	}
+
+	for (const FName BuffId : CurrentStageBuffIds)
+	{
+		if (AppliedStageBuffHandles.Contains(BuffId))
+		{
+			UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: duplicate runtime BuffId=%s"), *BuffId.ToString());
+			return false;
+		}
+		const UHSRStageBuffDefinition* Definition =
+			Transition->FindStageBuffDefinition(CurrentEncounterId, BuffId);
+		if (!Definition || !Definition->GameplayEffectClass
+			|| Definition->ResourceCost < 0
+			|| (Definition->ResourceCost > 0 && Definition->ResourceItemId.IsNone()))
+		{
+			UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: invalid definition BuffId=%s"), *BuffId.ToString());
+			return false;
+		}
+
+		if (Definition->ResourceCost > 0)
+		{
+			FHSRInventorySnapshot Snapshot;
+			Inventory->GetSnapshot(Snapshot);
+			const FHSRItemStackSnapshot* Stack = Snapshot.Stacks.FindByPredicate(
+				[Definition](const FHSRItemStackSnapshot& Entry)
+				{
+					return Entry.ItemId == Definition->ResourceItemId;
+				});
+			if (!Stack || Stack->Quantity < Definition->ResourceCost)
+			{
+				UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: resource changed after preflight BuffId=%s"), *BuffId.ToString());
+				return false;
+			}
+		}
+
+		FGameplayEffectSpecHandle Spec = Player->AbilitySystemComponent->MakeOutgoingSpec(
+			Definition->GameplayEffectClass, 1.0f, Player->AbilitySystemComponent->MakeEffectContext());
+		if (!Spec.IsValid())
+		{
+			UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: invalid GE spec BuffId=%s"), *BuffId.ToString());
+			return false;
+		}
+		const FActiveGameplayEffectHandle Handle =
+			Player->AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+		if (!Handle.WasSuccessfullyApplied() || !Player->AbilitySystemComponent->GetActiveGameplayEffect(Handle))
+		{
+			UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: GE was not active BuffId=%s"), *BuffId.ToString());
+			return false;
+		}
+		AppliedStageBuffHandles.Add(BuffId, Handle);
+
+		if (Definition->ResourceCost > 0)
+		{
+			if (Inventory->RemoveStack(Definition->ResourceItemId, Definition->ResourceCost)
+				!= EHSRInventoryOperationResult::Success)
+			{
+				Player->AbilitySystemComponent->RemoveActiveGameplayEffect(Handle);
+				AppliedStageBuffHandles.Remove(BuffId);
+				UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: resource debit failed BuffId=%s"), *BuffId.ToString());
+				return false;
+			}
+			AppliedStageBuffCosts.Add(BuffId, Definition->ResourceCost);
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("P17-009D Stage Buffs applied RequestId=%s Count=%d Debits=%d"),
+		*CurrentRequestId.ToString(), AppliedStageBuffHandles.Num(), AppliedStageBuffCosts.Num());
+	return true;
+}
+
+UAbilitySystemComponent* UHSRBattleCoordinator::FindLeaderAbilitySystemComponent(EHSRBattleParticipantTeam Team) const
+{
+	// The leader is the first roster entry for the team, which is also the first
+	// participant spawned for it, so first-match wins.
+	for (const FHSRBattleParticipant& Participant : Participants)
+	{
+		if (Participant.Team == Team)
+		{
+			return Participant.AbilitySystemComponent.Get();
+		}
+	}
+
+	return nullptr;
+}
+
+void UHSRBattleCoordinator::RollbackStageBuffs(bool bRefundResources)
+{
+	// This used to compare ParticipantId against PlayerCharacterId — an id-space mismatch
+	// ("Player" vs the authored character id) that never matched, so rollback silently did
+	// nothing.  Stage buffs land on the leader, so resolve the leader by roster position.
+	UAbilitySystemComponent* PlayerASC = FindLeaderAbilitySystemComponent(EHSRBattleParticipantTeam::Player);
+
+	if (PlayerASC)
+	{
+		for (const TPair<FName, FActiveGameplayEffectHandle>& Entry : AppliedStageBuffHandles)
+		{
+			if (Entry.Value.IsValid())
+			{
+				PlayerASC->RemoveActiveGameplayEffect(Entry.Value);
+			}
+		}
+	}
+
+	if (bRefundResources)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			if (UGameInstance* GI = World->GetGameInstance())
+			{
+				if (UHSRInventorySubsystem* Inventory = GI->GetSubsystem<UHSRInventorySubsystem>())
+				{
+					for (const TPair<FName, int32>& Entry : AppliedStageBuffCosts)
+					{
+						const UHSRBattleTransitionSubsystem* Transition = GI->GetSubsystem<UHSRBattleTransitionSubsystem>();
+						const UHSRStageBuffDefinition* Definition = Transition
+							? Transition->FindStageBuffDefinition(CurrentEncounterId, Entry.Key) : nullptr;
+						if (Definition)
+						{
+							Inventory->AddStack(Definition->ResourceItemId, Entry.Value);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	AppliedStageBuffHandles.Reset();
+	AppliedStageBuffCosts.Reset();
 }
 
 FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
@@ -129,6 +317,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 	Participants.Empty();
 	const auto RollbackBuild = [this]()
 	{
+		RollbackStageBuffs(true);
 		ClearRuntimeDelegates();
 		ClearProgressionGameplayEffects();
 		for (FHSRBattleParticipant& Existing : Participants) if (Existing.Actor.IsValid()) Existing.Actor->Destroy();
@@ -227,6 +416,16 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			Participant.AbilitySystemComponent.IsValid() ? *Participant.AbilitySystemComponent->GetName() : TEXT("null"));
 	}
 
+	if (!ApplyStageBuffs(BattleWorld))
+	{
+		UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed RequestId=%s"), *CurrentRequestId.ToString());
+		RollbackBuild();
+		ParticipantDefinitions.Empty();
+		CurrentState = EHSRBattleCoordinatorState::Failed;
+		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed,
+			FText::FromString(TEXT("Stage Buff application or resource transaction failed.")));
+	}
+
 	TurnManager = NewObject<UHSRTurnManager>(this);
 	if (!TurnManager || !TurnManager->Initialize(Participants))
 	{
@@ -245,12 +444,12 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 
 	// Atomically transition to Spawned
 	CurrentState = EHSRBattleCoordinatorState::Spawned;
-	if (UGameInstance* GI=BattleWorld->GetGameInstance()) if (UHSREquipmentSubsystem* Equipment=GI->GetSubsystem<UHSREquipmentSubsystem>()) Equipment->SetRestoreProjection(FHSREquipmentRestoreProjection::CreateUObject(this,&ThisClass::ProjectEquipmentRestore));
+	if (UGameInstance* GI=BattleWorld->GetGameInstance()) if (UHSREquipmentSubsystem* Equipment=GI->GetSubsystem<UHSREquipmentSubsystem>()) { Equipment->SetRestoreProjection(FHSREquipmentRestoreProjection::CreateUObject(this,&ThisClass::ProjectEquipmentRestore)); BindEquipmentMovementProjection(*Equipment); }
 	BindEnemyTurnManager(TurnManager);
 	DevelopmentDamageRandomStream.Initialize(DevelopmentDamageSeed);
 	DevelopmentDamageConsumeCount = 0;
 	DevelopmentDamageResults.Empty();
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	ClearDamageTestInjection();
 	LastDevelopmentFormalExecutionResult = FHSRFormalDamageExecutionResult();
 #endif
@@ -281,14 +480,14 @@ bool UHSRBattleCoordinator::RequestBasicAttack(FName AttackerParticipantId, FNam
 FHSRAbilityResolution UHSRBattleCoordinator::RequestAction(const FHSRBattleActionCommand& Command)
 {
 	++RequestActionDispatchDepth;
-	#if WITH_EDITOR
+	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	++PublicRequestActionDepth;
 	MaxPublicRequestActionDepth = FMath::Max(MaxPublicRequestActionDepth, PublicRequestActionDepth);
 	++CoreExecutionDepth;
 	MaxCoreExecutionDepth = FMath::Max(MaxCoreExecutionDepth, CoreExecutionDepth);
 	#endif
 	const FHSRAbilityResolution Resolution = RequestActionCore(Command);
-	#if WITH_EDITOR
+	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	check(CoreExecutionDepth > 0);
 	--CoreExecutionDepth;
 	check(PublicRequestActionDepth > 0);
@@ -468,7 +667,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		DamageContext->DamageContext.ActionId = Request.ActionId; DamageContext->DamageContext.DamageType = Request.DamageType;
 		DamageContext->DamageContext.AbilityMultiplier = Request.AbilityMultiplier; DamageContext->DamageContext.CritRoll = Request.CritRoll;
 		DamageContext->DefenseCoefficient = Request.DefenseCoefficient; DamageContext->MinDamage = Request.MinDamage;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		DamageContext->TestInjection = DamageTestInjectionActionId == Command.ActionId ? NextDamageTestInjection : EHSRDamageTestInjection::None;
 		UE_LOG(LogTemp, Log, TEXT("P7-004 InjectionBind ActionId=%s BoundActionId=%s Requested=%d Applied=%d"), *Command.ActionId.ToString(), *DamageTestInjectionActionId.ToString(), static_cast<int32>(NextDamageTestInjection), static_cast<int32>(DamageContext->TestInjection));
 		if (DamageTestInjectionActionId == Command.ActionId) { ClearDamageTestInjection(); }
@@ -497,7 +696,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		PendingDefeatedParticipantId = NAME_None;
 		const bool bActivated = Attacker->AbilitySystemComponent->TryActivateAbility(AbilitySpec->Handle);
 		const FHSRFormalDamageExecutionResult ExecutionResult = Ability->GetLastFormalDamageExecutionResult();
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		LastDevelopmentFormalExecutionResult = ExecutionResult;
 #endif
 		bFormalDamageTransactionOpen = false;
@@ -628,7 +827,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 				&& PendingDefeatedParticipantId == Target->ParticipantId;
 			const EHSRStatusOperationResult BreakStatusResult = RequestBreakStatus(
 				Command.ActorParticipantId, BreakResult.TargetParticipantId, BreakResult.ActionId, bAllowPendingDeferredDefeat);
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 			LastBreakStatusResultForTest = BreakStatusResult;
 			if (BreakStatusResult == EHSRStatusOperationResult::Success)
 			{
@@ -643,7 +842,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 			bLastBreakDelayRegistered = bAllowPendingDeferredDefeat
 				? TurnManager->ConsumeAdmittedBreakDelay(DelayRequest)
 				: TurnManager->ConsumeBreakDelay(DelayRequest);
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 			bLastBreakDelayAcceptedForTest = bLastBreakDelayRegistered;
 			if (bLastBreakDelayRegistered)
 			{
@@ -766,7 +965,7 @@ void UHSRBattleCoordinator::BindEnemyTurnManager(UHSRTurnManager* InManager)
 	});
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 bool UHSRBattleCoordinator::BeginEnemyTurnAutomationAuditForDevelopmentTest(UHSRTurnManager* IsolatedManager)
 {
 	if (!IsolatedManager || bEnemyTurnAutomationAuditActive || RequestActionDispatchDepth != 0 || bDrainingEnemyTurns)
@@ -826,7 +1025,7 @@ void UHSRBattleCoordinator::RecordEnemyTurnIfCurrent(UHSRTurnManager* SourceMana
 	if (!ConsumedEnemyTurnKeys.Contains(Key) && (!PendingEnemyTurnKey.IsSet() || PendingEnemyTurnKey.GetValue() != Key))
 	{
 		PendingEnemyTurnKey = Key;
-	#if WITH_EDITOR
+	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		++EnemyTurnQueueCount;
 	#endif
 		UE_LOG(LogTemp, Log, TEXT("P10-001A EnemyTurn Queue Key=%s"), *Key);
@@ -887,21 +1086,21 @@ void UHSRBattleCoordinator::DrainPendingEnemyTurns()
 		Command.SkillId = BasicAttackDefinition->SkillId;
 		Command.TargetParticipantIds.Add(Targets[0]);
 		UE_LOG(LogTemp, Log, TEXT("P10-001A EnemyTurn Dispatch Key=%s ActionId=%s"), *QueuedKey, *Command.ActionId.ToString());
-	#if WITH_EDITOR
+	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		++EnemyTurnDispatchCount;
 	#endif
 		// This is the explicit non-public dispatch scope.  A TurnStarted raised
 		// by the core can only queue; the loop observes it after this scope ends.
 		++RequestActionDispatchDepth;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		++CoreExecutionDepth;
 		MaxCoreExecutionDepth = FMath::Max(MaxCoreExecutionDepth, CoreExecutionDepth);
 #endif
 		const FHSRAbilityResolution EnemyResolution = RequestActionCore(Command);
-	#if WITH_EDITOR
+	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		if (!EnemyResolution.Succeeded()) ++EnemyTurnRejectedCount;
 	#endif
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		check(CoreExecutionDepth > 0);
 		--CoreExecutionDepth;
 #endif
@@ -1114,44 +1313,80 @@ bool UHSRBattleCoordinator::GetBattleResultForPresentation(FHSRBattleResult& Out
 	return true;
 }
 
+FName UHSRBattleCoordinator::MakeParticipantId(EHSRBattleParticipantTeam Team, int32 RosterIndex)
+{
+	// Index 0 keeps the historical unsuffixed id so single-member encounters, their save
+	// projections, and the existing harnesses observe exactly the ids they did before.
+	const TCHAR* Prefix = Team == EHSRBattleParticipantTeam::Player ? TEXT("Player") : TEXT("Enemy");
+	return RosterIndex == 0 ? FName(Prefix) : FName(*FString::Printf(TEXT("%s%d"), Prefix, RosterIndex + 1));
+}
+
+TArray<FHSRBattleRosterEntry> UHSRBattleCoordinator::BuildEffectivePlayerRoster() const
+{
+	if (!PlayerRoster.IsEmpty()) return PlayerRoster;
+	// Callers that only ever set the leader still get a well-formed one-entry roster.
+	TArray<FHSRBattleRosterEntry> Fallback;
+	if (!PlayerCharacterId.IsNone()) Fallback.Add({ PlayerCharacterId, PlayerCharacterClass });
+	return Fallback;
+}
+
+TArray<FHSRBattleRosterEntry> UHSRBattleCoordinator::BuildEffectiveEnemyRoster() const
+{
+	if (!EnemyRoster.IsEmpty()) return EnemyRoster;
+	TArray<FHSRBattleRosterEntry> Fallback;
+	// The enemy shell is the native APawn: encounters author stats through EnemyDefinition
+	// rather than a pawn Blueprint, so there is no per-entry class to resolve yet.
+	if (!CurrentEnemyDefinitionId.IsNone()) Fallback.Add({ CurrentEnemyDefinitionId, APawn::StaticClass() });
+	return Fallback;
+}
+
+void UHSRBattleCoordinator::AppendRosterDefinitions(const TArray<FHSRBattleRosterEntry>& Roster,
+	EHSRBattleParticipantTeam Team, TArray<FHSRBattleParticipantDefinition>& OutDefinitions)
+{
+	for (int32 Index = 0; Index < Roster.Num(); ++Index)
+	{
+		FHSRBattleParticipantDefinition Def;
+		Def.ParticipantId = MakeParticipantId(Team, Index);
+		Def.DefinitionId = Roster[Index].CharacterId;
+		Def.Team = Team;
+		Def.PawnClass = Roster[Index].PawnClass;
+		OutDefinitions.Add(Def);
+	}
+}
+
 FHSRBattleInitResult UHSRBattleCoordinator::BuildAndValidateParticipantDefinitions()
 {
 	ParticipantDefinitions.Empty();
 
-	// Player Definition: uses a well-known constant, not EncounterId
-	FHSRBattleParticipantDefinition PlayerDef;
-	PlayerDef.ParticipantId = FName(TEXT("Player"));
-	PlayerDef.DefinitionId = PlayerCharacterId;
-	PlayerDef.Team = EHSRBattleParticipantTeam::Player;
-	PlayerDef.PawnClass = PlayerCharacterClass;
-	if (PlayerDef.DefinitionId.IsNone() || !PlayerDef.PawnClass)
+	// Both sides go through the same roster expansion so battle width is data-driven: one
+	// participant per roster entry, with ParticipantIds minted per side and per index.
+	const TArray<FHSRBattleRosterEntry> PlayerEntries = BuildEffectivePlayerRoster();
+	if (PlayerEntries.IsEmpty())
 	{
 		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::DefinitionNotFound,
-			FText::FromString(TEXT("Player definition is not registered.")), PlayerDef.DefinitionId);
+			FText::FromString(TEXT("Player roster is empty.")), PlayerCharacterId);
+	}
+	for (const FHSRBattleRosterEntry& Entry : PlayerEntries)
+	{
+		if (!Entry.IsValid() || !Entry.PawnClass)
+		{
+			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::DefinitionNotFound,
+				FText::FromString(TEXT("Player definition is not registered.")), Entry.CharacterId);
+		}
 	}
 
-	// Enemy Definition: uses CurrentEnemyDefinitionId from the encounter request
-	FHSRBattleParticipantDefinition EnemyDef;
-	EnemyDef.ParticipantId = FName(TEXT("Enemy"));
-	EnemyDef.DefinitionId = CurrentEnemyDefinitionId;
-	EnemyDef.Team = EHSRBattleParticipantTeam::Enemy;
-	EnemyDef.PawnClass = nullptr;
-	// The phase-5 runtime currently exposes one intentionally small, explicit
-	// definition registry. Unknown non-empty IDs must fail deterministically.
-	if (EnemyDef.DefinitionId != FName(TEXT("Enemy_TestGoblin")))
+	const TArray<FHSRBattleRosterEntry> EnemyEntries = BuildEffectiveEnemyRoster();
+	if (EnemyEntries.IsEmpty())
 	{
 		UE_LOG(LogTemp, Warning,
 			TEXT("UHSRBattleCoordinator::BuildAndValidateParticipantDefinitions - DefinitionNotFound DefId=%s RequestId=%s"),
-			*EnemyDef.DefinitionId.ToString(), *CurrentRequestId.ToString());
+			*CurrentEnemyDefinitionId.ToString(), *CurrentRequestId.ToString());
 		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::DefinitionNotFound,
-			FText::FromString(TEXT("Enemy definition is not registered.")), EnemyDef.DefinitionId);
+			FText::FromString(TEXT("Enemy definition is not registered.")), CurrentEnemyDefinitionId);
 	}
-	// Resolve the registered definitions to their controlled runtime class.
-	// The prototype intentionally uses the native APawn shell for both entries;
-	// SpawnParticipantActor never falls back for a validated definition.
-	EnemyDef.PawnClass = APawn::StaticClass();
-	ParticipantDefinitions.Add(PlayerDef);
-	ParticipantDefinitions.Add(EnemyDef);
+
+	AppendRosterDefinitions(PlayerEntries, EHSRBattleParticipantTeam::Player, ParticipantDefinitions);
+	AppendRosterDefinitions(EnemyEntries, EHSRBattleParticipantTeam::Enemy, ParticipantDefinitions);
 
 	// Validate each definition
 	for (const auto& Def : ParticipantDefinitions)
@@ -1187,10 +1422,8 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildAndValidateParticipantDefinitio
 	}
 
 	UE_LOG(LogTemp, Log,
-		TEXT("UHSRBattleCoordinator::BuildAndValidateParticipantDefinitions - SUCCESS Definitions=%d PlayerDefId=%s EnemyDefId=%s"),
-		ParticipantDefinitions.Num(),
-		*ParticipantDefinitions[0].DefinitionId.ToString(),
-		*ParticipantDefinitions[1].DefinitionId.ToString());
+		TEXT("UHSRBattleCoordinator::BuildAndValidateParticipantDefinitions - SUCCESS Definitions=%d Players=%d Enemies=%d"),
+		ParticipantDefinitions.Num(), PlayerEntries.Num(), EnemyEntries.Num());
 
 	return FHSRBattleInitResult::MakeSuccess();
 }
@@ -1201,6 +1434,7 @@ void UHSRBattleCoordinator::Reset()
 		TEXT("UHSRBattleCoordinator::Reset - Clearing state. Previous state=%d RequestId=%s"),
 		static_cast<int32>(CurrentState), *CurrentRequestId.ToString());
 
+	RollbackStageBuffs(false);
 	ClearRuntimeDelegates();
 	ClearProgressionGameplayEffects();
 	if (EquipmentEffectBridge) EquipmentEffectBridge->RemoveAll();
@@ -1212,6 +1446,7 @@ void UHSRBattleCoordinator::Reset()
 	CurrentRequestId = FGuid();
 	CurrentEncounterId = NAME_None;
 	CurrentEnemyDefinitionId = NAME_None;
+	CurrentStageBuffIds.Reset();
 	CurrentRewardDefinitionId = NAME_None;
 	CurrentRewardSeed = 0;
 	ReturnContext = FHSRBattleReturnContext();
@@ -1224,13 +1459,13 @@ void UHSRBattleCoordinator::Reset()
 	DevelopmentDamageResults.Empty();
 	DevelopmentDamageRandomStream.Initialize(DevelopmentDamageSeed);
 	DevelopmentDamageConsumeCount = 0;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	ClearDamageTestInjection();
 	LastDevelopmentFormalExecutionResult = FHSRFormalDamageExecutionResult();
 #endif
 	LastActionResolution = FHSRAbilityResolution();
 	PresentationEvents.Empty();
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	PublicRequestActionDepth = 0;
 	MaxPublicRequestActionDepth = 0;
 	CoreExecutionDepth = 0;
@@ -1243,7 +1478,7 @@ void UHSRBattleCoordinator::Reset()
 	TeamResourceState = FHSRTeamResourceState();
 	bLastBreakDelayRegistered = false;
 	LastBreakDelayActionId.Invalidate();
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	BreakStatusRequestCountForTest = 0;
 	BreakDelayRegistrationCountForTest = 0;
 	LastBreakStatusResultForTest = EHSRStatusOperationResult::UnknownStatus;
@@ -1287,7 +1522,7 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticip
 	Spec.Data->SetSetByCallerMagnitude(AbilityMultiplierTag, Definition->DamageAbilityMultiplier); Spec.Data->SetSetByCallerMagnitude(DefenseCoefficientTag, Rule->DefenseCoefficient); Spec.Data->SetSetByCallerMagnitude(MinDamageTag, Rule->MinDamage); Spec.Data->SetSetByCallerMagnitude(CritRollTag, DamageContext->DamageContext.CritRoll);
 	const float HealthBefore = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
 	bFormalDamageTransactionOpen = true; PendingDefeatedParticipantId = NAME_None;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	if (bForceStatusDamageApplyFailure)
 	{
 		DevelopmentDamageRandomStream = RandomStreamBeforeApply; bFormalDamageTransactionOpen = false; Failure.Result = EHSRDamageResultType::EffectApplicationFailed; return Failure;
@@ -1302,7 +1537,7 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticip
 		bFormalDamageTransactionOpen = false;
 		PendingDefeatedParticipantId = NAME_None;
 	}
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	else { ++StatusDamageCommitCount; }
 #endif
 	return Result;
@@ -1313,7 +1548,7 @@ void UHSRBattleCoordinator::FinalizeStatusDamage()
 	if (!PendingDefeatedParticipantId.IsNone()) { const FName Defeated = PendingDefeatedParticipantId; PendingDefeatedParticipantId = NAME_None; bFormalDamageTransactionOpen = false; ResolveDefeat(Defeated); }
 	else { bFormalDamageTransactionOpen = false; }
 }
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 FHSRBattleInitResult UHSRBattleCoordinator::ResetAndRebuildForDevelopmentTest(UWorld* BattleWorld)
 {
 	if (!BattleWorld || !LastSubmittedRequestForDevelopment.IsSet())
@@ -1414,6 +1649,20 @@ void UHSRBattleCoordinator::HandleHealthChanged(const FOnAttributeChangeData& Ch
 	}
 }
 
+bool UHSRBattleCoordinator::IsTeamWiped(EHSRBattleParticipantTeam Team) const
+{
+	bool bFoundMember = false;
+	for (const FHSRBattleParticipant& Participant : Participants)
+	{
+		if (Participant.Team != Team) continue;
+		bFoundMember = true;
+		// bDefeated is authoritative here; an ASC that has gone away counts as down so a
+		// destroyed pawn cannot keep a wiped team nominally alive.
+		if (!Participant.bDefeated && UHSRTurnManager::IsParticipantTurnEligible(Participant)) return false;
+	}
+	return bFoundMember;
+}
+
 void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
 {
 	if (bBattleResultProduced || CurrentState != EHSRBattleCoordinatorState::Spawned)
@@ -1433,23 +1682,36 @@ void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
 	}
 
 	Defeated->bDefeated = true;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	LastSourceInvalidRemovedCount = RouteSourceInvalid(DefeatedParticipantId);
 #else
 	RouteSourceInvalid(DefeatedParticipantId);
 #endif
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	++DefeatCount;
 #endif
 	if (UHSRStatusComponent* StatusComponent = GetStatusComponent(DefeatedParticipantId))
 	{
 		StatusComponent->ClearStatus();
 	}
+	// A single casualty no longer ends the battle: only a full team wipe does.  The downed
+	// participant leaves the turn rotation so the survivors keep acting.
+	// No explicit turn-order removal is needed: UHSRTurnManager::IsParticipantTurnEligible
+	// already gates on Health > 0, so a downed member is skipped by AdvanceToNextValidTurn.
+	const EHSRBattleParticipantTeam DefeatedTeam = Defeated->Team;
+	if (!IsTeamWiped(DefeatedTeam))
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::ResolveDefeat - PARTIAL Defeated=%s SurvivorsRemain=1"), *DefeatedParticipantId.ToString());
+		ParticipantDefeated.Broadcast(DefeatedParticipantId);
+		PublishCommandViewState();
+		return;
+	}
+
 	BattleResult.RequestId = CurrentRequestId;
 	BattleResult.DefeatedParticipantId = DefeatedParticipantId;
 	BattleResult.EncounterId = CurrentEncounterId;
 	BattleResult.ReturnContext = ReturnContext;
-	BattleResult.Outcome = Defeated->Team == EHSRBattleParticipantTeam::Enemy ? EHSRBattleOutcome::PlayerVictory : EHSRBattleOutcome::PlayerDefeat;
+	BattleResult.Outcome = DefeatedTeam == EHSRBattleParticipantTeam::Enemy ? EHSRBattleOutcome::PlayerVictory : EHSRBattleOutcome::PlayerDefeat;
 	bBattleResultProduced = true;
 	CurrentState = EHSRBattleCoordinatorState::Finished;
 	ClearEnemyTurnAutomation();
@@ -1460,7 +1722,7 @@ void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
 	ClearStatusComponents();
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::ResolveDefeat - SUCCESS RequestId=%s Defeated=%s Outcome=%d"), *BattleResult.RequestId.ToString(), *DefeatedParticipantId.ToString(), static_cast<int32>(BattleResult.Outcome));
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	++BattleResultBroadcastCount;
 #endif
 	BattleResultReady.Broadcast(BattleResult);
@@ -1505,7 +1767,9 @@ AActor* UHSRBattleCoordinator::SpawnParticipantActor(UWorld* World, const FHSRBa
 
 	if (AActor* SpawnedActor = Cast<AActor>(Pawn))
 	{
+#if WITH_EDITOR
 		SpawnedActor->SetActorLabel(Definition.Team == EHSRBattleParticipantTeam::Player ? TEXT("BattlePlayerPawn") : TEXT("BattleEnemyPawn"));
+#endif
 	}
 
 	UE_LOG(LogTemp, Log,
@@ -1607,7 +1871,7 @@ void UHSRBattleCoordinator::ClearStatusComponents()
 		{
 			if (const FDelegateHandle* Handle = StatusChangedHandles.Find(Pair.Key)) Pair.Value->OnStatusChanged().Remove(*Handle);
 			Pair.Value->ClearStatus();
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 			LastClearedStatusSnapshots.Add(Pair.Key, Pair.Value->GetSnapshot());
 #endif
 			Pair.Value->UnbindTurnManager();
@@ -1649,7 +1913,7 @@ int32 UHSRBattleCoordinator::RouteSourceInvalid(FName SourceParticipantId)
 	return Removed;
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 EHSRStatusOperationResult UHSRBattleCoordinator::AddStatusForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId)
 {
 	const FHSRBattleParticipant* Source = Participants.FindByPredicate([SourceParticipantId](const FHSRBattleParticipant& Participant)
@@ -1841,7 +2105,7 @@ bool UHSRBattleCoordinator::ApplyCharacterProgressionGameplayEffect(const FHSRBa
 	Spec.Data->SetSetByCallerMagnitude(HSRProgressionTags::BonusDefense, Context.ProgressionBonuses.Defense);
 	Spec.Data->SetSetByCallerMagnitude(HSRProgressionTags::BonusSpeed, Context.ProgressionBonuses.Speed);
 	const float OldHealth = ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	if (bForceProgressionApplyFailureForTest) return false;
 #endif
 	const FActiveGameplayEffectHandle NewHandle = ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
@@ -1851,11 +2115,11 @@ bool UHSRBattleCoordinator::ApplyCharacterProgressionGameplayEffect(const FHSRBa
 		if (Existing->AbilitySystemComponent.IsValid() && Existing->ActiveHandle.IsValid()
 			&& Existing->AbilitySystemComponent->GetActiveGameplayEffect(Existing->ActiveHandle)
 			&&
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 			(bForceProgressionOldRemoveFailureForTest ||
 #endif
 			!Existing->AbilitySystemComponent->RemoveActiveGameplayEffect(Existing->ActiveHandle)
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 			)
 #endif
 			)
@@ -1894,12 +2158,12 @@ bool UHSRBattleCoordinator::ValidateCharacterProgressionEffectContract(const UGa
 
 bool UHSRBattleCoordinator::RefreshCharacterProgression(FName ParticipantId,const FHSRCharacterProgressionContext& Context)
 {
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	++ProgressionRefreshCountForTest;bLastProgressionRefreshResultForTest=false;
 #endif
 	const FHSRBattleParticipant* Participant=Participants.FindByPredicate([ParticipantId](const FHSRBattleParticipant& P){return P.ParticipantId==ParticipantId;});if(!Participant||Participant->Team==EHSRBattleParticipantTeam::Enemy)return false;
 	const FHSRCharacterProgressionContext* Existing=CharacterProgressionContexts.Find(ParticipantId);const TOptional<FHSRCharacterProgressionContext> Previous=Existing?TOptional<FHSRCharacterProgressionContext>(*Existing):TOptional<FHSRCharacterProgressionContext>();CharacterProgressionContexts.Add(ParticipantId,Context);if(ApplyCharacterProgressionGameplayEffect(*Participant)){
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	bLastProgressionRefreshResultForTest=true;
 #endif
 	return true;}if(Previous.IsSet())CharacterProgressionContexts.Add(ParticipantId,Previous.GetValue());else CharacterProgressionContexts.Remove(ParticipantId);return false;
@@ -1935,9 +2199,64 @@ bool UHSRBattleCoordinator::RemoveEquipmentSetSource(FName ParticipantId,FName S
 	const FHSRBattleParticipant* P=Participants.FindByPredicate([&](const FHSRBattleParticipant& V){return V.ParticipantId==ParticipantId;});
 	return P && EquipmentEffectBridge->RemoveSetSource(SetSourceId);
 }
+void UHSRBattleCoordinator::BindEquipmentMovementProjection(UHSREquipmentSubsystem& Equipment)
+{
+	if(!EquipmentEffectBridge)EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
+	Equipment.SetMovementProjection(
+		UHSREquipmentSubsystem::FMovementProjectionPreflight::CreateUObject(this,&ThisClass::CanProjectEquipmentMovement),
+		UHSREquipmentSubsystem::FMovementProjectionApply::CreateUObject(this,&ThisClass::ApplyEquipmentMovementProjection),
+		UHSREquipmentSubsystem::FMovementProjectionCommit::CreateUObject(this,&ThisClass::CommitEquipmentMovementProjection));
+}
+bool UHSRBattleCoordinator::CanProjectEquipmentMovement(const FHSREquipmentMovementRequest& Request,const FHSREquipmentLoadout& Candidate) const
+{
+	if(Request.CharacterId!=HSRCharacterGuidFromProfileName(PlayerCharacterId)||!EquipmentGameplayEffect)return false;
+	const FHSRBattleParticipant* Participant=Participants.FindByPredicate([](const FHSRBattleParticipant& Value){return Value.ParticipantId==TEXT("Player");});
+	if(!Participant||!Participant->AbilitySystemComponent.IsValid())return false;
+	UHSREquipmentEffectBridge* Bridge=EquipmentEffectBridge.Get();
+	if(!Bridge)return false;
+	TSet<FGuid> DesiredIds;for(const auto& Pair:Candidate.Equipment)DesiredIds.Add(Pair.Value.InstanceId);for(const auto& Pair:Candidate.Relics)DesiredIds.Add(Pair.Value.InstanceId);
+	for(const auto& Existing:EquipmentProjectionStates)if(!DesiredIds.Contains(Existing.Key)&&!Bridge->CanRemove(Existing.Key))return false;
+	if(Request.Intent==EHSREquipmentMovementIntent::Unequip)return true;
+	FHSREquipmentAggregate Aggregate;
+	return UHSREquipmentStatAggregator::Aggregate(Candidate,Request.ExpectedEquipmentRevision+1,Aggregate)&&Bridge->CanApply(Participant->AbilitySystemComponent.Get(),EquipmentGameplayEffect,Aggregate);
+}
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
+void UHSRBattleCoordinator::SetEquipmentMovementProjectionFailureForDevelopmentTest(bool bApply,bool bRemove)
+{
+	if(!EquipmentEffectBridge)EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
+	EquipmentEffectBridge->SetPreflightFailureForDevelopmentTest(bApply,bRemove);
+}
+void UHSRBattleCoordinator::SetEquipmentMovementProjectionCommitFailureForDevelopmentTest(bool bApply,bool bRemove)
+{
+	if(!EquipmentEffectBridge)EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
+	EquipmentEffectBridge->SetCommitFailureForDevelopmentTest(bApply,bRemove);
+}
+#endif
+bool UHSRBattleCoordinator::ApplyEquipmentMovementProjection(const FHSREquipmentMovementRequest& Request,const FHSREquipmentLoadout& Candidate)
+{
+	if(Request.Intent==EHSREquipmentMovementIntent::Unequip)
+	{
+		if(!RemoveEquipmentSource(TEXT("Player"),Request.InstanceId))return false;
+		EquipmentProjectionStates.Remove(Request.InstanceId);
+		EquipmentProjectionParticipants.Remove(Request.InstanceId);
+		return true;
+	}
+	TSet<FGuid> DesiredIds;
+	for(const auto& Pair:Candidate.Equipment)DesiredIds.Add(Pair.Value.InstanceId);
+	for(const auto& Pair:Candidate.Relics)DesiredIds.Add(Pair.Value.InstanceId);
+	FHSREquipmentAggregate Aggregate;
+	if(!UHSREquipmentStatAggregator::Aggregate(Candidate,Request.ExpectedEquipmentRevision+1,Aggregate)||!ApplyEquipmentSource(TEXT("Player"),Request.InstanceId,Aggregate,Aggregate.Revision))return false;
+	TArray<FGuid> RemovedIds;
+	if(Request.Intent==EHSREquipmentMovementIntent::Replace)for(const auto& Existing:EquipmentProjectionStates)if(!DesiredIds.Contains(Existing.Key))RemovedIds.Add(Existing.Key);
+	for(const FGuid& RemovedId:RemovedIds)if(!RemoveEquipmentSource(TEXT("Player"),RemovedId)){RemoveEquipmentSource(TEXT("Player"),Request.InstanceId);return false;}
+	for(const FGuid& RemovedId:RemovedIds){EquipmentProjectionStates.Remove(RemovedId);EquipmentProjectionParticipants.Remove(RemovedId);}
+	EquipmentProjectionStates.Add(Request.InstanceId,Aggregate);
+	EquipmentProjectionParticipants.Add(Request.InstanceId,TEXT("Player"));
+	return true;
+}
 bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipmentRestoreState>& Candidate)
 {
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	if (bForceEquipmentRestoreProjectionFailure) return false;
 #endif
 	if (!EquipmentGameplayEffect || !RelicSetGameplayEffect) return false;
@@ -1964,7 +2283,7 @@ bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipme
 	const auto RestoreOld=[&](){for(const auto& Old:OldStates)ApplyEquipmentSource(OldParticipants.FindRef(Old.Key),Old.Key,Old.Value,Old.Value.Revision);for(const auto& Old:OldSetStates)ApplyEquipmentSetSource(OldSetParticipants.FindRef(Old.Key),Old.Key,Old.Value,Old.Value.Revision);for(const auto& Desired:DesiredStates)if(!OldStates.Contains(Desired.Key))RemoveEquipmentSource(DesiredParticipants.FindRef(Desired.Key),Desired.Key);for(const auto& Desired:DesiredSetStates)if(!OldSetStates.Contains(Desired.Key))RemoveEquipmentSetSource(DesiredSetParticipants.FindRef(Desired.Key),Desired.Key);};
 	int32 CompletedOperations=0;
 	const auto InjectFailure=[&](){
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		return EquipmentRestoreFailureAfterOperations>=0&&CompletedOperations>=EquipmentRestoreFailureAfterOperations;
 #else
 		return false;
@@ -1979,7 +2298,7 @@ bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipme
 	return true;
 }
 
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 bool UHSRBattleCoordinator::HasProgressionPrimaryHandleForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S&&S->ActiveHandle.IsValid();}
 FString UHSRBattleCoordinator::GetProgressionPrimaryHandleForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S?S->ActiveHandle.ToString():FString();}
 int32 UHSRBattleCoordinator::GetProgressionSecondaryCountForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S?S->SecondaryOwnedHandles.Num():0;}

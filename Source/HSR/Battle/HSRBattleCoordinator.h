@@ -28,6 +28,8 @@ struct FOnAttributeChangeData;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleResultReadyDelegate, const FHSRBattleResult&);
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleCommandStateReadyDelegate, const FHSRBattleCommandViewState&);
+/** Fires for every casualty, including ones that do not end the battle. */
+DECLARE_MULTICAST_DELEGATE_OneParam(FHSRParticipantDefeatedDelegate, FName /* ParticipantId */);
 
 /**
  * State machine for battle initialization.
@@ -75,7 +77,14 @@ public:
 	void SetParticipantInitializationGameplayEffect(TSubclassOf<UGameplayEffect> InEffect) { ParticipantInitializationGameplayEffect = InEffect; }
 	void SetCharacterProgressionGameplayEffect(TSubclassOf<UGameplayEffect> InEffect) { CharacterProgressionGameplayEffect = InEffect; }
 	void SetCharacterProgressionContext(FName ParticipantId, const FHSRCharacterProgressionContext& Context) { CharacterProgressionContexts.Add(ParticipantId, Context); }
-	void SetPlayerCharacterDefinition(FName CharacterId, TSubclassOf<APawn> CharacterClass) { PlayerCharacterId = CharacterId; PlayerCharacterClass = CharacterClass; }
+	/** Single-member convenience form.  It collapses to a one-entry roster so callers that
+	 * only ever field a leader keep working unchanged. */
+	void SetPlayerCharacterDefinition(FName CharacterId, TSubclassOf<APawn> CharacterClass) { PlayerCharacterId = CharacterId; PlayerCharacterClass = CharacterClass; PlayerRoster.Reset(); if (!CharacterId.IsNone()) PlayerRoster.Add({ CharacterId, CharacterClass }); }
+	/** Full roster form, leader first.  Each member becomes its own participant with its own
+	 * action-distance state, progression context, and equipment projection. */
+	void SetPlayerRoster(const TArray<FHSRBattleRosterEntry>& InRoster) { PlayerRoster = InRoster; PlayerCharacterId = InRoster.IsEmpty() ? NAME_None : InRoster[0].CharacterId; PlayerCharacterClass = InRoster.IsEmpty() ? nullptr : InRoster[0].PawnClass; }
+	void SetEnemyRoster(const TArray<FHSRBattleRosterEntry>& InRoster) { EnemyRoster = InRoster; }
+	const TArray<FHSRBattleRosterEntry>& GetPlayerRoster() const { return PlayerRoster; }
 	void SetStatusDefinition(UHSRStatusDefinition* InDefinition) { StatusDefinition = InDefinition; }
 	void SetDamageOverTimeStatusDefinition(UHSRStatusDefinition* InDefinition) { DamageOverTimeStatusDefinition = InDefinition; }
 	void SetBreakStatusDefinition(UHSRStatusDefinition* InDefinition) { BreakStatusDefinition = InDefinition; }
@@ -84,7 +93,7 @@ public:
 	const FHSRTeamResourceState& GetTeamResourceState() const { return TeamResourceState; }
 	bool WasLastBreakDelayRegistered() const { return bLastBreakDelayRegistered; }
 	FGuid GetLastBreakDelayActionId() const { return LastBreakDelayActionId; }
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	/** Controlled-runtime counters for repeatable Break transaction audits. */
 	int32 GetBreakStatusRequestCountForDevelopmentTest() const { return BreakStatusRequestCountForTest; }
 	int32 GetBreakDelayRegistrationCountForDevelopmentTest() const { return BreakDelayRegistrationCountForTest; }
@@ -104,8 +113,9 @@ public:
 	bool ApplyEquipmentSetSource(FName ParticipantId, FName SetSourceId, const FHSREquipmentAggregate& Aggregate, int64 Revision);
 	bool RemoveEquipmentSetSource(FName ParticipantId, FName SetSourceId);
 	bool ProjectEquipmentRestore(const TMap<FGuid,FHSREquipmentRestoreState>& Candidate);
+	void BindEquipmentMovementProjection(UHSREquipmentSubsystem& Equipment);
 	bool SetEquipmentSource(FName ParticipantId,const FGuid& InstanceId,const FHSREquipmentAggregate& Aggregate,int64 Revision) { return ApplyEquipmentSource(ParticipantId,InstanceId,Aggregate,Revision); }
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	bool HasProgressionPrimaryHandleForDevelopmentTest(FName Id) const;
 	FString GetProgressionPrimaryHandleForDevelopmentTest(FName Id) const;
 	int32 GetProgressionSecondaryCountForDevelopmentTest(FName Id) const;
@@ -118,6 +128,8 @@ public:
 	void SetProgressionOldRemoveFailureForDevelopmentTest(bool bForce) { bForceProgressionOldRemoveFailureForTest=bForce; }
 	void SetEquipmentRestoreProjectionFailureForDevelopmentTest(bool bForce) { bForceEquipmentRestoreProjectionFailure=bForce; }
 	void SetEquipmentRestoreProjectionFailureAfterOperationsForDevelopmentTest(int32 Count) { EquipmentRestoreFailureAfterOperations=Count; }
+	void SetEquipmentMovementProjectionFailureForDevelopmentTest(bool bApply,bool bRemove);
+	void SetEquipmentMovementProjectionCommitFailureForDevelopmentTest(bool bApply,bool bRemove);
 	void SetParticipantsForEquipmentProjectionDevelopmentTest(const TArray<FHSRBattleParticipant>& InParticipants) { Participants=InParticipants; }
 	int32 GetEquipmentProjectionSourceCountForDevelopmentTest() const { return EquipmentEffectBridge?EquipmentEffectBridge->GetActiveSourceCount():0; }
 	EHSRStatusOperationResult AddStatusForDevelopmentTest(FName SourceParticipantId, FName TargetParticipantId);
@@ -143,6 +155,9 @@ public:
 	void ClearDamageTestInjection() { DamageTestInjectionActionId = FGuid(); NextDamageTestInjection = EHSRDamageTestInjection::None; }
 	const FHSRFormalDamageExecutionResult& GetLastDevelopmentFormalExecutionResult() const { return LastDevelopmentFormalExecutionResult; }
 	FHSRBattleInitResult ResetAndRebuildForDevelopmentTest(UWorld* BattleWorld);
+	bool HasStageBuffPlayerForDevelopmentTest() const { return FindStageBuffPlayerParticipant() != nullptr; }
+	int32 GetAppliedStageBuffCountForDevelopmentTest() const { return AppliedStageBuffHandles.Num(); }
+	int32 GetConsumedStageBuffResourceCountForDevelopmentTest() const { return AppliedStageBuffCosts.Num(); }
 	void SetTeamSkillPointsForDevelopmentTest(int32 Current, int32 Max) { TeamResourceState.MaxSkillPoints = FMath::Max(0, Max); TeamResourceState.CurrentSkillPoints = FMath::Clamp(Current, 0, TeamResourceState.MaxSkillPoints); }
 	void InitializeDevelopmentDamageRng(int32 InSeed);
 	int32 GetDevelopmentDamageConsumeCount() const { return DevelopmentDamageConsumeCount; }
@@ -154,6 +169,18 @@ public:
 	/** Read-only terminal result inspection for preflight; it never consumes or changes authority. */
 	bool GetBattleResultForPresentation(FHSRBattleResult& OutResult) const;
 	FHSRBattleResultReadyDelegate& OnBattleResultReady() { return BattleResultReady; }
+	FHSRParticipantDefeatedDelegate& OnParticipantDefeated() { return ParticipantDefeated; }
+	/** True when no member of Team can still act.  False for an unknown/empty team. */
+	bool IsTeamWiped(EHSRBattleParticipantTeam Team) const;
+	/** ASC of the team's first roster entry (its leader), or null when the team is absent. */
+	UAbilitySystemComponent* FindLeaderAbilitySystemComponent(EHSRBattleParticipantTeam Team) const;
+	/**
+	 * Participant id for a roster slot.  Index 0 keeps the unsuffixed "Player"/"Enemy" id so
+	 * single-member encounters, their save projections, and existing harnesses observe exactly
+	 * the ids they did before; later slots get a 1-based suffix ("Player2", "Enemy3", ...).
+	 * Public because callers keyed by participant id (progression, UI) must not re-derive it.
+	 */
+	static FName MakeParticipantId(EHSRBattleParticipantTeam Team, int32 RosterIndex);
 
 	/** Reset to Idle for a fresh battle session. */
 	void Reset();
@@ -165,6 +192,9 @@ private:
 	int32 CurrentRewardSeed = 0;
 	FName CurrentEncounterId;
 	FName CurrentEnemyDefinitionId;
+	TArray<FName> CurrentStageBuffIds;
+	TMap<FName, FActiveGameplayEffectHandle> AppliedStageBuffHandles;
+	TMap<FName, int32> AppliedStageBuffCosts;
 	FHSRBattleReturnContext ReturnContext;
 	TArray<FHSRBattleParticipant> Participants;
 	TArray<FHSRBattleParticipantDefinition> ParticipantDefinitions;
@@ -184,7 +214,7 @@ private:
 	TSet<FString> ConsumedEnemyTurnKeys;
 	int32 RequestActionDispatchDepth = 0;
 	bool bDrainingEnemyTurns = false;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	int32 PublicRequestActionDepth = 0;
 	int32 MaxPublicRequestActionDepth = 0;
 	int32 CoreExecutionDepth = 0;
@@ -218,7 +248,7 @@ private:
 	FHSRTeamResourceState TeamResourceState;
 	bool bLastBreakDelayRegistered = false;
 	FGuid LastBreakDelayActionId;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	int32 BreakStatusRequestCountForTest = 0;
 	int32 BreakDelayRegistrationCountForTest = 0;
 	EHSRStatusOperationResult LastBreakStatusResultForTest = EHSRStatusOperationResult::UnknownStatus;
@@ -250,14 +280,18 @@ private:
 	TMap<FGuid,FName> EquipmentProjectionParticipants;
 	TMap<FName,FHSREquipmentAggregate> EquipmentSetProjectionStates;
 	TMap<FName,FName> EquipmentSetProjectionParticipants;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	bool bForceEquipmentRestoreProjectionFailure=false;
 	int32 EquipmentRestoreFailureAfterOperations=-1;
 #endif
+	/** Leader mirror of PlayerRoster[0], kept for the many call sites that legitimately want
+	 * just the leading character rather than the whole team. */
 	FName PlayerCharacterId;
 	TSubclassOf<APawn> PlayerCharacterClass;
+	TArray<FHSRBattleRosterEntry> PlayerRoster;
+	TArray<FHSRBattleRosterEntry> EnemyRoster;
 	uint64 ProgressionEpoch = 0;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	int32 ProgressionRefreshCountForTest=0;
 	bool bLastProgressionRefreshResultForTest=false;
 	bool bForceProgressionApplyFailureForTest=false;
@@ -265,11 +299,12 @@ private:
 #endif
 	FHSRBattleResultReadyDelegate BattleResultReady;
 	FHSRBattleCommandStateReadyDelegate CommandStateReady;
+	FHSRParticipantDefeatedDelegate ParticipantDefeated;
 	FRandomStream DevelopmentDamageRandomStream;
 	int32 DevelopmentDamageSeed = 1337;
 	int32 DevelopmentDamageConsumeCount = 0;
 	TMap<FGuid, FHSRDamageResult> DevelopmentDamageResults;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	EHSRDamageTestInjection NextDamageTestInjection = EHSRDamageTestInjection::None;
 	FGuid DamageTestInjectionActionId;
 	FHSRFormalDamageExecutionResult LastDevelopmentFormalExecutionResult;
@@ -292,6 +327,9 @@ private:
 	AActor* SpawnParticipantActor(UWorld* World, const FHSRBattleParticipantDefinition& Definition);
 	bool InitParticipantASC(AActor* TargetActor);
 	bool ApplyParticipantInitializationGameplayEffect(const FHSRBattleParticipant& Participant);
+	bool CanProjectEquipmentMovement(const FHSREquipmentMovementRequest& Request, const FHSREquipmentLoadout& Candidate) const;
+	bool ApplyEquipmentMovementProjection(const FHSREquipmentMovementRequest& Request, const FHSREquipmentLoadout& Candidate);
+	void CommitEquipmentMovementProjection(const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&) {}
 	bool ApplyCharacterProgressionGameplayEffect(const FHSRBattleParticipant& Participant);
 	bool ClearProgressionGameplayEffects();
 	bool GrantBasicAttackAbility(const FHSRBattleParticipant& Participant);
@@ -311,6 +349,13 @@ private:
 	void CommitSkillPoints(const FGuid& ActionId);
 	void CommitActionEnergyGain(const FGuid& ActionId, const UHSRSkillDefinition& ActionSkillDefinition, UAbilitySystemComponent& SourceASC);
 	FHSRBattleInitResult BuildAndValidateParticipantDefinitions();
+	static void AppendRosterDefinitions(const TArray<FHSRBattleRosterEntry>& Roster,
+		EHSRBattleParticipantTeam Team, TArray<FHSRBattleParticipantDefinition>& OutDefinitions);
+	TArray<FHSRBattleRosterEntry> BuildEffectivePlayerRoster() const;
+	TArray<FHSRBattleRosterEntry> BuildEffectiveEnemyRoster() const;
+	const FHSRBattleParticipant* FindStageBuffPlayerParticipant() const;
+	bool ApplyStageBuffs(UWorld* BattleWorld);
+	void RollbackStageBuffs(bool bRefundResources);
 	void BindHealthObserver(const FHSRBattleParticipant& Participant);
 	void HandleHealthChanged(const FOnAttributeChangeData& ChangeData, FName ParticipantId);
 	void ResolveDefeat(FName DefeatedParticipantId);

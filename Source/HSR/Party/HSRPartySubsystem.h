@@ -10,15 +10,16 @@ class HSR_API UHSRPartySubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
 public:
-	static constexpr int32 Capacity = 2;
+	static constexpr int32 Capacity = 4;
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	EHSRPartyResult AddCharacter(FName CharacterId, int32 PreferredSlot = INDEX_NONE);
 	EHSRPartyResult RemoveCharacter(int32 Slot);
 	EHSRPartyResult ReplaceCharacter(int32 Slot, FName CharacterId);
 	EHSRPartyResult SwapSlots(int32 FirstSlot, int32 SecondSlot);
+	EHSRPartyResult CommitCandidate(const FHSRPartySnapshot& Candidate);
 	bool GetSnapshot(FHSRPartySnapshot& OutSnapshot) const;
 	FHSRPartyChanged& OnPartyChanged() { return PartyChanged; }
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	void InitializeForDevelopmentTest(UHSRCharacterProfileSubsystem* InProfiles) { Slots.SetNum(Capacity); Profiles = InProfiles; }
 #endif
 

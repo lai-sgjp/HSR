@@ -30,7 +30,8 @@ enum class EHSREncounterResultType : uint8
 	InvalidMap UMETA(DisplayName = "Invalid Battle Map"),
 	NothingPending UMETA(DisplayName = "Nothing Pending"),
 	AlreadyConsumed UMETA(DisplayName = "Already Consumed"),
-	TravelInitiationFailed UMETA(DisplayName = "Travel Initiation Failed")
+	TravelInitiationFailed UMETA(DisplayName = "Travel Initiation Failed"),
+	NoPlayerSelection UMETA(DisplayName = "No Player Selection")
 };
 
 UENUM(BlueprintType)
@@ -51,11 +52,23 @@ struct FHSREncounterRequest
 	UPROPERTY()
 	FGuid RequestId;
 
+	/** Roster leader.  Kept as the stable single-member identity for callers that only need
+	 * one character; PlayerPartyIds carries the full committed order. */
+	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
+	FName PlayerCharacterId;
+
+	/** Committed party order, leader first.  Empty slots are dropped, so this is dense. */
+	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
+	TArray<FName> PlayerPartyIds;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
 	FName EncounterId;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
 	FName EnemyDefinitionId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Encounter|Preparation")
+	TArray<FName> BuffIds;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
 	EHSREncounterInitiative Initiative = EHSREncounterInitiative::Neutral;
@@ -75,7 +88,25 @@ struct FHSREncounterRequest
 	UPROPERTY(BlueprintReadOnly, Category = "Encounter|Reward")
 	int32 RewardSeed = 0;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Encounter|Reward")
+	int32 VictoryExperience = 0;
+
 	FHSREncounterRequest() = default;
+};
+
+USTRUCT(BlueprintType)
+struct HSR_API FHSRPreBattleAdmissionInput
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, Category = "Encounter|Preparation")
+	FHSREncounterRequest Template;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Encounter|Preparation")
+	TArray<FName> CandidateParty;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Encounter|Preparation")
+	TArray<FName> BuffIds;
 };
 
 USTRUCT(BlueprintType)

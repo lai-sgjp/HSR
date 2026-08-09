@@ -18,7 +18,7 @@ struct HSR_API FHSRSaveEnvelopeHeader
 	static constexpr uint16 HeaderBytes = 104;
 	static constexpr uint16 PayloadCodecVersion = 1;
 	static constexpr int64 MaxPayloadBytes = 16ll * 1024ll * 1024ll;
-	uint32 SchemaVersion = 6;
+	uint32 SchemaVersion = 9;
 	uint32 MinimumCompatibleSchema = 1;
 	FGuid SaveId;
 	uint64 Generation = 1;
@@ -28,10 +28,14 @@ struct HSR_API FHSRSaveEnvelopeHeader
 
 namespace HSRSaveVersion
 {
-	constexpr int32 CurrentSchema = 6;
+	constexpr int32 CurrentSchema = 9;
 	constexpr uint32 MaxRecordCount = 65535;
 	constexpr uint32 MaxTokenBytes = 4096;
-	constexpr uint32 PartySlotCount = 2;
+	/** Party width is part of the disk contract, so it is pinned per schema rather than
+	 * tracked against the runtime capacity.  Schema 9 widened the party from 2 to 4. */
+	constexpr uint32 LegacyPartySlotCount = 2;
+	constexpr uint32 PartySlotCount = 4;
+	constexpr uint32 PartySlotCountForSchema(uint32 Schema) { return Schema >= 9 ? PartySlotCount : LegacyPartySlotCount; }
 	bool IsValidSlot(const FString& SlotName, int32 UserIndex);
 	bool IsValidPayloadSize(uint64 PayloadBytes);
 	bool IsCanonicalIdToken(const FString& Token);
