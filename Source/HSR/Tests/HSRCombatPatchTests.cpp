@@ -114,6 +114,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRTurnForecastPatchTest, "HSR.Battle.Patch.Ac
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRBehaviorTreeAdapterPatchTest, "HSR.Exploration.Patch.BehaviorTreeAdapter", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRSkillLoadoutPatchTest, "HSR.Battle.Patch.SkillLoadout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRAuthoredSkillContentTest, "HSR.Battle.Patch.AuthoredSkillContent", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRDefaultLoadoutResolutionTest, "HSR.Battle.Patch.DefaultLoadoutResolution", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 {
@@ -1344,6 +1345,60 @@ bool FHSRAuthoredSkillContentTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Category lookup still resolves"), ByCategory);
 	TestEqual(TEXT("Category lookup is first-match-wins, which is why id lookup is needed"),
 		ByCategory->SkillId, FName(TEXT("SkillA")));
+
+	return true;
+}
+
+bool FHSRDefaultLoadoutResolutionTest::RunTest(const FString& Parameters)
+{
+	// The shared default loadout used to be four named UPROPERTY slots brace-initialised at two
+	// call sites, so a fifth default skill needed a C++ edit.  DefaultSkillLoadout is now the
+	// authoring surface; the named slots survive only so already-authored Blueprints keep working.
+	auto MakeNamed = [](const TCHAR* Id)
+	{
+		UHSRSkillDefinition* Skill = NewObject<UHSRSkillDefinition>();
+		Skill->SkillId = Id;
+		return Skill;
+	};
+
+	UHSRSkillDefinition* Basic = MakeNamed(TEXT("Legacy.Basic"));
+	UHSRSkillDefinition* Skill = MakeNamed(TEXT("Legacy.Skill"));
+	UHSRSkillDefinition* Ultimate = MakeNamed(TEXT("Legacy.Ultimate"));
+	UHSRSkillDefinition* Heal = MakeNamed(TEXT("Legacy.Heal"));
+
+	AHSRBattleGameMode* GameMode = NewObject<AHSRBattleGameMode>();
+	GameMode->SetLegacySkillSlotsForTest(Basic, Skill, Ultimate, Heal);
+
+	// Legacy fallback, in historical presentation order.
+	TArray<UHSRSkillDefinition*> Resolved = GameMode->ResolveDefaultSkillLoadoutForTest();
+	TestEqual(TEXT("An unauthored array falls back to the four named slots"), Resolved.Num(), 4);
+	TestEqual(TEXT("Legacy order is preserved"), Resolved[0]->SkillId, FName(TEXT("Legacy.Basic")));
+	TestEqual(TEXT("Legacy heal stays last"), Resolved[3]->SkillId, FName(TEXT("Legacy.Heal")));
+
+	// A partially authored Blueprint must not contribute nulls to the Coordinator.
+	GameMode->SetLegacySkillSlotsForTest(Basic, nullptr, Ultimate, nullptr);
+	Resolved = GameMode->ResolveDefaultSkillLoadoutForTest();
+	TestEqual(TEXT("Unauthored legacy slots are dropped, not passed through as null"), Resolved.Num(), 2);
+
+	// Five entries: the case that previously required a new UPROPERTY plus two brace edits.
+	GameMode->SetLegacySkillSlotsForTest(Basic, Skill, Ultimate, Heal);
+	GameMode->SetDefaultSkillLoadoutForTest({ MakeNamed(TEXT("A")), MakeNamed(TEXT("B")),
+		MakeNamed(TEXT("C")), MakeNamed(TEXT("D")), MakeNamed(TEXT("E")) });
+	Resolved = GameMode->ResolveDefaultSkillLoadoutForTest();
+	TestEqual(TEXT("A fifth default skill is a DataAsset edit"), Resolved.Num(), 5);
+	TestEqual(TEXT("The authored array wins over the legacy slots"), Resolved[0]->SkillId, FName(TEXT("A")));
+	TestEqual(TEXT("Authoring order is presentation order"), Resolved[4]->SkillId, FName(TEXT("E")));
+
+	// Nulls inside the authored array are dropped too.
+	GameMode->SetDefaultSkillLoadoutForTest({ MakeNamed(TEXT("A")), nullptr, MakeNamed(TEXT("C")) });
+	Resolved = GameMode->ResolveDefaultSkillLoadoutForTest();
+	TestEqual(TEXT("Null authored entries are dropped"), Resolved.Num(), 2);
+	TestEqual(TEXT("Surviving authored entries keep their order"), Resolved[1]->SkillId, FName(TEXT("C")));
+
+	// An array holding only nulls is not an authoring intent to have no skills at all.
+	GameMode->SetDefaultSkillLoadoutForTest({ nullptr, nullptr });
+	Resolved = GameMode->ResolveDefaultSkillLoadoutForTest();
+	TestEqual(TEXT("An all-null array falls back rather than yielding an empty loadout"), Resolved.Num(), 4);
 
 	return true;
 }

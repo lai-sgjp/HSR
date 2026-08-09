@@ -1502,14 +1502,57 @@ AHSRBattleGameMode::AHSRBattleGameMode()
 	PrimaryActorTick.bCanEverTick = false;
 }
 
+TArray<UHSRSkillDefinition*> AHSRBattleGameMode::ResolveDefaultSkillLoadout() const
+{
+	TArray<UHSRSkillDefinition*> Resolved;
+
+	// The authored array wins outright when it holds anything, so a fifth default skill is a
+	// DataAsset edit. Null entries are dropped rather than propagated to the Coordinator.
+	if (!DefaultSkillLoadout.IsEmpty())
+	{
+		for (const TObjectPtr<UHSRSkillDefinition>& Authored : DefaultSkillLoadout)
+		{
+			if (Authored)
+			{
+				Resolved.Add(Authored);
+			}
+		}
+
+		if (!Resolved.IsEmpty())
+		{
+			return Resolved;
+		}
+	}
+
+	// Legacy path: the four named slots, in their historical presentation order.
+	const TObjectPtr<UHSRSkillDefinition> LegacySlots[] = {
+		BasicAttackSkillDefinition,
+		SkillSkillDefinition,
+		UltimateSkillDefinition,
+		HealSkillDefinition };
+
+	for (const TObjectPtr<UHSRSkillDefinition>& Legacy : LegacySlots)
+	{
+		if (Legacy)
+		{
+			Resolved.Add(Legacy);
+		}
+	}
+
+	return Resolved;
+}
+
 #if WITH_DEV_AUTOMATION_TESTS
 UHSRBattleCoordinator* AHSRBattleGameMode::CreateRepeatableBreakAutomationFixture(UObject* Outer, UWorld* BattleWorld, TSubclassOf<AHSRBattleGameMode> ConfiguredGameModeClass, FText& OutFailure)
 {
 	OutFailure = FText::GetEmpty();
 	const AHSRBattleGameMode* Config = ConfiguredGameModeClass
 		? ConfiguredGameModeClass->GetDefaultObject<AHSRBattleGameMode>() : nullptr;
-	if (!Outer || !BattleWorld || !Config || !Config->BasicAttackSkillDefinition || !Config->EnemyDefinition
-		|| !Config->BreakStatusDefinition || !Config->ParticipantInitializationGameplayEffect)
+	// Checks the resolved loadout rather than the legacy slot, so a Blueprint that authors only
+	// DefaultSkillLoadout is not misreported as unconfigured.
+	if (!Outer || !BattleWorld || !Config || !Config->EnemyDefinition
+		|| !Config->BreakStatusDefinition || !Config->ParticipantInitializationGameplayEffect
+		|| Config->ResolveDefaultSkillLoadout().IsEmpty())
 	{
 		OutFailure = FText::FromString(TEXT("Missing configured production battle fixture."));
 		return nullptr;
@@ -1543,11 +1586,7 @@ UHSRBattleCoordinator* AHSRBattleGameMode::CreateRepeatableBreakAutomationFixtur
 		return nullptr;
 	}
 	UHSRBattleCoordinator* Result = NewObject<UHSRBattleCoordinator>(Outer);
-	Result->SetDefaultSkillLoadout({
-		Config->BasicAttackSkillDefinition,
-		Config->SkillSkillDefinition,
-		Config->UltimateSkillDefinition,
-		Config->HealSkillDefinition });
+	Result->SetDefaultSkillLoadout(Config->ResolveDefaultSkillLoadout());
 	Result->SetEnemyDefinition(Config->EnemyDefinition);
 	Result->SetStatusDefinition(Config->AttackUpStatusDefinition);
 	Result->SetDamageOverTimeStatusDefinition(Config->DamageOverTimeStatusDefinition);
@@ -1628,11 +1667,7 @@ void AHSRBattleGameMode::BeginPlay()
 			*ConsumeResult.RequestId.ToString());
 		return;
 	}
-	Coordinator->SetDefaultSkillLoadout({
-		BasicAttackSkillDefinition,
-		SkillSkillDefinition,
-		UltimateSkillDefinition,
-		HealSkillDefinition });
+	Coordinator->SetDefaultSkillLoadout(ResolveDefaultSkillLoadout());
 	Coordinator->SetEnemyDefinition(EnemyDefinition);
 	Coordinator->SetStatusDefinition(AttackUpStatusDefinition);
 	Coordinator->SetDamageOverTimeStatusDefinition(DamageOverTimeStatusDefinition);
