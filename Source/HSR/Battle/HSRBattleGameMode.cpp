@@ -2020,8 +2020,8 @@ const auto RunP10001CommandHarnessLocal = [this]()
 		&& bWrongBattleMatchingActionDidNotClear && !TestViewModel->IsCommandPendingForDevelopmentTest());
 	TestViewModel->BeginCommandSubmit(FGuid::NewGuid(), TestState.CurrentActorId, SelectedSkill, SelectedTarget);
 	TestViewModel->UnbindCoordinator();
-	Case(TEXT("Unbind_ClearsLocksAndAttributeHandles"), !TestViewModel->IsCommandPendingForDevelopmentTest() && !TestViewModel->IsPresentationLockedForDevelopmentTest()
-		&& !TestViewModel->HasObservedAttributeBindingsForDevelopmentTest() && !TestViewModel->HasBoundCoordinatorForDevelopmentTest());
+	Case(TEXT("Unbind_ClearsLocksAndCoordinator"), !TestViewModel->IsCommandPendingForDevelopmentTest() && !TestViewModel->IsPresentationLockedForDevelopmentTest()
+		&& !TestViewModel->HasBoundCoordinatorForDevelopmentTest());
 
 	UHSRBattleCommandWidget* LifecycleWidget = CreateWidget<UHSRBattleCommandWidget>(GetWorld(), BattleCommandWidgetClass);
 	if (LifecycleWidget)

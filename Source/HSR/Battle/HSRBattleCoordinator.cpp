@@ -1202,6 +1202,7 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 			View.MaxEnergy = Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxEnergyAttribute());
 			View.Toughness = Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetToughnessAttribute());
 			View.MaxToughness = Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxToughnessAttribute());
+			View.bHasAttributes = true;
 		}
 	}
 	State.LastResolution = LastActionResolution;

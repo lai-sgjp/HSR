@@ -80,6 +80,8 @@ struct FHSRBattleParticipantView
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") float Toughness = 0.0f;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") float MaxToughness = 0.0f;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") TArray<FGameplayTag> WeaknessTags;
+	/** False means the numeric fields above were never read from an ASC, not that they are zero. */
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") bool bHasAttributes = false;
 };
 
 USTRUCT(BlueprintType)

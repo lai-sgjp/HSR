@@ -3,8 +3,6 @@
 #include "../Battle/HSRBattleCoordinator.h"
 #include "../Battle/HSRBattleParticipant.h"
 #include "../Battle/HSRBattleTypes.h"
-#include "../GAS/Attribute/HSRCoreAttributeSet.h"
-#include "AbilitySystemComponent.h"
 
 void UHSRBattleCommandViewModel::BeginDestroy()
 {
@@ -32,19 +30,13 @@ void UHSRBattleCommandViewModel::BindCoordinator(UHSRBattleCoordinator* InCoordi
 {
 	UnbindCoordinator();
 	Coordinator = InCoordinator;
-	RebindTargetAttributes();
 	RefreshReadOnlyBattlePresentation();
-	UE_LOG(LogTemp, Log, TEXT("P8-005 ViewModel Bind Coordinator=%s Target=%s Bound=%d"), InCoordinator ? TEXT("valid") : TEXT("null"), *SelectedTargetId.ToString(), ObservedTargetASC.IsValid() ? 1 : 0);
+	UE_LOG(LogTemp, Log, TEXT("P8-005 ViewModel Bind Coordinator=%s Target=%s"), InCoordinator ? TEXT("valid") : TEXT("null"), *SelectedTargetId.ToString());
 }
 
 void UHSRBattleCommandViewModel::UnbindCoordinator()
 {
-	if (ObservedTargetASC.IsValid())
-	{
-		if (ToughnessChangedHandle.IsValid()) ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetToughnessAttribute()).Remove(ToughnessChangedHandle);
-		if (MaxToughnessChangedHandle.IsValid()) ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetMaxToughnessAttribute()).Remove(MaxToughnessChangedHandle);
-	}
-	ToughnessChangedHandle.Reset(); MaxToughnessChangedHandle.Reset(); ObservedTargetASC.Reset(); Coordinator.Reset();
+	Coordinator.Reset();
 	ClearCommandLocks();
 	UE_LOG(LogTemp, Log, TEXT("P8-005 ViewModel Unbind"));
 }
@@ -107,7 +99,7 @@ void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
 	{
 		SelectedTargetId = SelectedSkill && SelectedSkill->CandidateTargetIds.Num() > 0 ? SelectedSkill->CandidateTargetIds[0] : NAME_None;
 	}
-	RebindTargetAttributes();
+	RefreshReadOnlyBattlePresentation();
 	RefreshCommandState();
 }
 
@@ -122,7 +114,6 @@ bool UHSRBattleCommandViewModel::SelectSkillById(FName SkillId)
 	SelectedSkillId = Skill->SkillId;
 	SelectedTargetId = Skill->CandidateTargetIds.Num() > 0 ? Skill->CandidateTargetIds[0] : NAME_None;
 
-	RebindTargetAttributes();
 	RefreshReadOnlyBattlePresentation();
 	RefreshCommandState();
 	Changed.Broadcast(State);
@@ -147,7 +138,9 @@ bool UHSRBattleCommandViewModel::SelectTarget(FName TargetId)
 {
 	if (!GetTargetOptions().Contains(TargetId)) return false;
 	SelectedTargetId = TargetId;
-	RebindTargetAttributes(); RefreshReadOnlyBattlePresentation(); RefreshCommandState(); Changed.Broadcast(State);
+	RefreshReadOnlyBattlePresentation();
+	RefreshCommandState();
+	Changed.Broadcast(State);
 	return true;
 }
 
@@ -232,39 +225,44 @@ void UHSRBattleCommandViewModel::RefreshCommandState()
 		&& Skill && Skill->bAvailable && Skill->CandidateTargetIds.Contains(SelectedTargetId);
 }
 
-void UHSRBattleCommandViewModel::RebindTargetAttributes()
-{
-	if (ObservedTargetASC.IsValid())
-	{
-		if (ToughnessChangedHandle.IsValid()) ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetToughnessAttribute()).Remove(ToughnessChangedHandle);
-		if (MaxToughnessChangedHandle.IsValid()) ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetMaxToughnessAttribute()).Remove(MaxToughnessChangedHandle);
-	}
-	ToughnessChangedHandle.Reset(); MaxToughnessChangedHandle.Reset(); ObservedTargetASC.Reset();
-	if (!Coordinator.IsValid()) return;
-	const FHSRBattleParticipant* Target = Coordinator->GetParticipants().FindByPredicate([this](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == SelectedTargetId; });
-	if (!Target || !Target->AbilitySystemComponent.IsValid()) return;
-	ObservedTargetASC = Target->AbilitySystemComponent;
-	ToughnessChangedHandle = ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetToughnessAttribute()).AddUObject(this, &UHSRBattleCommandViewModel::HandleObservedToughnessChanged);
-	MaxToughnessChangedHandle = ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetMaxToughnessAttribute()).AddUObject(this, &UHSRBattleCommandViewModel::HandleObservedToughnessChanged);
-}
-
-void UHSRBattleCommandViewModel::HandleObservedToughnessChanged(const FOnAttributeChangeData& ChangeData)
-{
-	RefreshReadOnlyBattlePresentation();
-	Changed.Broadcast(State);
-}
-
 void UHSRBattleCommandViewModel::RefreshReadOnlyBattlePresentation()
 {
-	WeaknessText = FText::GetEmpty(); ToughnessText = FText::GetEmpty(); BreakText = FText::GetEmpty(); DelayText = FText::GetEmpty();
-	if (!Coordinator.IsValid()) return;
-	const FHSRBattleParticipant* Target = Coordinator->GetParticipants().FindByPredicate([this](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == SelectedTargetId; });
-	if (Target && Target->AbilitySystemComponent.IsValid())
+	WeaknessText = FText::GetEmpty();
+	ToughnessText = FText::GetEmpty();
+	BreakText = FText::GetEmpty();
+	DelayText = FText::GetEmpty();
+
+	// Toughness and weaknesses come from the participant view the Coordinator already baked from the
+	// ASC, so the UI never observes a live ASC of its own. bHasAttributes distinguishes "never read"
+	// from a genuine zero, which is why an ASC-less participant still renders no text at all.
+	const FHSRBattleParticipantView* TargetView = State.Participants.FindByPredicate(
+		[this](const FHSRBattleParticipantView& Candidate)
+		{
+			return Candidate.ParticipantId == SelectedTargetId;
+		});
+	if (TargetView && TargetView->bHasAttributes)
 	{
 		FString Weaknesses;
-		for (const FGameplayTag& Tag : Target->WeaknessTags) { if (!Weaknesses.IsEmpty()) Weaknesses += TEXT(", "); Weaknesses += Tag.ToString(); }
-		WeaknessText = FText::Format(NSLOCTEXT("HSRCommand", "Weakness", "Weakness: {0}"), FText::FromString(Weaknesses.IsEmpty() ? TEXT("None") : Weaknesses));
-		ToughnessText = FText::Format(NSLOCTEXT("HSRCommand", "Toughness", "Toughness: {0} / {1}"), FText::AsNumber(FMath::RoundToInt(Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetToughnessAttribute()))), FText::AsNumber(FMath::RoundToInt(Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxToughnessAttribute()))));
+		for (const FGameplayTag& Tag : TargetView->WeaknessTags)
+		{
+			if (!Weaknesses.IsEmpty())
+			{
+				Weaknesses += TEXT(", ");
+			}
+			Weaknesses += Tag.ToString();
+		}
+		WeaknessText = FText::Format(
+			NSLOCTEXT("HSRCommand", "Weakness", "Weakness: {0}"),
+			FText::FromString(Weaknesses.IsEmpty() ? TEXT("None") : Weaknesses));
+		ToughnessText = FText::Format(
+			NSLOCTEXT("HSRCommand", "Toughness", "Toughness: {0} / {1}"),
+			FText::AsNumber(FMath::RoundToInt(TargetView->Toughness)),
+			FText::AsNumber(FMath::RoundToInt(TargetView->MaxToughness)));
+	}
+
+	if (!Coordinator.IsValid())
+	{
+		return;
 	}
 	if (State.LastResolution.bHasBreakResult)
 	{

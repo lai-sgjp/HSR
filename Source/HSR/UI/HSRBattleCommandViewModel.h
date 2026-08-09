@@ -6,8 +6,6 @@
 #include "HSRBattleCommandViewModel.generated.h"
 
 class UHSRBattleCoordinator;
-class UAbilitySystemComponent;
-struct FOnAttributeChangeData;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleCommandStateChanged, const FHSRBattleCommandViewState&);
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleResultConfirmRequested, const FGuid&);
@@ -82,7 +80,6 @@ public:
 	bool IsPresentationLockedForDevelopmentTest() const { return bPresentationLocked; }
 	FGuid GetPendingBattleIdForDevelopmentTest() const { return PendingBattleId; }
 	FGuid GetPendingActionIdForDevelopmentTest() const { return PendingActionId; }
-	bool HasObservedAttributeBindingsForDevelopmentTest() const { return ToughnessChangedHandle.IsValid() || MaxToughnessChangedHandle.IsValid(); }
 	bool HasBoundCoordinatorForDevelopmentTest() const { return Coordinator.IsValid(); }
 #endif
 
@@ -94,9 +91,6 @@ private:
 	FHSRBattleCommandStateChanged Changed;
 	FHSRBattleResultConfirmRequested ResultConfirmRequested;
 	TWeakObjectPtr<UHSRBattleCoordinator> Coordinator;
-	TWeakObjectPtr<UAbilitySystemComponent> ObservedTargetASC;
-	FDelegateHandle ToughnessChangedHandle;
-	FDelegateHandle MaxToughnessChangedHandle;
 	FGuid PendingBattleId;
 	FGuid PendingActionId;
 	bool bCommandPending = false;
@@ -105,7 +99,5 @@ private:
 	const FHSRBattleCommandSkillView* FindSelectedSkill() const;
 	void RefreshPresentationAndSelection();
 	void RefreshReadOnlyBattlePresentation();
-	void RebindTargetAttributes();
-	void HandleObservedToughnessChanged(const FOnAttributeChangeData& ChangeData);
 	void RefreshCommandState();
 };
