@@ -10,7 +10,9 @@ class UHSRInventoryRewardViewModel;
 class UHSRInventoryWidget;
 class UHSRRewardSummaryWidget;
 class UHSRScreenWidget;
-class UHSRCharacterDetailWidget;
+class UHSRFrontendShellWidget;
+class UHSRFrontendModuleRootWidget;
+class UUserWidget;
 
 UCLASS()
 class HSR_API AHSRHUD : public AHUD
@@ -51,16 +53,29 @@ protected:
 	TObjectPtr<UHSRUserWidget> ExplorationWidgetInstance;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
-	TSubclassOf<UHSRScreenWidget> PauseWidgetClass;
+	TSubclassOf<UHSRFrontendShellWidget> FrontendShellClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
-	TSubclassOf<UHSRCharacterDetailWidget> CharacterDetailWidgetClass;
+	TSubclassOf<UHSRFrontendModuleRootWidget> FrontendModuleRootClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
+	TSubclassOf<UHSRScreenWidget> CharacterDetailWidgetClass;
 
 	UPROPERTY()
 	TObjectPtr<UHSRInteractionViewModel> InteractionViewModel;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P13")
 	TSubclassOf<UHSRInventoryWidget> InventoryWidgetClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
+	TSubclassOf<UUserWidget> PartyWidgetClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
+	TSubclassOf<UUserWidget> MapWidgetClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
+	TSubclassOf<UUserWidget> ChallengeWidgetClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
+	TSubclassOf<UUserWidget> QuestWidgetClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
+	TSubclassOf<UUserWidget> SaveWidgetClass;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P13")
 	TSubclassOf<UHSRRewardSummaryWidget> RewardSummaryWidgetClass;
 	UPROPERTY(Transient)

@@ -13,6 +13,7 @@ class HSR_API UHSRScreenStack : public UObject
 public:
 	EHSRScreenStackResult SubmitRequest(const FHSRScreenRequest& Request);
 	const FHSRScreenStackSnapshot& GetSnapshot() const { return Snapshot; }
+	void RestoreSnapshotForTransaction(const FHSRScreenStackSnapshot& InSnapshot) { Snapshot = InSnapshot; }
 	bool GetActiveEntry(FHSRScreenStackEntry& OutEntry) const;
 
 private:

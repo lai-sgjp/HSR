@@ -14,6 +14,7 @@ class HSR_API UHSRScreenWidget : public UUserWidget
 
 public:
 	void SetOwningUIManager(UHSRUIManagerSubsystem* Manager);
+	UHSRUIManagerSubsystem* GetOwningUIManager() const { return OwningUIManager.Get(); }
 
 	UFUNCTION(BlueprintCallable, Category = "HSR|UI")
 	bool RequestBack();
@@ -23,13 +24,17 @@ public:
 
 #if WITH_DEV_AUTOMATION_TESTS
 	bool ShouldConsumeBackKeyForAutomation(const FKey& Key) const;
+	bool ShouldConsumeCloseToRootKeyForAutomation(const FKey& Key) const;
+	bool RouteCloseToRootKeyForAutomation(const FKey& Key);
 #endif
 
 protected:
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
 private:
+	bool SubmitCloseToRoot();
 	bool ShouldConsumeBackKey(const FKey& Key) const;
+	bool ShouldConsumeCloseToRootKey(const FKey& Key) const;
 	UPROPERTY(Transient)
 	TWeakObjectPtr<UHSRUIManagerSubsystem> OwningUIManager;
 };

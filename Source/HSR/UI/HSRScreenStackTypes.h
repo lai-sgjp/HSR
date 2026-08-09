@@ -58,6 +58,7 @@ enum class EHSRUIScreenResult : uint8
 	ViewportAttachFailed,
 	PolicyApplyFailed,
 	PauseApplyFailed,
+	FocusApplyFailed,
 	AlreadyOpen,
 	NothingOpen,
 	ExternalPause,
