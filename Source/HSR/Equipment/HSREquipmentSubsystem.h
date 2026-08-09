@@ -156,6 +156,17 @@ private:
 		}
 	}
 
+	/**
+	 * Validates one restored instance against its authored definition. Shared by both PrepareRestore
+	 * overloads so a blob is accepted or rejected identically regardless of which schema wrote it.
+	 */
+	bool ValidateRestoreInstance(FName DefinitionId, EHSREquipmentKind Kind, int32 Slot,
+		int32 EnhancementLevel, FName SetId, const TArray<FHSREquipmentModifier>& Modifiers) const;
+
+	/** Places a validated instance into a per-character restore state, rejecting duplicate slots. */
+	static bool InsertIntoRestoreState(FHSREquipmentRestoreState& State,
+		const FHSREquipmentInstance& Instance, int32 Slot, FName SetId);
+
 	bool IsValidInstance(const FHSREquipmentInstance& Instance) const;
 	bool IsValidModifiers(const TArray<FHSREquipmentModifier>& Modifiers) const;
 	const FDefinitionRule* FindDefinition(const FHSREquipmentInstance& Instance) const;
