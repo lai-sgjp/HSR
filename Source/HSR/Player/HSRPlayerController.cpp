@@ -264,6 +264,13 @@ void AHSRPlayerController::HandlePauseBack()
 		UE_LOG(LogTemp, Warning, TEXT("HSRUI P17 PauseBack ignored LocalPlayer=%s Manager=None"), LP ? TEXT("valid") : TEXT("None"));
 		return;
 	}
+	if (Manager->HasOpenDialogueOverlay())
+	{
+		const EHSRUIScreenResult Result = Manager->CloseDialogueOverlay();
+		UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Dialogue Back Result=%d HasOverlay=%s"),
+			static_cast<int32>(Result), Manager->HasOpenDialogueOverlay() ? TEXT("true") : TEXT("false"));
+		return;
+	}
 
 	const int32 StackBefore = Manager->GetLogicalScreenCount();
 	const EHSRUIScreenResult Result = StackBefore <= 1
@@ -277,7 +284,23 @@ void AHSRPlayerController::HandleInventory() { if (ULocalPlayer* LP = GetLocalPl
 void AHSRPlayerController::HandleParty() { if (ULocalPlayer* LP = GetLocalPlayer()) if (auto* M = LP->GetSubsystem<UHSRUIManagerSubsystem>()) M->OpenFrontendModule(EHSRFrontendModule::Party); }
 void AHSRPlayerController::HandleMap() { if (ULocalPlayer* LP = GetLocalPlayer()) if (auto* M = LP->GetSubsystem<UHSRUIManagerSubsystem>()) M->OpenFrontendModule(EHSRFrontendModule::Map); }
 void AHSRPlayerController::HandleChallenge() { if (ULocalPlayer* LP = GetLocalPlayer()) if (auto* M = LP->GetSubsystem<UHSRUIManagerSubsystem>()) M->OpenFrontendModule(EHSRFrontendModule::Challenge); }
-void AHSRPlayerController::HandleCloseToRoot() { RequestCloseFrontendToRoot(); }
+void AHSRPlayerController::HandleCloseToRoot()
+{
+	if (ULocalPlayer* LP = GetLocalPlayer())
+	{
+		if (UHSRUIManagerSubsystem* Manager = LP->GetSubsystem<UHSRUIManagerSubsystem>())
+		{
+			if (Manager->HasOpenDialogueOverlay())
+			{
+				const EHSRUIScreenResult Result = Manager->CloseDialogueOverlay();
+				UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Dialogue CloseToRoot Result=%d HasOverlay=%s"),
+					static_cast<int32>(Result), Manager->HasOpenDialogueOverlay() ? TEXT("true") : TEXT("false"));
+				return;
+			}
+		}
+	}
+	RequestCloseFrontendToRoot();
+}
 
 void AHSRPlayerController::AddFrontendNavigationContext()
 {

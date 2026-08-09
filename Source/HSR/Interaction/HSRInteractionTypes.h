@@ -14,6 +14,13 @@ enum class EHSRInteractionFailureReason : uint8
 	ExecutionFailed UMETA(DisplayName = "Execution Failed")
 };
 
+UENUM(BlueprintType)
+enum class EHSRInteractionPayloadType : uint8
+{
+	None,
+	Dialogue
+};
+
 USTRUCT(BlueprintType)
 struct FHSRInteractionContext
 {
@@ -44,6 +51,15 @@ struct FHSRInteractionResult
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
 	FText Message;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction|Payload")
+	EHSRInteractionPayloadType PayloadType = EHSRInteractionPayloadType::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction|Payload")
+	FName DialogueId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Interaction|Payload")
+	FName DialogueNodeId;
+
 	FHSRInteractionResult() {}
 
 	static FHSRInteractionResult MakeSuccess()
@@ -61,5 +77,20 @@ struct FHSRInteractionResult
 		Result.FailureReason = Reason;
 		Result.Message = InMessage;
 		return Result;
+	}
+
+	static FHSRInteractionResult MakeDialogueSuccess(FName InDialogueId, FName InNodeId)
+	{
+		FHSRInteractionResult Result = MakeSuccess();
+		Result.PayloadType = EHSRInteractionPayloadType::Dialogue;
+		Result.DialogueId = InDialogueId;
+		Result.DialogueNodeId = InNodeId;
+		return Result;
+	}
+
+	bool HasDialoguePayload() const
+	{
+		return bSuccess && PayloadType == EHSRInteractionPayloadType::Dialogue
+			&& !DialogueId.IsNone() && !DialogueNodeId.IsNone();
 	}
 };

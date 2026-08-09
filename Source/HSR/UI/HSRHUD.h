@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
+#include "../Interaction/HSRInteractionTypes.h"
 #include "HSRHUD.generated.h"
 
 class UHSRUserWidget;
@@ -13,6 +14,8 @@ class UHSRScreenWidget;
 class UHSRFrontendShellWidget;
 class UHSRFrontendModuleRootWidget;
 class UHSRInventoryModuleWidget;
+class UHSRDialogueOverlayWidget;
+class UHSRInteractionComponent;
 class UUserWidget;
 
 UCLASS()
@@ -42,6 +45,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void ClearInteractionObserverInstance();
 
+	UFUNCTION()
+	void HandleInteractionCompleted(const FHSRInteractionResult& Result);
+
 	// Development-only Phase 2 test interface
 	UFUNCTION(BlueprintCallable, Category = "HUD|Development", meta = (DevelopmentOnly))
 	void RequestRebuildExplorationHUDForPhase2Test();
@@ -62,8 +68,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
 	TSubclassOf<UHSRScreenWidget> CharacterDetailWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
+	TSubclassOf<UHSRDialogueOverlayWidget> DialogueOverlayWidgetClass;
+
 	UPROPERTY()
 	TObjectPtr<UHSRInteractionViewModel> InteractionViewModel;
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<UHSRInteractionComponent> ObservedInteractionComponent;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P13")
 	TSubclassOf<UHSRInventoryWidget> InventoryWidgetClass;

@@ -20,6 +20,74 @@
 
 ---
 
+## 2026-08-09 TASK-P17-DIALOGUE-004 - USER ACCEPTED
+
+- [x] Gate 0：冻结 Dialogue start payload、Overlay 独立于 Pause Router、UIManager
+  输入/焦点 ownership、Escape/Gamepad Back/X 关闭、失败补偿和 travel teardown。
+- [x] TDD RED：新增 Overlay lifecycle/interaction payload Automation，并在
+  生产实现前真实失败。
+- [x] GREEN：实现 Overlay widget、HUD/UIManager 接线和 PlayerController close
+  routing；未修改 Authority、Config 或 UAsset。
+- [x] Build、Dialogue/UI Automation、`git diff --check` 与文档证据。
+- [x] 用户 Editor 创建/接线 WBP、Dialogue DataAsset、地图 Actor 与 HUD 引用，
+  Save All/reopen，并完成手动 PIE；用户确认视觉与交互正常。
+
+> 当前任务：`TASK-P17-DIALOGUE-004` 为 `COMPLETE / USER ACCEPTED`；不自动提交
+> Git，`.claude/**` 不纳入提交。
+
+---
+
+## 2026-08-09 TASK-P17-DIALOGUE-003 - code/Automation complete
+
+- [x] Gate 0：冻结 None / Quest / Encounter / Reward 分支、稳定
+  `BranchOperationId`、完整 Encounter request、Authority ownership 和失败
+  snapshot 保持规则。
+- [x] TDD RED：真实 UBT 在生产实现前触发缺失 branch contract/API 的预期编译
+  失败。
+- [x] GREEN：Quest、Reward、Encounter 通过对应 Authority exactly-once 转发；
+  Reward 使用 `ClaimId`，Encounter 使用 `RequestId`，ledger 支持 `NoOp` 与
+  `OperationIdConflict`，Authority 失败不写入 ledger。
+- [x] 验证：Development Editor Build Succeeded；
+  `HSR.Dialogue.Authority` 5/5、`HSR.Dialogue.Presentation` 4/4、
+  `HSR.QuestDialogue` 1/1；`git diff --check` 通过。
+- [x] 更新 `tasks/active-task.md`、`tasks/execution-result.md`、
+  `PROJECT_STATE.md`、`worklog.md` 与 `docs/testing/TASK-P17-DIALOGUE-003.tdd.md`。
+
+> 当前状态：`TASK-P17-DIALOGUE-003 = COMPLETE / CODE + AUTOMATION PASS`。
+> Overlay/HUD/input/focus/travel/Editor/PIE 属于下一包 Dialogue-004；本轮不
+> 自动创建、不 stage/commit/push，`.claude/**` 和其他脏工作树修改保持原样。
+
+---
+
+## 2026-08-09 TASK-P17-DIALOGUE-001 - RED confirmed / package closed
+
+- [x] Gate 0: freeze InteractionComponent `F`/Candidate ownership,
+  DialogueSubsystem node/choice progression, Overlay route boundary, pure-value
+  Query/Node/Choice identity, and failure snapshot preservation.
+- [x] TDD RED: after the user exited Unreal Editor, real UBT reached the
+  intentional missing `HSRDialoguePresentationTypes.h` compile failure; GREEN
+  was not started.
+- [x] Record the unrelated `NameLess` duplicate-definition error; do not modify
+  or attribute it to this task.
+- [x] Dialogue-002 authorized; implemented the pure-value presentation
+  contract/ViewModel and read-only Dialogue node/choice preview seams. Overlay,
+  UAsset and branch Authority forwarding remain deferred.
+
+> Current status: `TASK-P17-DIALOGUE-001` = `COMPLETE / GATE 0 PASS / TDD RED
+> CONFIRMED / GREEN NOT STARTED`. No stage/commit/push; `.claude/**` and
+> unrelated dirty-worktree changes remain untouched.
+
+## 2026-08-09 TASK-P17-DIALOGUE-002 - code/Automation complete
+
+- [x] TDD RED confirmed at the intentionally missing
+  `HSRDialoguePresentationTypes.h` header.
+- [x] GREEN production build passed after adding authored display fields,
+  read-only Dialogue seams and the pure-value Presentation ViewModel.
+- [x] Rebuild after correcting the test fixture's `UGameInstance` Outer;
+  `HSR.Dialogue.Presentation` 4/4 and `HSR.QuestDialogue` 1/1 passed.
+- [x] Update exact final evidence. Dialogue-003 still requires separate
+  authorization; no Git commit or push is implied.
+
 ## 2026-08-09 TASK-P17-INVENTORY-004 code gate complete / Editor-PIE pending (historical handoff)
 
 - [x] 独立 Gate 0：冻结共享 Frontend Shell/Router/UIManager 与
@@ -441,10 +509,16 @@
 - [x] `TASK-P17-INVENTORY-003`：Equip/Enhance 合法命令、失败快照保持；Use/Disassemble 无 Authority 时 typed unavailable；Build/7 项 Automation 通过。
 - [x] `TASK-P17-INVENTORY-004`：用户 Editor 集成、B/Back/X、旅行 teardown、PIE
   与收口；用户确认体验正常，`COMPLETE / USER ACCEPTED`。
-- [ ] `TASK-P17-DIALOGUE-001`：Gate 0、Interaction/Dialogue 合同与真实 RED。
-- [ ] `TASK-P17-DIALOGUE-002`：事件驱动对话 Overlay、说话者、正文、选项、选择和退出。
-- [ ] `TASK-P17-DIALOGUE-003`：稳定 Node/Choice ID 与 Quest/Encounter/Reward Authority exactly-once 转发。
-- [ ] `TASK-P17-DIALOGUE-004`：生命周期、焦点、旅行恢复、Editor/PIE 与收口。
+- [x] `TASK-P17-DIALOGUE-001`：Gate 0、Interaction/Dialogue 合同与真实 RED；
+  `COMPLETE / GATE 0 PASS / TDD RED CONFIRMED`。
+
+> 当前任务：Dialogue-004 已完成 Gate 0、TDD RED、生产 Build、Overlay 4/4、
+> Authority 5/5、Presentation 4/4 与 QuestDialogue 1/1 回归；不宣称 Editor/PIE
+> 或最终收口，等待用户手动验证。
+- [x] `TASK-P17-DIALOGUE-002`：事件驱动对话 Presentation、说话者、正文、选项、选择和退出；代码门禁完成。
+- [x] `TASK-P17-DIALOGUE-003`：稳定 Node/Choice ID 与 Quest/Encounter/Reward Authority exactly-once 转发；代码门禁完成。
+- [ ] `TASK-P17-DIALOGUE-004`：代码/Automation 门禁完成；生命周期、焦点、旅行
+  teardown 的用户 Editor/PIE 体验与最终收口待完成。
 - [ ] Phase 18 Gate 0 及 `TASK-P18-PRESENTATION-001`～`004`：在 P17-016 后建立，不提前实施。
 
 > 串行规则：一次只保留一个活动任务卡；完成前一包的 Build/Automation/PIE/文档

@@ -1,3 +1,252 @@
+# TASK-P17-DIALOGUE-004 Execution Result
+
+Status: COMPLETE / GATE 0 PASS / TDD RED CONFIRMED / GREEN PASS / FOCUSED AUTOMATION PASS / EDITOR-PIE PASS / USER ACCEPTED
+
+Dialogue-004 is the unambiguous Phase 17 P17-012 lifecycle/Editor/PIE package;
+the archived `TASK-P17-012` dynamic-mount task is not reused. User
+authorization was supplied on 2026-08-09.
+
+## Gate 0
+
+The Dialogue Overlay remains an Exploration HUD layer outside the Pause Hub
+Router. `F` and Candidate ownership remain in `UHSRInteractionComponent`; a
+successful Dialogue interactable interaction will carry a typed Dialogue start
+payload to HUD/UIManager. UIManager owns the Overlay's input policy, focus,
+attach/close compensation and travel teardown. The Overlay will not call
+Authorities or own viewport state.
+
+Authorized travel closes and releases the Overlay; the next host starts at a
+clean Exploration Root instead of restoring a stale query. Runtime WBP/Input
+asset authoring, Editor Save All/reopen and visual PIE were user-owned and are
+now complete by user confirmation.
+
+## RED evidence
+
+Before the production Overlay/HUD/UIManager implementation, the real UE5.6
+UBT run compiled `Source/HSR/Tests/HSRDialogueOverlayLifecycleTests.cpp` and
+reached the intended missing include:
+
+```text
+HSRDialogueOverlayLifecycleTests.cpp: Cannot open include file:
+'../UI/Dialogue/HSRDialogueOverlayWidget.h'
+```
+
+This was the expected compile-time RED for the new typed payload, Overlay
+Widget and lifecycle seam, not a test-only assertion or dependency failure.
+
+## GREEN and focused Automation evidence
+
+The final Development Editor build was run after the user exited Unreal Editor:
+
+```text
+"E:/programs/Epic Games/UE_5.6/Engine/Build/BatchFiles/Build.bat" HSREditor Win64 Development -Project="E:/work/unreal_projects/HSR/HSR.uproject" -WaitMutex -NoHotReload
+```
+
+It returned `Result: Succeeded` (`Target is up to date`). The focused runtime
+commands used the same project and quoted `ExecCmds`/`TestExit` arguments:
+
+```text
+Automation RunTests HSR.Dialogue.Overlay; Quit
+Automation RunTests HSR.Dialogue.Authority; Quit
+Automation RunTests HSR.Dialogue.Presentation; Quit
+Automation RunTests HSR.QuestDialogue; Quit
+```
+
+Results from `Saved/Logs/DialogueOverlayFinal.log`,
+`Saved/Logs/DialogueAuthorityFinal.log`, `Saved/Logs/DialoguePresentationFinal.log` and
+`Saved/Logs/QuestDialogueFinal.log`:
+
+- `HSR.Dialogue.Overlay`: 4 discovered, 4/4 `Result={Success}` —
+  FailureAndTravel, InteractionPayload, Lifecycle and WidgetSeams.
+- `HSR.Dialogue.Authority`: 5 discovered, 5/5 `Result={Success}`.
+- `HSR.Dialogue.Presentation`: 4 discovered, 4/4 `Result={Success}`.
+- `HSR.QuestDialogue`: 1 discovered, 1/1 `Result={Success}`.
+- Every command reported `**** TEST COMPLETE. EXIT CODE: 0 ****`.
+- `git diff --check` passed; the only output was known LF/CRLF conversion
+  warnings and no whitespace error.
+
+The passing tests guarantee typed Dialogue interaction payloads, bounds-safe
+Overlay seams, single-instance open/close, create/attach/policy/focus failure
+compensation, and travel teardown without stale arrival restoration. The
+Authority and Presentation suites are regression evidence for Dialogue-003 and
+Dialogue-002 behavior.
+
+## Editor/PIE integration and user acceptance
+
+User created and saved:
+
+- `Content/Data/Dialogue/DA_Dialogue_P17_Demo.uasset` with
+  `Dialogue.P17.Demo`, `Node.Start`, `Node.End`, one None-branch progression
+  choice and one terminal choice; Quest/Reward/Encounter fields remain empty.
+- `Content/UI/P17/Dialogue/WBP_DialogueOverlay_P17.uasset`, parented to
+  `UHSRDialogueOverlayWidget`, with full-screen layout, four choice buttons,
+  CloseButton, persisted `SubmitChoiceByIndex(0..3)` bindings and close binding.
+- `Content/Blueprints/UI/BP_HSRHUD.uasset` binding
+  `DialogueOverlayWidgetClass`, plus the placed/configured
+  `AHSRDialogueInteractable` in `Content/Maps/Map_Exploration_P15_A.umap`.
+
+The interactable received a user-verified visual/range correction: visible
+Sphere marker, `NoCollision`, and interaction radius 260. PIE observed the Talk
+candidate at distance 140, successful `Dialogue.P17.Demo / Node.Start` payload,
+Overlay open (`FocusResult=1`, result 0), and frontend-module rejection while
+Dialogue was active (`AlreadyOpen`, result 12). The user confirmed choice
+progression, Escape/Gamepad Back/X/CloseButton closing and authorized travel
+teardown without stale restoration. No Blueprint Runtime Error, Ensure or
+array-bounds error was observed.
+
+Task status is `COMPLETE / USER ACCEPTED`. No Git stage, commit, push, reset,
+clean, or `.claude/**` operation was performed.
+
+---
+
+# TASK-P17-DIALOGUE-003 Execution Result
+
+Status: COMPLETE / GATE 0 PASS / TDD RED CONFIRMED / GREEN PASS / FOCUSED AUTOMATION PASS
+
+Dialogue-003 is the unambiguous Phase 17 P17-012 Authority-forwarding package;
+the archived `TASK-P17-012` dynamic-mount task is not reused. The user
+authorized this task on 2026-08-09.
+
+## Implementation evidence
+
+- Added `EHSRDialogueChoiceBranch` with `None`, `Quest`, `Encounter` and
+  `Reward` branches. Explicit Authority branches require authored,
+  deterministic `BranchOperationId` values.
+- Quest, Reward and Encounter choices are dispatched only through their existing
+  Authorities. Reward uses `BranchOperationId` as `ClaimId`; Encounter copies it
+  into `RequestId` and submits the complete authored
+  `FHSREncounterRequest`. No context is inferred from `EncounterId`.
+- Added a Dialogue branch ledger. The same Dialogue/Node/Choice operation
+  replays as `NoOp`; an operation ID attached to a different Choice returns
+  `OperationIdConflict`; failed Authority calls do not write a ledger entry.
+- Presentation ViewModel choice submission uses the Dialogue Authority seam.
+  Authority failures do not publish an empty replacement and retain the full
+  previous Presentation snapshot plus raw branch result.
+- Kept the legacy `SelectChoice(FName, FName, FName, ...)` overload for existing
+  callers while routing explicit branches through the new contract.
+
+## RED evidence
+
+Before production implementation, the real UE5.6 UBT run compiled the new
+`HSRDialogueAuthorityTests.cpp` and reached the intended missing branch
+contract/API compiler failures. This was the expected compile-time RED for the
+new branch request/result and Authority seam, rather than a test-only or
+dependency failure.
+
+## GREEN and Automation status
+
+The post-implementation Development Editor Build returned `Result: Succeeded`.
+Focused UE Automation completed with the following results:
+
+- `HSR.Dialogue.Authority`: 5 discovered, 5/5 `Result={Success}`.
+- `HSR.Dialogue.Presentation`: 4 discovered, 4/4 `Result={Success}`.
+- Existing `HSR.QuestDialogue`: 1 discovered, 1/1 `Result={Success}`.
+
+The Authority suite covers branch-definition validation, Quest/Reward/Encounter
+exactly-once behavior, operation-ID conflict, Authority failure and complete
+Presentation snapshot preservation. The command runs ended successfully and
+`git diff --check` passed.
+
+## Boundaries
+
+No Quest/Reward/Encounter Authority implementation, Inventory/Equipment code,
+UAsset, Config, HUD, Overlay input/focus, travel teardown, PIE, Git
+stage/commit/push or `.claude/**` operation was performed. Dialogue-003 closes
+the code/Automation gate only; Dialogue-004 requires separate authorization.
+
+---
+
+# TASK-P17-DIALOGUE-001 Execution Result
+
+Status: COMPLETE / GATE 0 PASS / TDD RED CONFIRMED / GREEN NOT STARTED
+
+Dialogue-001 is the unambiguous Phase 17 P17-012 Dialogue package; the archived
+`TASK-P17-012` dynamic-mount task is not reused. The user authorized this task
+on 2026-08-09.
+
+Gate 0 audit is complete. `F` and the current candidate remain owned by
+`UHSRInteractionComponent`; node/choice progression remains owned by
+`UHSRDialogueSubsystem`; the future Dialogue Overlay stays outside the Pause Hub
+Router and uses pure-value active-query/Node/Choice identity. The existing
+generic interaction result lacks typed DialogueId/NodeId presentation data, and
+Dialogue Definitions lack speaker/choice display text; both are recorded as
+future API/data decisions.
+
+The only new production-adjacent file is the intentionally failing test
+`Source/HSR/Tests/HSRDialoguePresentationTests.cpp`. No production code, UAsset,
+Config, Editor, PIE, Git stage/commit/push, or `.claude/**` change was made.
+
+## RED evidence
+
+After the user fully exited Unreal Editor, the real UE5.6 command reached
+compilation:
+
+```text
+"E:\\programs\\Epic Games\\UE_5.6\\Engine\\Build\\BatchFiles\\Build.bat" HSREditor Win64 Development -Project=E:/work/unreal_projects/HSR/HSR.uproject
+```
+
+The intended first failure was:
+
+```text
+HSRDialoguePresentationTests.cpp(6,1): fatal error C1083:
+Cannot open include file: '../UI/Dialogue/HSRDialoguePresentationTypes.h': No such file or directory
+```
+
+This is the expected compile-time RED because the Dialogue-002 presentation
+contract is intentionally absent. The same invocation also reported an
+out-of-scope dirty-worktree error: `NameLess` is defined in both
+`HSRSaveVersion.cpp` and `HSRChallengeProgressionSubsystem.cpp`. That error was
+not introduced or modified by Dialogue-001 and remains a separate follow-up.
+
+GREEN, focused Automation, PIE, Editor asset work, and Phase 18 are not claimed.
+
+---
+
+# TASK-P17-DIALOGUE-002 Execution Result
+
+Status: COMPLETE / GATE 0 PASS / TDD RED CONFIRMED / GREEN PASS / FOCUSED AUTOMATION PASS
+
+Dialogue-002 implements the pure-value event-driven Dialogue presentation
+contract and ViewModel. The user authorized the task on 2026-08-09. The
+InteractionComponent/F ownership, Overlay route boundary and Dialogue-003
+branch Authority boundary remain unchanged.
+
+## Implementation evidence
+
+- Added authored `SpeakerText` and choice `DisplayText` fields to the Dialogue
+  definition structs.
+- Added read-only `GetNode` and `PreviewChoice` seams to the Dialogue
+  Subsystem. `PreviewChoice` does not submit Quest events; the existing
+  `SelectChoice` path retains its Authority behavior for the later branch task.
+- Added pure-value request, choice, status/result and snapshot types plus
+  `UHSRDialoguePresentationViewModel` with begin, repeat-open no-op, selection,
+  stale/invalid/unavailable rejection, exit and failure-snapshot preservation.
+- Raw `EHSRQuestOperationResult` remains available through
+  `GetLastAuthorityResult`; failed commands do not broadcast a replacement
+  snapshot.
+
+## RED evidence
+
+The real UE5.6 UBT run before production implementation failed first at the
+intentional missing `HSRDialoguePresentationTypes.h` include. The same run
+also reported the unrelated `NameLess` unity duplicate-definition error in
+`HSRSaveVersion.cpp` and `HSRChallengeProgressionSubsystem.cpp`.
+
+## GREEN and Automation status
+
+The post-implementation `HSREditor Win64 Development` build returned
+`Result: Succeeded`. After correcting the fixture to create the subsystem with
+a valid `UGameInstance` Outer, focused Automation discovered 4 Dialogue
+Presentation tests and all 4 completed with `Result={Success}`. The existing
+`HSR.QuestDialogue` regression discovered 1 test and completed with
+`Result={Success}`; both command runs ended with `EXIT CODE: 0`.
+
+No UAsset, Overlay, Router, Editor, PIE, Git stage/commit/push, or `.claude/**`
+operation was performed. Dialogue-002 is complete at the code/Automation gate;
+Dialogue-003 remains separately authorized work.
+
+---
+
 # TASK-P17-INVENTORY-004 Execution Result
 
 Status: COMPLETE / CODE + EDITOR + CORE PIE COMPLETE / USER ACCEPTED
@@ -208,3 +457,47 @@ Blueprint Runtime Error, Ensure, or invalid snapshot log. The user then
 confirmed the manual visual/interaction experience is normal. Final status is
 `COMPLETE / USER ACCEPTED`; the implementation checkpoint is `bda00e8`, no push
 was performed, and `.claude/**` remains excluded.
+# TASK-P17-DIALOGUE-001 Execution Result
+
+Status: IN PROGRESS / GATE 0 AUDIT IN PROGRESS / RED TEST WRITTEN / RED NOT YET VERIFIED
+
+This package is the unambiguous Dialogue-001 task for the Phase 17 execution
+plan's P17-012 meaning. The archived `TASK-P17-012` dynamic-mount package is
+not reused. User authorization was supplied on 2026-08-09.
+
+## Scope and Gate 0
+
+The read-only audit confirms that InteractionComponent owns the current
+candidate and `F`, DialogueSubsystem owns definition/choice progression and
+Quest event submission, and Quest/Reward/Encounter remain separate authorities.
+The current generic interaction result does not expose a typed DialogueId/NodeId
+presentation payload. The next package therefore needs a pure-value active
+query/presentation seam rather than UI-side Actor/log inference.
+
+The frozen contract uses a stable `FGuid QueryId` with `DialogueId` and current
+`NodeId`, stable `ChoiceId` projection, duplicate-open no-op behavior, and
+failure preservation of the last complete snapshot. Existing dialogue data has
+body text but no authoritative speaker or choice display text; that missing data
+contract is recorded for separately authorized Dialogue-002 work.
+
+## RED implementation
+
+Added only the test file:
+
+- `Source/HSR/Tests/HSRDialoguePresentationTests.cpp`
+
+The tests intentionally reference the not-yet-created
+`HSRDialoguePresentationTypes.h` and `HSRDialoguePresentationViewModel.h` seam.
+They cover active-query identity, stable Node/Choice projection, repeated-open
+no-op behavior, invalid request rejection, and complete-snapshot preservation.
+No production Dialogue/UI/Content/Config file was modified.
+
+## Verification pending
+
+The actual UE5.6 UBT RED command and output will be recorded below. Until that
+command is run, this task does not claim a valid RED gate or completion.
+
+No Git stage/commit/push operation was performed; `.claude/**` and unrelated
+dirty-worktree files remain untouched.
+
+---

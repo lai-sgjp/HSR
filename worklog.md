@@ -2553,3 +2553,144 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
   and asset checkpoint is `bda00e8`; the user explicitly authorized the
   closeout commit, no push was performed, and `.claude/**` plus the unrelated
   Relic archive remain excluded.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-001 Gate 0 started
+
+- User authorized the unambiguous Dialogue-001 package. It maps to the Phase 17
+  execution-plan meaning of P17-012; the archived `TASK-P17-012` dynamic-mount
+  package is not reused.
+- Read-only audit covers `HSRDialogueSubsystem`, `HSRDialogueInteractable`,
+  `HSRInteractionComponent`, Dialogue Definition, Quest/Reward authorities, and
+  the existing Quest/Dialogue Automation fixture.
+- Gate 0 freezes InteractionComponent candidate/F ownership, Dialogue authority
+  progression, Exploration Overlay ownership outside the Pause Router, pure-value
+  active-query identity, stable Node/Choice IDs, and failure snapshot retention.
+- The current generic interaction result lacks a typed DialogueId/NodeId start
+  payload, and Dialogue Definition lacks speaker/choice display text. Both are
+  recorded as explicit future API/data decisions; no UI inference is allowed.
+- Added `Source/HSR/Tests/HSRDialoguePresentationTests.cpp` as the TDD RED
+  reproducer. No production code, UAsset, Config, Git, or `.claude/**` change
+  was made; the real UBT RED run was the next verification step and is recorded
+  in the closeout entry below.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-001 TDD RED confirmed
+
+- User fully exited Unreal Editor, allowing the controlled UE5.6 UBT command to
+  reach compilation.
+- The first failure was the intentional missing
+  `../UI/Dialogue/HSRDialoguePresentationTypes.h` include in
+  `HSRDialoguePresentationTests.cpp`; this confirms the Dialogue presentation
+  contract RED boundary.
+- The same build reported an unrelated `NameLess` duplicate definition between
+  `HSRSaveVersion.cpp` and `HSRChallengeProgressionSubsystem.cpp`. It is outside
+  the Dialogue-001 allowlist and was not changed or reclassified as a Dialogue
+  defect.
+- Dialogue-001 is closed at `GATE 0 PASS / TDD RED CONFIRMED / GREEN NOT
+  STARTED`; no UAsset, production UI, Git stage/commit/push, or `.claude/**`
+  operation was performed. Dialogue-002 requires separate authorization.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-002 implementation / verification pending
+
+- User authorized Dialogue-002. Gate 0 keeps `F`/Candidate with
+  `UHSRInteractionComponent`, keeps the Overlay outside the Pause Router, and
+  defers Quest/Encounter/Reward branch submission to Dialogue-003.
+- TDD RED was extended for authored speaker/choice text, stable selection,
+  stale rejection, exit and unavailable behavior. The real UBT first failed at
+  the intentionally missing Presentation header.
+- Added `SpeakerText`/`DisplayText`, read-only `GetNode`/`PreviewChoice`, and the
+  pure-value `UHSRDialoguePresentationViewModel`. Preview does not submit Quest
+  events; raw Authority result codes remain exposed.
+- Post-implementation UBT Build returned `Result: Succeeded`. First focused
+  Automation discovered 4 tests: 3 passed; ActiveQuery failed only because the
+  test fixture created a GameInstance subsystem without a valid Outer. The
+  fixture was corrected.
+- Corrected-fixture rebuild/rerun is pending: the controlled command was
+  rejected by the approval service due server overload, while the default
+  sandbox hit the known UnrealBuildTool cache permission. No UAsset, Git,
+  `.claude/**`, Overlay or PIE operation was performed.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-002 code/Automation closeout
+
+- Rebuilt after correcting the test fixture's valid `UGameInstance` Outer;
+  `HSREditor Win64 Development` returned `Result: Succeeded`.
+- `HSR.Dialogue.Presentation` discovered 4 tests and all 4 returned
+  `Result={Success}`: ActiveQuery, ExitAndUnavailable,
+  FailurePreservesSnapshot and Selection.
+- Existing `HSR.QuestDialogue` discovered 1 test and returned
+  `Result={Success}` for BranchingReward. Both command runs ended with exit
+  code 0 and no Ensure/Error.
+- Dialogue-002 is complete at the code/Automation gate. No Overlay/UAsset,
+  Editor/PIE, Git stage/commit/push, or `.claude/**` operation was performed;
+  Dialogue-003 requires separate authorization.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-003 code/Automation closeout
+
+- User authorized the unambiguous Dialogue-003 package for the Phase 17 P17-012
+  meaning; the archived `TASK-P17-012` dynamic-mount task was not reused.
+- Gate 0 froze the explicit None/Quest/Encounter/Reward branch contract,
+  stable `BranchOperationId`, complete authored Encounter request, existing
+  Authority ownership, exactly-once semantics and failure snapshot retention.
+- Added Authority forwarding and a branch ledger. Quest uses Quest Authority;
+  Reward uses `BranchOperationId` as `ClaimId`; Encounter uses it as `RequestId`.
+  Replays return `NoOp`, cross-choice operation reuse returns
+  `OperationIdConflict`, and rejected branches do not enter the ledger.
+- TDD RED reached the intended missing branch contract/API compiler failures
+  before production implementation. GREEN Development Editor Build returned
+  `Result: Succeeded`.
+- Focused Automation passed `HSR.Dialogue.Authority` 5/5,
+  `HSR.Dialogue.Presentation` 4/4 and `HSR.QuestDialogue` 1/1. `git diff
+  --check` passed.
+- Dialogue-003 is complete at the code/Automation gate. Overlay/HUD/input,
+  focus, travel teardown, Editor/PIE and UAsset work remain Dialogue-004; no
+  Git stage/commit/push or `.claude/**` operation was performed.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-004 Gate 0 started
+
+- User authorized the unambiguous Dialogue-004 package for the Phase 17 P17-012
+  meaning; archived `TASK-P17-012` remains the unrelated dynamic-mount task.
+- Gate 0 freezes the typed Dialogue start payload from the InteractionComponent,
+  an Exploration-local Overlay outside the Pause Hub Router, UIManager-owned
+  input/focus/close/compensation, and clean-root travel teardown without stale
+  query restoration.
+- Runtime WBP creation/binding, Input assets/Config, Editor Save All/reopen and
+  visual PIE remain user-owned. The package has not performed Git stage/commit/
+  push and `.claude/**` remains excluded.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-004 code/Automation gate complete
+
+- The new `HSRDialogueOverlayLifecycleTests.cpp` reached the intended RED
+  before production implementation: the real UBT compile could not find
+  `../UI/Dialogue/HSRDialogueOverlayWidget.h`.
+- Implemented the typed interaction payload, Exploration-local Overlay Widget,
+  HUD forwarding, UIManager-owned create/attach/UIOnly/focus/close compensation,
+  Escape/Gamepad Back/X precedence, frontend blocking and travel teardown. The
+  Overlay remains outside the Screen Stack/Frontend Router and never calls an
+  Authority or owns viewport state.
+- Final build command used the local UE5.6 path with the Editor closed:
+  `Build.bat HSREditor Win64 Development -Project=E:\\work\\unreal_projects\\HSR\\HSR.uproject -WaitMutex -NoHotReload`;
+  it returned `Result: Succeeded`.
+- Focused Automation returned `HSR.Dialogue.Overlay` 4/4,
+  `HSR.Dialogue.Authority` 5/5, `HSR.Dialogue.Presentation` 4/4 and
+  `HSR.QuestDialogue` 1/1, with every test `Result={Success}` and exit code 0.
+  `git diff --check` passed.
+- User Editor authoring, Save All/close/reopen, visual PIE, input/focus feel and
+  travel teardown remain the only required acceptance evidence. No Git
+  stage/commit/push, UAsset/Config/Input asset change or `.claude/**` operation
+  was performed.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-004 Editor/PIE closeout — USER ACCEPTED
+
+- User created and saved `DA_Dialogue_P17_Demo` and
+  `WBP_DialogueOverlay_P17`; the Widget is parented to
+  `UHSRDialogueOverlayWidget` and its four choice/close bindings persisted.
+- `BP_HSRHUD` persists `DialogueOverlayWidgetClass`. `Map_Exploration_P15_A`
+  contains the configured `AHSRDialogueInteractable` at `(0,300,92)`. The
+  visible Sphere marker and interaction radius 260 make the actor discoverable;
+  PIE observed Talk at distance 140.
+- PIE evidence: typed start payload `Dialogue.P17.Demo / Node.Start`, Overlay
+  open result 0 with `FocusResult=1`, frontend request rejected as
+  `AlreadyOpen` result 12, and no Blueprint Runtime Error, Ensure or array
+  bounds error. User confirmed choice progression, Escape/Gamepad Back/X and
+  CloseButton close, plus authorized travel teardown without stale restoration.
+- `TASK-P17-DIALOGUE-004` is now `COMPLETE / USER ACCEPTED`. No Git stage,
+  commit, push or `.claude/**` operation was performed.

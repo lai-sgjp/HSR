@@ -2,6 +2,102 @@
 
 > 最后更新：2026-08-09
 
+## 2026-08-09 TASK-P17-DIALOGUE-004 complete / USER ACCEPTED
+
+- 用户已授权无歧义任务 `TASK-P17-DIALOGUE-004`，对应执行计划语义 P17-012，
+  不复用归档的 `TASK-P17-012` 五模块动态挂载任务。
+- Gate 0 冻结：`F` 和 Candidate 仍由 `UHSRInteractionComponent` 所有；成功的
+  `AHSRDialogueInteractable` 交互只增加 typed Dialogue start payload，HUD 将它
+  转发给 UIManager。Dialogue Overlay 是 Exploration HUD 的独立层，不进入
+  `HSRScreenStack` 或 Frontend Router。
+- UIManager 拥有 Overlay 的创建、唯一实例、UIOnly 输入策略、首选焦点、Escape /
+  Gamepad Back / X 关闭、失败补偿和销毁；Overlay Widget 只读 Presentation
+  snapshot、提交选择/关闭意图，不直接改 Authority 或 viewport。
+- Overlay 为 Exploration-local：授权旅行 teardown 时关闭并释放，不把旧对话带到
+  新地图；新 HUD host 到达后只恢复干净 Exploration Root。普通失败必须保留当前
+  Overlay/Presentation snapshot，不产生第二个实例。
+- 运行时 WBP、Dialogue DataAsset、探索地图 Actor 和 HUD 绑定由用户在 Editor
+  创建并保存；复用既有 Input Action/Mapping Context/Config，未新增输入资产。
+- 当前状态：Gate 0、真实 TDD RED、GREEN Build、聚焦 Automation、Editor 集成
+  和用户 PIE 已通过。
+  `HSR.Dialogue.Overlay` 4/4、`HSR.Dialogue.Authority` 5/5、
+  `HSR.Dialogue.Presentation` 4/4、`HSR.QuestDialogue` 1/1 均为
+  `Result={Success}`，Build `Result: Succeeded`，`git diff --check` 通过。
+  用户确认选择推进、Escape/Gamepad Back/X/CloseButton、前端阻断、旅行 teardown
+  和无错误日志均正常；任务为 `COMPLETE / USER ACCEPTED`。未执行 Git
+  stage/commit/push，`.claude/**` 继续排除。
+
+---
+
+## 2026-08-09 TASK-P17-DIALOGUE-003 Authority branch forwarding complete
+
+- 用户已授权无歧义任务 `TASK-P17-DIALOGUE-003`，对应执行计划语义 P17-012，
+  不复用归档的 `TASK-P17-012` 五模块动态挂载任务。
+- Dialogue choice 现在显式区分 None / Quest / Encounter / Reward 分支；显式
+  Authority 分支必须携带稳定 `BranchOperationId`。Encounter 必须携带完整、已
+  authored 的 `FHSREncounterRequest`，不会由 `EncounterId` 臆造敌人、地图或返回
+  上下文。
+- Quest、Reward、Encounter 均只通过各自 Authority 提交。Reward 使用
+  `BranchOperationId` 作为 `ClaimId`，Encounter 使用它作为 `RequestId`。
+  Dialogue branch ledger 保证相同分支重放为 `NoOp`，同一 OperationId 绑定不同
+  Choice 返回 `OperationIdConflict`，Authority 失败不写入 ledger。
+- Presentation ViewModel 已转发新的 Dialogue Authority seam；Authority 失败
+  保留完整 Presentation snapshot，并保留原始分支结果/日志。旧的三参数
+  `SelectChoice` 路径仍保留兼容性。
+- 真实 TDD RED、Development Editor Build 和聚焦 Automation 已通过：
+  `HSR.Dialogue.Authority` 5/5、`HSR.Dialogue.Presentation` 4/4、既有
+  `HSR.QuestDialogue` 1/1；`git diff --check` 通过。
+- Dialogue-003 当前为 `COMPLETE / CODE + AUTOMATION PASS`。Overlay、HUD、输入、
+  焦点、旅行 teardown、PIE 和 UAsset/Editor 接线仍属于后续
+  `TASK-P17-DIALOGUE-004`，不在本包中宣称完成；未执行 Git stage/commit/push，
+  `.claude/**` 继续排除。
+
+---
+
+## 2026-08-09 TASK-P17-DIALOGUE-001 Gate 0 / TDD RED confirmed
+
+- 用户已明确授权无歧义任务 `TASK-P17-DIALOGUE-001`；它对应执行计划语义
+  P17-012，不复用仓库中实际记录五模块动态挂载的 `TASK-P17-012`。
+- Inventory-001～004 已按用户 PIE 体验确认收口；本轮开始审计
+  `HSRDialogueSubsystem`、`HSRDialogueInteractable`、Interaction candidate、
+  Quest/Reward Authority 与 Dialogue Definition。
+- Gate 0 冻结：`F` 与当前 Candidate 仍由 `UHSRInteractionComponent` 所有，
+  DialogueSubsystem 所有节点/选择推进；Overlay 不进入 Pause Hub Router，
+  未来快照只携带纯值 active query、DialogueId、NodeId、ChoiceId。
+- 现有 generic `FHSRInteractionResult` 尚不携带 typed DialogueId/NodeId
+  Presentation payload；现有 Dialogue Definition 也没有 speaker/choice display
+  text。缺失 API 与数据字段记录为后续独立扩权，不在 UI 中臆造。
+- 已新增真实 RED 测试
+  `Source/HSR/Tests/HSRDialoguePresentationTests.cpp`。用户完全退出 Editor
+  后重跑真实 UBT，首个编译错误确认为缺失的
+  `HSRDialoguePresentationTypes.h`，因此 TDD RED 已确认；尚未实现生产
+  Dialogue UI/ViewModel，未修改 UAsset/Config，未 stage/commit/push，
+  `.claude/**` 保持排除。
+- 同一次全量编译还报告工作区中与本任务无关的
+  `HSRSaveVersion.cpp` / `HSRChallengeProgressionSubsystem.cpp`
+  `NameLess` 重定义错误。该问题未由本任务修改，GREEN 尚未开始。
+
+---
+
+## 2026-08-09 TASK-P17-DIALOGUE-002 code/Automation complete
+
+- 用户已授权无歧义任务 `TASK-P17-DIALOGUE-002`，对应执行计划语义 P17-012
+  Dialogue Presentation，不复用归档的 `TASK-P17-012`。
+- Gate 0 冻结：`F`/Candidate 仍由 `UHSRInteractionComponent` 所有，Overlay 不
+  进入 Pause Hub Router；Quest/Encounter/Reward 分支提交留给 Dialogue-003。
+- 已实现 authored `SpeakerText`/choice `DisplayText`、Dialogue 只读
+  `GetNode`/`PreviewChoice`、纯值 request/snapshot 与
+  `UHSRDialoguePresentationViewModel`。失败不替换最后完整快照，raw
+  `EHSRQuestOperationResult` 保留。
+- GREEN Build 已通过。修正 fixture 的合法 `UGameInstance` Outer 后，
+  `HSR.Dialogue.Presentation` 4/4、既有 `HSR.QuestDialogue` 1/1 通过，命令
+  日志均为 `EXIT CODE: 0`，无 Ensure/Error。
+- 当前状态为 `COMPLETE / GATE 0 PASS / TDD RED CONFIRMED / GREEN PASS /
+  FOCUSED AUTOMATION PASS`。未修改 UAsset/Config、未 stage/commit/push，
+  `.claude/**` 保持排除；Overlay/PIE 与 Dialogue-003 仍未宣称完成。
+
+---
+
 ## 2026-08-09 TASK-P17-INVENTORY-004 Editor integration, PIE, and user acceptance complete
 
 - 用户已完成并保存 /Game/Data/Items/DA_InventoryCatalog_P17 与

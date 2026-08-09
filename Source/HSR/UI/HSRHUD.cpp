@@ -90,6 +90,7 @@ void AHSRHUD::ShowExplorationHUD()
 				UIManager->RegisterExplorationHost(this, HSRPC, ExplorationWidgetInstance, FrontendShellClass,
 					FrontendModuleRootClass, CharacterDetailWidgetClass, InventoryWidgetClass,
 					InventoryModuleWidgetClass,
+					DialogueOverlayWidgetClass,
 					PartyWidgetClass, MapWidgetClass, ChallengeWidgetClass, QuestWidgetClass, SaveWidgetClass);
 			}
 		}
@@ -157,6 +158,17 @@ void AHSRHUD::RefreshInteractionObserver()
 		UE_LOG(LogTemp, Log, TEXT("AHSRHUD::RefreshInteractionObserver - Created new VM[%d]"), InteractionViewModel->GetInstanceId());
 	}
 
+	if (ObservedInteractionComponent.Get() != InteractComp)
+	{
+		if (ObservedInteractionComponent.IsValid())
+		{
+			ObservedInteractionComponent->OnInteractionCompleted.RemoveDynamic(
+				this, &ThisClass::HandleInteractionCompleted);
+		}
+		ObservedInteractionComponent = InteractComp;
+	}
+	InteractComp->OnInteractionCompleted.AddUniqueDynamic(this, &ThisClass::HandleInteractionCompleted);
+
 	// Observe first to establish component binding
 	InteractionViewModel->Observe(InteractComp);
 
@@ -172,6 +184,12 @@ void AHSRHUD::RefreshInteractionObserver()
 
 void AHSRHUD::ClearInteractionObserverInstance()
 {
+	if (ObservedInteractionComponent.IsValid())
+	{
+		ObservedInteractionComponent->OnInteractionCompleted.RemoveDynamic(
+			this, &ThisClass::HandleInteractionCompleted);
+		ObservedInteractionComponent.Reset();
+	}
 	if (InteractionViewModel)
 	{
 		InteractionViewModel->Teardown();
@@ -182,6 +200,29 @@ void AHSRHUD::ClearInteractionObserverInstance()
 		ExplorationWidgetInstance->SetInteractionViewModel(nullptr);
 	}
 	UE_LOG(LogTemp, Log, TEXT("AHSRHUD::ClearInteractionObserverInstance - Cleared"));
+}
+
+void AHSRHUD::HandleInteractionCompleted(const FHSRInteractionResult& Result)
+{
+	if (!Result.HasDialoguePayload())
+	{
+		return;
+	}
+
+	AHSRPlayerController* HSRPC = Cast<AHSRPlayerController>(GetOwningPlayerController());
+	ULocalPlayer* LP = HSRPC ? HSRPC->GetLocalPlayer() : nullptr;
+	UHSRUIManagerSubsystem* UIManager = LP ? LP->GetSubsystem<UHSRUIManagerSubsystem>() : nullptr;
+	if (!UIManager)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AHSRHUD::HandleInteractionCompleted - Dialogue payload has no UIManager"));
+		return;
+	}
+
+	const EHSRUIScreenResult OpenResult = UIManager->OpenDialogueOverlay(
+		Result.DialogueId, Result.DialogueNodeId);
+	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Dialogue RequestOpen Result=%d Dialogue=%s Node=%s HasOverlay=%s"),
+		static_cast<int32>(OpenResult), *Result.DialogueId.ToString(), *Result.DialogueNodeId.ToString(),
+		UIManager->HasOpenDialogueOverlay() ? TEXT("true") : TEXT("false"));
 }
 
 void AHSRHUD::RequestRebuildExplorationHUDForPhase2Test()
