@@ -1,10 +1,11 @@
 # TASK-P17-INVENTORY-004 — Editor 集成、PIE 与收口
-Status: IN PROGRESS / CODE + EDITOR + CORE PIE COMPLETE / USER VISUAL ACCEPTANCE PENDING
+Status: COMPLETE / CODE + EDITOR + CORE PIE COMPLETE / USER ACCEPTED
 
-This is the current active task. The detailed 004 contract is recorded in the
+This is the current task record. The detailed 004 contract is recorded in the
 004 section below; the preceding Inventory-003 block is historical context only.
-The user has supplied Editor integration and core PIE evidence. The only
-remaining work is manual visual/interaction experience and final acceptance.
+The user supplied Editor integration and core PIE evidence, then confirmed the
+manual visual/interaction experience is normal. This task is closed; no next
+task is created automatically.
 
 ---
 
@@ -150,7 +151,7 @@ of a successful enhancement PIE path.
 Inventory-002 is preserved in `tasks/archive/` and its TDD evidence. Earlier
 Inventory-001 and Relic/Equipment history remain in their existing archives.
 # TASK-P17-INVENTORY-004 — Editor 集成、PIE 与收口
-Status: `IN PROGRESS / GATE 0 PASS / TDD RED CONFIRMED / GREEN PASS / FOCUSED AUTOMATION PASS / PIE PENDING`
+Status: `COMPLETE / GATE 0 PASS / TDD RED CONFIRMED / GREEN PASS / FOCUSED AUTOMATION PASS / PIE PASS / USER ACCEPTED`
 
 ## Scope identity
 
@@ -212,9 +213,10 @@ failure preserves the last complete snapshot and consistent UI.
 3. GREEN: complete. The seam, dynamic route, focus fallback, Back/X lifecycle,
    travel restore, and production snapshot guard compile and pass focused
    Automation.
-4. Editor/PIE closeout: pending user action. UAsset creation, Blueprint wiring,
-   Editor reopen, and happy/failure PIE evidence must be supplied by the user;
-   this task card does not claim those results.
+4. Editor/PIE closeout: complete. The user supplied saved UAssets and core PIE
+   evidence, then confirmed the manual visual/interaction experience is normal.
+   The task is `COMPLETE / USER ACCEPTED`; known ScreenLifecycle fixture
+   failures remain outside this product claim.
 
 ## Allowed files
 
@@ -249,7 +251,9 @@ Class Defaults. The agent does not create or edit those UAssets.
 - Do not create or edit UAsset, Config, Build.cs, `.uproject`, plugin, generated,
   or build-output files.
 - Do not add a second viewport/mount path or call `AddToViewport` from Inventory.
-- Do not stage, commit, push, reset, clean, delete, or rewrite Git history.
+- During implementation, do not stage, commit, push, reset, clean, delete, or
+  rewrite Git history. A final closeout commit requires explicit user
+  authorization; push remains a separate user decision.
 - Do not claim PIE, Editor reopen, or UAsset provenance evidence before the user
   performs and reports those steps.
 
@@ -266,10 +270,10 @@ and TDD evidence report.
 
 The code gate is complete: Development Editor Build succeeded, Inventory
 Automation is 9/9, FrontendNavigation Automation is 11/11, and `git diff --check`
-passed. Existing `HSR.UI.ScreenLifecycle` CharacterDetail/Inventory/
-TravelRestore fixture failures remain a known pre-task baseline and were not
-reclassified as product failures. UAsset creation, Editor reopen, and PIE are
-`NOT VERIFIED` until user evidence is supplied.
+passed. The user supplied and accepted the UAsset, Editor, and PIE evidence.
+Existing `HSR.UI.ScreenLifecycle` CharacterDetail/Inventory/TravelRestore
+fixture failures remain a known pre-task baseline and were not reclassified as
+product failures.
 
 ---
 ## Latest user-provided closeout update — 2026-08-09
@@ -282,5 +286,5 @@ and the allowlisted C++ Blueprint seams/dynamic row projection are present.
 
 Core PIE evidence from Map_Exploration_P15_A confirms Inventory open, Back to
 Pause Hub, X to exploration, and no Blueprint Runtime Error, Ensure, or invalid
-snapshot log. The only remaining item is manual visual/gamepad experience and
-final USER ACCEPTED confirmation.
+snapshot log. The user then confirmed the manual visual/interaction experience
+is normal. Final status: `COMPLETE / USER ACCEPTED`.

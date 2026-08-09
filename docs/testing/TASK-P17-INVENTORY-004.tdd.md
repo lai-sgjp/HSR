@@ -83,23 +83,28 @@ Results:
 ## Coverage and known gaps
 
 The UE Automation target does not emit source coverage, so no coverage
-percentage is claimed. The user has supplied Editor integration and core PIE
-evidence; final manual mouse/gamepad visual and complete interaction experience
-remains pending.
+percentage is claimed. The user supplied Editor integration and core PIE
+evidence, then confirmed the manual visual/interaction experience is normal.
+This closes the user-acceptance boundary for this task; it remains user-provided
+PIE evidence rather than an independently MCP-reproduced mouse/gamepad run.
 
 The repository's known `HSR.UI.ScreenLifecycle` CharacterDetail/Inventory/
 TravelRestore fixture failures (including `bFocusSucceeds=false` and the
 pre-existing Inventory attach hook issue) are outside this package's product
 scope and were not reclassified here.
 
-No Git checkpoint commit was created because the user explicitly prohibited
-automatic stage/commit/push operations. No `.claude/**` files were modified.
+At the time of the code-gate report, no Git checkpoint commit had been created
+because automatic stage/commit/push operations were prohibited. After the user
+confirmed acceptance and explicitly authorized a commit, the implementation and
+asset checkpoint was recorded as `bda00e8`; no `.claude/**` files were modified
+and no push was performed.
 
 ## Merge evidence
 
 The code-gate evidence is Build success, 9/9 Inventory Automation, 11/11
-FrontendNavigation Automation, and `git diff --check`. The remaining closeout
-requires the user's Editor/PIE evidence; this report does not claim a PIE pass.
+FrontendNavigation Automation, and `git diff --check`. The user-provided
+Editor/PIE evidence and final normal-experience confirmation complete the
+closeout; the task status is `COMPLETE / USER ACCEPTED`.
 ## User Editor and core PIE evidence
 
 This latest section supersedes the earlier code-gate-only boundary above.
@@ -129,9 +134,11 @@ User-provided core PIE evidence from Map_Exploration_P15_A:
 - The reported run contains no Blueprint Runtime Error, Ensure, or invalid
   snapshot log. The SortBox U+25BE glyph warning was fixed.
 
-The remaining user check is visual/manual: category, filter, sort, selection,
-Stack/Unique detail, Equip/Enhance and unavailable actions, normal travel
-restore, and failure snapshot preservation.
+The user then confirmed that the manual Inventory experience is normal, closing
+the visual/interaction acceptance boundary for the categorized list, details,
+actions, route lifecycle, and failure-preservation journey.
 
-Latest closeout status: code, Editor integration, and core PIE are complete;
-final visual acceptance is pending. No stage, commit, or push was performed.
+Latest closeout status: code, Editor integration, core PIE, and user visual/
+interaction acceptance are complete; `TASK-P17-INVENTORY-004` is
+`COMPLETE / USER ACCEPTED`. The implementation checkpoint is `bda00e8`; no push
+was performed and `.claude/**` remains excluded.

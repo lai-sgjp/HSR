@@ -2544,3 +2544,12 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Remaining work is manual visual/gamepad experience of the complete list,
   details, actions, travel restore, and failure preservation. No stage, commit,
   push, or .claude/** modification was performed.
+
+# 2026-08-09 | TASK-P17-INVENTORY-004 user acceptance and commit closeout
+
+- User completed the remaining manual Inventory PIE experience and confirmed
+  that the visual and interaction experience is normal.
+- TASK-P17-INVENTORY-004 is now `COMPLETE / USER ACCEPTED`. The implementation
+  and asset checkpoint is `bda00e8`; the user explicitly authorized the
+  closeout commit, no push was performed, and `.claude/**` plus the unrelated
+  Relic archive remain excluded.

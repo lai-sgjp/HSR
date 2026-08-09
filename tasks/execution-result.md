@@ -1,11 +1,12 @@
 # TASK-P17-INVENTORY-004 Execution Result
 
-Status: CODE + EDITOR + CORE PIE COMPLETE / USER VISUAL ACCEPTANCE PENDING
+Status: COMPLETE / CODE + EDITOR + CORE PIE COMPLETE / USER ACCEPTED
 
 The current result includes the code gate, user-owned Editor integration, and
 user-provided core PIE evidence. Build succeeded, Inventory Automation passed
-9/9, FrontendNavigation passed 11/11, and git diff --check passed. Only manual
-visual/interaction acceptance remains.
+9/9, FrontendNavigation passed 11/11, and git diff --check passed. The user
+then confirmed the manual visual/interaction experience is normal. The task is
+closed as `COMPLETE / USER ACCEPTED`; no push was performed.
 
 ---
 
@@ -87,7 +88,7 @@ Inventory-004 work. No UAsset, Config, Authority, Git, or PIE operation was
 performed in this package.
 # TASK-P17-INVENTORY-004 Execution Result
 
-Status: `CODE GATE COMPLETE / GATE 0 PASS / TDD RED CONFIRMED / GREEN PASS / FOCUSED AUTOMATION PASS / PIE PENDING`
+Status: `COMPLETE / GATE 0 PASS / TDD RED CONFIRMED / GREEN PASS / FOCUSED AUTOMATION PASS / PIE PASS / USER ACCEPTED`
 
 ## Gate 0 decisions
 
@@ -203,5 +204,7 @@ Inventory Catalog and P17 Widget, assigned the three catalog assets, configured
 HUD and input, and supplied core PIE evidence from Map_Exploration_P15_A.
 
 Core PIE confirms Inventory open, Back to Pause Hub, X to exploration, and no
-Blueprint Runtime Error, Ensure, or invalid snapshot log. Final manual visual
-and complete interaction acceptance remains pending; no Git operation was done.
+Blueprint Runtime Error, Ensure, or invalid snapshot log. The user then
+confirmed the manual visual/interaction experience is normal. Final status is
+`COMPLETE / USER ACCEPTED`; the implementation checkpoint is `bda00e8`, no push
+was performed, and `.claude/**` remains excluded.

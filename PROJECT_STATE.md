@@ -2,7 +2,7 @@
 
 > 最后更新：2026-08-09
 
-## 2026-08-09 TASK-P17-INVENTORY-004 Editor integration and core PIE verified / visual acceptance pending
+## 2026-08-09 TASK-P17-INVENTORY-004 Editor integration, PIE, and user acceptance complete
 
 - 用户已完成并保存 /Game/Data/Items/DA_InventoryCatalog_P17 与
   /Game/UI/P17/Inventory/WBP_Inventory_P17。Inventory Catalog 含 12 个真实
@@ -21,9 +21,9 @@
   Back 返回 Pause Hub、X 返回探索，且无 Blueprint Runtime Error、Ensure
   或 invalid snapshot 日志。自动化与 Build 证据仍为 Inventory 9/9、
   FrontendNavigation 11/11、Build Succeeded、diff-check 通过。
-- 剩余事项仅为用户手动鼠标/手柄体验分类、筛选、排序、选择、操作、旅行
-  restore 和失败保持；任务暂不标记为最终 USER ACCEPTED。未 stage/commit/push，
-  .claude/** 未修改。
+- 用户随后完成手动体验并确认背包视觉与交互正常；任务状态为
+  `COMPLETE / USER ACCEPTED`。实现与资产检查点为 `bda00e8`；本次文档收口
+  由用户明确授权提交，不 push，`.claude/**` 保持排除。
 
 ---
 

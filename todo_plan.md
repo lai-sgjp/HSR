@@ -1,6 +1,6 @@
 ﻿# HSR Todo Plan
 
-## 2026-08-09 TASK-P17-INVENTORY-004 Editor/core PIE closeout pending visual acceptance
+## 2026-08-09 TASK-P17-INVENTORY-004 Editor/core PIE closeout — USER ACCEPTED
 
 - [x] 用户创建并保存 DA_InventoryCatalog_P17、WBP_Inventory_P17，并完成
   Catalog/MappingCatalog/EnhancementCatalog、HUD、Input 与动态列表接线。
@@ -10,15 +10,17 @@
   Hub、X 返回探索；无 Blueprint Runtime Error、Ensure 或 invalid snapshot 日志。
 - [x] Build Succeeded、HSR.UI.Inventory 9/9、HSR.UI.FrontendNavigation 11/11、
   git diff --check 通过。
-- [ ] 用户手动鼠标/手柄体验分类、筛选、排序、选择、Equip/Enhance/不可用操作、
-  正常旅行 restore 与失败快照保持；完成后再标记 USER ACCEPTED。
+- [x] 用户手动体验分类、筛选、排序、选择、操作、正常旅行 restore 与失败
+  快照保持，确认整体体验正常。
 
-> 当前状态：代码、Editor 集成和核心 PIE 已完成；视觉/完整交互验收仍待用户确认。
-> 未 stage/commit/push，.claude/** 和其他用户脏工作树修改保持原样。
+> 当前状态：代码、Editor 集成、核心 PIE 与用户视觉/完整交互验收均完成；
+> `TASK-P17-INVENTORY-004` 为 `COMPLETE / USER ACCEPTED`。实现与资产检查点为
+> `bda00e8`；本次文档收口已获用户授权，不 push，`.claude/**` 和无关脏工作树
+> 修改保持原样。
 
 ---
 
-## 2026-08-09 TASK-P17-INVENTORY-004 code gate complete / Editor-PIE pending
+## 2026-08-09 TASK-P17-INVENTORY-004 code gate complete / Editor-PIE pending (historical handoff)
 
 - [x] 独立 Gate 0：冻结共享 Frontend Shell/Router/UIManager 与
   ModuleContentHost 挂载路径、P13 fallback、Authority 边界、动态焦点和旅行
@@ -34,8 +36,8 @@
 - [ ] 用户 PIE：B、分类/筛选/排序/选择、合法/不可用操作、Back/X、travel
   teardown/restore、失败快照保持；完成后再决定 USER ACCEPTED 或修复首个真实失败。
 
-> 当前状态：004 代码门禁完成，但不能声称 PIE/UAsset 已通过。.claude/**、
-> 其他用户脏工作树修改以及 Git 历史均保持不变，未 stage/commit/push。
+> 历史交接状态：004 代码门禁完成；该段记录用户 Editor/PIE 操作前的门禁，不覆盖上方最新的
+> `COMPLETE / USER ACCEPTED` 状态。
 
 ---
 
@@ -437,7 +439,8 @@
 - [ ] `TASK-P17-INVENTORY-001`：Gate 0、Authority/数据合同与真实 RED。
 - [x] `TASK-P17-INVENTORY-002`：分类、详情、筛选、排序、稳定选择和只读 ViewModel/Widget 投影；Build/Automation 通过。
 - [x] `TASK-P17-INVENTORY-003`：Equip/Enhance 合法命令、失败快照保持；Use/Disassemble 无 Authority 时 typed unavailable；Build/7 项 Automation 通过。
-- [ ] `TASK-P17-INVENTORY-004`：用户 Editor 集成、B/Back/X、旅行 teardown、PIE 与收口。
+- [x] `TASK-P17-INVENTORY-004`：用户 Editor 集成、B/Back/X、旅行 teardown、PIE
+  与收口；用户确认体验正常，`COMPLETE / USER ACCEPTED`。
 - [ ] `TASK-P17-DIALOGUE-001`：Gate 0、Interaction/Dialogue 合同与真实 RED。
 - [ ] `TASK-P17-DIALOGUE-002`：事件驱动对话 Overlay、说话者、正文、选项、选择和退出。
 - [ ] `TASK-P17-DIALOGUE-003`：稳定 Node/Choice ID 与 Quest/Encounter/Reward Authority exactly-once 转发。
@@ -482,7 +485,7 @@
 - [x] P11-006：fresh Build、8 项 HSR Automation、失败注入、Editor 重开 Load、完整战斗返回、C/蓝图按钮 UI 切换与归档完成。
 - [ ] Follow-up：Standalone `Esc` 返回；详情页打开时终局自动显示 ResultView；完整 Phase 2/5～10 专项回归。
 - [ ] Phase 11 提交前 provenance/allowlist 审计及阶段收尾 commit；不得提交 `.claude/settings.local.json`、插件 `__pycache__`、Binaries、Intermediate 或 Saved。
-## 2026-08-09 TASK-P17-INVENTORY-004 code gate complete / Editor-PIE pending
+## 2026-08-09 TASK-P17-INVENTORY-004 code gate complete / Editor-PIE pending (historical handoff)
 
 - [x] 独立 Gate 0：冻结共享 Frontend Shell/Router/UIManager 与
   `ModuleContentHost` 挂载路径、P13 fallback、Authority 边界、动态焦点和旅行
@@ -498,7 +501,7 @@
 - [ ] 用户 PIE：B、分类/筛选/排序/选择、合法/不可用操作、Back/X、travel
   teardown/restore、失败快照保持；完成后再决定 `USER ACCEPTED` 或修复首个真实失败。
 
-> 当前状态：004 代码门禁完成，但不能声称 PIE/UAsset 已通过。`.claude/**`、
-> 其他用户脏工作树修改以及 Git 历史均保持不变，未 stage/commit/push。
+> 历史交接状态：该段记录用户 Editor/PIE 操作前的门禁，不覆盖上方最新的
+> `COMPLETE / USER ACCEPTED` 状态。
 
 ---
