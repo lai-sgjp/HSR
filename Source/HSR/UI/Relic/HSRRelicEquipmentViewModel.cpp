@@ -2,6 +2,7 @@
 
 #include "../../Data/Definitions/HSREquipmentEnhancementCatalog.h"
 #include "../../Data/Definitions/HSRItemEquipmentMappingCatalog.h"
+#include "../../Equipment/HSREquipmentStatAggregator.h"
 #include "../../Equipment/HSREquipmentSubsystem.h"
 #include "../../Inventory/HSRInventorySubsystem.h"
 
@@ -474,15 +475,25 @@ void UHSRRelicEquipmentViewModel::HandleInventoryChanged(int64)
 	Rebuild();
 }
 
+// Sums one instance through the same aggregator the authority uses, so the comparison panel cannot
+// show a value Equip would reject. An unaggregatable instance reads as zero across every stat.
 float UHSRRelicEquipmentViewModel::GetStatValue(const FHSREquipmentInstance& Instance,
 	const EHSREquipmentStat Stat)
 {
-	float Total = 0.0f;
-	for (const FHSREquipmentModifier& Modifier : Instance.Modifiers)
+	FHSREquipmentAggregate Aggregate;
+	if (!UHSREquipmentStatAggregator::AddInstance(Instance, Aggregate))
 	{
-		if (Modifier.Stat == Stat) Total += Modifier.Value;
+		return 0.0f;
 	}
-	return Total;
+
+	switch (Stat)
+	{
+	case EHSREquipmentStat::MaxHealth: return Aggregate.MaxHealth;
+	case EHSREquipmentStat::Attack: return Aggregate.Attack;
+	case EHSREquipmentStat::Defense: return Aggregate.Defense;
+	case EHSREquipmentStat::Speed: return Aggregate.Speed;
+	default: return 0.0f;
+	}
 }
 
 EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::MapMovementResult(
