@@ -1,6 +1,7 @@
 #include "HSRInventorySubsystem.h"
 
 #include "../Data/Definitions/HSRItemDefinition.h"
+#include "../Reward/HSRSettlementTypes.h"
 
 EHSRInventoryOperationResult UHSRInventorySubsystem::RegisterDefinition(const UHSRItemDefinition& Definition)
 {
@@ -176,15 +177,9 @@ EHSRInventoryOperationResult UHSRInventorySubsystem::ApplyGrants(const TArray<FH
 	return ApplyGrantsInternal(Grants, true, CommittedRevision);
 }
 
-EHSRInventoryOperationResult UHSRInventorySubsystem::ApplyGrantsInternal(const TArray<FHSRInventoryGrant>& Grants, bool bBroadcast, int64& OutRevision)
+EHSRInventoryOperationResult UHSRInventorySubsystem::ApplyGrantsToCandidate(const TArray<FHSRInventoryGrant>& Grants,
+	TMap<FName, int32>& CandidateStacks, TMap<FGuid, FHSRItemInstance>& CandidateUniqueItems) const
 {
-	if (Grants.IsEmpty())
-	{
-		return EHSRInventoryOperationResult::NoOp;
-	}
-
-	TMap<FName, int32> CandidateStacks = Stacks;
-	TMap<FGuid, FHSRItemInstance> CandidateUniqueItems = UniqueItems;
 	for (const FHSRInventoryGrant& Grant : Grants)
 	{
 		if (Grant.ItemId.IsNone())
@@ -218,26 +213,43 @@ EHSRInventoryOperationResult UHSRInventorySubsystem::ApplyGrantsInternal(const T
 				return EHSRInventoryOperationResult::StackLimitExceeded;
 			}
 			CandidateStacks.Add(Grant.ItemId, NewQuantity);
+			continue;
 		}
-		else
+
+		if (Grant.InstanceIds.Num() != Grant.Quantity)
 		{
-			if (Grant.InstanceIds.Num() != Grant.Quantity)
-			{
-				return EHSRInventoryOperationResult::StorageKindMismatch;
-			}
-			for (const FGuid& InstanceId : Grant.InstanceIds)
-			{
-				if (!InstanceId.IsValid())
-				{
-					return EHSRInventoryOperationResult::InvalidInstanceId;
-				}
-				if (CandidateUniqueItems.Contains(InstanceId))
-				{
-					return EHSRInventoryOperationResult::DuplicateInstanceId;
-				}
-				CandidateUniqueItems.Add(InstanceId, {InstanceId, Grant.ItemId});
-			}
+			return EHSRInventoryOperationResult::StorageKindMismatch;
 		}
+		for (const FGuid& InstanceId : Grant.InstanceIds)
+		{
+			if (!InstanceId.IsValid())
+			{
+				return EHSRInventoryOperationResult::InvalidInstanceId;
+			}
+			if (CandidateUniqueItems.Contains(InstanceId))
+			{
+				return EHSRInventoryOperationResult::DuplicateInstanceId;
+			}
+			CandidateUniqueItems.Add(InstanceId, {InstanceId, Grant.ItemId});
+		}
+	}
+	return EHSRInventoryOperationResult::Success;
+}
+
+EHSRInventoryOperationResult UHSRInventorySubsystem::ApplyGrantsInternal(const TArray<FHSRInventoryGrant>& Grants, bool bBroadcast, int64& OutRevision)
+{
+	if (Grants.IsEmpty())
+	{
+		return EHSRInventoryOperationResult::NoOp;
+	}
+
+	TMap<FName, int32> CandidateStacks = Stacks;
+	TMap<FGuid, FHSRItemInstance> CandidateUniqueItems = UniqueItems;
+	if (const EHSRInventoryOperationResult GrantResult =
+			ApplyGrantsToCandidate(Grants, CandidateStacks, CandidateUniqueItems);
+		GrantResult != EHSRInventoryOperationResult::Success)
+	{
+		return GrantResult;
 	}
 
 	if (GetUsedSlots(CandidateStacks, CandidateUniqueItems) > Capacity)
@@ -363,6 +375,168 @@ void UHSRInventorySubsystem::CommitRestore(FHSRInventoryRestoreState&& Candidate
 	{
 		InventoryChanged.Broadcast(Revision);
 	}
+}
+
+EHSRInventoryOperationResult UHSRInventorySubsystem::PrepareSettlementCandidate(const FGuid& TransactionId,
+	const TArray<FHSRInventoryGrant>& Grants, int64 ExpectedRevision,
+	FHSRInventorySettlementCandidate& OutCandidate) const
+{
+	if (ExpectedRevision != Revision)
+	{
+		return EHSRInventoryOperationResult::RevisionConflict;
+	}
+	if (Grants.IsEmpty())
+	{
+		return EHSRInventoryOperationResult::NoOp;
+	}
+	FHSRInventorySettlementCandidate Candidate;
+	Candidate.TransactionId = TransactionId;
+	Candidate.Stacks = Stacks;
+	Candidate.UniqueItems = UniqueItems;
+	if (const EHSRInventoryOperationResult GrantResult =
+			ApplyGrantsToCandidate(Grants, Candidate.Stacks, Candidate.UniqueItems);
+		GrantResult != EHSRInventoryOperationResult::Success)
+	{
+		return GrantResult;
+	}
+	if (GetUsedSlots(Candidate.Stacks, Candidate.UniqueItems) > Capacity)
+	{
+		return EHSRInventoryOperationResult::CapacityExceeded;
+	}
+	Candidate.NextRevision = Revision + 1;
+	OutCandidate = MoveTemp(Candidate);
+	return EHSRInventoryOperationResult::Success;
+}
+
+void UHSRInventorySubsystem::InstallSettlementCandidateNoFail(FHSRInventorySettlementCandidate&& Candidate)
+{
+	Stacks = MoveTemp(Candidate.Stacks);
+	UniqueItems = MoveTemp(Candidate.UniqueItems);
+}
+
+void UHSRInventorySubsystem::FinalizeSettlementRevisionNoFail(int64 PreparedRevision)
+{
+	Revision = PreparedRevision;
+}
+
+void UHSRInventorySubsystem::PublishSettlementCommit(int64 PreparedRevision)
+{
+	BroadcastRevision(Revision);
+}
+
+EHSRInventoryOperationResult UHSRInventorySubsystem::PrepareEquipmentRemovalCandidate(const FGuid& InstanceId,
+	const FName ExpectedItemId, const int64 ExpectedRevision, FHSRInventoryMovementCandidate& OutCandidate) const
+{
+	if (ExpectedRevision != Revision) return EHSRInventoryOperationResult::RevisionConflict;
+	const FHSRItemInstance* Existing = UniqueItems.Find(InstanceId);
+	if (!Existing) return EHSRInventoryOperationResult::InstanceNotFound;
+	if (Existing->DefinitionId != ExpectedItemId) return EHSRInventoryOperationResult::StorageKindMismatch;
+	FHSRInventoryMovementCandidate Candidate;
+	Candidate.Stacks = Stacks;
+	Candidate.UniqueItems = UniqueItems;
+	Candidate.UniqueItems.Remove(InstanceId);
+	Candidate.NextRevision = Revision + 1;
+	OutCandidate = MoveTemp(Candidate);
+	return EHSRInventoryOperationResult::Success;
+}
+
+EHSRInventoryOperationResult UHSRInventorySubsystem::PrepareEquipmentAdditionCandidate(const FGuid& InstanceId,
+	const FName ItemId, const int64 ExpectedRevision, FHSRInventoryMovementCandidate& OutCandidate) const
+{
+	if (ExpectedRevision != Revision) return EHSRInventoryOperationResult::RevisionConflict;
+	const FDefinitionRule* Rule = Definitions.Find(ItemId);
+	if (!Rule) return EHSRInventoryOperationResult::UnknownDefinition;
+	if (Rule->StorageKind != EHSRItemStorageKind::Unique) return EHSRInventoryOperationResult::StorageKindMismatch;
+	if (UniqueItems.Contains(InstanceId)) return EHSRInventoryOperationResult::DuplicateInstanceId;
+	FHSRInventoryMovementCandidate Candidate;
+	Candidate.Stacks = Stacks;
+	Candidate.UniqueItems = UniqueItems;
+	Candidate.UniqueItems.Add(InstanceId, {InstanceId, ItemId});
+	if (GetUsedSlots(Candidate.Stacks, Candidate.UniqueItems) > Capacity) return EHSRInventoryOperationResult::CapacityExceeded;
+	Candidate.NextRevision = Revision + 1;
+	OutCandidate = MoveTemp(Candidate);
+	return EHSRInventoryOperationResult::Success;
+}
+
+EHSRInventoryOperationResult UHSRInventorySubsystem::PrepareEquipmentSwapCandidate(const FGuid& IncomingInstanceId,
+	const FName IncomingItemId, const FGuid& DisplacedInstanceId, const FName DisplacedItemId,
+	const int64 ExpectedRevision, FHSRInventoryMovementCandidate& OutCandidate) const
+{
+	if (ExpectedRevision != Revision) return EHSRInventoryOperationResult::RevisionConflict;
+	const FHSRItemInstance* Incoming = UniqueItems.Find(IncomingInstanceId);
+	if (!Incoming) return EHSRInventoryOperationResult::InstanceNotFound;
+	if (Incoming->DefinitionId != IncomingItemId) return EHSRInventoryOperationResult::StorageKindMismatch;
+	const FDefinitionRule* DisplacedRule = Definitions.Find(DisplacedItemId);
+	if (!DisplacedRule) return EHSRInventoryOperationResult::UnknownDefinition;
+	if (DisplacedRule->StorageKind != EHSRItemStorageKind::Unique) return EHSRInventoryOperationResult::StorageKindMismatch;
+	if (UniqueItems.Contains(DisplacedInstanceId)) return EHSRInventoryOperationResult::DuplicateInstanceId;
+	FHSRInventoryMovementCandidate Candidate;
+	Candidate.Stacks = Stacks;
+	Candidate.UniqueItems = UniqueItems;
+	Candidate.UniqueItems.Remove(IncomingInstanceId);
+	Candidate.UniqueItems.Add(DisplacedInstanceId, {DisplacedInstanceId, DisplacedItemId});
+	if (GetUsedSlots(Candidate.Stacks, Candidate.UniqueItems) > Capacity) return EHSRInventoryOperationResult::CapacityExceeded;
+	Candidate.NextRevision = Revision + 1;
+	OutCandidate = MoveTemp(Candidate);
+	return EHSRInventoryOperationResult::Success;
+}
+
+EHSRInventoryOperationResult UHSRInventorySubsystem::PrepareEquipmentEnhancementCandidate(
+	const FName MaterialItemId, const int32 MaterialCost, const int64 ExpectedRevision,
+	FHSRInventoryEnhancementCandidate& OutCandidate) const
+{
+	if (ExpectedRevision != Revision) return EHSRInventoryOperationResult::RevisionConflict;
+	if (MaterialItemId.IsNone()) return EHSRInventoryOperationResult::InvalidDefinitionId;
+	if (MaterialCost <= 0) return EHSRInventoryOperationResult::InvalidQuantity;
+	const FDefinitionRule* Rule = Definitions.Find(MaterialItemId);
+	if (!Rule) return EHSRInventoryOperationResult::UnknownDefinition;
+	if (Rule->StorageKind != EHSRItemStorageKind::Stackable) return EHSRInventoryOperationResult::StorageKindMismatch;
+	const int32 Existing = Stacks.FindRef(MaterialItemId);
+	if (Existing < MaterialCost) return EHSRInventoryOperationResult::InsufficientQuantity;
+	FHSRInventoryEnhancementCandidate Candidate;
+	Candidate.Stacks = Stacks;
+	Candidate.UniqueItems = UniqueItems;
+	const int32 Remaining = Existing - MaterialCost;
+	if (Remaining == 0) Candidate.Stacks.Remove(MaterialItemId);
+	else Candidate.Stacks.Add(MaterialItemId, Remaining);
+	Candidate.NextRevision = Revision + 1;
+	OutCandidate = MoveTemp(Candidate);
+	return EHSRInventoryOperationResult::Success;
+}
+
+void UHSRInventorySubsystem::InstallEquipmentMovementCandidateNoFail(FHSRInventoryMovementCandidate&& Candidate)
+{
+	Stacks = MoveTemp(Candidate.Stacks);
+	UniqueItems = MoveTemp(Candidate.UniqueItems);
+}
+
+void UHSRInventorySubsystem::FinalizeEquipmentMovementRevisionNoFail(const int64 PreparedRevision)
+{
+	Revision = PreparedRevision;
+}
+
+void UHSRInventorySubsystem::PublishEquipmentMovementCommit(const int64 PreparedRevision)
+{
+	check(Revision == PreparedRevision);
+	BroadcastRevision(PreparedRevision);
+}
+
+void UHSRInventorySubsystem::InstallEquipmentEnhancementCandidateNoFail(
+	FHSRInventoryEnhancementCandidate&& Candidate)
+{
+	Stacks = MoveTemp(Candidate.Stacks);
+	UniqueItems = MoveTemp(Candidate.UniqueItems);
+}
+
+void UHSRInventorySubsystem::FinalizeEquipmentEnhancementRevisionNoFail(const int64 PreparedRevision)
+{
+	Revision = PreparedRevision;
+}
+
+void UHSRInventorySubsystem::PublishEquipmentEnhancementCommit(const int64 PreparedRevision)
+{
+	check(Revision == PreparedRevision);
+	BroadcastRevision(PreparedRevision);
 }
 
 #if WITH_DEV_AUTOMATION_TESTS
