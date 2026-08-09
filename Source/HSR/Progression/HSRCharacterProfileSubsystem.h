@@ -7,7 +7,9 @@
 
 class UHSRCharacterDefinition;
 class UHSRCharacterCatalog;
+class UHSRSettlementAuthority;
 struct FHSRCharacterProgressionContext;
+struct FHSRProfileSettlementCandidate;
 
 UCLASS()
 class HSR_API UHSRCharacterProfileSubsystem : public UGameInstanceSubsystem
@@ -20,6 +22,7 @@ public:
 	EHSRCharacterProfileResult GrantExperience(FName CharacterId, int32 ExperienceToGrant);
 	EHSRCharacterProfileResult SetSkillLevel(FName CharacterId, FName SkillId, int32 SkillLevel);
 	bool GetProfileSnapshot(FName CharacterId, FHSRCharacterProfileSnapshot& OutSnapshot) const;
+	bool GetAllProfileSnapshots(TArray<FHSRCharacterProfileSnapshot>& OutSnapshots) const;
 	bool GetProgressionContext(FName CharacterId, FHSRCharacterProgressionContext& OutContext) const;
 	bool GetDefinition(FName CharacterId, const UHSRCharacterDefinition*& OutDefinition) const;
 	bool HasDefinition(FName CharacterId) const { return Definitions.Contains(CharacterId); }
@@ -27,10 +30,15 @@ public:
 
 private:
 	friend class UHSRSaveSubsystem;
+	friend class UHSRSettlementAuthority;
 	void ExportProfiles(TArray<FHSRCharacterProfileSnapshot>& OutProfiles) const;
 	bool PrepareRestore(const TArray<FHSRCharacterProfileSnapshot>& SavedProfiles, TMap<FName, FHSRCharacterProfileSnapshot>& OutCandidate) const;
 	void CommitRestoreSilent(TMap<FName, FHSRCharacterProfileSnapshot>&& Candidate) { Profiles=MoveTemp(Candidate); }
 	void NotifyRestored(const TArray<FName>& ChangedIds);
+	EHSRCharacterProfileResult PrepareSettlementCandidate(const FGuid& TransactionId, FName CharacterId,
+		int32 Experience, int64 ExpectedRevision, FHSRProfileSettlementCandidate& OutCandidate) const;
+	void InstallSettlementCandidateNoFail(FHSRProfileSettlementCandidate&& Candidate);
+	void PublishSettlementCommit(FName CharacterId, int64 PreparedRevision);
 	UPROPERTY() TMap<FName, TObjectPtr<const UHSRCharacterDefinition>> Definitions;
 	UPROPERTY() TMap<FName, FHSRCharacterProfileSnapshot> Profiles;
 	FHSRCharacterProfileChanged ProfileChanged;

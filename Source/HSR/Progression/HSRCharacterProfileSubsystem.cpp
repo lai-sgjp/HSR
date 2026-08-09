@@ -3,6 +3,7 @@
 #include "../Data/Definitions/HSRCharacterDefinition.h"
 #include "../Data/Definitions/HSRCharacterCatalog.h"
 #include "HSRCharacterStatAggregator.h"
+#include "../Reward/HSRSettlementTypes.h"
 
 EHSRCharacterProfileResult UHSRCharacterProfileSubsystem::RegisterDefinition(const UHSRCharacterDefinition* Definition)
 {
@@ -83,6 +84,16 @@ bool UHSRCharacterProfileSubsystem::GetProfileSnapshot(FName CharacterId, FHSRCh
 	return true;
 }
 
+bool UHSRCharacterProfileSubsystem::GetAllProfileSnapshots(TArray<FHSRCharacterProfileSnapshot>& OutSnapshots) const
+{
+	Profiles.GenerateValueArray(OutSnapshots);
+	OutSnapshots.Sort([](const FHSRCharacterProfileSnapshot& A, const FHSRCharacterProfileSnapshot& B)
+	{
+		return A.RuntimeState.CharacterId.LexicalLess(B.RuntimeState.CharacterId);
+	});
+	return true;
+}
+
 bool UHSRCharacterProfileSubsystem::GetProgressionContext(FName CharacterId, FHSRCharacterProgressionContext& OutContext) const
 {
 	const FHSRCharacterProfileSnapshot* Profile = Profiles.Find(CharacterId);
@@ -109,3 +120,43 @@ bool UHSRCharacterProfileSubsystem::PrepareRestore(const TArray<FHSRCharacterPro
 }
 
 void UHSRCharacterProfileSubsystem::NotifyRestored(const TArray<FName>& Ids){ for(FName Id:Ids){if(const auto* P=Profiles.Find(Id))ProfileChanged.Broadcast(Id,P->RuntimeRevision);} }
+
+EHSRCharacterProfileResult UHSRCharacterProfileSubsystem::PrepareSettlementCandidate(const FGuid& TransactionId,
+	FName CharacterId, int32 Experience, int64 ExpectedRevision, FHSRProfileSettlementCandidate& OutCandidate) const
+{
+	const FHSRCharacterProfileSnapshot* Profile = Profiles.Find(CharacterId);
+	const TObjectPtr<const UHSRCharacterDefinition>* Definition = Definitions.Find(CharacterId);
+	if (!Profile || !Definition)
+	{
+		return EHSRCharacterProfileResult::ProfileNotFound;
+	}
+	if (Profile->RuntimeRevision != ExpectedRevision)
+	{
+		return EHSRCharacterProfileResult::RevisionConflict;
+	}
+	FHSRCharacterProfileSnapshot Updated = *Profile;
+	if (UHSRCharacterProgressionLibrary::TryGrantExperience(Definition->Get(), Experience,
+		Updated.RuntimeState) != EHSRCharacterProgressionResult::Success)
+	{
+		return EHSRCharacterProfileResult::ProgressionRejected;
+	}
+	FHSRProfileSettlementCandidate Candidate;
+	Candidate.TransactionId = TransactionId;
+	Candidate.CharacterId = CharacterId;
+	Candidate.Profiles = Profiles;
+	Updated.RuntimeRevision = Profile->RuntimeRevision + (Experience > 0 ? 1 : 0);
+	Candidate.Profiles.Add(CharacterId, Updated);
+	Candidate.NextRevision = Updated.RuntimeRevision;
+	OutCandidate = MoveTemp(Candidate);
+	return EHSRCharacterProfileResult::Success;
+}
+
+void UHSRCharacterProfileSubsystem::InstallSettlementCandidateNoFail(FHSRProfileSettlementCandidate&& Candidate)
+{
+	Profiles = MoveTemp(Candidate.Profiles);
+}
+
+void UHSRCharacterProfileSubsystem::PublishSettlementCommit(FName CharacterId, int64 PreparedRevision)
+{
+	ProfileChanged.Broadcast(CharacterId, PreparedRevision);
+}
