@@ -109,6 +109,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceLifecyclePatchTest, "HSR.Batt
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceThreeParticipantPatchTest, "HSR.Battle.Patch.ActionDistance.ThreeParticipant", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceRequestMatrixPatchTest, "HSR.Battle.Patch.ActionDistance.RequestMatrix", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceNumericLifecyclePatchTest, "HSR.Battle.Patch.ActionDistance.NumericAndBinding", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRTurnForecastPatchTest, "HSR.Battle.Patch.ActionDistance.TurnForecast", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRBehaviorTreeAdapterPatchTest, "HSR.Exploration.Patch.BehaviorTreeAdapter", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
@@ -1115,6 +1116,109 @@ bool FHSRStatusGenericPatchTest::RunTest(const FString& Parameters)
 	EffectDefault->DurationPolicy = OriginalDurationPolicy;
 	EffectDefault->StackingType = OriginalStackingType;
 	World->DestroyWorld(false);
+	return true;
+}
+
+bool FHSRTurnForecastPatchTest::RunTest(const FString& Parameters)
+{
+	if (!GEngine)
+	{
+		return false;
+	}
+
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GEngine);
+	GameInstance->AddToRoot();
+
+	UWorld* World = nullptr;
+	UHSRBattleCoordinator* Coordinator = nullptr;
+	ON_SCOPE_EXIT
+	{
+		if (Coordinator)
+		{
+			Coordinator->Reset();
+		}
+		if (GameInstance)
+		{
+			GameInstance->Shutdown();
+			if (World)
+			{
+				World->DestroyWorld(false);
+				GEngine->DestroyWorldContext(World);
+			}
+			GameInstance->RemoveFromRoot();
+		}
+	};
+
+	GameInstance->InitializeStandalone(FName(*FString::Printf(TEXT("HSRTurnForecast_%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits))));
+	World = GameInstance->GetWorld();
+
+	TSubclassOf<AHSRBattleGameMode> Class = LoadClass<AHSRBattleGameMode>(nullptr, TEXT("/Game/Blueprints/Framework/BP_HSRBattleGameMode.BP_HSRBattleGameMode_C"));
+
+	FText Failure;
+	Coordinator = World && Class ? AHSRBattleGameMode::CreateRepeatableBreakAutomationFixture(GameInstance, World, Class, Failure) : nullptr;
+	if (!TestNotNull(TEXT("Forecast fixture builds"), Coordinator))
+	{
+		return false;
+	}
+
+	UHSRTurnManager* Manager = Coordinator->GetTurnManager();
+	if (!TestNotNull(TEXT("Forecast manager exists"), Manager))
+	{
+		return false;
+	}
+
+	const TArray<FHSRTurnForecastEntry> Forecast = Manager->BuildTurnForecast(6);
+	TestEqual(TEXT("Forecast fills the requested slot count"), Forecast.Num(), 6);
+
+	if (Forecast.Num() > 0)
+	{
+		TestEqual(TEXT("First forecast slot is the acting participant"), Forecast[0].ParticipantId, Manager->GetCurrentParticipantId());
+		TestEqual(TEXT("First forecast slot is index zero"), Forecast[0].SlotIndex, 0);
+		TestTrue(TEXT("First forecast slot has no wait"), FMath::IsNearlyZero(Forecast[0].DistanceUntilAction));
+	}
+
+	// Distances must be monotonically non-decreasing: a later slot can never act sooner.
+	bool bMonotonic = true;
+	for (int32 Index = 1; Index < Forecast.Num(); ++Index)
+	{
+		if (Forecast[Index].DistanceUntilAction < Forecast[Index - 1].DistanceUntilAction - KINDA_SMALL_NUMBER)
+		{
+			bMonotonic = false;
+			break;
+		}
+		if (Forecast[Index].SlotIndex != Index)
+		{
+			bMonotonic = false;
+			break;
+		}
+	}
+	TestTrue(TEXT("Forecast slots are ordered by distance until action"), bMonotonic);
+
+	// Every forecast entry must name a live, non-defeated participant.
+	bool bAllResolve = true;
+	for (const FHSRTurnForecastEntry& Entry : Forecast)
+	{
+		const FHSRBattleParticipant* Found = Manager->GetOrderedParticipants().FindByPredicate(
+			[&Entry](const FHSRBattleParticipant& Candidate) { return Candidate.ParticipantId == Entry.ParticipantId; });
+		if (!Found || Found->bDefeated)
+		{
+			bAllResolve = false;
+			break;
+		}
+	}
+	TestTrue(TEXT("Forecast only names live participants"), bAllResolve);
+
+	// A zero or negative request is a valid "no bar" ask and must not produce entries.
+	TestEqual(TEXT("Zero slot request yields empty forecast"), Manager->BuildTurnForecast(0).Num(), 0);
+	TestEqual(TEXT("Negative slot request yields empty forecast"), Manager->BuildTurnForecast(-3).Num(), 0);
+
+	// Forecasting is a pure read: it must not disturb live turn state.
+	const FName BeforeCurrent = Manager->GetCurrentParticipantId();
+	const uint64 BeforeSequence = Manager->GetTurnSequence();
+	Manager->BuildTurnForecast(12);
+	TestEqual(TEXT("Forecast leaves current participant untouched"), Manager->GetCurrentParticipantId(), BeforeCurrent);
+	TestEqual(TEXT("Forecast leaves turn sequence untouched"), Manager->GetTurnSequence(), BeforeSequence);
+
 	return true;
 }
 

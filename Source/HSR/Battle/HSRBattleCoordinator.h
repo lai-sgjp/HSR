@@ -186,6 +186,9 @@ public:
 	void Reset();
 
 private:
+	/** How many upcoming action slots the turn-order bar receives per view-state publish. */
+	static constexpr int32 TurnForecastSlotCount = 8;
+
 	EHSRBattleCoordinatorState CurrentState = EHSRBattleCoordinatorState::Idle;
 	FGuid CurrentRequestId;
 	FName CurrentRewardDefinitionId;

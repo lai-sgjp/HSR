@@ -1140,6 +1140,7 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 				}
 			}
 		}
+		State.TurnForecast = TurnManager->BuildTurnForecast(TurnForecastSlotCount);
 	}
 	for (const FHSRBattleParticipant& Participant : Participants)
 	{

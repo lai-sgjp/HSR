@@ -85,6 +85,9 @@ struct FHSRBattleCommandViewState
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FGuid BattleId;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FName CurrentActorId;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") TArray<FName> TurnOrderParticipantIds;
+
+	/** Action-distance forecast for the turn-order bar. Empty outside an active battle. */
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|TurnOrder") TArray<FHSRTurnForecastEntry> TurnForecast;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Participants") TArray<FHSRBattleParticipantView> Participants;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") bool bCurrentActorPlayerControlled = false;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") int32 SkillPoints = 0;
