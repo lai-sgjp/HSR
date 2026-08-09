@@ -448,7 +448,7 @@ bool UHSRRelicEquipmentViewModel::BuildEnhancementOptions()
 		Option.MaterialItemId = Rule.MaterialItemId;
 		Option.MaterialCost = Rule.MaterialCost;
 		Option.TargetModifiers = Rule.TargetModifiers;
-		Option.bAffordable = FindStackQuantity(InventorySnapshot, Rule.MaterialItemId) >= Rule.MaterialCost;
+		Option.bAffordable = InventorySnapshot.GetStackQuantity(Rule.MaterialItemId) >= Rule.MaterialCost;
 		Option.bAvailable = Rule.TargetLevel > Current->EquippedInstance.EnhancementLevel
 			&& Rule.MaterialCost > 0;
 		Snapshot.EnhancementOptions.Add(MoveTemp(Option));
@@ -456,22 +456,12 @@ bool UHSRRelicEquipmentViewModel::BuildEnhancementOptions()
 	return !Snapshot.EnhancementOptions.IsEmpty();
 }
 
-int32 UHSRRelicEquipmentViewModel::FindStackQuantity(const FHSRInventorySnapshot& InventorySnapshot,
-	const FName ItemId) const
-{
-	for (const FHSRItemStackSnapshot& Stack : InventorySnapshot.Stacks)
-	{
-		if (Stack.ItemId == ItemId) return Stack.Quantity;
-	}
-	return 0;
-}
-
 int32 UHSRRelicEquipmentViewModel::GetHeldMaterialQuantity(const FName ItemId) const
 {
 	if (!Inventory.IsValid()) return -1;
 	FHSRInventorySnapshot InventorySnapshot;
 	Inventory->GetSnapshot(InventorySnapshot);
-	return FindStackQuantity(InventorySnapshot, ItemId);
+	return InventorySnapshot.GetStackQuantity(ItemId);
 }
 
 void UHSRRelicEquipmentViewModel::HandleEquipmentChanged(const FGuid& ChangedCharacterId, int32)

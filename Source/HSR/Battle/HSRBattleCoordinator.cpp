@@ -28,6 +28,44 @@
 #include "../Data/Definitions/HSRStageBuffDefinition.h"
 #include "../Inventory/HSRInventorySubsystem.h"
 
+namespace
+{
+	/**
+	 * The four SetByCaller magnitudes UHSRDamageExecutionCalculation reads. Resolved once per
+	 * damage request so the three damage paths cannot drift in which tags they look up or write.
+	 */
+	struct FHSRDamageSetByCallerTags
+	{
+		FGameplayTag AbilityMultiplier;
+		FGameplayTag DefenseCoefficient;
+		FGameplayTag MinDamage;
+		FGameplayTag CritRoll;
+
+		FHSRDamageSetByCallerTags()
+			: AbilityMultiplier(FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.AbilityMultiplier")), false))
+			, DefenseCoefficient(FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.DefenseCoefficient")), false))
+			, MinDamage(FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.MinDamage")), false))
+			, CritRoll(FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.CritRoll")), false))
+		{
+		}
+
+		bool IsValid() const
+		{
+			return AbilityMultiplier.IsValid() && DefenseCoefficient.IsValid()
+				&& MinDamage.IsValid() && CritRoll.IsValid();
+		}
+
+		void ApplyTo(FGameplayEffectSpec& Spec, float InAbilityMultiplier, float InDefenseCoefficient,
+			float InMinDamage, float InCritRoll) const
+		{
+			Spec.SetSetByCallerMagnitude(AbilityMultiplier, InAbilityMultiplier);
+			Spec.SetSetByCallerMagnitude(DefenseCoefficient, InDefenseCoefficient);
+			Spec.SetSetByCallerMagnitude(MinDamage, InMinDamage);
+			Spec.SetSetByCallerMagnitude(CritRoll, InCritRoll);
+		}
+	};
+}
+
 bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRequest)
 {
 	if (CurrentState != EHSRBattleCoordinatorState::Idle)
@@ -175,12 +213,7 @@ bool UHSRBattleCoordinator::ApplyStageBuffs(UWorld* BattleWorld)
 		{
 			FHSRInventorySnapshot Snapshot;
 			Inventory->GetSnapshot(Snapshot);
-			const FHSRItemStackSnapshot* Stack = Snapshot.Stacks.FindByPredicate(
-				[Definition](const FHSRItemStackSnapshot& Entry)
-				{
-					return Entry.ItemId == Definition->ResourceItemId;
-				});
-			if (!Stack || Stack->Quantity < Definition->ResourceCost)
+			if (Snapshot.GetStackQuantity(Definition->ResourceItemId) < Definition->ResourceCost)
 			{
 				UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: resource changed after preflight BuffId=%s"), *BuffId.ToString());
 				return false;
@@ -635,13 +668,10 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		}
 		const UHSRDamageRuleDefinition* Rule = ResolvedSkillDefinition->DamageRule.LoadSynchronous();
 		const TSubclassOf<UGameplayEffect> DamageEffect = ResolvedSkillDefinition->EffectGameplayEffectClass.LoadSynchronous();
-		const FGameplayTag AbilityMultiplierTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.AbilityMultiplier")), false);
-		const FGameplayTag DefenseCoefficientTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.DefenseCoefficient")), false);
-		const FGameplayTag MinDamageTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.MinDamage")), false);
-		const FGameplayTag CritRollTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.CritRoll")), false);
+		const FHSRDamageSetByCallerTags DamageTags;
 		if (!Rule || !Rule->IsValidRuleDefinition() || !DamageEffect || !ResolvedSkillDefinition->DamageType.IsValid()
 			|| !FMath::IsFinite(ResolvedSkillDefinition->AbilityMultiplier) || ResolvedSkillDefinition->AbilityMultiplier <= 0.0f
-			|| !AbilityMultiplierTag.IsValid() || !DefenseCoefficientTag.IsValid() || !MinDamageTag.IsValid() || !CritRollTag.IsValid())
+			|| !DamageTags.IsValid())
 		{
 			Ability->ClearPendingTarget();
 			return Reject(EHSRAbilityFailureReason::DefinitionMissing);
@@ -672,10 +702,8 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 			SpecContext->DamageContext.ActionId = Request.ActionId;
 			UE_LOG(LogTemp, Log, TEXT("P7-004 SpecContext ActionId=%s Injection=%d"), *SpecContext->DamageContext.ActionId.ToString(), static_cast<int32>(SpecContext->TestInjection));
 		}
-		DamageSpec.Data->SetSetByCallerMagnitude(AbilityMultiplierTag, Request.AbilityMultiplier);
-		DamageSpec.Data->SetSetByCallerMagnitude(DefenseCoefficientTag, Request.DefenseCoefficient);
-		DamageSpec.Data->SetSetByCallerMagnitude(MinDamageTag, Request.MinDamage);
-		DamageSpec.Data->SetSetByCallerMagnitude(CritRollTag, Request.CritRoll);
+		DamageTags.ApplyTo(*DamageSpec.Data, Request.AbilityMultiplier, Request.DefenseCoefficient,
+			Request.MinDamage, Request.CritRoll);
 		FHSRFormalDamagePrepareResult PrepareResult;
 		if (!Ability->PrepareFormalDamage(Request, DamageSpec, Target->AbilitySystemComponent.Get(), PrepareResult)) { UE_LOG(LogTemp, Warning, TEXT("P7-003 Formal Stage=Prepare Result=FAIL ActionId=%s Skill=%s DamageResult=%d"), *Command.ActionId.ToString(), *Command.SkillId.ToString(), static_cast<int32>(PrepareResult.Result)); Ability->ClearPendingTarget(); return Reject(EHSRAbilityFailureReason::EffectFailed); }
 		const bool bUsesPlayerSkillPoints = Attacker->Team == EHSRBattleParticipantTeam::Player;
@@ -1522,11 +1550,12 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticip
 	if (!Source || !Source->AbilitySystemComponent.IsValid()) { Failure.Result = EHSRDamageResultType::InvalidSource; return Failure; }
 	if (!Target || !Target->AbilitySystemComponent.IsValid()) { Failure.Result = EHSRDamageResultType::InvalidTarget; return Failure; }
 	if (!Rule || !Rule->IsValidRuleDefinition()) { Failure.Result = EHSRDamageResultType::MissingDamageRule; return Failure; }
-	const FGameplayTag AbilityMultiplierTag = FGameplayTag::RequestGameplayTag(TEXT("Damage.Data.AbilityMultiplier"), false);
-	const FGameplayTag DefenseCoefficientTag = FGameplayTag::RequestGameplayTag(TEXT("Damage.Data.DefenseCoefficient"), false);
-	const FGameplayTag MinDamageTag = FGameplayTag::RequestGameplayTag(TEXT("Damage.Data.MinDamage"), false);
-	const FGameplayTag CritRollTag = FGameplayTag::RequestGameplayTag(TEXT("Damage.Data.CritRoll"), false);
-	if (!Definition->DamageType.IsValid() || !AbilityMultiplierTag.IsValid() || !DefenseCoefficientTag.IsValid() || !MinDamageTag.IsValid() || !CritRollTag.IsValid()) { Failure.Result = EHSRDamageResultType::InvalidDamageType; return Failure; }
+	const FHSRDamageSetByCallerTags DamageTags;
+	if (!Definition->DamageType.IsValid() || !DamageTags.IsValid())
+	{
+		Failure.Result = EHSRDamageResultType::InvalidDamageType;
+		return Failure;
+	}
 	FGameplayEffectContextHandle Context = Source->AbilitySystemComponent->MakeEffectContext();
 	FHSRDamageEffectContext* DamageContext = static_cast<FHSRDamageEffectContext*>(Context.Get());
 	if (!DamageContext || DamageContext->GetScriptStruct() != FHSRDamageEffectContext::StaticStruct()) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return Failure; }
@@ -1537,7 +1566,8 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticip
 	if (!Spec.IsValid()) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return Failure; }
 	const FRandomStream RandomStreamBeforeApply = DevelopmentDamageRandomStream;
 	DamageContext->DamageContext.CritRoll = DevelopmentDamageRandomStream.GetFraction();
-	Spec.Data->SetSetByCallerMagnitude(AbilityMultiplierTag, Definition->DamageAbilityMultiplier); Spec.Data->SetSetByCallerMagnitude(DefenseCoefficientTag, Rule->DefenseCoefficient); Spec.Data->SetSetByCallerMagnitude(MinDamageTag, Rule->MinDamage); Spec.Data->SetSetByCallerMagnitude(CritRollTag, DamageContext->DamageContext.CritRoll);
+	DamageTags.ApplyTo(*Spec.Data, Definition->DamageAbilityMultiplier, Rule->DefenseCoefficient,
+		Rule->MinDamage, DamageContext->DamageContext.CritRoll);
 	const float HealthBefore = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
 	bFormalDamageTransactionOpen = true; PendingDefeatedParticipantId = NAME_None;
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
@@ -1606,11 +1636,12 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveDevelopmentExecutionDamage(FName 
 	if (!Rule || !Rule->IsValidRuleDefinition()) { Failure.Result = EHSRDamageResultType::MissingDamageRule; return CacheFailure(Failure); }
 	if (!DamageType.IsValid() || !FMath::IsFinite(AbilityMultiplier) || AbilityMultiplier <= 0.0f || AbilityMultiplier > 100.0f) { Failure.Result = EHSRDamageResultType::InvalidDamageType; return CacheFailure(Failure); }
 	if (!DamageEffectClass) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return CacheFailure(Failure); }
-	const FGameplayTag AbilityMultiplierTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.AbilityMultiplier")), false);
-	const FGameplayTag DefenseCoefficientTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.DefenseCoefficient")), false);
-	const FGameplayTag MinDamageTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.MinDamage")), false);
-	const FGameplayTag CritRollTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Damage.Data.CritRoll")), false);
-	if (!AbilityMultiplierTag.IsValid() || !DefenseCoefficientTag.IsValid() || !MinDamageTag.IsValid() || !CritRollTag.IsValid()) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return CacheFailure(Failure); }
+	const FHSRDamageSetByCallerTags DamageTags;
+	if (!DamageTags.IsValid())
+	{
+		Failure.Result = EHSRDamageResultType::SpecCreationFailed;
+		return CacheFailure(Failure);
+	}
 	FGameplayEffectContextHandle ContextHandle = Source->AbilitySystemComponent->MakeEffectContext();
 	FHSRDamageEffectContext* DamageContext = static_cast<FHSRDamageEffectContext*>(ContextHandle.Get());
 	if (!DamageContext || DamageContext->GetScriptStruct() != FHSRDamageEffectContext::StaticStruct()) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return CacheFailure(Failure); }
@@ -1626,10 +1657,8 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveDevelopmentExecutionDamage(FName 
 	// The unique commit point: Spec is valid and Apply is immediately next.
 	DamageContext->DamageContext.CritRoll = DevelopmentDamageRandomStream.GetFraction();
 	++DevelopmentDamageConsumeCount;
-	Spec.Data->SetSetByCallerMagnitude(AbilityMultiplierTag, AbilityMultiplier);
-	Spec.Data->SetSetByCallerMagnitude(DefenseCoefficientTag, Rule->DefenseCoefficient);
-	Spec.Data->SetSetByCallerMagnitude(MinDamageTag, Rule->MinDamage);
-	Spec.Data->SetSetByCallerMagnitude(CritRollTag, DamageContext->DamageContext.CritRoll);
+	DamageTags.ApplyTo(*Spec.Data, AbilityMultiplier, Rule->DefenseCoefficient,
+		Rule->MinDamage, DamageContext->DamageContext.CritRoll);
 	const float HealthBefore = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
 	const FActiveGameplayEffectHandle Applied = Source->AbilitySystemComponent->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), Target->AbilitySystemComponent.Get());
 	if (!Applied.WasSuccessfullyApplied()) { Failure.Result = EHSRDamageResultType::EffectApplicationFailed; return CacheFailure(Failure); }

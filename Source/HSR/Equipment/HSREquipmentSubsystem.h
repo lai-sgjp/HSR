@@ -7,6 +7,9 @@
 
 class UHSREquipmentDefinition;
 class UHSRRelicDefinition;
+class UHSREquipmentEnhancementCatalog;
+class UHSRInventorySubsystem;
+class UHSRItemEquipmentMappingCatalog;
 struct FHSREquipmentSaveDto;
 
 struct FHSREquipmentRestoreState
@@ -24,6 +27,11 @@ struct FHSRRelicSetSnapshot
 	bool bActive = false;
 };
 using FHSREquipmentRestoreMap = TMap<FGuid,FHSREquipmentRestoreState>;
+struct FHSREquipmentRegistryRestoreState
+{
+	TMap<FGuid, FHSREquipmentInstance> Registry;
+	FHSREquipmentRestoreMap Loadouts;
+};
 DECLARE_DELEGATE_RetVal_OneParam(bool, FHSREquipmentRestoreProjection, const FHSREquipmentRestoreMap&);
 
 DECLARE_MULTICAST_DELEGATE_TwoParams(FHSREquipmentLoadoutChanged, const FGuid& /* CharacterId */, int32 /* Revision */);
@@ -34,15 +42,54 @@ class HSR_API UHSREquipmentSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
+	DECLARE_DELEGATE_RetVal_TwoParams(bool, FMovementProjectionPreflight,
+		const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&);
+	DECLARE_DELEGATE_TwoParams(FMovementProjectionCommit,
+		const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&);
+	DECLARE_DELEGATE_RetVal_TwoParams(bool, FMovementProjectionApply,
+		const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&);
+	DECLARE_DELEGATE_RetVal_TwoParams(bool, FEnhancementProjectionPreflight,
+		const FHSREquipmentEnhancementRequest&, const FHSREquipmentInstance&);
+	DECLARE_DELEGATE_TwoParams(FEnhancementProjectionCommit,
+		const FHSREquipmentEnhancementRequest&, const FHSREquipmentInstance&);
+
 	void ExportSaveData(TArray<struct FHSREquipmentSaveDto>& Out) const;
+	void ExportSaveData(TArray<struct FHSREquipmentRegistryDto>& OutRegistry, TArray<struct FHSREquipmentPlacementDto>& OutPlacements) const;
 	bool PrepareRestore(const TArray<struct FHSREquipmentSaveDto>& In, FHSREquipmentRestoreMap& Out) const;
+	bool PrepareRestore(const TArray<struct FHSREquipmentRegistryDto>& Registry, const TArray<struct FHSREquipmentPlacementDto>& Placements, FHSREquipmentRegistryRestoreState& Out) const;
 	void CommitRestore(const FHSREquipmentRestoreMap& Candidate);
+	void CommitRestore(const FHSREquipmentRegistryRestoreState& Candidate);
 	void NotifyRestored(const TSet<FGuid>& Changed);
 	void SetRestoreProjection(FHSREquipmentRestoreProjection InProjection) { RestoreProjection=MoveTemp(InProjection); }
 	bool ProjectRestore(const FHSREquipmentRestoreMap& Candidate) const { return !RestoreProjection.IsBound() || RestoreProjection.Execute(Candidate); }
 	EHSREquipmentOperationResult RegisterDefinition(const UHSREquipmentDefinition& Definition);
 	EHSREquipmentOperationResult RegisterDefinition(const UHSRRelicDefinition& Definition);
 	bool HasDefinition(FName DefinitionId) const { return Definitions.Contains(DefinitionId); }
+	bool IsDefinitionCompatible(FName DefinitionId,EHSREquipmentKind Kind,int32 Slot) const;
+	EHSREquipmentOperationResult RegisterInstance(const FHSREquipmentInstance& Instance);
+	bool FindRegisteredInstance(const FGuid& InstanceId, FHSREquipmentInstance& OutInstance) const;
+	EHSREquipmentOperationResult EquipById(const FGuid& CharacterId, const FGuid& InstanceId);
+	EHSREquipmentOperationResult ReplaceById(const FGuid& CharacterId, const FGuid& InstanceId);
+	FHSREquipmentMovementResult ExecuteMovement(const FHSREquipmentMovementRequest& Request,
+		UHSRInventorySubsystem& Inventory, const UHSRItemEquipmentMappingCatalog& MappingCatalog);
+	FHSREquipmentEnhancementResult ExecuteEnhancement(const FHSREquipmentEnhancementRequest& Request,
+		UHSRInventorySubsystem& Inventory, const UHSREquipmentEnhancementCatalog& Catalog);
+	void SetMovementProjection(FMovementProjectionPreflight InPreflight, FMovementProjectionCommit InCommit)
+	{
+		MovementProjectionPreflight = MoveTemp(InPreflight);
+		MovementProjectionApply.Unbind();
+		MovementProjectionCommit = MoveTemp(InCommit);
+	}
+	void SetMovementProjection(FMovementProjectionPreflight InPreflight,FMovementProjectionApply InApply,FMovementProjectionCommit InCommit)
+	{
+		MovementProjectionPreflight=MoveTemp(InPreflight);MovementProjectionApply=MoveTemp(InApply);MovementProjectionCommit=MoveTemp(InCommit);
+	}
+	void SetEnhancementProjection(FEnhancementProjectionPreflight InPreflight,
+		FEnhancementProjectionCommit InCommit)
+	{
+		EnhancementProjectionPreflight = MoveTemp(InPreflight);
+		EnhancementProjectionCommit = MoveTemp(InCommit);
+	}
 
 	EHSREquipmentOperationResult Equip(const FGuid& CharacterId, const FHSREquipmentInstance& Instance);
 	EHSREquipmentOperationResult Replace(const FGuid& CharacterId, const FHSREquipmentInstance& Instance);
@@ -50,6 +97,7 @@ public:
 	EHSREquipmentOperationResult SetEnhancementLevel(const FGuid& CharacterId, const FGuid& InstanceId, int32 NewLevel);
 
 	bool GetLoadout(const FGuid& CharacterId, FHSREquipmentLoadout& OutLoadout, int32& OutRevision) const;
+	bool FindInstanceOwner(const FGuid& InstanceId, FGuid& OutCharacterId) const;
 	void GetRelicSetSnapshots(const FGuid& CharacterId, TArray<FHSRRelicSetSnapshot>& Out) const;
 	FHSREquipmentLoadoutChanged& OnLoadoutChanged() { return LoadoutChanged; }
 	const FHSREquipmentLoadoutChanged& OnLoadoutChanged() const { return LoadoutChanged; }
@@ -65,22 +113,63 @@ private:
 
 	struct FLoadoutState
 	{
-		FHSREquipmentLoadout Loadout;
+		TMap<EHSREquipmentSlot, FGuid> Equipment;
+		TMap<EHSRRelicSlot, FGuid> Relics;
 		int32 Revision = 0;
 	};
+	struct FMovementLedgerEntry
+	{
+		FHSREquipmentMovementRequest Request;
+		FHSREquipmentMovementResult Result;
+	};
+	struct FEnhancementLedgerEntry
+	{
+		FHSREquipmentEnhancementRequest Request;
+		FHSREquipmentEnhancementResult Result;
+	};
+
+	/** Shared cap for the movement and enhancement idempotency ledgers. */
+	static constexpr int32 MaxLedgerEntries = 128;
+
+	/** Records one entry and evicts the oldest once the ledger exceeds MaxLedgerEntries. */
+	template <typename TLedger, typename TEntry>
+	static void RecordLedgerEntry(TLedger& Ledger, TArray<FGuid>& Order, const FGuid& OperationId, TEntry&& Entry)
+	{
+		Ledger.Add(OperationId, Forward<TEntry>(Entry));
+		Order.Add(OperationId);
+		if (Order.Num() > MaxLedgerEntries)
+		{
+			Ledger.Remove(Order[0]);
+			Order.RemoveAt(0);
+		}
+	}
 
 	bool IsValidInstance(const FHSREquipmentInstance& Instance) const;
 	bool IsValidModifiers(const TArray<FHSREquipmentModifier>& Modifiers) const;
 	const FDefinitionRule* FindDefinition(const FHSREquipmentInstance& Instance) const;
 	bool IsSlotValid(EHSREquipmentKind Kind, int32 Slot) const;
-	bool IsSlotOccupied(const FHSREquipmentLoadout& Loadout, EHSREquipmentKind Kind, int32 Slot) const;
-	FHSREquipmentInstance* FindInstance(FHSREquipmentLoadout& Loadout, EHSREquipmentKind Kind, int32 Slot);
-	const FHSREquipmentInstance* FindInstance(const FHSREquipmentLoadout& Loadout, EHSREquipmentKind Kind, int32 Slot) const;
-	void CommitLoadout(const FGuid& CharacterId, const FHSREquipmentLoadout& Candidate);
+	bool IsSlotOccupied(const FLoadoutState& Loadout, EHSREquipmentKind Kind, int32 Slot) const;
+	const FGuid* FindPlacedInstance(const FLoadoutState& Loadout, EHSREquipmentKind Kind, int32 Slot) const;
+	void CommitLoadout(const FGuid& CharacterId, FLoadoutState Candidate);
+	bool ResolveLoadout(const FLoadoutState& State, FHSREquipmentLoadout& OutLoadout) const;
+	static bool IsSamePayload(const FHSREquipmentInstance& A, const FHSREquipmentInstance& B);
+	static bool IsSameMovementRequest(const FHSREquipmentMovementRequest& A, const FHSREquipmentMovementRequest& B);
+	static bool IsSameEnhancementRequest(const FHSREquipmentEnhancementRequest& A,
+		const FHSREquipmentEnhancementRequest& B);
 
 	TMap<FName, FDefinitionRule> Definitions;
+	TMap<FGuid, FHSREquipmentInstance> InstanceRegistry;
 	TMap<FGuid, FLoadoutState> Loadouts;
 	TMap<FGuid, FGuid> InstanceOwners;
 	FHSREquipmentLoadoutChanged LoadoutChanged;
 	FHSREquipmentRestoreProjection RestoreProjection;
+	TMap<FGuid, FMovementLedgerEntry> MovementLedger;
+	TArray<FGuid> MovementLedgerOrder;
+	TMap<FGuid, FEnhancementLedgerEntry> EnhancementLedger;
+	TArray<FGuid> EnhancementLedgerOrder;
+	FMovementProjectionPreflight MovementProjectionPreflight;
+	FMovementProjectionApply MovementProjectionApply;
+	FMovementProjectionCommit MovementProjectionCommit;
+	FEnhancementProjectionPreflight EnhancementProjectionPreflight;
+	FEnhancementProjectionCommit EnhancementProjectionCommit;
 };

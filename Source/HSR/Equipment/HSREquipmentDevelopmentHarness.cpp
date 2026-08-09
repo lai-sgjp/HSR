@@ -103,8 +103,7 @@ namespace
 			return;
 		}
 		FHSRInventorySnapshot Snap; Inventory->GetSnapshot(Snap);
-		int32 Have = 0;
-		for (const FHSRItemStackSnapshot& Stack : Snap.Stacks) if (Stack.ItemId == MaterialId) Have = Stack.Quantity;
+		const int32 Have = Snap.GetStackQuantity(MaterialId);
 		const int32 Desired = FMath::Min(999, MaxStack);
 		if (Have >= Desired)
 		{

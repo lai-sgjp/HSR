@@ -27,7 +27,8 @@ enum class EHSRInventoryOperationResult : uint8
 	DuplicateInstanceId,
 	InstanceNotFound,
 	InsufficientQuantity,
-	StorageKindMismatch
+	StorageKindMismatch,
+	RevisionConflict
 };
 
 USTRUCT(BlueprintType)
@@ -86,6 +87,17 @@ struct FHSRInventorySnapshot
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	int32 UsedSlots = 0;
 
+	/**
+	 * How many of ItemId this snapshot holds; 0 when absent. Single definition of the affordability
+	 * question, which battle preflight, the battle re-check, and the relic UI all ask.
+	 */
+	int32 GetStackQuantity(FName ItemId) const
+	{
+		const FHSRItemStackSnapshot* Stack = Stacks.FindByPredicate(
+			[ItemId](const FHSRItemStackSnapshot& Candidate) { return Candidate.ItemId == ItemId; });
+		return Stack ? Stack->Quantity : 0;
+	}
+
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	int64 Revision = 0;
 };
@@ -110,6 +122,20 @@ struct FHSRInventoryRestoreState
 	TMap<FName, int32> Stacks;
 	TMap<FGuid, FHSRItemInstance> UniqueItems;
 	int64 Revision = 0;
+};
+
+struct FHSRInventoryMovementCandidate
+{
+	TMap<FName, int32> Stacks;
+	TMap<FGuid, FHSRItemInstance> UniqueItems;
+	int64 NextRevision = 0;
+};
+
+struct FHSRInventoryEnhancementCandidate
+{
+	TMap<FName, int32> Stacks;
+	TMap<FGuid, FHSRItemInstance> UniqueItems;
+	int64 NextRevision = 0;
 };
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRInventoryChanged, int64 /* Revision */);

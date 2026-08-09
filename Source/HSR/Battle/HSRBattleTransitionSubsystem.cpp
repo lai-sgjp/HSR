@@ -100,12 +100,7 @@ bool UHSRBattleTransitionSubsystem::CanAffordStageBuffs(FName EncounterId, const
 	Inventory->GetSnapshot(Snapshot);
 	for (const TPair<FName, int32>& Entry : Required)
 	{
-		const FHSRItemStackSnapshot* Stack = Snapshot.Stacks.FindByPredicate(
-			[&Entry](const FHSRItemStackSnapshot& Candidate)
-			{
-				return Candidate.ItemId == Entry.Key;
-			});
-		if (!Stack || Stack->Quantity < Entry.Value)
+		if (Snapshot.GetStackQuantity(Entry.Key) < Entry.Value)
 		{
 			return false;
 		}
