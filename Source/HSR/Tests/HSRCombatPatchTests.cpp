@@ -1284,6 +1284,23 @@ bool FHSRSkillLoadoutPatchTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Empty authored loadout falls back to the default"),
 		Coordinator->GetSkillLoadoutFor(MemberB).Num(), 2);
 
+	// The authored delta is the single authority for both charging and display.  These once
+	// disagreed: the spend path recomputed the delta from Category, so a DataAsset authoring -3
+	// displayed a cost of 3 while only one point was actually deducted.  A BasicAttack authored
+	// to spend is the case that pins it down, because the old category rule forced +1 there.
+	UHSRSkillDefinition* SpendingBasic = MakeSkill(TEXT("SpendingBasic"), EHSRSkillCategory::BasicAttack, -2);
+	TestEqual(TEXT("Authored spend wins over the BasicAttack generate default"),
+		SpendingBasic->GetSkillPointDelta(), -2);
+	TestEqual(TEXT("Displayed cost matches the authored spend"),
+		SpendingBasic->GetSkillPointCost(), 2);
+
+	// Every category reads its delta from the asset, so cost is no longer category-derived.
+	UHSRSkillDefinition* PaidUltimate = MakeSkill(TEXT("PaidUltimate"), EHSRSkillCategory::Ultimate, -4);
+	TestEqual(TEXT("Ultimate can author a skill-point spend"), PaidUltimate->GetSkillPointDelta(), -4);
+	TestEqual(TEXT("Ultimate reports its authored cost"), PaidUltimate->GetSkillPointCost(), 4);
+	UHSRSkillDefinition* FreeUltimate = MakeSkill(TEXT("FreeUltimate"), EHSRSkillCategory::Ultimate, 0);
+	TestEqual(TEXT("An unauthored Ultimate still costs nothing"), FreeUltimate->GetSkillPointDelta(), 0);
+
 	return true;
 }
 

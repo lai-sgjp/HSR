@@ -676,10 +676,13 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		FHSRFormalDamagePrepareResult PrepareResult;
 		if (!Ability->PrepareFormalDamage(Request, DamageSpec, Target->AbilitySystemComponent.Get(), PrepareResult)) { UE_LOG(LogTemp, Warning, TEXT("P7-003 Formal Stage=Prepare Result=FAIL ActionId=%s Skill=%s DamageResult=%d"), *Command.ActionId.ToString(), *Command.SkillId.ToString(), static_cast<int32>(PrepareResult.Result)); Ability->ClearPendingTarget(); return Reject(EHSRAbilityFailureReason::EffectFailed); }
 		const bool bUsesPlayerSkillPoints = Attacker->Team == EHSRBattleParticipantTeam::Player;
-		const int32 SkillPointDelta = bUsesPlayerSkillPoints
-			? (ResolvedSkillDefinition->Category == EHSRSkillCategory::BasicAttack ? 1 : (ResolvedSkillDefinition->Category == EHSRSkillCategory::Skill ? -1 : 0))
-			: 0;
-		if (!ReserveSkillPoints(Command.ActionId, SkillPointDelta)) { Ability->ClearPreparedFormalDamage(); Ability->ClearPendingTarget(); return Reject(EHSRAbilityFailureReason::InsufficientSkillPoint); }
+		const int32 SkillPointDelta = bUsesPlayerSkillPoints ? ResolvedSkillDefinition->GetSkillPointDelta() : 0;
+		if (!ReserveSkillPoints(Command.ActionId, SkillPointDelta))
+		{
+			Ability->ClearPreparedFormalDamage();
+			Ability->ClearPendingTarget();
+			return Reject(EHSRAbilityFailureReason::InsufficientSkillPoint);
+		}
 		Ability->SetActionContext(Command.ActionId, Command.SkillId);
 		bFormalDamageTransactionOpen = true;
 		PendingDefeatedParticipantId = NAME_None;
@@ -864,9 +867,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		return Reject(PreActivationFailure);
 	}
 	const bool bUsesPlayerSkillPoints = Attacker->Team == EHSRBattleParticipantTeam::Player;
-	const int32 SkillPointDelta = bUsesPlayerSkillPoints
-		? (ResolvedSkillDefinition->Category == EHSRSkillCategory::BasicAttack ? 1 : (ResolvedSkillDefinition->Category == EHSRSkillCategory::Skill ? -1 : 0))
-		: 0;
+	const int32 SkillPointDelta = bUsesPlayerSkillPoints ? ResolvedSkillDefinition->GetSkillPointDelta() : 0;
 	if (!ReserveSkillPoints(Command.ActionId, SkillPointDelta))
 	{
 		return Reject(EHSRAbilityFailureReason::InsufficientSkillPoint);
@@ -903,8 +904,10 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 
 void UHSRBattleCoordinator::CommitActionEnergyGain(const FGuid& ActionId, const UHSRSkillDefinition& ActionSkillDefinition, UAbilitySystemComponent& SourceASC)
 {
-	if ((ActionSkillDefinition.Category != EHSRSkillCategory::BasicAttack && ActionSkillDefinition.Category != EHSRSkillCategory::Skill)
-		|| ActionSkillDefinition.EnergyGain <= 0.0f)
+	// Authored EnergyGain is the only gate: a category that historically gained no energy
+	// simply leaves it at 0, so this stays behaviour-compatible while letting any skill
+	// generate energy from its DataAsset alone.
+	if (ActionSkillDefinition.EnergyGain <= 0.0f)
 	{
 		return;
 	}
