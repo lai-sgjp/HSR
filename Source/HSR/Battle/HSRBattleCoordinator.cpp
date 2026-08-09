@@ -709,6 +709,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		++DevelopmentDamageConsumeCount;
 		CommitActionEnergyGain(Command.ActionId, *ResolvedSkillDefinition, *Attacker->AbilitySystemComponent);
 		CommitSkillPoints(Command.ActionId);
+		ApplyAuthoredSkillStatuses(*ResolvedSkillDefinition, Command.ActorParticipantId, Command.TargetParticipantIds);
 		Resolution.Status = EHSRAbilityResolutionStatus::Succeeded;
 		Resolution.FailureReason = EHSRAbilityFailureReason::None;
 		Resolution.bHasDamageResult = true;
@@ -1953,6 +1954,40 @@ EHSRStatusOperationResult UHSRBattleCoordinator::AddDamageOverTimeForDevelopment
 	UHSRStatusComponent* Component = GetStatusComponent(TargetParticipantId);
 	if (!DamageOverTimeStatusDefinition) return EHSRStatusOperationResult::InvalidDefinition;
 	return Component ? Component->AddOrRefreshStatus(DamageOverTimeStatusDefinition, SourceParticipantId, TargetParticipantId, OperationId) : EHSRStatusOperationResult::InvalidTarget;
+}
+
+void UHSRBattleCoordinator::ApplyAuthoredSkillStatuses(const UHSRSkillDefinition& ActionSkillDefinition, FName SourceParticipantId, const TArray<FName>& TargetParticipantIds)
+{
+	if (ActionSkillDefinition.AppliedStatuses.IsEmpty())
+	{
+		return;
+	}
+
+	for (const TSoftObjectPtr<UHSRStatusDefinition>& AuthoredStatus : ActionSkillDefinition.AppliedStatuses)
+	{
+		const UHSRStatusDefinition* Definition = AuthoredStatus.LoadSynchronous();
+		if (!Definition)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Skill %s authored an unloadable status entry; skipping it rather than failing the action."),
+				*ActionSkillDefinition.SkillId.ToString());
+			continue;
+		}
+
+		for (const FName TargetParticipantId : TargetParticipantIds)
+		{
+			UHSRStatusComponent* Component = GetStatusComponent(TargetParticipantId);
+			if (!Component)
+			{
+				continue;
+			}
+
+			// Status application is deliberately advisory: a refused status (immune, capped)
+			// never rewrites the already-committed damage transaction above.
+			const EHSRStatusOperationResult Result = Component->AddOrRefreshStatus(Definition, SourceParticipantId, TargetParticipantId, FGuid::NewGuid());
+			UE_LOG(LogTemp, Log, TEXT("Skill status apply Skill=%s Status=%s Target=%s Result=%d"),
+				*ActionSkillDefinition.SkillId.ToString(), *Definition->StatusId.ToString(), *TargetParticipantId.ToString(), static_cast<int32>(Result));
+		}
+	}
 }
 
 EHSRStatusOperationResult UHSRBattleCoordinator::AddSpecificStatusForDevelopmentTest(const UHSRStatusDefinition* Definition, FName SourceParticipantId, FName TargetParticipantId, FGuid OperationId)

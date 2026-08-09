@@ -24,6 +24,7 @@
 #include "../Battle/HSRBattleTransitionSubsystem.h"
 #include "../Data/HSRSkillDefinition.h"
 #include "../Data/Definitions/HSRStatusDefinition.h"
+#include "../UI/HSRBattleCommandTypes.h"
 #include "../GAS/HSRAbilitySystemComponent.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "../Status/HSRStatusComponent.h"
@@ -112,6 +113,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceNumericLifecyclePatchTest, "H
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRTurnForecastPatchTest, "HSR.Battle.Patch.ActionDistance.TurnForecast", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRBehaviorTreeAdapterPatchTest, "HSR.Exploration.Patch.BehaviorTreeAdapter", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRSkillLoadoutPatchTest, "HSR.Battle.Patch.SkillLoadout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRAuthoredSkillContentTest, "HSR.Battle.Patch.AuthoredSkillContent", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 {
@@ -1300,6 +1302,48 @@ bool FHSRSkillLoadoutPatchTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Ultimate reports its authored cost"), PaidUltimate->GetSkillPointCost(), 4);
 	UHSRSkillDefinition* FreeUltimate = MakeSkill(TEXT("FreeUltimate"), EHSRSkillCategory::Ultimate, 0);
 	TestEqual(TEXT("An unauthored Ultimate still costs nothing"), FreeUltimate->GetSkillPointDelta(), 0);
+
+	return true;
+}
+
+bool FHSRAuthoredSkillContentTest::RunTest(const FString& Parameters)
+{
+	// A skill that applies a debuff should be authorable end to end: a status DA referenced from
+	// a skill DA, with no C++ edit.  Before this seam existed the only way in was three named
+	// coordinator members reachable only from development harnesses.
+	UHSRStatusDefinition* Poison = NewObject<UHSRStatusDefinition>();
+	Poison->StatusId = TEXT("Poison");
+
+	UHSRSkillDefinition* Plain = NewObject<UHSRSkillDefinition>();
+	Plain->SkillId = TEXT("Plain");
+	TestTrue(TEXT("A skill authors no statuses by default"), Plain->AppliedStatuses.IsEmpty());
+
+	UHSRSkillDefinition* Debuff = NewObject<UHSRSkillDefinition>();
+	Debuff->SkillId = TEXT("Debuff");
+	Debuff->AppliedStatuses.Add(Poison);
+	TestEqual(TEXT("Authored status survives on the asset"), Debuff->AppliedStatuses.Num(), 1);
+	TestEqual(TEXT("Authored status resolves back to its definition"),
+		Debuff->AppliedStatuses[0].LoadSynchronous()->StatusId, FName(TEXT("Poison")));
+
+	// The command view must be reachable by SkillId, not by category, or a second skill sharing a
+	// category is unreachable no matter how it is authored.
+	FHSRBattleCommandViewState ViewState;
+	FHSRBattleCommandSkillView First;
+	First.SkillId = TEXT("SkillA");
+	First.Category = EHSRSkillCategory::Skill;
+	FHSRBattleCommandSkillView Second;
+	Second.SkillId = TEXT("SkillB");
+	Second.Category = EHSRSkillCategory::Skill;
+	ViewState.Skills = { First, Second };
+
+	const FHSRBattleCommandSkillView* FoundSecond = ViewState.FindSkill(TEXT("SkillB"));
+	TestNotNull(TEXT("The second skill of a shared category is reachable by id"), FoundSecond);
+	TestNull(TEXT("An unknown id resolves to nothing"), ViewState.FindSkill(TEXT("Missing")));
+
+	const FHSRBattleCommandSkillView* ByCategory = ViewState.FindSkillByCategory(EHSRSkillCategory::Skill);
+	TestNotNull(TEXT("Category lookup still resolves"), ByCategory);
+	TestEqual(TEXT("Category lookup is first-match-wins, which is why id lookup is needed"),
+		ByCategory->SkillId, FName(TEXT("SkillA")));
 
 	return true;
 }

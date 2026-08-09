@@ -396,6 +396,10 @@ private:
 	void RollbackSkillPoints(const FGuid& ActionId);
 	void CommitSkillPoints(const FGuid& ActionId);
 	void CommitActionEnergyGain(const FGuid& ActionId, const UHSRSkillDefinition& ActionSkillDefinition, UAbilitySystemComponent& SourceASC);
+
+	/** Applies every status authored on the skill DA to each resolved target.  Advisory: a
+	 * refused or unloadable status never rewrites the committed damage transaction. */
+	void ApplyAuthoredSkillStatuses(const UHSRSkillDefinition& ActionSkillDefinition, FName SourceParticipantId, const TArray<FName>& TargetParticipantIds);
 	FHSRBattleInitResult BuildAndValidateParticipantDefinitions();
 	static void AppendRosterDefinitions(const TArray<FHSRBattleRosterEntry>& Roster,
 		EHSRBattleParticipantTeam Team, TArray<FHSRBattleParticipantDefinition>& OutDefinitions);

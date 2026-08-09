@@ -10,6 +10,8 @@
 #include "HSRBreakTypes.h"
 #include "HSRSkillDefinition.generated.h"
 
+class UHSRStatusDefinition;
+
 UCLASS(BlueprintType)
 class HSR_API UHSRSkillDefinition : public UPrimaryDataAsset
 {
@@ -76,6 +78,13 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage")
 	TSoftObjectPtr<UHSRDamageRuleDefinition> DamageRule;
 
+	/** Statuses applied to each resolved target after this skill lands.  Empty is the common
+	 * case and costs nothing; authoring an entry is the whole story for a debuff skill, no
+	 * C++ change required.  Entries that fail to load are skipped with a warning rather than
+	 * failing the action. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Status")
+	TArray<TSoftObjectPtr<UHSRStatusDefinition>> AppliedStatuses;
+
 	bool IsValidDefinition() const
 	{
 		return !SkillId.IsNone() && AbilityClass != nullptr;
@@ -102,5 +111,62 @@ public:
 		return IsValidDefinition() && Category == EHSRSkillCategory::Skill
 			&& TargetType == EHSRTargetType::SingleEnemy && !EffectGameplayEffectClass.IsNull();
 	}
-	bool IsValidHealDefinition() const { return IsValidDefinition() && Category == EHSRSkillCategory::Heal && (TargetType == EHSRTargetType::SingleAlly || TargetType == EHSRTargetType::Self) && !EffectGameplayEffectClass.IsNull(); }
+	bool IsValidHealDefinition() const
+	{
+		return IsValidDefinition()
+			&& Category == EHSRSkillCategory::Heal
+			&& (TargetType == EHSRTargetType::SingleAlly || TargetType == EHSRTargetType::Self)
+			&& !EffectGameplayEffectClass.IsNull();
+	}
+
+	/** Category-dispatched validation.  One entry point so callers never have to know which
+	 * per-category validator applies -- adding a category means extending this switch only. */
+	bool IsValidForCategory() const
+	{
+		switch (Category)
+		{
+		case EHSRSkillCategory::BasicAttack:
+			return IsValidDefinition() && TargetType == EHSRTargetType::SingleEnemy;
+		case EHSRSkillCategory::Skill:
+			return IsValidSkillDefinition();
+		case EHSRSkillCategory::Ultimate:
+			return IsValidUltimateDefinition();
+		case EHSRSkillCategory::Heal:
+			return IsValidHealDefinition();
+		default:
+			return false;
+		}
+	}
+
+	/** Authored skill-point delta applied when this skill commits: negative spends, positive
+	 * generates.  Authoring -1 on a Skill and +1 on a BasicAttack reproduces the legacy
+	 * hardcoded behaviour, which is what GetSkillPointDelta() falls back to when left at 0. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cost")
+	int32 SkillPointDelta = 0;
+
+	/** Effective skill-point delta.  Falls back to the historical per-category rule when the
+	 * DataAsset leaves SkillPointDelta at its default, so existing assets keep working. */
+	int32 GetSkillPointDelta() const
+	{
+		if (SkillPointDelta != 0)
+		{
+			return SkillPointDelta;
+		}
+		switch (Category)
+		{
+		case EHSRSkillCategory::BasicAttack:
+			return 1;
+		case EHSRSkillCategory::Skill:
+			return -1;
+		default:
+			return 0;
+		}
+	}
+
+	/** Skill-point cost as the UI displays it: a positive number of points consumed. */
+	int32 GetSkillPointCost() const
+	{
+		const int32 Delta = GetSkillPointDelta();
+		return Delta < 0 ? -Delta : 0;
+	}
 };
