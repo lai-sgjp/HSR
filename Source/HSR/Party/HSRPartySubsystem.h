@@ -10,7 +10,10 @@ class HSR_API UHSRPartySubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
 public:
-	static constexpr int32 Capacity = 4;
+	/** Alias for the domain constant; kept as a member so existing call sites still read
+	 *  UHSRPartySubsystem::Capacity. The value lives in HSRPartyTypes.h so the save layer can
+	 *  static_assert against it instead of duplicating the literal. */
+	static constexpr int32 Capacity = HSRPartyCapacity;
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	EHSRPartyResult AddCharacter(FName CharacterId, int32 PreferredSlot = INDEX_NONE);
 	EHSRPartyResult RemoveCharacter(int32 Slot);
