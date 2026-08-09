@@ -34,7 +34,11 @@ public:
 	EHSRMapOperationResult BuildTeleportRequest(FName TeleportId, FHSRTeleportRequest& OutRequest) const;
 	UFUNCTION(BlueprintCallable, Category="HSR|Map")
 	EHSRMapOperationResult RequestTeleportTravel(FName TeleportId);
+	EHSRMapOperationResult RequestRestoreTravel();
+	EHSRMapOperationResult RequestRestoreTravel(const FHSRMapRuntimeSnapshot& RestoreTarget);
+	EHSRMapOperationResult ApplyRestoreLocation(const FHSRMapRuntimeSnapshot& RestoreTarget);
 	EHSRMapOperationResult CommitPendingArrival(FName DestinationMapId, FName ArrivalId, APawn* Pawn, const FTransform& ArrivalTransform);
+	EHSRMapOperationResult CommitPendingRestoreArrival(FName DestinationMapId, APawn* Pawn, const FTransform& SavedTransform);
 	EHSRMapOperationResult ValidatePendingArrivalContext(FName DestinationMapId, FName ArrivalId, const FString& LoadedWorldPackage, int32 MatchingArrivalCount) const;
 	EHSRMapOperationResult CommitBattleReturnLocation(FName MapId, APawn* Pawn, const FTransform& ReturnTransform);
 	bool ResolveMapIdByPackage(FName MapPackage, FName& OutMapId) const;
@@ -52,7 +56,9 @@ public:
 	const FHSRMapRuntimeSnapshot& GetSnapshot() const { return Snapshot; }
 	FHSRMapStateChanged& OnMapStateChanged() { return MapStateChanged; }
 	FHSRMapArrivalCommitted& OnArrivalCommitted() { return ArrivalCommitted; }
+	FHSRMapRestoreTravelFailed& OnRestoreTravelFailed() { return RestoreTravelFailed; }
 	int64 GetArrivalCommitGeneration() const { return ArrivalCommitGeneration; }
+	const FGuid& GetLastCommittedRequestId() const { return LastCommittedRequestId; }
 	void ExportSaveData(FHSRMapSaveData& OutData) const;
 	bool PrepareRestore(const FHSRMapSaveData& Data, FHSRMapRuntimeSnapshot& OutCandidate) const;
 	bool IsRestoreDifferent(const FHSRMapRuntimeSnapshot& Candidate) const;
@@ -88,6 +94,7 @@ private:
 	};
 
 	void CommitStateChange();
+	EHSRMapOperationResult CommitPendingArrivalValidated(FName DestinationMapId, FName ArrivalId, APawn* Pawn, const FTransform& ArrivalTransform);
 	void PublishArrivalCommitted(FName MapId, FName ArrivalId, EHSRMapArrivalCommitKind Kind);
 	void HandleTravelTimeout();
 
@@ -99,7 +106,9 @@ private:
 
 	FHSRMapStateChanged MapStateChanged;
 	FHSRMapArrivalCommitted ArrivalCommitted;
+	FHSRMapRestoreTravelFailed RestoreTravelFailed;
 	int64 ArrivalCommitGeneration = 0;
+	FGuid LastCommittedRequestId;
 	FHSRTeleportRequest PendingRequest;
 	bool bTravelPending = false;
 	FTimerHandle TravelTimeoutTimer;

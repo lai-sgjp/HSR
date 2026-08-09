@@ -7,6 +7,8 @@
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "../Battle/HSRBattleTransitionSubsystem.h"
+#include "../UI/HSRUIManagerSubsystem.h"
+#include "Engine/LocalPlayer.h"
 #include "Misc/PackageName.h"
 
 namespace
@@ -95,6 +97,10 @@ EHSRMapOperationResult UHSRMapSubsystem::RegisterMapDefinition(const UHSRMapDefi
 
 EHSRMapOperationResult UHSRMapSubsystem::RegisterTeleportDefinition(const UHSRTeleportDefinition& Definition)
 {
+	if (Definition.TeleportId == TEXT("Save.Restore"))
+	{
+		return EHSRMapOperationResult::InvalidDefinition;
+	}
 	if (Definition.TeleportId.IsNone() || Definition.SourceMapId.IsNone() || Definition.DestinationMapId.IsNone()
 		|| Definition.DestinationArrivalId.IsNone() || Definition.SourceMapId == Definition.DestinationMapId)
 	{
@@ -290,6 +296,16 @@ EHSRMapOperationResult UHSRMapSubsystem::RequestTeleportTravel(const FName Telep
 	{
 		return EHSRMapOperationResult::InvalidWorld;
 	}
+	if (ULocalPlayer* LocalPlayer = GetGameInstance() ? GetGameInstance()->GetFirstGamePlayer() : nullptr)
+	{
+		if (UHSRUIManagerSubsystem* UIManager = LocalPlayer->GetSubsystem<UHSRUIManagerSubsystem>())
+		{
+			if (UIManager->PrepareExplorationTravel() != EHSRUIScreenResult::Success)
+			{
+				return EHSRMapOperationResult::UIPreparationFailed;
+			}
+		}
+	}
 
 	PendingRequest = Candidate;
 	bTravelPending = true;
@@ -298,6 +314,54 @@ EHSRMapOperationResult UHSRMapSubsystem::RequestTeleportTravel(const FName Telep
 		*Candidate.RequestId.ToString(), *Candidate.TeleportId.ToString(), *Candidate.Source.MapId.ToString(),
 		*Candidate.Destination.MapId.ToString(), *Candidate.Destination.ArrivalId.ToString());
 	UGameplayStatics::OpenLevel(World, FName(*PackageName), true);
+	return EHSRMapOperationResult::Success;
+}
+
+EHSRMapOperationResult UHSRMapSubsystem::RequestRestoreTravel()
+{
+	return RequestRestoreTravel(Snapshot);
+}
+
+EHSRMapOperationResult UHSRMapSubsystem::RequestRestoreTravel(const FHSRMapRuntimeSnapshot& RestoreTarget)
+{
+	if (RestoreTarget.CurrentLocation.MapId.IsNone())
+	{
+		return EHSRMapOperationResult::NoOp;
+	}
+	if (Snapshot.CurrentLocation.MapId == RestoreTarget.CurrentLocation.MapId)
+	{
+		return EHSRMapOperationResult::NoOp;
+	}
+	UWorld* World = GetWorld();
+	if (!World || bTravelPending) return bTravelPending ? EHSRMapOperationResult::AlreadyPending : EHSRMapOperationResult::InvalidWorld;
+	const FRegisteredMap* Destination = Maps.Find(RestoreTarget.CurrentLocation.MapId);
+	if (!Destination || Destination->World.IsNull()) return EHSRMapOperationResult::UnknownMap;
+	const FString Package = Destination->World.GetLongPackageName();
+	if (Package.IsEmpty() || !FPackageName::DoesPackageExist(Package)) return EHSRMapOperationResult::InvalidMapPackage;
+	FName Loaded; if (World->GetOutermost() && ResolveMapIdByPackage(World->GetOutermost()->GetFName(), Loaded) && Loaded == RestoreTarget.CurrentLocation.MapId) return EHSRMapOperationResult::NoOp;
+	if (ULocalPlayer* LP = GetGameInstance() ? GetGameInstance()->GetFirstGamePlayer() : nullptr) if (UHSRUIManagerSubsystem* UI = LP->GetSubsystem<UHSRUIManagerSubsystem>()) if (UI->PrepareExplorationTravel() != EHSRUIScreenResult::Success) return EHSRMapOperationResult::UIPreparationFailed;
+	PendingRequest.RequestId=FGuid::NewGuid(); PendingRequest.TeleportId=TEXT("Save.Restore"); PendingRequest.Source.MapId=Loaded; PendingRequest.Destination=RestoreTarget.CurrentLocation; bTravelPending=true;
+	World->GetTimerManager().SetTimer(TravelTimeoutTimer,this,&UHSRMapSubsystem::HandleTravelTimeout,5.0f,false);
+	UE_LOG(LogTemp,Log,TEXT("HSR Map restore travel issued RequestId=%s Destination=%s"),*PendingRequest.RequestId.ToString(),*PendingRequest.Destination.MapId.ToString());
+	UGameplayStatics::OpenLevel(World,FName(*Package),true); return EHSRMapOperationResult::Success;
+}
+
+EHSRMapOperationResult UHSRMapSubsystem::ApplyRestoreLocation(const FHSRMapRuntimeSnapshot& RestoreTarget)
+{
+	if (RestoreTarget.CurrentLocation.MapId.IsNone()) return EHSRMapOperationResult::NoOp;
+	UWorld* World = GetWorld();
+	if (!World) return EHSRMapOperationResult::NoOp;
+	FName LoadedMapId;
+	if (!World->GetOutermost() || !ResolveMapIdByPackage(World->GetOutermost()->GetFName(), LoadedMapId)
+		|| LoadedMapId != RestoreTarget.CurrentLocation.MapId) return EHSRMapOperationResult::InvalidWorld;
+	APlayerController* Controller = World->GetFirstPlayerController();
+	APawn* Pawn = Controller ? Controller->GetPawn() : nullptr;
+	if (!Pawn) return EHSRMapOperationResult::PawnUnavailable;
+	if (RestoreTarget.CurrentLocation.WorldTransform.ContainsNaN()
+		|| !Pawn->SetActorTransform(RestoreTarget.CurrentLocation.WorldTransform, false, nullptr, ETeleportType::TeleportPhysics))
+	{
+		return EHSRMapOperationResult::PlacementFailed;
+	}
 	return EHSRMapOperationResult::Success;
 }
 
@@ -312,6 +376,34 @@ EHSRMapOperationResult UHSRMapSubsystem::CommitPendingArrival(const FName Destin
 	{
 		return ContextResult;
 	}
+	return CommitPendingArrivalValidated(DestinationMapId, ArrivalId, Pawn, ArrivalTransform);
+}
+
+EHSRMapOperationResult UHSRMapSubsystem::CommitPendingRestoreArrival(const FName DestinationMapId, APawn* Pawn,
+	const FTransform& SavedTransform)
+{
+	if (!bTravelPending)
+	{
+		return EHSRMapOperationResult::NothingPending;
+	}
+	if (PendingRequest.TeleportId != TEXT("Save.Restore") || PendingRequest.Destination.MapId != DestinationMapId)
+	{
+		return EHSRMapOperationResult::WrongDestination;
+	}
+	UWorld* World = GetWorld();
+	const FString LoadedPackage = World && World->GetOutermost()
+		? UWorld::RemovePIEPrefix(World->GetOutermost()->GetPathName()) : FString();
+	const FRegisteredMap* DestinationMap = Maps.Find(DestinationMapId);
+	if (!DestinationMap || LoadedPackage.IsEmpty() || LoadedPackage != DestinationMap->World.GetLongPackageName())
+	{
+		return EHSRMapOperationResult::InvalidWorld;
+	}
+	return CommitPendingArrivalValidated(DestinationMapId, PendingRequest.Destination.ArrivalId, Pawn, SavedTransform);
+}
+
+EHSRMapOperationResult UHSRMapSubsystem::CommitPendingArrivalValidated(const FName DestinationMapId, const FName ArrivalId,
+	APawn* Pawn, const FTransform& ArrivalTransform)
+{
 	if (!Pawn)
 	{
 		return EHSRMapOperationResult::PawnUnavailable;
@@ -328,8 +420,10 @@ EHSRMapOperationResult UHSRMapSubsystem::CommitPendingArrival(const FName Destin
 	Snapshot.CurrentLocation = PendingRequest.Destination;
 	Snapshot.CurrentLocation.WorldTransform = ArrivalTransform;
 	const FGuid CompletedRequestId = PendingRequest.RequestId;
+	LastCommittedRequestId = CompletedRequestId;
 	PendingRequest = FHSRTeleportRequest();
 	bTravelPending = false;
+	UWorld* World = GetWorld();
 	if (World)
 	{
 		World->GetTimerManager().ClearTimer(TravelTimeoutTimer);
@@ -428,11 +522,16 @@ EHSRMapOperationResult UHSRMapSubsystem::CancelPendingTravel(const FGuid& Reques
 	{
 		return EHSRMapOperationResult::RequestMismatch;
 	}
+	const FHSRTeleportRequest CanceledRequest = PendingRequest;
 	PendingRequest = FHSRTeleportRequest();
 	bTravelPending = false;
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(TravelTimeoutTimer);
+	}
+	if (CanceledRequest.TeleportId == TEXT("Save.Restore"))
+	{
+		RestoreTravelFailed.Broadcast(CanceledRequest.RequestId);
 	}
 	return EHSRMapOperationResult::Success;
 }

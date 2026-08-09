@@ -289,3 +289,13 @@ void AHSRCharacterBase::BindAttributeDelegates()
 	bAttributeDelegatesBound = true;
 	UE_LOG(LogTemp, Log, TEXT("%s::BindAttributeDelegates - ViewModel initialized and delegates bound"), *GetName());
 }
+
+bool AHSRCharacterBase::SetProjectedCharacterId(const FName CharacterId)
+{
+	if (CharacterId.IsNone())
+	{
+		return false;
+	}
+	ProjectedCharacterId = CharacterId;
+	return true;
+}

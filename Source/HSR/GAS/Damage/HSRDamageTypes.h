@@ -4,7 +4,7 @@
 #include "GameplayTagContainer.h"
 #include "HSRDamageTypes.generated.h"
 
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 enum class EHSRDamageTestInjection : uint8
 {
 	None,

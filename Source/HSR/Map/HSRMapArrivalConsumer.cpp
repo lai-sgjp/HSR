@@ -50,6 +50,21 @@ void AHSRMapArrivalConsumer::TryCommitArrival()
 		? UWorld::RemovePIEPrefix(GetWorld()->GetOutermost()->GetPathName()) : FString();
 	const EHSRMapOperationResult ContextResult = Maps->ValidatePendingArrivalContext(MapId,
 		Pending.Destination.ArrivalId, LoadedPackage, MatchCount);
+	if (MatchCount <= 1 && Pending.TeleportId == TEXT("Save.Restore"))
+	{
+		APlayerController* PC = GetWorld()->GetFirstPlayerController();
+		APawn* Pawn = PC ? PC->GetPawn() : nullptr;
+		const EHSRMapOperationResult RestoreResult = Maps->CommitPendingRestoreArrival(MapId, Pawn,
+			Pending.Destination.WorldTransform);
+		if (RestoreResult == EHSRMapOperationResult::Success)
+		{
+			UE_LOG(LogTemp, Log, TEXT("HSR Map restore arrival used saved transform RequestId=%s Map=%s Arrival=%s"),
+				*Pending.RequestId.ToString(), *MapId.ToString(), *Pending.Destination.ArrivalId.ToString());
+			return;
+		}
+		RetryOrCancel(TEXT("saved transform placement not ready"));
+		return;
+	}
 	if (ContextResult != EHSRMapOperationResult::Success || !Match)
 	{
 		RetryOrCancel(ContextResult == EHSRMapOperationResult::InvalidWorld ? TEXT("destination world mismatch")

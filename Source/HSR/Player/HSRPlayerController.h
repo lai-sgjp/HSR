@@ -5,6 +5,8 @@
 #include "HSRPlayerController.generated.h"
 
 class UInputMappingContext;
+class UInputAction;
+class UInputComponent;
 struct FHSRInputModePolicy;
 enum class EHSRUIInputIntent : uint8;
 
@@ -35,6 +37,18 @@ public:
 	EHSRPlayerControlMode GetControlMode() const { return CurrentControlMode; }
 
 	bool ApplyUIInputPolicy(const FHSRInputModePolicy& Policy, EHSRPlayerControlMode SemanticMode);
+	static bool ShouldBindFrontendInputComponent(const UInputComponent* Bound, const UInputComponent* Current)
+	{
+		return Current && Bound != Current;
+	}
+	static bool ShouldEnsureBattleReturnConsumer(bool bReturnPending, bool bConsumerPresent)
+	{
+		return bReturnPending && !bConsumerPresent;
+	}
+	static bool ShouldRestoreFrontendNavigationContext(bool bMarkedAdded, bool bContextPresent)
+	{
+		return !bMarkedAdded || !bContextPresent;
+	}
 
 	UFUNCTION(BlueprintCallable, Category = "UI|Navigation")
 	void RequestOpenPauseScreen();
@@ -48,14 +62,41 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI|Navigation")
 	void RequestBackScreen();
 
+	UFUNCTION(BlueprintCallable, Category = "UI|Navigation")
+	void RequestCloseFrontendToRoot();
+
 protected:
 	virtual void SetupInputComponent() override;
 
 	void AddExplorationContext();
 	void RemoveExplorationContext();
+	void AddFrontendNavigationContext();
+	static constexpr int32 FrontendInputPriority = 100;
+	void HandlePauseBack();
+	void HandleInventory();
+	void HandleParty();
+	void HandleMap();
+	void HandleChallenge();
+	void HandleCloseToRoot();
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> ExplorationMappingContext;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Frontend", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputMappingContext> FrontendNavigationMappingContext;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Frontend", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> PauseBackAction;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Frontend", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> InventoryAction;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Frontend", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> PartyAction;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Frontend", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> MapAction;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Frontend", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> ChallengeAction;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Frontend", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> CloseToRootAction;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category = "Control")
 	EHSRPlayerControlMode CurrentControlMode;
@@ -64,6 +105,9 @@ protected:
 	bool bControlModeApplied;
 
 	bool bExplorationContextAdded;
+	bool bFrontendNavigationContextAdded;
+	UPROPERTY(Transient)
+	TObjectPtr<UInputComponent> FrontendBindingsInputComponent;
 	bool bInputSystemReady;
 	EHSRUIInputIntent AppliedInputIntent;
 };

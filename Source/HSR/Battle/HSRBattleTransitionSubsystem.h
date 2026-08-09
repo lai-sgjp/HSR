@@ -9,6 +9,8 @@
 #include "HSRBattleTransitionSubsystem.generated.h"
 
 class UHSREncounterDefinition;
+class UHSRStageBuffAuthority;
+class UHSRStageBuffDefinition;
 class APawn;
 
 UENUM()
@@ -28,6 +30,7 @@ struct FHSRTransitionAutomationSnapshot
 	FGuid TravelRequestId;
 	bool bResolvedMembership = false;
 	int32 AdmissionMutationCount = 0;
+	int32 TravelInitiationCount = 0;
 };
 #endif
 
@@ -37,11 +40,27 @@ class HSR_API UHSRBattleTransitionSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
+	static EHSREncounterResultType BuildEncounterRequest(const FHSRPreBattleAdmissionInput& Input,
+		FHSREncounterRequest& OutRequest);
+
+	/** Builds the read-only template consumed by the pre-battle candidate UI. */
+	UFUNCTION(BlueprintCallable, Category = "Encounter|Preparation")
+	FHSREncounterResult BuildPreBattleEncounterTemplate(UHSREncounterDefinition* Definition,
+		EHSREncounterInitiative Initiative, UPARAM(ref) FHSREncounterRequest& OutTemplate);
+	bool ValidateStageBuffIds(FName EncounterId, const TArray<FName>& BuffIds) const;
+	bool CanAffordStageBuffs(FName EncounterId, const TArray<FName>& BuffIds) const;
+	const UHSRStageBuffDefinition* FindStageBuffDefinition(FName EncounterId, FName BuffId) const;
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
 	UFUNCTION(BlueprintCallable, Category = "Encounter")
 	FHSREncounterResult RequestEncounter(UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative);
+
+	/** Submits a previously validated, pure encounter request for travel. */
+	UFUNCTION(BlueprintCallable, Category = "Encounter")
+	FHSREncounterResult SubmitEncounterRequestFromUI(const FHSREncounterRequest& Request);
+	FHSREncounterResult RequestEncounterForInteractor(UHSREncounterDefinition* Definition,
+		EHSREncounterInitiative Initiative, AActor* Interactor);
 
 	UFUNCTION(BlueprintCallable, Category = "Encounter")
 	FHSREncounterResult ConsumePendingEncounter();
@@ -81,10 +100,14 @@ public:
 	void SeedPendingEncounterForAutomation(const FHSREncounterRequest& InRequest);
 	void SeedResolvedEncounterForAutomation(FName EncounterId);
 	void ResetEncounterAutomationFixture();
+	void SetTravelSuppressedForAutomation(bool bSuppress) { bSuppressTravelForAutomation = bSuppress; }
 #endif
 	static bool DoesTravelFailureMatch(const FString& FailureWorldPackage, const FString& SourcePackage, const FString& TargetPackage);
 
 private:
+	FHSREncounterResult SubmitEncounterRequest(const FHSREncounterRequest& Request, UWorld* World);
+	FHSREncounterResult RequestEncounterInternal(UHSREncounterDefinition* Definition,
+		EHSREncounterInitiative Initiative, AActor* Interactor);
 	void StartTravelTimeout();
 	void ClearTravelTimeout();
 	bool HandleTravelTimeout(float DeltaTime);
@@ -100,7 +123,11 @@ private:
 	FName TravelCompletedEncounterId;
 	FTSTicker::FDelegateHandle TravelTimeoutHandle;
 	TSet<FName> ResolvedEncounterIds;
+	UPROPERTY()
+	TObjectPtr<UHSRStageBuffAuthority> StageBuffAuthority;
 #if WITH_DEV_AUTOMATION_TESTS
 	int32 AdmissionMutationCountForAutomation = 0;
+	int32 TravelInitiationCountForAutomation = 0;
+	bool bSuppressTravelForAutomation = false;
 #endif
 };

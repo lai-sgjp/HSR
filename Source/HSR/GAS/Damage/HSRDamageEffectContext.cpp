@@ -29,7 +29,7 @@ bool FHSRDamageEffectContext::NetSerialize(FArchive& Ar, UPackageMap* Map, bool&
 	Ar << DamageResult.Breakdown.NormalizedAttack << DamageResult.Breakdown.NormalizedDefense;
 	Ar << DamageResult.Breakdown.RawDamage << DamageResult.Breakdown.CritMultiplier;
 	Ar << DamageResult.Breakdown.bCritical << DamageResult.Breakdown.FinalDamage << DamageResult.Breakdown.AppliedDamage;
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	uint8 InjectionValue = static_cast<uint8>(TestInjection);
 	Ar << InjectionValue;
 	if (Ar.IsLoading()) { TestInjection = static_cast<EHSRDamageTestInjection>(InjectionValue); }
