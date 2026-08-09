@@ -3,7 +3,7 @@
 #include "HSRPartyTypes.generated.h"
 
 UENUM(BlueprintType)
-enum class EHSRPartyResult : uint8 { Success, InvalidSlot, ProfileNotFound, DuplicateCharacter, EmptySlot, Full, InvalidCandidate };
+enum class EHSRPartyResult : uint8 { Success, InvalidSlot, ProfileNotFound, DuplicateCharacter, EmptySlot, Full, InvalidCandidate, RevisionConflict };
 
 USTRUCT(BlueprintType)
 struct HSR_API FHSRPartySlot

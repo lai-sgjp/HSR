@@ -111,6 +111,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceRequestMatrixPatchTest, "HSR.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceNumericLifecyclePatchTest, "HSR.Battle.Patch.ActionDistance.NumericAndBinding", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRTurnForecastPatchTest, "HSR.Battle.Patch.ActionDistance.TurnForecast", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRBehaviorTreeAdapterPatchTest, "HSR.Exploration.Patch.BehaviorTreeAdapter", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRSkillLoadoutPatchTest, "HSR.Battle.Patch.SkillLoadout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 {
@@ -1218,6 +1219,70 @@ bool FHSRTurnForecastPatchTest::RunTest(const FString& Parameters)
 	Manager->BuildTurnForecast(12);
 	TestEqual(TEXT("Forecast leaves current participant untouched"), Manager->GetCurrentParticipantId(), BeforeCurrent);
 	TestEqual(TEXT("Forecast leaves turn sequence untouched"), Manager->GetTurnSequence(), BeforeSequence);
+
+	return true;
+}
+
+/**
+ * Locks the skill list refactor: a participant's command list comes from its own authored
+ * loadout rather than four fixed slots, skill-point cost is read from the DataAsset, and
+ * adding a skill is purely additive.  Pure-value test -- no World or PIE fixture needed.
+ */
+bool FHSRSkillLoadoutPatchTest::RunTest(const FString& Parameters)
+{
+	const auto MakeSkill = [](FName Id, EHSRSkillCategory Category, int32 PointDelta)
+	{
+		UHSRSkillDefinition* Skill = NewObject<UHSRSkillDefinition>();
+		Skill->SkillId = Id;
+		Skill->Category = Category;
+		Skill->SkillPointDelta = PointDelta;
+		return Skill;
+	};
+
+	// Skill-point semantics now live in the asset, with the legacy per-category rule as fallback.
+	UHSRSkillDefinition* Basic = MakeSkill(TEXT("Basic"), EHSRSkillCategory::BasicAttack, 0);
+	UHSRSkillDefinition* Skill = MakeSkill(TEXT("Skill"), EHSRSkillCategory::Skill, 0);
+	UHSRSkillDefinition* Costly = MakeSkill(TEXT("Costly"), EHSRSkillCategory::Skill, -3);
+	TestEqual(TEXT("Unauthored basic attack still generates one point"), Basic->GetSkillPointDelta(), 1);
+	TestEqual(TEXT("Unauthored skill still spends one point"), Skill->GetSkillPointDelta(), -1);
+	TestEqual(TEXT("Authored delta overrides the category default"), Costly->GetSkillPointDelta(), -3);
+	TestEqual(TEXT("Cost is the absolute value of a spend"), Costly->GetSkillPointCost(), 3);
+	TestEqual(TEXT("A generating skill reports zero cost"), Basic->GetSkillPointCost(), 0);
+
+	UHSRBattleCoordinator* Coordinator = NewObject<UHSRBattleCoordinator>();
+	const FName MemberA = UHSRBattleCoordinator::MakeParticipantId(EHSRBattleParticipantTeam::Player, 0);
+	const FName MemberB = UHSRBattleCoordinator::MakeParticipantId(EHSRBattleParticipantTeam::Player, 1);
+
+	// The shared default applies to every slot that has no authored list of its own.
+	Coordinator->SetDefaultSkillLoadout({ Basic, Skill });
+	TestEqual(TEXT("Unconfigured participant inherits the default loadout"),
+		Coordinator->GetSkillLoadoutFor(MemberA).Num(), 2);
+	TestEqual(TEXT("Second participant inherits the same default"),
+		Coordinator->GetSkillLoadoutFor(MemberB).Num(), 2);
+
+	// An authored list overrides the default for that participant only -- this is what makes a
+	// per-character DataAsset edit sufficient to change one member's command panel.
+	Coordinator->SetParticipantSkillLoadout(MemberB, { Basic, Skill, Costly });
+	TestEqual(TEXT("Authored loadout overrides the default for its own slot"),
+		Coordinator->GetSkillLoadoutFor(MemberB).Num(), 3);
+	TestEqual(TEXT("Override does not leak onto other participants"),
+		Coordinator->GetSkillLoadoutFor(MemberA).Num(), 2);
+
+	// Order is presentation order, so the UI can render buttons by index without a lookup table.
+	const TArray<TObjectPtr<UHSRSkillDefinition>>& Ordered = Coordinator->GetSkillLoadoutFor(MemberB);
+	TestEqual(TEXT("Loadout preserves authored order at index 0"), Ordered[0]->SkillId, Basic->SkillId);
+	TestEqual(TEXT("Loadout preserves authored order at index 2"), Ordered[2]->SkillId, Costly->SkillId);
+
+	// Growth is additive: a fifth skill needs no new field, slot, or branch.
+	UHSRSkillDefinition* Extra = MakeSkill(TEXT("Extra"), EHSRSkillCategory::Skill, -2);
+	Coordinator->SetParticipantSkillLoadout(MemberB, { Basic, Skill, Costly, Extra });
+	TestEqual(TEXT("A fourth skill is accepted without code changes"),
+		Coordinator->GetSkillLoadoutFor(MemberB).Num(), 4);
+
+	// An empty authored list must fall back rather than leave a member with no commands.
+	Coordinator->SetParticipantSkillLoadout(MemberB, {});
+	TestEqual(TEXT("Empty authored loadout falls back to the default"),
+		Coordinator->GetSkillLoadoutFor(MemberB).Num(), 2);
 
 	return true;
 }

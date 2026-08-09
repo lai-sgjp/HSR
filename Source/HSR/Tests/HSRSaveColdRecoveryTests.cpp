@@ -51,7 +51,13 @@ struct FFixture
 void AssertState(FAutomationTestBase& T,const FHSRSaveData& D,bool bS2)
 {
 	T.TestEqual(TEXT("two profiles"),D.Profiles.Num(),2);const FHSRSaveProfileDto* A=D.Profiles.FindByPredicate([](const auto& P){return P.State.CharacterId==TEXT("character.p16.a");});T.TestTrue(TEXT("profile A exists"),A!=nullptr);if(A){T.TestEqual(TEXT("profile A level"),A->State.Level,bS2?2:1);T.TestEqual(TEXT("profile A revision"),A->RuntimeRevision,static_cast<int64>(bS2?1:0));}
-	T.TestEqual(TEXT("party revision"),D.PartyRevision,static_cast<int64>(bS2?2:1));T.TestEqual(TEXT("two party slots"),D.PartySlots.Num(),2);if(D.PartySlots.Num()>=2){T.TestEqual(TEXT("party A"),D.PartySlots[0].CharacterId,FName(TEXT("character.p16.a")));T.TestEqual(TEXT("party B state"),D.PartySlots[1].CharacterId,bS2?FName(TEXT("character.p16.b")):NAME_None);}
+	T.TestEqual(TEXT("party revision"), D.PartyRevision, static_cast<int64>(bS2 ? 2 : 1));
+	T.TestEqual(TEXT("party slots widened to capacity"), D.PartySlots.Num(), static_cast<int32>(HSRSaveVersion::PartySlotCount));
+	if (D.PartySlots.Num() >= 2)
+	{
+		T.TestEqual(TEXT("party A"), D.PartySlots[0].CharacterId, FName(TEXT("character.p16.a")));
+		T.TestEqual(TEXT("party B state"), D.PartySlots[1].CharacterId, bS2 ? FName(TEXT("character.p16.b")) : NAME_None);
+	}
 	T.TestEqual(TEXT("one equipment registry record"),D.EquipmentRegistry.Num(),1);if(!D.EquipmentRegistry.IsEmpty()){T.TestEqual(TEXT("equipment id"),D.EquipmentRegistry[0].InstanceId,FGuid(16,5,1,1));T.TestEqual(TEXT("equipment enhancement"),D.EquipmentRegistry[0].EnhancementLevel,bS2?4:3);}
 	T.TestEqual(TEXT("one equipment placement"),D.EquipmentPlacements.Num(),1);if(!D.EquipmentPlacements.IsEmpty()){T.TestEqual(TEXT("placement id"),D.EquipmentPlacements[0].InstanceId,FGuid(16,5,1,1));T.TestEqual(TEXT("equipment revision"),D.EquipmentPlacements[0].AuthorityRevision,bS2?3:2);}
 	T.TestEqual(TEXT("inventory stacks"),D.Inventory.Stacks.Num(),bS2?1:0);T.TestEqual(TEXT("inventory revision"),D.Inventory.Revision,static_cast<int64>(bS2?1:0));if(bS2&&!D.Inventory.Stacks.IsEmpty())T.TestEqual(TEXT("inventory quantity"),D.Inventory.Stacks[0].Quantity,2);

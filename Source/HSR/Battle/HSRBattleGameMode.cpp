@@ -55,6 +55,41 @@ namespace
 		return Roster;
 	}
 
+	/**
+	 * Loads a character's authored skill list into a battle-ready loadout.  Definitions are soft
+	 * refs so that progression can inspect skills without pulling abilities into memory; the
+	 * battle path is the one place that genuinely needs them resident, so it resolves here.
+	 * Entries that fail to load or fail their own category validation are dropped with a warning
+	 * rather than aborting setup, so one bad DataAsset cannot make a character unplayable.
+	 */
+	TArray<UHSRSkillDefinition*> ResolveAuthoredLoadout(const UHSRCharacterDefinition& Definition)
+	{
+		TArray<UHSRSkillDefinition*> Loadout;
+		Loadout.Reserve(Definition.SkillDefinitions.Num());
+
+		for (const TSoftObjectPtr<UHSRSkillDefinition>& SoftSkill : Definition.SkillDefinitions)
+		{
+			UHSRSkillDefinition* Skill = SoftSkill.LoadSynchronous();
+			if (!Skill)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("SkillLoadout SKIP LoadFailed Character=%s Path=%s"),
+					*Definition.CharacterId.ToString(), *SoftSkill.ToString());
+				continue;
+			}
+
+			if (!Skill->IsValidForCategory())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("SkillLoadout SKIP InvalidDefinition Character=%s Skill=%s"),
+					*Definition.CharacterId.ToString(), *Skill->SkillId.ToString());
+				continue;
+			}
+
+			Loadout.Add(Skill);
+		}
+
+		return Loadout;
+	}
+
 	void ApplyP10004ResultInput(APlayerController* PlayerController, const FGuid& RequestId)
 	{
 		if (!PlayerController || !PlayerController->IsLocalController())
@@ -1508,10 +1543,11 @@ UHSRBattleCoordinator* AHSRBattleGameMode::CreateRepeatableBreakAutomationFixtur
 		return nullptr;
 	}
 	UHSRBattleCoordinator* Result = NewObject<UHSRBattleCoordinator>(Outer);
-	Result->SetBasicAttackDefinition(Config->BasicAttackSkillDefinition);
-	Result->SetUltimateDefinition(Config->UltimateSkillDefinition);
-	Result->SetSkillDefinition(Config->SkillSkillDefinition);
-	Result->SetHealDefinition(Config->HealSkillDefinition);
+	Result->SetDefaultSkillLoadout({
+		Config->BasicAttackSkillDefinition,
+		Config->SkillSkillDefinition,
+		Config->UltimateSkillDefinition,
+		Config->HealSkillDefinition });
 	Result->SetEnemyDefinition(Config->EnemyDefinition);
 	Result->SetStatusDefinition(Config->AttackUpStatusDefinition);
 	Result->SetDamageOverTimeStatusDefinition(Config->DamageOverTimeStatusDefinition);
@@ -1592,10 +1628,11 @@ void AHSRBattleGameMode::BeginPlay()
 			*ConsumeResult.RequestId.ToString());
 		return;
 	}
-	Coordinator->SetBasicAttackDefinition(BasicAttackSkillDefinition);
-	Coordinator->SetUltimateDefinition(UltimateSkillDefinition);
-	Coordinator->SetSkillDefinition(SkillSkillDefinition);
-	Coordinator->SetHealDefinition(HealSkillDefinition);
+	Coordinator->SetDefaultSkillLoadout({
+		BasicAttackSkillDefinition,
+		SkillSkillDefinition,
+		UltimateSkillDefinition,
+		HealSkillDefinition });
 	Coordinator->SetEnemyDefinition(EnemyDefinition);
 	Coordinator->SetStatusDefinition(AttackUpStatusDefinition);
 	Coordinator->SetDamageOverTimeStatusDefinition(DamageOverTimeStatusDefinition);
@@ -1626,6 +1663,8 @@ void AHSRBattleGameMode::BeginPlay()
 	const TArray<FName> PartyRoster = ResolvePartyRoster(ActiveEncounterRequest, ActivePlayerCharacterId);
 	TArray<FHSRBattleRosterEntry> PlayerRoster;
 	PlayerRoster.Reserve(PartyRoster.Num());
+	// Authored per-character skill lists, applied to the Coordinator once participant ids exist.
+	TMap<FName, TArray<UHSRSkillDefinition*>> MemberLoadouts;
 
 	for (const FName& MemberId : PartyRoster)
 	{
@@ -1645,6 +1684,7 @@ void AHSRBattleGameMode::BeginPlay()
 		}
 
 		PlayerRoster.Add(FHSRBattleRosterEntry{ MemberId, MemberClass });
+		MemberLoadouts.Add(MemberId, ResolveAuthoredLoadout(*MemberDefinition));
 	}
 
 	if (PlayerRoster.Num() == 0)
@@ -1659,12 +1699,22 @@ void AHSRBattleGameMode::BeginPlay()
 	// Coordinator for the id it will assign rather than reconstructing the naming rule here.
 	for (int32 Index = 0; Index < PlayerRoster.Num(); ++Index)
 	{
-		FHSRCharacterProgressionContext MemberContext;
-		if (!Profiles->GetProgressionContext(PlayerRoster[Index].CharacterId, MemberContext)) { continue; }
-
+		const FName CharacterId = PlayerRoster[Index].CharacterId;
 		const FName ParticipantId = UHSRBattleCoordinator::MakeParticipantId(
 			EHSRBattleParticipantTeam::Player, Index);
-		Coordinator->SetCharacterProgressionContext(ParticipantId, MemberContext);
+
+		FHSRCharacterProgressionContext MemberContext;
+		if (Profiles->GetProgressionContext(CharacterId, MemberContext))
+		{
+			Coordinator->SetCharacterProgressionContext(ParticipantId, MemberContext);
+		}
+
+		// An authored loadout overrides the GameMode's shared default list for this slot only,
+		// so a new skill ships as a DataAsset edit with no C++ change.
+		if (const TArray<UHSRSkillDefinition*>* Loadout = MemberLoadouts.Find(CharacterId))
+		{
+			Coordinator->SetParticipantSkillLoadout(ParticipantId, *Loadout);
+		}
 	}
 #if WITH_EDITOR
 	Coordinator->InitializeDevelopmentDamageRng(DevelopmentDamageSeed);
@@ -1823,36 +1873,62 @@ const auto RunP10001CommandHarnessLocal = [this]()
 		&& RngBeforePure == Coordinator->GetDevelopmentDamageConsumeCount() && ReservationBeforePure == Coordinator->GetSkillPointReservationCountForDevelopmentTest()
 		&& ResourceBeforePure.CurrentSkillPoints == Coordinator->GetTeamResourceState().CurrentSkillPoints
 		&& ResolutionBeforePure.ActionId == Coordinator->GetLastActionResolutionForDevelopmentTest().ActionId);
-	Case(TEXT("FourSlots_ConfiguredStableOrder"), PureA.Skills.Num() == 4
+	// The command list mirrors the authored loadout: length and order come from the asset list,
+	// not from four fixed category slots.
+	Case(TEXT("Loadout_MirrorsAuthoredOrder"), PureA.Skills.Num() == Coordinator->GetSkillLoadoutFor(PureA.CurrentActorId).Num()
+		&& PureA.Skills.Num() == 4
 		&& PureA.Skills[0].Category == EHSRSkillCategory::BasicAttack && PureA.Skills[1].Category == EHSRSkillCategory::Skill
 		&& PureA.Skills[2].Category == EHSRSkillCategory::Ultimate && PureA.Skills[3].Category == EHSRSkillCategory::Heal);
 
-	const auto TestNullSlot = [this, &Case](const TCHAR* Name, EHSRSkillCategory Category, UHSRSkillDefinition* Definition, const TFunction<void(UHSRSkillDefinition*)>& SetDefinition)
+	// Dropping one entry from the loadout removes that command outright rather than leaving a
+	// disabled placeholder, and leaves the surviving entries in their authored order.
+	const TArray<UHSRSkillDefinition*> FullLoadout = {
+		BasicAttackSkillDefinition,
+		SkillSkillDefinition,
+		UltimateSkillDefinition,
+		HealSkillDefinition };
+	// Drive the acting participant's own override, not the shared default: the actor may carry an
+	// authored loadout from its character asset, in which case changing the default proves nothing.
+	const FName LoadoutActorId = PureA.CurrentActorId;
+	TArray<UHSRSkillDefinition*> SavedActorLoadout;
+	for (const TObjectPtr<UHSRSkillDefinition>& Entry : Coordinator->GetSkillLoadoutFor(LoadoutActorId))
 	{
-		SetDefinition(nullptr);
-		const FHSRBattleCommandViewState MissingState = Coordinator->GetCommandViewState();
-		SetDefinition(Definition);
+		SavedActorLoadout.Add(Entry.Get());
+	}
+	Coordinator->SetParticipantSkillLoadout(LoadoutActorId, FullLoadout);
+
+	const auto TestOmittedSkill = [this, &Case, &FullLoadout, LoadoutActorId](const TCHAR* Name, const UHSRSkillDefinition* Omitted)
+	{
+		TArray<UHSRSkillDefinition*> Reduced = FullLoadout;
+		Reduced.Remove(const_cast<UHSRSkillDefinition*>(Omitted));
+		Coordinator->SetParticipantSkillLoadout(LoadoutActorId, Reduced);
+		const FHSRBattleCommandViewState ReducedState = Coordinator->GetCommandViewState();
+		Coordinator->SetParticipantSkillLoadout(LoadoutActorId, FullLoadout);
 		const FHSRBattleCommandViewState RestoredState = Coordinator->GetCommandViewState();
-		const FHSRBattleCommandSkillView* Missing = MissingState.Skills.FindByPredicate([Category](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == Category; });
-		const FHSRBattleCommandSkillView* Restored = RestoredState.Skills.FindByPredicate([Category](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == Category; });
-		Case(Name, Missing && Missing->SkillId.IsNone() && !Missing->bAvailable && Missing->DisabledReason == EHSRAbilityFailureReason::DefinitionMissing
-			&& Missing->CandidateTargetIds.IsEmpty() && Restored && Definition && Restored->SkillId == Definition->SkillId);
+
+		const bool bOmittedIsGone = Omitted && !ReducedState.Skills.ContainsByPredicate(
+			[Omitted](const FHSRBattleCommandSkillView& Skill) { return Skill.SkillId == Omitted->SkillId; });
+		const bool bOthersSurvive = ReducedState.Skills.Num() == FullLoadout.Num() - 1;
+		const bool bRestored = RestoredState.Skills.Num() == FullLoadout.Num()
+			&& RestoredState.Skills.ContainsByPredicate(
+				[Omitted](const FHSRBattleCommandSkillView& Skill) { return Skill.SkillId == Omitted->SkillId; });
+		Case(Name, bOmittedIsGone && bOthersSurvive && bRestored);
 	};
-	TestNullSlot(TEXT("NullDefinition_BasicFixedSlot"), EHSRSkillCategory::BasicAttack, BasicAttackSkillDefinition, [this](UHSRSkillDefinition* Value) { Coordinator->SetBasicAttackDefinition(Value); });
-	TestNullSlot(TEXT("NullDefinition_SkillFixedSlot"), EHSRSkillCategory::Skill, SkillSkillDefinition, [this](UHSRSkillDefinition* Value) { Coordinator->SetSkillDefinition(Value); });
-	TestNullSlot(TEXT("NullDefinition_UltimateFixedSlot"), EHSRSkillCategory::Ultimate, UltimateSkillDefinition, [this](UHSRSkillDefinition* Value) { Coordinator->SetUltimateDefinition(Value); });
-	TestNullSlot(TEXT("NullDefinition_HealFixedSlot"), EHSRSkillCategory::Heal, HealSkillDefinition, [this](UHSRSkillDefinition* Value) { Coordinator->SetHealDefinition(Value); });
-	Coordinator->SetBasicAttackDefinition(SkillSkillDefinition);
-	const FHSRBattleCommandViewState MismatchState = Coordinator->GetCommandViewState();
-	Coordinator->SetBasicAttackDefinition(BasicAttackSkillDefinition);
-	const FHSRBattleCommandViewState MismatchRestored = Coordinator->GetCommandViewState();
-	const FHSRBattleCommandSkillView* MismatchBasic = MismatchState.Skills.FindByPredicate([](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == EHSRSkillCategory::BasicAttack; });
-	const FHSRBattleCommandSkillView* MismatchSkill = MismatchState.Skills.FindByPredicate([](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == EHSRSkillCategory::Skill; });
-	const FHSRBattleCommandSkillView* RestoredBasic = MismatchRestored.Skills.FindByPredicate([](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == EHSRSkillCategory::BasicAttack; });
-	Case(TEXT("CategoryMismatch_DoesNotMigrateSlotAndRestores"), MismatchBasic && MismatchBasic->SkillId.IsNone()
-		&& !MismatchBasic->bAvailable && MismatchBasic->DisabledReason == EHSRAbilityFailureReason::DefinitionMissing
-		&& MismatchSkill && SkillSkillDefinition && MismatchSkill->SkillId == SkillSkillDefinition->SkillId
-		&& RestoredBasic && BasicAttackSkillDefinition && RestoredBasic->SkillId == BasicAttackSkillDefinition->SkillId);
+	TestOmittedSkill(TEXT("OmittedSkill_BasicDisappears"), BasicAttackSkillDefinition);
+	TestOmittedSkill(TEXT("OmittedSkill_SkillDisappears"), SkillSkillDefinition);
+	TestOmittedSkill(TEXT("OmittedSkill_UltimateDisappears"), UltimateSkillDefinition);
+	TestOmittedSkill(TEXT("OmittedSkill_HealDisappears"), HealSkillDefinition);
+
+	// A duplicate SkillId must not double up in the list -- registration stays idempotent.
+	TArray<UHSRSkillDefinition*> WithDuplicate = FullLoadout;
+	WithDuplicate.Add(BasicAttackSkillDefinition);
+	Coordinator->SetParticipantSkillLoadout(LoadoutActorId, WithDuplicate);
+	const FHSRBattleCommandViewState DuplicateState = Coordinator->GetCommandViewState();
+	Case(TEXT("DuplicateSkillId_CollapsesToOneEntry"), DuplicateState.Skills.Num() == FullLoadout.Num());
+
+	// Hand the participant back its pre-harness loadout so later cases see the production list
+	// rather than this harness's scratch one.
+	Coordinator->SetParticipantSkillLoadout(LoadoutActorId, SavedActorLoadout);
 
 	const int32 SavedSkillPoints = Coordinator->GetTeamResourceState().CurrentSkillPoints;
 	Coordinator->SetTeamSkillPointsForDevelopmentTest(0, Coordinator->GetTeamResourceState().MaxSkillPoints);

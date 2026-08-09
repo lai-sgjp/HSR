@@ -4,6 +4,8 @@
 #include "../GAS/Ability/HSRAbilityTypes.h"
 #include "HSRBattleTypes.generated.h"
 
+class UHSRSkillDefinition;
+
 UENUM(BlueprintType)
 enum class EHSRBattleParticipantTeam : uint8
 {
@@ -58,6 +60,17 @@ struct FHSRBattleRosterEntry
 		: CharacterId(InCharacterId), PawnClass(InPawnClass) {}
 
 	bool IsValid() const { return !CharacterId.IsNone(); }
+};
+
+/** One participant's skill list, in presentation order.  Wrapper struct exists because
+ * TMap values cannot be bare TArray in a UPROPERTY. */
+USTRUCT()
+struct FHSRSkillLoadout
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<TObjectPtr<UHSRSkillDefinition>> Skills;
 };
 
 USTRUCT(BlueprintType)

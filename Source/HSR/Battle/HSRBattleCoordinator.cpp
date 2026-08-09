@@ -382,29 +382,18 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			Participant.AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetToughnessAttribute(), EnemyDefinition->InitialToughness);
 			UE_LOG(LogTemp, Log, TEXT("P8-005 EnemyToughness Participant=%s Toughness=%.2f MaxToughness=%.2f"), *Participant.ParticipantId.ToString(), Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetToughnessAttribute()), Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxToughnessAttribute()));
 		}
-		if (!GrantBasicAttackAbility(Participant))
+		if (!GrantSkillLoadout(Participant))
 		{
-			UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED to grant BasicAttack ParticipantId=%s"), *Participant.ParticipantId.ToString());
-			SpawnedActor->Destroy(); RollbackBuild();
+			UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED to grant skill loadout ParticipantId=%s"), *Participant.ParticipantId.ToString());
+			SpawnedActor->Destroy();
+			RollbackBuild();
 			ParticipantDefinitions.Empty();
 			CurrentState = EHSRBattleCoordinatorState::Failed;
-			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to grant BasicAttack ability.")), Def.DefinitionId);
+			return FHSRBattleInitResult::MakeFailure(
+				EHSRBattleInitFailureType::InitFailed,
+				FText::FromString(TEXT("Failed to grant skill loadout.")),
+				Def.DefinitionId);
 		}
-		if (UltimateDefinition && !GrantUltimateAbility(Participant))
-		{
-			UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED to grant Ultimate ParticipantId=%s"), *Participant.ParticipantId.ToString());
-			SpawnedActor->Destroy(); RollbackBuild();
-			ParticipantDefinitions.Empty();
-			CurrentState = EHSRBattleCoordinatorState::Failed;
-			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to grant Ultimate ability.")), Def.DefinitionId);
-		}
-		if (SkillDefinition && !GrantSkillAbility(Participant))
-		{
-			UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED to grant Skill ParticipantId=%s"), *Participant.ParticipantId.ToString());
-			SpawnedActor->Destroy(); RollbackBuild(); ParticipantDefinitions.Empty(); CurrentState = EHSRBattleCoordinatorState::Failed;
-			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to grant Skill ability.")), Def.DefinitionId);
-		}
-		if (HealDefinition && !GrantHealAbility(Participant)) { SpawnedActor->Destroy(); RollbackBuild(); CurrentState=EHSRBattleCoordinatorState::Failed; return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed,FText::FromString(TEXT("Failed to grant Heal ability.")),Def.DefinitionId); }
 		Participants.Add(Participant);
 		BindHealthObserver(Participant);
 
@@ -1066,13 +1055,31 @@ void UHSRBattleCoordinator::DrainPendingEnemyTurns()
 			continue;
 		}
 		ConsumedEnemyTurnKeys.Add(QueuedKey);
+			// The enemy acts with the first attack in its own loadout, so changing an enemy's
+			// authored skill set changes its AI behaviour with no code change.
+			const UHSRSkillDefinition* EnemyAttack = nullptr;
+			{
+				const FHSRBattleParticipant* Actor = Participants.FindByPredicate(
+					[EnemyId](const FHSRBattleParticipant& P) { return P.ParticipantId == EnemyId; });
+				if (Actor)
+				{
+					for (const TObjectPtr<UHSRSkillDefinition>& Candidate : GetSkillLoadoutFor(Actor->ParticipantId))
+					{
+						if (Candidate && Candidate->Category == EHSRSkillCategory::BasicAttack && Candidate->IsValidForCategory())
+						{
+							EnemyAttack = Candidate;
+							break;
+						}
+					}
+				}
+			}
 		const FHSRBattleParticipant* Enemy = Participants.FindByPredicate([EnemyId](const FHSRBattleParticipant& P) { return P.ParticipantId == EnemyId; });
-		if (!Enemy || Enemy->Team != EHSRBattleParticipantTeam::Enemy || Enemy->bDefeated || !Enemy->AbilitySystemComponent.IsValid() || !BasicAttackDefinition || !BasicAttackDefinition->IsValidDefinition())
+		if (!Enemy || Enemy->Team != EHSRBattleParticipantTeam::Enemy || Enemy->bDefeated || !Enemy->AbilitySystemComponent.IsValid() || !EnemyAttack)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("P10-001A EnemyTurn ConsumedWithoutAction Key=%s"), *QueuedKey);
 			continue;
 		}
-		TArray<FName> Targets = FHSRTargetingPolicy::BuildCandidateTargetIds(*BasicAttackDefinition, *Enemy, Participants);
+		TArray<FName> Targets = FHSRTargetingPolicy::BuildCandidateTargetIds(*EnemyAttack, *Enemy, Participants);
 		Targets.Sort([](const FName& Left, const FName& Right) { return Left.LexicalLess(Right); });
 		if (Targets.IsEmpty())
 		{
@@ -1083,7 +1090,7 @@ void UHSRBattleCoordinator::DrainPendingEnemyTurns()
 		Command.ActionId = FGuid::NewGuid();
 		Command.BattleId = CurrentRequestId;
 		Command.ActorParticipantId = EnemyId;
-		Command.SkillId = BasicAttackDefinition->SkillId;
+		Command.SkillId = EnemyAttack->SkillId;
 		Command.TargetParticipantIds.Add(Targets[0]);
 		UE_LOG(LogTemp, Log, TEXT("P10-001A EnemyTurn Dispatch Key=%s ActionId=%s"), *QueuedKey, *Command.ActionId.ToString());
 	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
@@ -1191,34 +1198,17 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 	State.bCurrentActorPlayerControlled = Actor->Team == EHSRBattleParticipantTeam::Player;
 	State.Energy = Actor->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
 	State.MaxEnergy = Actor->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxEnergyAttribute());
-	struct FSkillSlot
+	// The current actor's own loadout drives the panel, so two party members with different
+	// skills produce different command lists.  Authoring order is presentation order.
+	for (const TObjectPtr<UHSRSkillDefinition>& LoadoutEntry : GetSkillLoadoutFor(State.CurrentActorId))
 	{
-		EHSRSkillCategory Category;
-		const UHSRSkillDefinition* Definition;
-		FText PlaceholderName;
-	};
-	const FSkillSlot SkillSlots[] =
-	{
-		{ EHSRSkillCategory::BasicAttack, BasicAttackDefinition, NSLOCTEXT("HSRCommand", "MissingBasic", "Basic Attack") },
-		{ EHSRSkillCategory::Skill, SkillDefinition, NSLOCTEXT("HSRCommand", "MissingSkill", "Skill") },
-		{ EHSRSkillCategory::Ultimate, UltimateDefinition, NSLOCTEXT("HSRCommand", "MissingUltimate", "Ultimate") },
-		{ EHSRSkillCategory::Heal, HealDefinition, NSLOCTEXT("HSRCommand", "MissingHeal", "Heal") }
-	};
-	for (const FSkillSlot& Slot : SkillSlots)
-	{
+		const UHSRSkillDefinition* Definition = LoadoutEntry;
 		FHSRBattleCommandSkillView View;
-		View.Category = Slot.Category;
-		const UHSRSkillDefinition* Definition = Slot.Definition;
-		if (!Definition || Definition->Category != Slot.Category)
+		if (!Definition)
 		{
-			View.DisplayName = Slot.PlaceholderName;
-			View.Description = NSLOCTEXT("HSRCommand", "MissingSkillDefinitionDescription", "This command is not configured.");
-			View.bDescriptionIsPlaceholder = true;
-			View.bAvailable = false;
-			View.DisabledReason = EHSRAbilityFailureReason::DefinitionMissing;
-			State.Skills.Add(View);
 			continue;
 		}
+		View.Category = Definition->Category;
 		View.SkillId = Definition->SkillId;
 		View.TargetType = Definition->TargetType;
 		View.DisplayName = Definition->DisplayName.IsEmpty() ? FText::FromName(Definition->SkillId) : Definition->DisplayName;
@@ -1226,7 +1216,7 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 			? FText::Format(NSLOCTEXT("HSRCommand", "MissingAuthoredDescription", "No description authored for {0}."), FText::FromName(Definition->SkillId))
 			: Definition->Description;
 		View.bDescriptionIsPlaceholder = Definition->Description.IsEmpty();
-		View.SkillPointCost = Definition->Category == EHSRSkillCategory::Skill ? 1 : 0;
+		View.SkillPointCost = Definition->GetSkillPointCost();
 		if (Definition->Category == EHSRSkillCategory::Ultimate)
 		{
 			const UClass* LoadedCostClass = Definition->CostGameplayEffectClass.Get();
@@ -2332,86 +2322,180 @@ bool UHSRBattleCoordinator::ClearProgressionGameplayEffects()
 	return bAllRemoved;
 }
 
-bool UHSRBattleCoordinator::GrantBasicAttackAbility(const FHSRBattleParticipant& Participant)
+void UHSRBattleCoordinator::SetDefaultSkillLoadout(const TArray<UHSRSkillDefinition*>& InSkills)
 {
-	if (!Participant.AbilitySystemComponent.IsValid() || !BasicAttackDefinition || !BasicAttackDefinition->IsValidDefinition() || BasicAttackDefinition->Category != EHSRSkillCategory::BasicAttack || BasicAttackDefinition->TargetType != EHSRTargetType::SingleEnemy)
+	DefaultSkillLoadout.Reset();
+	for (UHSRSkillDefinition* Definition : InSkills)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantBasicAttackAbility - REJECTED missing/invalid BasicAttack SkillDefinition Participant=%s"), *Participant.ParticipantId.ToString());
-		return false;
+		AddSkillToDefaultLoadout(Definition);
 	}
-
-	const FGameplayAbilitySpecHandle AbilityHandle = Participant.AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(BasicAttackDefinition->AbilityClass, 1, INDEX_NONE, this));
-	const bool bGranted = AbilityHandle.IsValid();
-	if (bGranted)
-	{
-		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::GrantBasicAttackAbility - SUCCESS Participant=%s"), *Participant.ParticipantId.ToString());
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantBasicAttackAbility - FAILED Participant=%s"), *Participant.ParticipantId.ToString());
-	}
-	return bGranted;
 }
 
-bool UHSRBattleCoordinator::GrantUltimateAbility(const FHSRBattleParticipant& Participant)
+void UHSRBattleCoordinator::AddSkillToDefaultLoadout(UHSRSkillDefinition* InDefinition)
 {
-	if (!Participant.AbilitySystemComponent.IsValid() || !UltimateDefinition || !UltimateDefinition->IsValidUltimateDefinition())
+	if (!InDefinition)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantUltimateAbility - REJECTED missing/invalid Ultimate SkillDefinition Participant=%s"), *Participant.ParticipantId.ToString());
-		return false;
+		return;
 	}
 
-	const FGameplayAbilitySpecHandle AbilityHandle = Participant.AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(UltimateDefinition->AbilityClass, 1, INDEX_NONE, this));
-	FGameplayAbilitySpec* AbilitySpec = AbilityHandle.IsValid() ? Participant.AbilitySystemComponent->FindAbilitySpecFromClass(UltimateDefinition->AbilityClass) : nullptr;
-	UHSRGameplayAbilityBase* Ability = AbilitySpec ? Cast<UHSRGameplayAbilityBase>(AbilitySpec->GetPrimaryInstance()) : nullptr;
-	if (!Ability || !Ability->ConfigureFromSkillDefinition(*UltimateDefinition))
+	const int32 ExistingIndex = DefaultSkillLoadout.IndexOfByPredicate(
+		[InDefinition](const TObjectPtr<UHSRSkillDefinition>& Candidate)
+		{
+			return Candidate && Candidate->SkillId == InDefinition->SkillId;
+		});
+	if (ExistingIndex != INDEX_NONE)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantUltimateAbility - FAILED configuration Participant=%s"), *Participant.ParticipantId.ToString());
-		return false;
+		DefaultSkillLoadout[ExistingIndex] = InDefinition;
+		return;
 	}
-
-	UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::GrantUltimateAbility - SUCCESS Participant=%s"), *Participant.ParticipantId.ToString());
-	return true;
+	DefaultSkillLoadout.Add(InDefinition);
 }
 
-bool UHSRBattleCoordinator::GrantSkillAbility(const FHSRBattleParticipant& Participant)
+void UHSRBattleCoordinator::SetParticipantSkillLoadout(FName ParticipantId, const TArray<UHSRSkillDefinition*>& InSkills)
 {
-	if (!Participant.AbilitySystemComponent.IsValid() || !SkillDefinition || !SkillDefinition->IsValidSkillDefinition()) return false;
-	const FGameplayAbilitySpecHandle Handle = Participant.AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(SkillDefinition->AbilityClass, 1, INDEX_NONE, this));
-	FGameplayAbilitySpec* Spec = Handle.IsValid() ? Participant.AbilitySystemComponent->FindAbilitySpecFromClass(SkillDefinition->AbilityClass) : nullptr;
+	if (ParticipantId.IsNone())
+	{
+		return;
+	}
+
+	FHSRSkillLoadout Loadout;
+	for (UHSRSkillDefinition* Definition : InSkills)
+	{
+		if (!Definition)
+		{
+			continue;
+		}
+		const bool bDuplicate = Loadout.Skills.ContainsByPredicate(
+			[Definition](const TObjectPtr<UHSRSkillDefinition>& Candidate)
+			{
+				return Candidate && Candidate->SkillId == Definition->SkillId;
+			});
+		if (!bDuplicate)
+		{
+			Loadout.Skills.Add(Definition);
+		}
+	}
+	ParticipantSkillLoadouts.Add(ParticipantId, MoveTemp(Loadout));
+}
+
+const TArray<TObjectPtr<UHSRSkillDefinition>>& UHSRBattleCoordinator::GetSkillLoadoutFor(FName ParticipantId) const
+{
+	// An override that resolved to nothing -- every authored entry failed to load or failed
+	// validation -- must not leave the participant with an empty command panel, so treat it the
+	// same as having no override at all.
+	if (const FHSRSkillLoadout* Override = ParticipantSkillLoadouts.Find(ParticipantId))
+	{
+		if (Override->Skills.Num() > 0)
+		{
+			return Override->Skills;
+		}
+	}
+	return DefaultSkillLoadout;
+}
+
+const UHSRSkillDefinition* UHSRBattleCoordinator::FindDefaultSkillByCategory(EHSRSkillCategory Category) const
+{
+	for (const TObjectPtr<UHSRSkillDefinition>& Definition : DefaultSkillLoadout)
+	{
+		if (Definition && Definition->Category == Category)
+		{
+			return Definition;
+		}
+	}
+	return nullptr;
+}
+
+bool UHSRBattleCoordinator::GrantSkillLoadout(const FHSRBattleParticipant& Participant)
+{
+	if (!Participant.AbilitySystemComponent.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantSkillLoadout - REJECTED invalid ASC Participant=%s"), *Participant.ParticipantId.ToString());
+		return false;
+	}
+
+	const TArray<TObjectPtr<UHSRSkillDefinition>>& Loadout = GetSkillLoadoutFor(Participant.ParticipantId);
+	bool bGrantedAny = false;
+	for (const TObjectPtr<UHSRSkillDefinition>& Definition : Loadout)
+	{
+		if (!Definition || !Definition->IsValidForCategory())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantSkillLoadout - SKIPPED invalid definition Participant=%s Skill=%s"),
+				*Participant.ParticipantId.ToString(), Definition ? *Definition->SkillId.ToString() : TEXT("null"));
+			continue;
+		}
+		if (!GrantSingleSkill(Participant, *Definition))
+		{
+			return false;
+		}
+		bGrantedAny = true;
+	}
+
+	if (!bGrantedAny)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantSkillLoadout - REJECTED empty loadout Participant=%s"), *Participant.ParticipantId.ToString());
+	}
+	return bGrantedAny;
+}
+
+bool UHSRBattleCoordinator::GrantSingleSkill(const FHSRBattleParticipant& Participant, const UHSRSkillDefinition& Definition)
+{
+	const FGameplayAbilitySpecHandle Handle = Participant.AbilitySystemComponent->GiveAbility(
+		FGameplayAbilitySpec(Definition.AbilityClass, 1, INDEX_NONE, this));
+	if (!Handle.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantSingleSkill - FAILED GiveAbility Participant=%s Skill=%s"),
+			*Participant.ParticipantId.ToString(), *Definition.SkillId.ToString());
+		return false;
+	}
+
+	// BasicAttack historically skipped ability configuration; every other category requires it.
+	if (Definition.Category == EHSRSkillCategory::BasicAttack)
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::GrantSingleSkill - SUCCESS Participant=%s Skill=%s"),
+			*Participant.ParticipantId.ToString(), *Definition.SkillId.ToString());
+		return true;
+	}
+
+	FGameplayAbilitySpec* Spec = Participant.AbilitySystemComponent->FindAbilitySpecFromClass(Definition.AbilityClass);
 	UHSRGameplayAbilityBase* Ability = Spec ? Cast<UHSRGameplayAbilityBase>(Spec->GetPrimaryInstance()) : nullptr;
-	const bool bSuccess = Ability && Ability->ConfigureFromSkillDefinition(*SkillDefinition);
-	if (bSuccess)
+	if (!Ability || !Ability->ConfigureFromSkillDefinition(Definition))
 	{
-		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::GrantSkillAbility - SUCCESS Participant=%s"), *Participant.ParticipantId.ToString());
+		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantSingleSkill - FAILED configuration Participant=%s Skill=%s"),
+			*Participant.ParticipantId.ToString(), *Definition.SkillId.ToString());
+		return false;
 	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("UHSRBattleCoordinator::GrantSkillAbility - FAILED Participant=%s"), *Participant.ParticipantId.ToString());
-	}
-	return bSuccess;
-}
-bool UHSRBattleCoordinator::GrantHealAbility(const FHSRBattleParticipant& Participant)
-{
-	if(!Participant.AbilitySystemComponent.IsValid()||!HealDefinition||!HealDefinition->IsValidHealDefinition())return false;
-	auto H=Participant.AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(HealDefinition->AbilityClass,1,INDEX_NONE,this)); auto* S=H.IsValid()?Participant.AbilitySystemComponent->FindAbilitySpecFromClass(HealDefinition->AbilityClass):nullptr; auto* A=S?Cast<UHSRGameplayAbilityBase>(S->GetPrimaryInstance()):nullptr; return A&&A->ConfigureFromSkillDefinition(*HealDefinition);
+
+	UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::GrantSingleSkill - SUCCESS Participant=%s Skill=%s"),
+		*Participant.ParticipantId.ToString(), *Definition.SkillId.ToString());
+	return true;
 }
 
 const UHSRSkillDefinition* UHSRBattleCoordinator::FindSkillDefinition(FName SkillId) const
 {
-	if (BasicAttackDefinition && BasicAttackDefinition->SkillId == SkillId)
+	if (SkillId.IsNone())
 	{
-		return BasicAttackDefinition;
+		return nullptr;
 	}
-	if (UltimateDefinition && UltimateDefinition->SkillId == SkillId)
+
+	for (const TObjectPtr<UHSRSkillDefinition>& Definition : DefaultSkillLoadout)
 	{
-		return UltimateDefinition;
+		if (Definition && Definition->SkillId == SkillId)
+		{
+			return Definition;
+		}
 	}
-	if (SkillDefinition && SkillDefinition->SkillId == SkillId)
+
+	// Per-participant loadouts may carry skills absent from the default list.
+	for (const TPair<FName, FHSRSkillLoadout>& Entry : ParticipantSkillLoadouts)
 	{
-		return SkillDefinition;
+		for (const TObjectPtr<UHSRSkillDefinition>& Definition : Entry.Value.Skills)
+		{
+			if (Definition && Definition->SkillId == SkillId)
+			{
+				return Definition;
+			}
+		}
 	}
-	if (HealDefinition && HealDefinition->SkillId == SkillId) return HealDefinition;
 	return nullptr;
 }
 
