@@ -51,7 +51,7 @@ void UHSRBattleCommandViewModel::UnbindCoordinator()
 
 const FHSRBattleCommandSkillView* UHSRBattleCommandViewModel::FindSelectedSkill() const
 {
-	return State.Skills.FindByPredicate([this](const FHSRBattleCommandSkillView& Skill) { return Skill.SkillId == SelectedSkillId; });
+	return State.FindSkill(SelectedSkillId);
 }
 
 void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
@@ -111,14 +111,30 @@ void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
 	RefreshCommandState();
 }
 
-bool UHSRBattleCommandViewModel::SelectSkill(EHSRSkillCategory Category)
+bool UHSRBattleCommandViewModel::SelectSkillById(FName SkillId)
 {
-	const FHSRBattleCommandSkillView* Skill = State.Skills.FindByPredicate([Category](const FHSRBattleCommandSkillView& Candidate) { return Candidate.Category == Category; });
-	if (!Skill) return false;
+	const FHSRBattleCommandSkillView* Skill = State.FindSkill(SkillId);
+	if (!Skill)
+	{
+		return false;
+	}
+
 	SelectedSkillId = Skill->SkillId;
 	SelectedTargetId = Skill->CandidateTargetIds.Num() > 0 ? Skill->CandidateTargetIds[0] : NAME_None;
-	RebindTargetAttributes(); RefreshReadOnlyBattlePresentation(); RefreshCommandState(); Changed.Broadcast(State);
+
+	RebindTargetAttributes();
+	RefreshReadOnlyBattlePresentation();
+	RefreshCommandState();
+	Changed.Broadcast(State);
 	return true;
+}
+
+// Category-keyed selection is first-match-wins, so it cannot reach a second skill sharing a
+// category. Kept as a shim for existing callers; new code should use SelectSkillById.
+bool UHSRBattleCommandViewModel::SelectSkill(EHSRSkillCategory Category)
+{
+	const FHSRBattleCommandSkillView* Skill = State.FindSkillByCategory(Category);
+	return Skill ? SelectSkillById(Skill->SkillId) : false;
 }
 
 TArray<FName> UHSRBattleCommandViewModel::GetTargetOptions() const
@@ -137,7 +153,7 @@ bool UHSRBattleCommandViewModel::SelectTarget(FName TargetId)
 
 bool UHSRBattleCommandViewModel::BeginCommandSubmit(const FGuid& ActionId, FName ActorParticipantId, FName SkillId, FName TargetParticipantId)
 {
-	const FHSRBattleCommandSkillView* Skill = State.Skills.FindByPredicate([SkillId](const FHSRBattleCommandSkillView& Candidate) { return Candidate.SkillId == SkillId; });
+	const FHSRBattleCommandSkillView* Skill = State.FindSkill(SkillId);
 	if (!ActionId.IsValid() || !State.BattleId.IsValid() || !State.bCurrentActorPlayerControlled || bCommandPending || bPresentationLocked || ActorParticipantId != State.CurrentActorId
 		|| !Skill || !Skill->bAvailable || SkillId != SelectedSkillId || TargetParticipantId != SelectedTargetId || !Skill->CandidateTargetIds.Contains(TargetParticipantId)) return false;
 	PendingBattleId = State.BattleId;

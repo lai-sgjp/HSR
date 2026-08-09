@@ -54,6 +54,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Battle|Presentation") FText GetPresentationText() const { return PresentationText; }
 
 	/** Selects a configured skill and automatically chooses its first valid target. */
+	/** Select by stable skill id. Use this for data-driven skill lists: it can address every entry
+	    in a loadout, including several skills sharing one category. */
+	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkillById(FName SkillId);
+
+	/** Legacy category-keyed selection; forwards to SelectSkillById on the first category match. */
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkill(EHSRSkillCategory Category);
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FName GetSelectedSkillId() const { return SelectedSkillId; }
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FName GetSelectedTargetId() const { return SelectedTargetId; }

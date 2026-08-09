@@ -1218,6 +1218,7 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 			: Definition->Description;
 		View.bDescriptionIsPlaceholder = Definition->Description.IsEmpty();
 		View.SkillPointCost = Definition->GetSkillPointCost();
+		View.SkillPointDelta = Definition->GetSkillPointDelta();
 		if (Definition->Category == EHSRSkillCategory::Ultimate)
 		{
 			const UClass* LoadedCostClass = Definition->CostGameplayEffectClass.Get();

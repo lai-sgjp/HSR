@@ -1,9 +1,11 @@
 #include "HSRBattleCommandWidget.h"
 
 #include "HSRBattleCommandViewModel.h"
+#include "HSRSkillButtonWidget.h"
 #include "../Battle/HSRBattleCoordinator.h"
 #include "../Battle/HSRBattleGameMode.h"
 #include "Components/Button.h"
+#include "Components/PanelWidget.h"
 #include "Components/ComboBoxString.h"
 #include "Components/TextBlock.h"
 #include "InputCoreTypes.h"
@@ -73,6 +75,69 @@ FText UHSRBattleCommandWidget::GetPresentationText() const { return ViewModel.Is
 FText UHSRBattleCommandWidget::GetStatusText() const { return ViewModel.IsValid() ? ViewModel->GetStatusText() : FText::GetEmpty(); }
 FText UHSRBattleCommandWidget::GetStatusOperationText() const { return ViewModel.IsValid() ? ViewModel->GetStatusOperationText() : FText::GetEmpty(); }
 bool UHSRBattleCommandWidget::SelectSkill(EHSRSkillCategory Category) { return ViewModel.IsValid() && ViewModel->SelectSkill(Category); }
+
+bool UHSRBattleCommandWidget::SelectSkillById(FName SkillId) { return ViewModel.IsValid() && ViewModel->SelectSkillById(SkillId); }
+
+bool UHSRBattleCommandWidget::UsesSkillList() const
+{
+	return SkillListContainer != nullptr && SkillEntryClass != nullptr;
+}
+
+// One entry per authored skill. Entries are reused across refreshes and only created/destroyed when
+// the skill count changes, so a loadout swap between participants does not churn the whole panel.
+void UHSRBattleCommandWidget::RefreshSkillList(const FHSRBattleCommandViewState& State)
+{
+	if (!UsesSkillList())
+	{
+		return;
+	}
+
+	const int32 DesiredCount = State.Skills.Num();
+
+	while (SkillEntries.Num() > DesiredCount)
+	{
+		if (UHSRSkillButtonWidget* Removed = SkillEntries.Pop())
+		{
+			Removed->OnSkillClicked.Unbind();
+			Removed->RemoveFromParent();
+		}
+	}
+
+	while (SkillEntries.Num() < DesiredCount)
+	{
+		UHSRSkillButtonWidget* Entry = CreateWidget<UHSRSkillButtonWidget>(this, SkillEntryClass);
+		if (!Entry)
+		{
+			break;
+		}
+		Entry->OnSkillClicked.BindUObject(this, &UHSRBattleCommandWidget::HandleSkillEntryClicked);
+		SkillListContainer->AddChild(Entry);
+		SkillEntries.Add(Entry);
+	}
+
+	const bool bUnlockedPlayerTurn = !State.ResultViewState.bVisible && State.bCurrentActorPlayerControlled
+		&& !State.bCommandPending && !State.bPresentationLocked;
+
+	for (int32 Index = 0; Index < SkillEntries.Num(); ++Index)
+	{
+		if (UHSRSkillButtonWidget* Entry = SkillEntries[Index])
+		{
+			FHSRBattleCommandSkillView EntryView = State.Skills[Index];
+			// Turn-level locks gate every entry, on top of each skill's own availability.
+			EntryView.bAvailable = EntryView.bAvailable && bUnlockedPlayerTurn;
+			Entry->SetSkillView(EntryView, EntryView.SkillId == State.SelectedSkillId);
+		}
+	}
+}
+
+void UHSRBattleCommandWidget::HandleSkillEntryClicked(FName SkillId)
+{
+	if (bRefreshingDesignerControls)
+	{
+		return;
+	}
+	SelectSkillById(SkillId);
+}
 bool UHSRBattleCommandWidget::SelectTarget(FName TargetId) { return ViewModel.IsValid() && ViewModel->SelectTarget(TargetId); }
 FName UHSRBattleCommandWidget::GetSelectedSkillId() const { return ViewModel.IsValid() ? ViewModel->GetSelectedSkillId() : NAME_None; }
 FName UHSRBattleCommandWidget::GetSelectedTargetId() const { return ViewModel.IsValid() ? ViewModel->GetSelectedTargetId() : NAME_None; }
@@ -147,7 +212,7 @@ void UHSRBattleCommandWidget::HandleViewStateChanged(const FHSRBattleCommandView
 
 const FHSRBattleCommandSkillView* UHSRBattleCommandWidget::FindSkillView(const FHSRBattleCommandViewState& State, EHSRSkillCategory Category) const
 {
-	return State.Skills.FindByPredicate([Category](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == Category; });
+	return State.FindSkillByCategory(Category);
 }
 
 void UHSRBattleCommandWidget::RefreshSkillControls(const FHSRBattleCommandViewState& State, EHSRSkillCategory Category, UButton* Button, UTextBlock* NameText, UTextBlock* DescriptionText, UTextBlock* CostText)
@@ -209,12 +274,19 @@ void UHSRBattleCommandWidget::RefreshDesignerControls(const FHSRBattleCommandVie
 	}
 	if (State.ResultViewState.bVisible) FocusResultConfirm();
 
-	RefreshSkillControls(State, EHSRSkillCategory::BasicAttack, BTN_Basic, TXT_BasicName, TXT_BasicDescription, TXT_BasicCost);
-	RefreshSkillControls(State, EHSRSkillCategory::Skill, BTN_Skill, TXT_SkillName, TXT_SkillDescription, TXT_SkillCost);
-	RefreshSkillControls(State, EHSRSkillCategory::Ultimate, BTN_Ultimate, TXT_UltimateName, TXT_UltimateDescription, TXT_UltimateCost);
-	RefreshSkillControls(State, EHSRSkillCategory::Heal, Button_Heal, TXT_HealName, TXT_HealDescription, TXT_HealCost);
+	if (UsesSkillList())
+	{
+		RefreshSkillList(State);
+	}
+	else
+	{
+		RefreshSkillControls(State, EHSRSkillCategory::BasicAttack, BTN_Basic, TXT_BasicName, TXT_BasicDescription, TXT_BasicCost);
+		RefreshSkillControls(State, EHSRSkillCategory::Skill, BTN_Skill, TXT_SkillName, TXT_SkillDescription, TXT_SkillCost);
+		RefreshSkillControls(State, EHSRSkillCategory::Ultimate, BTN_Ultimate, TXT_UltimateName, TXT_UltimateDescription, TXT_UltimateCost);
+		RefreshSkillControls(State, EHSRSkillCategory::Heal, Button_Heal, TXT_HealName, TXT_HealDescription, TXT_HealCost);
+	}
 
-	const FHSRBattleCommandSkillView* SelectedSkill = State.Skills.FindByPredicate([&State](const FHSRBattleCommandSkillView& Skill) { return Skill.SkillId == State.SelectedSkillId; });
+	const FHSRBattleCommandSkillView* SelectedSkill = State.FindSelectedSkill();
 	if (TXT_DisabledReason)
 	{
 		FText Reason = FText::GetEmpty();

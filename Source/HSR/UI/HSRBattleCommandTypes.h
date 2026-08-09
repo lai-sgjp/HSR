@@ -52,7 +52,12 @@ struct FHSRBattleCommandSkillView
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FText DisplayName;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FText Description;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") bool bDescriptionIsPlaceholder = true;
+	/** Points consumed, always >= 0. Zero for skills that grant points -- read SkillPointDelta for
+	    the signed value. */
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") int32 SkillPointCost = 0;
+
+	/** Signed skill-point change, straight from the DataAsset: negative spends, positive grants. */
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") int32 SkillPointDelta = 0;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") float EnergyCost = 0.0f;
 	/** False means EnergyCost is unknown, never that the command is free. */
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") bool bEnergyCostIsKnown = false;
@@ -106,4 +111,29 @@ struct FHSRBattleCommandViewState
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") bool bCommandPending = false;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") bool bPresentationLocked = false;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FGuid PendingActionId;
+
+	/** Skill lookup by stable id. Prefer this over category matching: a loadout may hold several
+	    skills of the same category, and only the id distinguishes them. */
+	const FHSRBattleCommandSkillView* FindSkill(FName SkillId) const
+	{
+		return Skills.FindByPredicate([SkillId](const FHSRBattleCommandSkillView& Candidate)
+		{
+			return Candidate.SkillId == SkillId;
+		});
+	}
+
+	/** First skill of a category, or null. First-match-wins, so it cannot address a second skill
+	    sharing the category -- present for legacy four-button UI paths only. */
+	const FHSRBattleCommandSkillView* FindSkillByCategory(EHSRSkillCategory Category) const
+	{
+		return Skills.FindByPredicate([Category](const FHSRBattleCommandSkillView& Candidate)
+		{
+			return Candidate.Category == Category;
+		});
+	}
+
+	const FHSRBattleCommandSkillView* FindSelectedSkill() const
+	{
+		return FindSkill(SelectedSkillId);
+	}
 };
