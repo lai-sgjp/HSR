@@ -3,10 +3,10 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "HSRBattleCommandTypes.h"
+#include "HSRBattleCommandSink.h"
 #include "HSRBattleCommandWidget.generated.h"
 
 class UHSRBattleCommandViewModel;
-class UHSRBattleCoordinator;
 class UButton;
 class UComboBoxString;
 class UHSRSkillButtonWidget;
@@ -20,7 +20,13 @@ class HSR_API UHSRBattleCommandWidget : public UUserWidget
 
 public:
 	UHSRBattleCommandWidget(const FObjectInitializer& ObjectInitializer);
-	void BindViewModel(UHSRBattleCommandViewModel* InViewModel, UHSRBattleCoordinator* InCoordinator);
+
+	/**
+	 * Pushed in by whoever owns the battle presentation; the widget never reaches back for its own
+	 * dependencies. InCommandSink must implement IHSRBattleCommandSink -- pass the Coordinator in
+	 * production, or a double in tests.
+	 */
+	void BindViewModel(UHSRBattleCommandViewModel* InViewModel, UObject* InCommandSink);
 #if WITH_EDITOR
 	int32 GetBindGenerationForDevelopmentTest() const { return BindGeneration; }
 	bool HasActiveViewModelBindingForDevelopmentTest() const { return StateChangedHandle.IsValid(); }
@@ -141,7 +147,9 @@ private:
 	UPROPERTY(Transient) TArray<TObjectPtr<UHSRSkillButtonWidget>> SkillEntries;
 
 	TWeakObjectPtr<UHSRBattleCommandViewModel> ViewModel;
-	TWeakObjectPtr<UHSRBattleCoordinator> Coordinator;
+
+	/** Held as the interface, so the UI can only call the two sink methods. */
+	TWeakInterfacePtr<IHSRBattleCommandSink> CommandSink;
 	FDelegateHandle StateChangedHandle;
 	int32 BindGeneration = 0;
 	int32 SubmitCount = 0;

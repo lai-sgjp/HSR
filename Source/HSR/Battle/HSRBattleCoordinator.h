@@ -11,6 +11,7 @@
 #include "../Progression/HSRCharacterDerivedStats.h"
 #include "../Equipment/HSREquipmentEffectBridge.h"
 #include "../Equipment/HSREquipmentSubsystem.h"
+#include "../UI/HSRBattleCommandSink.h"
 #include "HSRBattleCoordinator.generated.h"
 
 class UWorld;
@@ -39,11 +40,16 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FHSRParticipantDefeatedDelegate, FName /* Pa
  * Exactly-once consumption enforced by RequestId.
  */
 UCLASS()
-class HSR_API UHSRBattleCoordinator : public UObject
+class HSR_API UHSRBattleCoordinator : public UObject, public IHSRBattleCommandSink
 {
 	GENERATED_BODY()
 
 public:
+	// IHSRBattleCommandSink: the narrow surface the command UI is allowed to see. Both forward to the
+	// existing authority methods, so implementing the interface adds no second code path.
+	virtual FGuid GetActiveBattleId() const override { return CurrentRequestId; }
+	virtual FHSRAbilityResolution SubmitBattleCommand(const FHSRBattleActionCommand& Command) override { return RequestAction(Command); }
+
 	EHSRBattleCoordinatorState GetCurrentState() const { return CurrentState; }
 	FGuid GetCurrentRequestId() const { return CurrentRequestId; }
 	FName GetCurrentRewardDefinitionId() const { return CurrentRewardDefinitionId; }

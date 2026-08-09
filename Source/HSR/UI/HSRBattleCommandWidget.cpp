@@ -2,8 +2,6 @@
 
 #include "HSRBattleCommandViewModel.h"
 #include "HSRSkillButtonWidget.h"
-#include "../Battle/HSRBattleCoordinator.h"
-#include "../Battle/HSRBattleGameMode.h"
 #include "Components/Button.h"
 #include "Components/PanelWidget.h"
 #include "Components/ComboBoxString.h"
@@ -22,8 +20,9 @@ void UHSRBattleCommandWidget::NativeConstruct()
 
 	SetIsFocusable(true);
 	BindDesignerEvents();
-	AHSRBattleGameMode* BattleGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AHSRBattleGameMode>() : nullptr;
-	BindViewModel(BattleGameMode ? BattleGameMode->GetCommandViewModel() : nullptr, BattleGameMode ? BattleGameMode->GetCoordinator() : nullptr);
+	// No GetAuthGameMode reach-back: the owner calls BindViewModel. This widget used to fetch its own
+	// ViewModel and Coordinator here as well, which meant a battle-map GameMode was a hard
+	// requirement just to construct the widget, and duplicated the push the owner already performs.
 	UE_LOG(LogTemp, Log, TEXT("P6-004A Widget NativeConstruct Widget=%s Generation=%d Bound=%d"), *GetName(), BindGeneration, StateChangedHandle.IsValid() ? 1 : 0);
 }
 
@@ -39,14 +38,18 @@ FReply UHSRBattleCommandWidget::NativeOnKeyDown(const FGeometry& InGeometry, con
 	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
 }
 
-void UHSRBattleCommandWidget::BindViewModel(UHSRBattleCommandViewModel* InViewModel, UHSRBattleCoordinator* InCoordinator)
+void UHSRBattleCommandWidget::BindViewModel(UHSRBattleCommandViewModel* InViewModel, UObject* InCommandSink)
 {
 	UnbindViewModel();
 	ViewModel = InViewModel;
-	Coordinator = InCoordinator;
-	if (!InViewModel || !InCoordinator)
+	// A non-null object that does not implement the sink interface is a wiring mistake, not a
+	// degraded mode, so it fails the bind the same way a null one does rather than silently
+	// producing a widget that renders state but drops every command.
+	IHSRBattleCommandSink* Sink = Cast<IHSRBattleCommandSink>(InCommandSink);
+	CommandSink = Sink;
+	if (!InViewModel || !Sink)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("P6-004A Widget Bind Result=FAILED Widget=%s ViewModel=%s Coordinator=%s"), *GetName(), InViewModel ? TEXT("valid") : TEXT("null"), InCoordinator ? TEXT("valid") : TEXT("null"));
+		UE_LOG(LogTemp, Warning, TEXT("P6-004A Widget Bind Result=FAILED Widget=%s ViewModel=%s Sink=%s"), *GetName(), InViewModel ? TEXT("valid") : TEXT("null"), Sink ? TEXT("valid") : (InCommandSink ? TEXT("not-a-sink") : TEXT("null")));
 		return;
 	}
 
@@ -155,7 +158,7 @@ FHSRAbilityResolution UHSRBattleCommandWidget::SubmitCommand(FGuid ActionId, FNa
 		return LastSubmittedResolution;
 	}
 	const FHSRBattleCommandViewState VerifiedSnapshot = GetCurrentViewState();
-	if (!Coordinator.IsValid())
+	if (!CommandSink.IsValid())
 	{
 		Resolution.Status = EHSRAbilityResolutionStatus::Rejected;
 		Resolution.FailureReason = EHSRAbilityFailureReason::InvalidBattle;
@@ -171,19 +174,19 @@ FHSRAbilityResolution UHSRBattleCommandWidget::SubmitCommand(FGuid ActionId, FNa
 	FHSRBattleActionCommand Command;
 	Command.ActionId = ActionId;
 	// Use the same snapshot that passed BeginCommandSubmit.  Reading the live
-	// Coordinator id after locking could route a stale UI command into a reset battle.
+	// sink id after locking could route a stale UI command into a reset battle.
 	Command.BattleId = VerifiedSnapshot.BattleId;
 	Command.ActorParticipantId = ActorParticipantId;
 	Command.SkillId = SkillId;
 	Command.TargetParticipantIds.Add(TargetParticipantId);
-	if (Command.BattleId != Coordinator->GetCurrentRequestId())
+	if (Command.BattleId != CommandSink->GetActiveBattleId())
 	{
 		Resolution.Status = EHSRAbilityResolutionStatus::Rejected;
 		Resolution.FailureReason = EHSRAbilityFailureReason::InvalidBattle;
 		ViewModel->ResolveCommandSubmit(Command.BattleId, Resolution);
 		return Resolution;
 	}
-	Resolution = Coordinator->RequestAction(Command);
+	Resolution = CommandSink->SubmitBattleCommand(Command);
 	LastSubmittedActionId = ActionId;
 	LastSubmittedResolution = Resolution;
 	ViewModel->ResolveCommandSubmit(Command.BattleId, Resolution);
@@ -356,7 +359,7 @@ void UHSRBattleCommandWidget::UnbindViewModel()
 	}
 	StateChangedHandle.Reset();
 	ViewModel.Reset();
-	Coordinator.Reset();
+	CommandSink.Reset();
 	LastSubmittedActionId.Invalidate();
 	LastSubmittedResolution = FHSRAbilityResolution();
 }
