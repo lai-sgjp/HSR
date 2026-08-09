@@ -8,6 +8,7 @@
 class UHSRDropTableDefinition;
 class UHSRItemDefinition;
 class UHSRRewardDefinition;
+class UHSRStageBuffDefinition;
 
 UCLASS(BlueprintType)
 class HSR_API UHSREncounterDefinition : public UPrimaryDataAsset
@@ -21,8 +22,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter")
 	FName EnemyDefinitionId;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter|Progression")
+	TArray<FName> PrerequisiteEncounterIds;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter")
 	TSoftObjectPtr<UWorld> BattleMap;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter|Preparation")
+	TArray<TObjectPtr<UHSRStageBuffDefinition>> StageBuffDefinitions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter|Reward")
 	TArray<TObjectPtr<UHSRItemDefinition>> RewardItemDefinitions;
@@ -35,4 +42,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter|Reward")
 	int32 RewardSeed = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter|Reward", meta = (ClampMin = "0"))
+	int32 VictoryExperience = 0;
 };
