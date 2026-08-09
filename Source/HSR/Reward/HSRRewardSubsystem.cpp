@@ -6,6 +6,8 @@
 #include "../Data/Definitions/HSRRewardDefinition.h"
 #include "../Inventory/HSRInventorySubsystem.h"
 #include "Misc/Crc.h"
+#include "HSRSettlementTypes.h"
+#include "UObject/UObjectGlobals.h"
 
 namespace
 {
@@ -33,7 +35,40 @@ namespace
 void UHSRRewardSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	Collection.InitializeDependency<UHSRInventorySubsystem>();
 	Inventory = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRInventorySubsystem>() : nullptr;
+	if (!Inventory.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("P13-004 ProductionDefinitionBootstrap=FAILED Reason=InventoryUnavailable"));
+		return;
+	}
+
+	// 存档校验可能早于奖励宝箱进入游戏世界，必须在 GameInstance 启动时注册已发布的 P13 奖励包。
+	// 这样冷启动恢复不依赖 Actor BeginPlay 的副作用。
+	TArray<TObjectPtr<UHSRItemDefinition>> ItemDefinitions;
+	ItemDefinitions.Add(LoadObject<UHSRItemDefinition>(nullptr, TEXT("/Game/Data/Items/DA_Item_LumenShard_P13.DA_Item_LumenShard_P13")));
+	ItemDefinitions.Add(LoadObject<UHSRItemDefinition>(nullptr, TEXT("/Game/Data/Items/DA_Item_ArchiveToken_P13.DA_Item_ArchiveToken_P13")));
+	UHSRDropTableDefinition* DropTable = LoadObject<UHSRDropTableDefinition>(nullptr, TEXT("/Game/Data/Drops/DA_Drop_P13_Standard.DA_Drop_P13_Standard"));
+	UHSRRewardDefinition* RewardDefinition = LoadObject<UHSRRewardDefinition>(nullptr, TEXT("/Game/Data/Rewards/DA_Reward_P13_Standard.DA_Reward_P13_Standard"));
+	if (!ItemDefinitions[0] || !ItemDefinitions[1] || !DropTable || !RewardDefinition)
+	{
+		UE_LOG(LogTemp, Error, TEXT("P13-004 ProductionDefinitionBootstrap=FAILED Reason=AssetLoad Item0=%s Item1=%s DropTable=%s Reward=%s"),
+			ItemDefinitions[0] ? TEXT("OK") : TEXT("MISSING"),
+			ItemDefinitions[1] ? TEXT("OK") : TEXT("MISSING"),
+			DropTable ? TEXT("OK") : TEXT("MISSING"),
+			RewardDefinition ? TEXT("OK") : TEXT("MISSING"));
+		return;
+	}
+
+	const EHSRRewardOperationResult Result = RegisterBundle(ItemDefinitions, *DropTable, *RewardDefinition);
+	if (Result != EHSRRewardOperationResult::Success && Result != EHSRRewardOperationResult::NoOp)
+	{
+		UE_LOG(LogTemp, Error, TEXT("P13-004 ProductionDefinitionBootstrap=FAILED Reason=RegisterBundle Result=%d"), static_cast<int32>(Result));
+		return;
+	}
+	UE_LOG(LogTemp, Log, TEXT("P13-004 ProductionDefinitionBootstrap=READY Result=%d Item0=%s Item1=%s DropTable=%s Reward=%s"),
+		static_cast<int32>(Result), *ItemDefinitions[0]->ItemId.ToString(), *ItemDefinitions[1]->ItemId.ToString(),
+		*DropTable->DropTableId.ToString(), *RewardDefinition->RewardDefinitionId.ToString());
 }
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -43,7 +78,7 @@ void UHSRRewardSubsystem::InitializeForAutomation(UHSRInventorySubsystem* InInve
 }
 #endif
 
-#if WITH_EDITOR
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 void UHSRRewardSubsystem::InitializeForDevelopmentTest(UHSRInventorySubsystem* InInventory)
 {
 	Inventory = InInventory;
@@ -134,7 +169,10 @@ EHSRRewardOperationResult UHSRRewardSubsystem::CanRegisterRewardDefinition(const
 	return EHSRRewardOperationResult::Success;
 }
 
-EHSRRewardOperationResult UHSRRewardSubsystem::RegisterBundle(const TArray<TObjectPtr<UHSRItemDefinition>>& ItemDefinitions, const UHSRDropTableDefinition& DropTable, const UHSRRewardDefinition& RewardDefinition)
+EHSRRewardOperationResult UHSRRewardSubsystem::CanRegisterBundle(
+	const TArray<TObjectPtr<UHSRItemDefinition>>& ItemDefinitions,
+	const UHSRDropTableDefinition& DropTable,
+	const UHSRRewardDefinition& RewardDefinition) const
 {
 	UHSRInventorySubsystem* InventorySubsystem = Inventory.Get();
 	if (!InventorySubsystem)
@@ -200,14 +238,30 @@ EHSRRewardOperationResult UHSRRewardSubsystem::RegisterBundle(const TArray<TObje
 		return RewardValidation;
 	}
 
+	bAnyChange |= DropValidation == EHSRRewardOperationResult::Success || RewardValidation == EHSRRewardOperationResult::Success;
+	return bAnyChange ? EHSRRewardOperationResult::Success : EHSRRewardOperationResult::NoOp;
+}
+
+EHSRRewardOperationResult UHSRRewardSubsystem::RegisterBundle(
+	const TArray<TObjectPtr<UHSRItemDefinition>>& ItemDefinitions,
+	const UHSRDropTableDefinition& DropTable,
+	const UHSRRewardDefinition& RewardDefinition)
+{
+	const EHSRRewardOperationResult Validation = CanRegisterBundle(ItemDefinitions, DropTable, RewardDefinition);
+	if (Validation != EHSRRewardOperationResult::Success && Validation != EHSRRewardOperationResult::NoOp)
+	{
+		return Validation;
+	}
+
+	UHSRInventorySubsystem* InventorySubsystem = Inventory.Get();
+	check(InventorySubsystem);
 	for (const UHSRItemDefinition* ItemDefinition : ItemDefinitions)
 	{
 		InventorySubsystem->RegisterDefinition(*ItemDefinition);
 	}
 	RegisterDropTable(DropTable);
 	RegisterRewardDefinition(RewardDefinition);
-	bAnyChange |= DropValidation == EHSRRewardOperationResult::Success || RewardValidation == EHSRRewardOperationResult::Success;
-	return bAnyChange ? EHSRRewardOperationResult::Success : EHSRRewardOperationResult::NoOp;
+	return Validation;
 }
 
 EHSRRewardOperationResult UHSRRewardSubsystem::SubmitReward(const FHSRRewardRequest& Request, FHSRRewardReceipt& OutReceipt)
@@ -366,6 +420,86 @@ void UHSRRewardSubsystem::CommitRestore(FHSRRewardRestoreState&& Candidate, bool
 	{
 		RewardRestored.Broadcast(Revision);
 	}
+}
+
+EHSRRewardOperationResult UHSRRewardSubsystem::PrepareSettlementCandidate(const FHSRSettlementRequest& Request,
+	FHSRRewardSettlementCandidate& OutCandidate, FHSRSettlementReceipt& OutPreparedReceipt,
+	TArray<FHSRInventoryGrant>& OutGrants, FHSRSettlementReceipt& OutExistingReceipt) const
+{
+	if (const FHSRSettlementReceipt* Existing = SettlementLedger.Find(Request.TransactionId))
+	{
+		if (Existing->RewardDefinitionId != Request.RewardDefinitionId
+			|| Existing->PlayerCharacterId != Request.PlayerCharacterId
+			|| Existing->RewardSeed != Request.RewardSeed
+			|| Existing->Experience != Request.Experience
+			|| Existing->ExpectedInventoryRevision != Request.ExpectedInventoryRevision
+			|| Existing->ExpectedProfileRevision != Request.ExpectedProfileRevision
+			|| Existing->ExpectedRewardRevision != Request.ExpectedRewardRevision)
+		{
+			return EHSRRewardOperationResult::ClaimConflict;
+		}
+		OutExistingReceipt = *Existing;
+		return EHSRRewardOperationResult::NoOp;
+	}
+	if (Request.ExpectedRewardRevision != Revision)
+	{
+		return EHSRRewardOperationResult::RevisionConflict;
+	}
+	const FHSRRewardDefinitionRule* Rule = Rewards.Find(Request.RewardDefinitionId);
+	if (!Rule)
+	{
+		return EHSRRewardOperationResult::UnknownRewardDefinition;
+	}
+	FHSRRewardRequest RewardRequest;
+	RewardRequest.ClaimId = Request.TransactionId;
+	RewardRequest.RewardDefinitionId = Request.RewardDefinitionId;
+	RewardRequest.Seed = Request.RewardSeed;
+	if (!BuildGrants(RewardRequest, *Rule, OutGrants))
+	{
+		return EHSRRewardOperationResult::ResolveFailed;
+	}
+
+	FHSRRewardSettlementCandidate Candidate;
+	Candidate.TransactionId = Request.TransactionId;
+	Candidate.Receipts = Receipts;
+	Candidate.SettlementLedger = SettlementLedger;
+	Candidate.NextRevision = Revision + 1;
+	Candidate.PublishedRewardReceipt.Request = RewardRequest;
+	Candidate.PublishedRewardReceipt.Grants = OutGrants;
+	Candidate.PublishedRewardReceipt.Revision = Candidate.NextRevision;
+	Candidate.Receipts.Add(Request.TransactionId, Candidate.PublishedRewardReceipt);
+
+	FHSRSettlementReceipt Receipt;
+	Receipt.TransactionId = Request.TransactionId;
+	Receipt.RewardDefinitionId = Request.RewardDefinitionId;
+	Receipt.PlayerCharacterId = Request.PlayerCharacterId;
+	Receipt.RewardSeed = Request.RewardSeed;
+	Receipt.Experience = Request.Experience;
+	Receipt.ExpectedInventoryRevision = Request.ExpectedInventoryRevision;
+	Receipt.ExpectedProfileRevision = Request.ExpectedProfileRevision;
+	Receipt.ExpectedRewardRevision = Request.ExpectedRewardRevision;
+	Receipt.RewardReceipt = Candidate.PublishedRewardReceipt;
+	Receipt.RewardRevision = Candidate.NextRevision;
+	Candidate.SettlementLedger.Add(Request.TransactionId, Receipt);
+	OutPreparedReceipt = Receipt;
+	OutCandidate = MoveTemp(Candidate);
+	return EHSRRewardOperationResult::Success;
+}
+
+void UHSRRewardSubsystem::InstallSettlementCandidateNoFail(FHSRRewardSettlementCandidate&& Candidate)
+{
+	Receipts = MoveTemp(Candidate.Receipts);
+	SettlementLedger = MoveTemp(Candidate.SettlementLedger);
+}
+
+void UHSRRewardSubsystem::FinalizeSettlementRevisionNoFail(int64 PreparedRevision)
+{
+	Revision = PreparedRevision;
+}
+
+void UHSRRewardSubsystem::PublishSettlementCommit(const FHSRRewardReceipt& PreparedReceipt, int64 PreparedRevision)
+{
+	RewardCommitted.Broadcast(PreparedReceipt);
 }
 
 FGuid UHSRRewardSubsystem::MakeInstanceId(const FGuid& ClaimId, FName ItemId, int32 Ordinal)
