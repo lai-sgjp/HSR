@@ -124,6 +124,33 @@ struct HSR_API FHSRTurnForecastEntry
 /** Pure Phase 8 authoring validation; it has no runtime battle side effects. */
 struct HSR_API FHSRToughnessConfiguration
 {
+	/**
+	 * Single source for the Element.X -> Weakness.X naming rule. Callers used to open-code this
+	 * string surgery, so a new element only worked if every copy agreed and the derived tag had
+	 * actually been authored. Returns an invalid tag when the input is not an Element.* tag or
+	 * when no matching Weakness.* tag exists, which callers should treat as "no weakness match"
+	 * rather than assuming the tag is present.
+	 */
+	static FGameplayTag GetWeaknessTagFor(const FGameplayTag& ElementTag)
+	{
+		if (ValidateElement(ElementTag) != EHSRElementToughnessContractResult::Valid)
+		{
+			return FGameplayTag();
+		}
+
+		static const FString ElementPrefix(TEXT("Element."));
+		const FString ElementName = ElementTag.ToString();
+		if (!ElementName.StartsWith(ElementPrefix))
+		{
+			return FGameplayTag();
+		}
+
+		const FString Leaf = ElementName.RightChop(ElementPrefix.Len());
+		return Leaf.IsEmpty()
+			? FGameplayTag()
+			: FGameplayTag::RequestGameplayTag(FName(*FString::Printf(TEXT("Weakness.%s"), *Leaf)), false);
+	}
+
 	static EHSRElementToughnessContractResult ValidateElement(const FGameplayTag& Tag)
 	{
 		if (!Tag.IsValid()) return EHSRElementToughnessContractResult::MissingElement;

@@ -1293,9 +1293,7 @@ namespace HSRBattleDevelopmentTest
 			UHSRTurnManager* RepeatManager = Coordinator->GetTurnManager();
 			UHSRSkillDefinition* RepeatSkill = const_cast<UHSRSkillDefinition*>(Coordinator->GetBasicAttackDefinition());
 			const float BreakDamage = RepeatSkill->ToughnessDamage;
-			const FGameplayTag RepeatWeakness = RepeatSkill->ElementTag.IsValid()
-				? FGameplayTag::RequestGameplayTag(FName(*FString::Printf(TEXT("Weakness.%s"), *RepeatSkill->ElementTag.ToString().RightChop(FCString::Strlen(TEXT("Element."))))), false)
-				: FGameplayTag();
+			const FGameplayTag RepeatWeakness = FHSRToughnessConfiguration::GetWeaknessTagFor(RepeatSkill->ElementTag);
 			if (RepeatSource.AbilitySystemComponent.IsValid() && RepeatTarget.AbilitySystemComponent.IsValid() && RepeatManager
 				&& BreakDamage > 0.0f && RepeatWeakness.IsValid())
 			{

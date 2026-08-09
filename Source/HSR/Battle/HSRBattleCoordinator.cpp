@@ -589,8 +589,11 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 				const FString ReplayTarget = Command.TargetParticipantIds.IsEmpty() ? TEXT("<omitted>") : Command.TargetParticipantIds[0].ToString();
 				const UHSRSkillDefinition* CachedSkillDefinition = FindSkillDefinition(Command.SkillId);
 				const FString ReplayElement = CachedSkillDefinition ? CachedSkillDefinition->ElementTag.ToString() : TEXT("<unavailable>");
-				const FString ReplayExpectedWeakness = ReplayElement.StartsWith(TEXT("Element."))
-					? FString::Printf(TEXT("Weakness.%s"), *ReplayElement.RightChop(FCString::Strlen(TEXT("Element."))))
+				const FGameplayTag ReplayExpectedWeaknessTag = CachedSkillDefinition
+					? FHSRToughnessConfiguration::GetWeaknessTagFor(CachedSkillDefinition->ElementTag)
+					: FGameplayTag();
+				const FString ReplayExpectedWeakness = ReplayExpectedWeaknessTag.IsValid()
+					? ReplayExpectedWeaknessTag.ToString()
 					: TEXT("<invalid>");
 				UE_LOG(LogTemp, Log, TEXT("P8-002 Toughness Replay ActionId=%s Actor=%s Target=%s Element=%s ExpectedWeakness=%s Matched=%d Before=%.2f Damage=%.2f After=%.2f ReachedZero=%d FailureReason=%d"),
 					*Command.ActionId.ToString(), *ExistingResolution->ActorParticipantId.ToString(), *ReplayTarget, *ReplayElement, *ReplayExpectedWeakness, CachedToughness.bMatched ? 1 : 0,
@@ -760,8 +763,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		}
 		else
 		{
-			const FGameplayTag MatchingWeakness = FGameplayTag::RequestGameplayTag(
-				FName(*FString::Printf(TEXT("Weakness.%s"), *ElementName.RightChop(ElementPrefix.Len()))), false);
+			const FGameplayTag MatchingWeakness = FHSRToughnessConfiguration::GetWeaknessTagFor(ResolvedSkillDefinition->ElementTag);
 			if (!MatchingWeakness.IsValid() || !Target->WeaknessTags.HasTagExact(MatchingWeakness))
 			{
 				ToughnessResult.FailureReason = EHSRToughnessFailureReason::NoWeaknessMatch;
@@ -809,9 +811,8 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 				}
 			}
 		}
-		const FString ExpectedWeakness = ElementName.StartsWith(ElementPrefix)
-			? FString::Printf(TEXT("Weakness.%s"), *ElementName.RightChop(ElementPrefix.Len()))
-			: TEXT("<invalid>");
+		const FGameplayTag ExpectedWeaknessTag = FHSRToughnessConfiguration::GetWeaknessTagFor(ResolvedSkillDefinition->ElementTag);
+		const FString ExpectedWeakness = ExpectedWeaknessTag.IsValid() ? ExpectedWeaknessTag.ToString() : TEXT("<invalid>");
 		UE_LOG(LogTemp, Log, TEXT("P8-002 Toughness ActionId=%s Actor=%s Target=%s Element=%s ExpectedWeakness=%s Matched=%d Before=%.2f Damage=%.2f After=%.2f ReachedZero=%d FailureReason=%d"),
 			*Command.ActionId.ToString(), *Command.ActorParticipantId.ToString(), *Target->ParticipantId.ToString(), *ElementName,
 			*ExpectedWeakness,
