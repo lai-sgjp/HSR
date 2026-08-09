@@ -639,7 +639,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		return Reject(EHSRAbilityFailureReason::InvalidTarget);
 	}
 	const bool bTargetAliveAtAdmission = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) > 0.0f;
-	if (ResolvedSkillDefinition->Category == EHSRSkillCategory::Heal && Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) >= Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxHealthAttribute())) return Reject(EHSRAbilityFailureReason::AlreadyAtFullHealth);
+	if (ResolvedSkillDefinition->RestoresHealth() && Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) >= Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxHealthAttribute())) return Reject(EHSRAbilityFailureReason::AlreadyAtFullHealth);
 
 	// This is the synchronous preflight for the only mutating P6-001 ability.
 	// ResolveAction can reject only if its current participant is absent/invalid or
@@ -658,9 +658,9 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 	{
 		return Reject(EHSRAbilityFailureReason::AbilityUnavailable);
 	}
-	// Basic and Skill use the formal prepared-damage seam.  Heal and Ultimate
-	// intentionally retain their existing paths until their dedicated migration.
-	if (ResolvedSkillDefinition->Category == EHSRSkillCategory::BasicAttack || ResolvedSkillDefinition->Category == EHSRSkillCategory::Skill || ResolvedSkillDefinition->Category == EHSRSkillCategory::Ultimate)
+	// Damage-dealing skills use the formal prepared-damage seam; a purely restorative skill has
+	// nothing to prepare and skips it.
+	if (ResolvedSkillDefinition->UsesPreparedDamage())
 	{
 		const EHSRAbilityFailureReason FormalPreActivationFailure = Ability->GetPreActivationFailureReason(AbilitySpec->Handle, Attacker->AbilitySystemComponent->AbilityActorInfo.Get());
 		if (FormalPreActivationFailure != EHSRAbilityFailureReason::None)
@@ -905,7 +905,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 	{
 		return Reject(EHSRAbilityFailureReason::InsufficientSkillPoint);
 	}
-	const float HealHealthBefore = ResolvedSkillDefinition->Category == EHSRSkillCategory::Heal
+	const float HealHealthBefore = ResolvedSkillDefinition->RestoresHealth()
 		? Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) : 0.0f;
 	Ability->SetActionContext(Command.ActionId, Command.SkillId);
 	if (!Attacker->AbilitySystemComponent->TryActivateAbility(AbilitySpec->Handle) || !Ability->DidLastActivationSucceed())
@@ -925,7 +925,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 	CommitSkillPoints(Command.ActionId);
 	Resolution.Status = EHSRAbilityResolutionStatus::Succeeded;
 	Resolution.FailureReason = EHSRAbilityFailureReason::None;
-	if (ResolvedSkillDefinition->Category == EHSRSkillCategory::Heal)
+	if (ResolvedSkillDefinition->RestoresHealth())
 	{
 		Resolution.bHasHealResult = true;
 		Resolution.HealAmount = FMath::Max(0.0f, Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) - HealHealthBefore);
@@ -1286,7 +1286,7 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 		View.bAvailable = Definition->IsValidDefinition() && View.CandidateTargetIds.Num() > 0;
 		if (!Definition->IsValidDefinition()) View.DisabledReason = EHSRAbilityFailureReason::DefinitionMissing;
 		else if (View.CandidateTargetIds.Num() == 0) View.DisabledReason = EHSRAbilityFailureReason::InvalidTarget;
-		else if (Definition->Category == EHSRSkillCategory::Skill && TeamResourceState.CurrentSkillPoints <= 0)
+		else if (Definition->RequiresSkillPointsToCommit() && TeamResourceState.CurrentSkillPoints + Definition->GetSkillPointDelta() < 0)
 		{
 			View.bAvailable = false;
 			View.DisabledReason = EHSRAbilityFailureReason::InsufficientSkillPoint;
@@ -2593,8 +2593,8 @@ bool UHSRBattleCoordinator::GrantSingleSkill(const FHSRBattleParticipant& Partic
 		return false;
 	}
 
-	// BasicAttack historically skipped ability configuration; every other category requires it.
-	if (Definition.Category == EHSRSkillCategory::BasicAttack)
+	// Skills that carry no per-action ability configuration are fully granted at this point.
+	if (!Definition.RequiresAbilityConfiguration())
 	{
 		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::GrantSingleSkill - SUCCESS Participant=%s Skill=%s"),
 			*Participant.ParticipantId.ToString(), *Definition.SkillId.ToString());

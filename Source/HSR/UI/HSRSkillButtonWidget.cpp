@@ -41,32 +41,10 @@ void UHSRSkillButtonWidget::SetSkillView(const FHSRBattleCommandSkillView& InVie
 	}
 	if (TXT_Cost)
 	{
-		TXT_Cost->SetText(BuildCostText());
+		TXT_Cost->SetText(SkillView.BuildCostText());
 	}
 
 	OnSkillViewChanged(SkillView, bSelected);
-}
-
-// Cost text is derived from the authored numbers, never from the category. A skill that costs two
-// skill points reads "SP -2" whatever category it carries, and a positive delta reads "SP +1".
-FText UHSRSkillButtonWidget::BuildCostText() const
-{
-	TArray<FText> Parts;
-	if (SkillView.SkillPointDelta < 0)
-	{
-		Parts.Add(FText::Format(NSLOCTEXT("HSRCommand", "EntrySkillPointSpend", "SP -{0}"), FText::AsNumber(-SkillView.SkillPointDelta)));
-	}
-	else if (SkillView.SkillPointDelta > 0)
-	{
-		Parts.Add(FText::Format(NSLOCTEXT("HSRCommand", "EntrySkillPointGain", "SP +{0}"), FText::AsNumber(SkillView.SkillPointDelta)));
-	}
-
-	if (SkillView.bEnergyCostIsKnown && SkillView.EnergyCost > 0.0f)
-	{
-		Parts.Add(FText::Format(NSLOCTEXT("HSRCommand", "EntryEnergyCost", "Energy -{0}"), FText::AsNumber(FMath::RoundToInt(SkillView.EnergyCost))));
-	}
-
-	return Parts.IsEmpty() ? FText::GetEmpty() : FText::Join(FText::FromString(TEXT("  ")), Parts);
 }
 
 void UHSRSkillButtonWidget::HandleClicked()

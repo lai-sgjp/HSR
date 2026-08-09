@@ -225,23 +225,9 @@ void UHSRBattleCommandWidget::RefreshSkillControls(const FHSRBattleCommandViewSt
 	if (DescriptionText) DescriptionText->SetVisibility(ESlateVisibility::Collapsed);
 	if (!CostText) return;
 
-	FText Cost = FText::GetEmpty();
-	if (Skill)
-	{
-		switch (Category)
-		{
-		case EHSRSkillCategory::BasicAttack: Cost = NSLOCTEXT("HSRCommand", "BasicCost", "SP +1"); break;
-		case EHSRSkillCategory::Skill: Cost = FText::Format(NSLOCTEXT("HSRCommand", "SkillCost", "SP -{0}"), FText::AsNumber(Skill->SkillPointCost)); break;
-		case EHSRSkillCategory::Ultimate:
-			Cost = Skill->bEnergyCostIsKnown
-				? FText::Format(NSLOCTEXT("HSRCommand", "UltimateCost", "Energy -{0}"), FText::AsNumber(Skill->EnergyCost))
-				: NSLOCTEXT("HSRCommand", "UnknownUltimateCost", "Energy ?");
-			break;
-		case EHSRSkillCategory::Heal: Cost = NSLOCTEXT("HSRCommand", "HealCost", "Cost --"); break;
-		default: break;
-		}
-	}
-	CostText->SetText(Cost);
+	// Shared with the skill-list entries so both surfaces render one cost rule. The old chain here
+	// hardcoded "SP +1" for BasicAttack, which silently misreported any other authored delta.
+	CostText->SetText(Skill ? Skill->BuildCostText() : FText::GetEmpty());
 }
 
 void UHSRBattleCommandWidget::RefreshDesignerControls(const FHSRBattleCommandViewState& State)

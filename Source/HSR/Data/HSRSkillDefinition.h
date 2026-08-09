@@ -169,4 +169,44 @@ public:
 		const int32 Delta = GetSkillPointDelta();
 		return Delta < 0 ? -Delta : 0;
 	}
+
+	/**
+	 * Behavioural predicates below replace open-coded Category comparisons at the call sites.
+	 * Each answers one question a caller actually has; none of them expose Category itself, so a
+	 * new category only has to answer these rather than have every caller learn its name.
+	 *
+	 * They read Category today because that is where the authored data lives. The point is not to
+	 * hide the enum -- it is that the branch exists in one place per behaviour instead of once per
+	 * caller, so a fifth category is a change here and nowhere else.
+	 */
+
+	/** True when this skill restores Health, so callers gate full-health rejection and heal-amount
+	 *  sampling on capability rather than on being literally the Heal category. */
+	bool RestoresHealth() const
+	{
+		return Category == EHSRSkillCategory::Heal;
+	}
+
+	/** True when this skill resolves through the formal prepared-damage seam. Heal deliberately
+	 *  does not: it has no damage to prepare. */
+	bool UsesPreparedDamage() const
+	{
+		return Category == EHSRSkillCategory::BasicAttack
+			|| Category == EHSRSkillCategory::Skill
+			|| Category == EHSRSkillCategory::Ultimate;
+	}
+
+	/** True when granting this skill must also configure the ability instance. BasicAttack carries
+	 *  no per-action configuration, so granting it is complete on its own. */
+	bool RequiresAbilityConfiguration() const
+	{
+		return Category != EHSRSkillCategory::BasicAttack;
+	}
+
+	/** True when a shortage of team skill points makes this skill unavailable. Derived from the
+	 *  authored delta, so a skill authored to spend points is gated whatever its category. */
+	bool RequiresSkillPointsToCommit() const
+	{
+		return GetSkillPointDelta() < 0;
+	}
 };

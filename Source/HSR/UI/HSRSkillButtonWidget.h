@@ -52,9 +52,6 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional)) TObjectPtr<UTextBlock> TXT_Cost;
 
 private:
-	/** Cost line built from the authored numbers, with no per-category special cases. */
-	FText BuildCostText() const;
-
 	UFUNCTION()
 	void HandleClicked();
 };

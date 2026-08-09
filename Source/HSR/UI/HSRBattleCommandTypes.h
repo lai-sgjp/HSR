@@ -64,6 +64,32 @@ struct FHSRBattleCommandSkillView
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") TArray<FName> CandidateTargetIds;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") bool bAvailable = false;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") EHSRAbilityFailureReason DisabledReason = EHSRAbilityFailureReason::None;
+
+	/**
+	 * Player-facing cost line, derived from the authored numbers rather than from Category. A skill
+	 * authored to spend two points reads "SP -2" whatever category it carries; the old per-category
+	 * chain hardcoded "SP +1" for BasicAttack and would have misreported any other authored value.
+	 * Lives here so every command surface renders one cost string from one rule.
+	 */
+	FText BuildCostText() const
+	{
+		TArray<FText> Parts;
+		if (SkillPointDelta < 0)
+		{
+			Parts.Add(FText::Format(NSLOCTEXT("HSRCommand", "EntrySkillPointSpend", "SP -{0}"), FText::AsNumber(-SkillPointDelta)));
+		}
+		else if (SkillPointDelta > 0)
+		{
+			Parts.Add(FText::Format(NSLOCTEXT("HSRCommand", "EntrySkillPointGain", "SP +{0}"), FText::AsNumber(SkillPointDelta)));
+		}
+
+		if (bEnergyCostIsKnown && EnergyCost > 0.0f)
+		{
+			Parts.Add(FText::Format(NSLOCTEXT("HSRCommand", "EntryEnergyCost", "Energy -{0}"), FText::AsNumber(FMath::RoundToInt(EnergyCost))));
+		}
+
+		return Parts.IsEmpty() ? FText::GetEmpty() : FText::Join(FText::FromString(TEXT("  ")), Parts);
+	}
 };
 
 USTRUCT(BlueprintType)
