@@ -138,6 +138,7 @@ void UHSRPartyViewModel::Rebuild()
 		bool bAnyOccupied = false;
 		if (!bHasPendingChanges) Candidate = AuthoritySnapshot;
 		Next.Revision = Candidate.Revision;
+		Next.ActiveSlot = Candidate.ActiveSlot;
 		Next.bHasPendingChanges = bHasPendingChanges;
 		TArray<FHSRCharacterProfileSnapshot> ProfileSnapshots;
 		if (Profiles.IsValid() && Profiles->GetAllProfileSnapshots(ProfileSnapshots))

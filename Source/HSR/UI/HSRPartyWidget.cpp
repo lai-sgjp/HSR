@@ -20,6 +20,25 @@ bool UHSRPartyWidget::GetCurrentSnapshot(FHSRPartyFrontendSnapshot& OutSnapshot)
 	return true;
 }
 
+bool UHSRPartyWidget::GetSlotAt(int32 SlotIndex, FHSRPartySlotViewData& OutSlot) const
+{
+	if (!Current.Slots.IsValidIndex(SlotIndex)) return false;
+	OutSlot = Current.Slots[SlotIndex];
+	return true;
+}
+
+bool UHSRPartyWidget::IsSlotOccupied(int32 SlotIndex) const
+{
+	FHSRPartySlotViewData ViewSlot;
+	return GetSlotAt(SlotIndex, ViewSlot) && ViewSlot.bOccupied;
+}
+
+FName UHSRPartyWidget::GetSlotCharacterId(int32 SlotIndex) const
+{
+	FHSRPartySlotViewData ViewSlot;
+	return GetSlotAt(SlotIndex, ViewSlot) ? ViewSlot.CharacterId : NAME_None;
+}
+
 EHSRPartyResult UHSRPartyWidget::SetCandidateSlot(int32 SlotIndex, FName CharacterId)
 {
 	return ViewModel ? ViewModel->SetCandidateSlot(SlotIndex, CharacterId) : EHSRPartyResult::InvalidCandidate;

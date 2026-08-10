@@ -304,6 +304,7 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 	NewRequest.RequestId = NewRequestId;
 	NewRequest.PlayerCharacterId = PlayerCharacterId;
 	NewRequest.PlayerPartyIds = PlayerPartyIds;
+	UE_LOG(LogTemp, Log, TEXT("HSRBattleTransition RequestEncounter PartyMembers=%d Leader=%s"), PlayerPartyIds.Num(), *PlayerCharacterId.ToString());
 	NewRequest.EncounterId = Definition->EncounterId;
 	NewRequest.EnemyDefinitionId = Definition->EnemyDefinitionId;
 	NewRequest.Initiative = Initiative;

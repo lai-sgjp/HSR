@@ -19,6 +19,8 @@ public:
 	EHSRPartyResult RemoveCharacter(int32 Slot);
 	EHSRPartyResult ReplaceCharacter(int32 Slot, FName CharacterId);
 	EHSRPartyResult SwapSlots(int32 FirstSlot, int32 SecondSlot);
+	EHSRPartyResult SetActiveSlot(int32 Slot);
+	int32 GetActiveSlot() const { return ActiveSlot; }
 	EHSRPartyResult CommitCandidate(const FHSRPartySnapshot& Candidate);
 	bool GetSnapshot(FHSRPartySnapshot& OutSnapshot) const;
 	FHSRPartyChanged& OnPartyChanged() { return PartyChanged; }
@@ -29,13 +31,14 @@ public:
 private:
 	friend class UHSRSaveSubsystem;
 	bool PrepareRestore(const FHSRPartySnapshot& Saved, FHSRPartySnapshot& OutCandidate) const;
-	void CommitRestoreSilent(FHSRPartySnapshot&& Candidate) { Slots=MoveTemp(Candidate.Slots); Revision=Candidate.Revision; }
+	void CommitRestoreSilent(FHSRPartySnapshot&& Candidate) { Slots=MoveTemp(Candidate.Slots); ActiveSlot=Candidate.ActiveSlot; Revision=Candidate.Revision; }
 	void NotifyRestored() { PartyChanged.Broadcast(Revision); }
 	bool IsValidSlot(int32 Slot) const { return Slot >= 0 && Slot < Capacity; }
 	bool IsKnownProfile(FName CharacterId) const;
 	bool IsDuplicate(const TArray<FHSRPartySlot>& Candidate, FName CharacterId, int32 IgnoreSlot = INDEX_NONE) const;
 	bool Commit(TArray<FHSRPartySlot>&& Candidate);
 	UPROPERTY() TArray<FHSRPartySlot> Slots;
+	UPROPERTY() int32 ActiveSlot = 0;
 	UPROPERTY() int64 Revision = 0;
 	TWeakObjectPtr<UHSRCharacterProfileSubsystem> Profiles;
 	FHSRPartyChanged PartyChanged;

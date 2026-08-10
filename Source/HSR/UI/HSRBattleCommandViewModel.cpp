@@ -189,12 +189,24 @@ bool UHSRBattleCommandViewModel::ShowBattleResult(const FHSRBattleResult& Result
 	State.ResultViewState.RequestId = Result.RequestId;
 	State.ResultViewState.Outcome = Result.Outcome;
 	State.ResultViewState.DefeatedParticipantId = Result.DefeatedParticipantId;
+	State.ResultViewState.RewardDefinitionId = Result.RewardDefinitionId;
+	State.ResultViewState.RewardGrants.Reset();
+	State.ResultViewState.RewardRevision = 0;
 	State.ResultViewState.bVisible = true;
 	State.ResultViewState.bConfirmPending = false;
 	ClearCommandLocks();
 	RefreshCommandState();
 	Changed.Broadcast(State);
 	return true;
+}
+
+void UHSRBattleCommandViewModel::SetBattleResultReward(const FHSRRewardReceipt& Receipt)
+{
+	if (!State.ResultViewState.bVisible || !Receipt.Request.ClaimId.IsValid()) return;
+	State.ResultViewState.RewardDefinitionId = Receipt.Request.RewardDefinitionId;
+	State.ResultViewState.RewardGrants = Receipt.Grants;
+	State.ResultViewState.RewardRevision = Receipt.Revision;
+	Changed.Broadcast(State);
 }
 
 bool UHSRBattleCommandViewModel::RequestBattleResultConfirm()

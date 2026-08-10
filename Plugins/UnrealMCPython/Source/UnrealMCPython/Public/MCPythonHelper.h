@@ -223,6 +223,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Editor|MCPython")
     static FString UmgWrapWidget(UBlueprint* WidgetBP, const FString& WidgetName, const FString& WrapperType, const FString& WrapperName);
 
+    /** Move a widget to a specific child index within its current panel parent. Returns JSON. */
+    UFUNCTION(BlueprintCallable, Category="Editor|MCPython")
+    static FString UmgMoveWidget(UBlueprint* WidgetBP, const FString& WidgetName, int32 TargetIndex);
+
     /** Replace a widget with a new widget of NewType at the same slot (old subtree is discarded). Returns JSON. */
     UFUNCTION(BlueprintCallable, Category="Editor|MCPython")
     static FString UmgReplaceWidget(UBlueprint* WidgetBP, const FString& WidgetName, const FString& NewType, const FString& NewName);

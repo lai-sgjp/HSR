@@ -774,14 +774,17 @@ FString UMCPythonHelper::ConnectBlueprintPins(UBlueprint* Blueprint, const FStri
         FPinConnectionResponse Response = Schema->CanCreateConnection(SourcePin, TargetPin);
         if (Response.Response == CONNECT_RESPONSE_DISALLOW)
             return MakeJsonError(FString::Printf(TEXT("Connection not allowed: %s"), *Response.Message.ToString()));
-        // Break existing connections when schema requires it (e.g. exec output already connected)
-        if (Response.Response == CONNECT_RESPONSE_BREAK_OTHERS_A)
-            SourcePin->BreakAllPinLinks();
-        else if (Response.Response == CONNECT_RESPONSE_BREAK_OTHERS_B)
-            TargetPin->BreakAllPinLinks();
+        // TryCreateConnection resolves wildcard pin types (e.g. For Each Loop Array) and
+        // performs the canonical link. Fall back to a bare MakeLinkTo only if the schema
+        // reports it as a plain CONNECT_RESPONSE_MAKE.
+        const bool bOk = Schema->TryCreateConnection(SourcePin, TargetPin);
+        if (!bOk && Response.Response == CONNECT_RESPONSE_MAKE)
+            SourcePin->MakeLinkTo(TargetPin);
     }
-
-    SourcePin->MakeLinkTo(TargetPin);
+    else
+    {
+        SourcePin->MakeLinkTo(TargetPin);
+    }
 
     FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
     return MakeJsonSuccess(FString::Printf(TEXT("Connected %s.%s -> %s.%s"),

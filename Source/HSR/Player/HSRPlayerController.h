@@ -36,6 +36,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Control")
 	EHSRPlayerControlMode GetControlMode() const { return CurrentControlMode; }
 
+	/** Possess the committed party member in an exploration slot. */
+	UFUNCTION(BlueprintCallable, Category = "Exploration|Party")
+	bool SwitchExplorationCharacter(int32 PartySlot);
+
 	bool ApplyUIInputPolicy(const FHSRInputModePolicy& Policy, EHSRPlayerControlMode SemanticMode);
 	static bool ShouldBindFrontendInputComponent(const UInputComponent* Bound, const UInputComponent* Current)
 	{
@@ -78,6 +82,10 @@ protected:
 	void HandleMap();
 	void HandleChallenge();
 	void HandleCloseToRoot();
+	void HandlePartySlot1();
+	void HandlePartySlot2();
+	void HandlePartySlot3();
+	void HandlePartySlot4();
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> ExplorationMappingContext;

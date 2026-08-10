@@ -1460,6 +1460,11 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildAndValidateParticipantDefinitio
 	UE_LOG(LogTemp, Log,
 		TEXT("UHSRBattleCoordinator::BuildAndValidateParticipantDefinitions - SUCCESS Definitions=%d Players=%d Enemies=%d"),
 		ParticipantDefinitions.Num(), PlayerEntries.Num(), EnemyEntries.Num());
+	for (const FHSRBattleRosterEntry& Entry : PlayerEntries)
+	{
+		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator PlayerRoster Member=%s Class=%s"),
+			*Entry.CharacterId.ToString(), Entry.PawnClass ? *Entry.PawnClass->GetName() : TEXT("None"));
+	}
 
 	return FHSRBattleInitResult::MakeSuccess();
 }
@@ -1747,6 +1752,7 @@ void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
 	BattleResult.RequestId = CurrentRequestId;
 	BattleResult.DefeatedParticipantId = DefeatedParticipantId;
 	BattleResult.EncounterId = CurrentEncounterId;
+	BattleResult.RewardDefinitionId = CurrentRewardDefinitionId;
 	BattleResult.ReturnContext = ReturnContext;
 	BattleResult.Outcome = DefeatedTeam == EHSRBattleParticipantTeam::Enemy ? EHSRBattleOutcome::PlayerVictory : EHSRBattleOutcome::PlayerDefeat;
 	bBattleResultProduced = true;

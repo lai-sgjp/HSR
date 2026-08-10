@@ -100,6 +100,7 @@ namespace
             {TEXT("EditableTextBox"),  TEXT("/Script/UMG.EditableTextBox")},
             {TEXT("ProgressBar"),      TEXT("/Script/UMG.ProgressBar")},
             {TEXT("Slider"),           TEXT("/Script/UMG.Slider")},
+            {TEXT("ComboBoxString"),   TEXT("/Script/UMG.ComboBoxString")},
         };
         const FString* Path = TypeMap.Find(TypeName);
         if (!Path) return nullptr;
@@ -365,12 +366,28 @@ FString UMCPythonHelper::UmgGetWidgetProperty(UBlueprint* WidgetBP, const FStrin
         return UmgErrorJson(FString::Printf(TEXT("Widget '%s' not found."), *WidgetName));
 
     FProperty* Prop = Widget->GetClass()->FindPropertyByName(FName(*PropertyName));
-    if (!Prop)
-        return UmgErrorJson(FString::Printf(TEXT("Property '%s' not found on widget '%s'."), *PropertyName, *WidgetName));
+    const void* ValueAddr = nullptr;
+    UObject* ValueOwner = nullptr;
+    if (Prop)
+    {
+        ValueAddr = Prop->ContainerPtrToValuePtr<void>(Widget);
+        ValueOwner = Widget;
+    }
+    else if (UPanelSlot* Slot = Widget->Slot)
+    {
+        // Fall back to the widget's slot (e.g. VerticalBoxSlot.Size, CanvasPanelSlot.Anchors).
+        Prop = Slot->GetClass()->FindPropertyByName(FName(*PropertyName));
+        if (Prop)
+        {
+            ValueAddr = Prop->ContainerPtrToValuePtr<void>(Slot);
+            ValueOwner = Slot;
+        }
+    }
+    if (!Prop || !ValueAddr)
+        return UmgErrorJson(FString::Printf(TEXT("Property '%s' not found on widget '%s' or its slot."), *PropertyName, *WidgetName));
 
     FString ValueStr;
-    const void* ValueAddr = Prop->ContainerPtrToValuePtr<void>(Widget);
-    Prop->ExportTextItem_Direct(ValueStr, ValueAddr, nullptr, Widget, PPF_None);
+    Prop->ExportTextItem_Direct(ValueStr, ValueAddr, nullptr, ValueOwner, PPF_None);
 
     TSharedPtr<FJsonObject> R = MakeShared<FJsonObject>();
     R->SetBoolField(TEXT("success"), true);
@@ -394,12 +411,70 @@ FString UMCPythonHelper::UmgSetWidgetProperty(UBlueprint* WidgetBP, const FStrin
         return UmgErrorJson(FString::Printf(TEXT("Widget '%s' not found."), *WidgetName));
 
     FProperty* Prop = Widget->GetClass()->FindPropertyByName(FName(*PropertyName));
-    if (!Prop)
-        return UmgErrorJson(FString::Printf(TEXT("Property '%s' not found on widget '%s'."), *PropertyName, *WidgetName));
+    UPanelSlot* Slot = Widget->Slot;
+    void* ValueAddr = nullptr;
+    UObject* ValueOwner = nullptr;
+    if (Prop)
+    {
+        ValueAddr = Prop->ContainerPtrToValuePtr<void>(Widget);
+        ValueOwner = Widget;
+    }
+    else if (Slot)
+    {
+        // Fall back to the widget's slot (e.g. VerticalBoxSlot.Size, HorizontalBoxSlot.Padding).
+        Prop = Slot->GetClass()->FindPropertyByName(FName(*PropertyName));
+        if (Prop)
+        {
+            ValueAddr = Prop->ContainerPtrToValuePtr<void>(Slot);
+            ValueOwner = Slot;
+        }
+    }
+    if (!Prop || !ValueAddr)
+        return UmgErrorJson(FString::Printf(TEXT("Property '%s' not found on widget '%s' or its slot."), *PropertyName, *WidgetName));
 
-    Widget->Modify();
-    void* ValueAddr = Prop->ContainerPtrToValuePtr<void>(Widget);
-    const TCHAR* ImportResult = Prop->ImportText_Direct(*Value, ValueAddr, Widget, PPF_None);
+    if (ValueOwner) ValueOwner->Modify();
+
+    // Properties with a BlueprintSetter (e.g. UHorizontalBoxSlot::Padding -> SetPadding) are
+    // deprecated direct-access paths; route through the setter so the live Slate slot updates.
+    if (const FString* SetterName = Prop->FindMetaData(TEXT("BlueprintSetter")))
+    {
+        if (UFunction* SetterFunc = ValueOwner->FindFunction(FName(**SetterName)))
+        {
+            // The setter takes exactly one parameter of the property's type; import into a temp of that type.
+            void* TempValue = FMemory::Malloc(Prop->GetSize(), Prop->GetMinAlignment());
+            Prop->InitializeValue(TempValue);
+            const bool bImported = Prop->ImportText_Direct(*Value, TempValue, ValueOwner, PPF_None) != nullptr;
+            if (bImported)
+            {
+                // Copy the imported value into the parameter block of the setter call.
+                // Use ProcessEvent with a frame that has one parameter slot.
+                for (TFieldIterator<FProperty> It(SetterFunc); It; ++It)
+                {
+                    if (It->HasAnyPropertyFlags(CPF_Parm) && !It->HasAnyPropertyFlags(CPF_ReturnParm) && !It->HasAnyPropertyFlags(CPF_OutParm))
+                    {
+                        const int32 ParamSize = It->GetSize();
+                        const int32 ParamAlign = It->GetMinAlignment();
+                        uint8* ParamBlock = (uint8*)FMemory::Malloc(ParamSize, ParamAlign);
+                        FMemory::Memcpy(ParamBlock, TempValue, FMath::Min(ParamSize, (int32)Prop->GetSize()));
+                        ValueOwner->ProcessEvent(SetterFunc, ParamBlock);
+                        FMemory::Free(ParamBlock);
+                        break;
+                    }
+                }
+                FMemory::Free(TempValue);
+                FBlueprintEditorUtils::MarkBlueprintAsModified(WB);
+                TSharedPtr<FJsonObject> R = MakeShared<FJsonObject>();
+                R->SetBoolField(TEXT("success"), true);
+                R->SetStringField(TEXT("widget"), WidgetName);
+                R->SetStringField(TEXT("property"), PropertyName);
+                R->SetStringField(TEXT("value"), Value);
+                return SerializeJsonObj(R);
+            }
+            FMemory::Free(TempValue);
+        }
+    }
+
+    const TCHAR* ImportResult = Prop->ImportText_Direct(*Value, ValueAddr, ValueOwner, PPF_None);
     if (!ImportResult)
         return UmgErrorJson(FString::Printf(TEXT("Failed to set property '%s' to '%s'."), *PropertyName, *Value));
 
@@ -453,6 +528,35 @@ FString UMCPythonHelper::UmgReparentWidget(UBlueprint* WidgetBP, const FString& 
     R->SetBoolField(TEXT("success"), true);
     R->SetStringField(TEXT("widget"), WidgetName);
     R->SetStringField(TEXT("new_parent"), NewParentName);
+    return SerializeJsonObj(R);
+}
+
+FString UMCPythonHelper::UmgMoveWidget(UBlueprint* WidgetBP, const FString& WidgetName, int32 TargetIndex)
+{
+    UWidgetBlueprint* WB = Cast<UWidgetBlueprint>(WidgetBP);
+    if (!WB || !WB->WidgetTree) return UmgErrorJson(TEXT("Not a WidgetBlueprint or no WidgetTree."));
+    UWidgetTree* WT = WB->WidgetTree;
+
+    UWidget* Widget = WT->FindWidget(FName(*WidgetName));
+    if (!Widget) return UmgErrorJson(FString::Printf(TEXT("Widget '%s' not found."), *WidgetName));
+    UPanelWidget* Parent = Cast<UPanelWidget>(Widget->GetParent());
+    if (!Parent) return UmgErrorJson(FString::Printf(TEXT("Widget '%s' has no panel parent to move within."), *WidgetName));
+    const int32 ChildCount = Parent->GetChildrenCount();
+    if (TargetIndex < 0 || TargetIndex >= ChildCount)
+        return UmgErrorJson(FString::Printf(TEXT("TargetIndex %d out of range [0,%d)."), TargetIndex, ChildCount));
+    const int32 CurrentIndex = Parent->GetChildIndex(Widget);
+    if (CurrentIndex == TargetIndex) return UmgErrorJson(FString::Printf(TEXT("Widget '%s' is already at index %d."), *WidgetName, TargetIndex));
+
+    WT->Modify();
+    Parent->RemoveChild(Widget);
+    Parent->InsertChildAt(TargetIndex, Widget);
+
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WB);
+    TSharedPtr<FJsonObject> R = MakeShared<FJsonObject>();
+    R->SetBoolField(TEXT("success"), true);
+    R->SetStringField(TEXT("widget"), WidgetName);
+    R->SetStringField(TEXT("parent"), Parent->GetName());
+    R->SetNumberField(TEXT("index"), TargetIndex);
     return SerializeJsonObj(R);
 }
 

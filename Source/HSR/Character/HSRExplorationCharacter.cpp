@@ -4,6 +4,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
+#include "../Player/HSRPlayerController.h"
 #include "../Interaction/HSRInteractionComponent.h"
 
 AHSRExplorationCharacter::AHSRExplorationCharacter()
@@ -71,10 +72,15 @@ void AHSRExplorationCharacter::SetupPlayerInputComponent(UInputComponent* Player
 
 void AHSRExplorationCharacter::Move(const FInputActionValue& Value)
 {
-	FVector2D MovementVector = Value.Get<FVector2D>();
-
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC) return;
+	if (const AHSRPlayerController* HSRPC = Cast<AHSRPlayerController>(PC))
+	{
+		const EHSRPlayerControlMode Mode = HSRPC->GetControlMode();
+		if (Mode != EHSRPlayerControlMode::Exploration) return;
+	}
+
+	FVector2D MovementVector = Value.Get<FVector2D>();
 
 	const FRotator YawRotation(0.0f, PC->GetControlRotation().Yaw, 0.0f);
 	const FVector Forward = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
@@ -86,10 +92,20 @@ void AHSRExplorationCharacter::Move(const FInputActionValue& Value)
 
 void AHSRExplorationCharacter::Look(const FInputActionValue& Value)
 {
-	FVector2D LookAxis = Value.Get<FVector2D>();
-
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC) return;
+	EHSRPlayerControlMode Mode = EHSRPlayerControlMode::Exploration;
+	if (const AHSRPlayerController* HSRPC = Cast<AHSRPlayerController>(PC))
+	{
+		Mode = HSRPC->GetControlMode();
+		if (Mode != EHSRPlayerControlMode::Exploration)
+		{
+			UE_LOG(LogTemp, Log, TEXT("HSRExplorationCharacter::Look - BLOCKED Mode=%d (non-exploration)"), static_cast<int32>(Mode));
+			return;
+		}
+	}
+
+	FVector2D LookAxis = Value.Get<FVector2D>();
 
 	PC->AddYawInput(LookAxis.X);
 	PC->AddPitchInput(LookAxis.Y);

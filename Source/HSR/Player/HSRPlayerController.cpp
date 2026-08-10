@@ -8,7 +8,14 @@
 #include "../UI/HSRScreenStackTypes.h"
 #include "../UI/HSRUIManagerSubsystem.h"
 #include "../Battle/HSRBattleTransitionSubsystem.h"
+#include "../Battle/HSRBattleGameMode.h"
 #include "../Battle/HSRExplorationReturnConsumer.h"
+#include "../Party/HSRPartySubsystem.h"
+#include "../Party/HSRPartyTypes.h"
+#include "../Progression/HSRCharacterProfileSubsystem.h"
+#include "../Data/Definitions/HSRCharacterDefinition.h"
+#include "GameFramework/Pawn.h"
+#include "InputCoreTypes.h"
 #include "EngineUtils.h"
 
 AHSRPlayerController::AHSRPlayerController()
@@ -31,6 +38,10 @@ void AHSRPlayerController::SetupInputComponent()
 	if (InputComponent)
 	{
 		InputComponent->Priority = FrontendInputPriority;
+		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &ThisClass::HandlePartySlot1);
+		InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &ThisClass::HandlePartySlot2);
+		InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &ThisClass::HandlePartySlot3);
+		InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &ThisClass::HandlePartySlot4);
 	}
 	AddFrontendNavigationContext();
 	if (UEnhancedInputComponent* Enhanced = Cast<UEnhancedInputComponent>(InputComponent);
@@ -112,8 +123,55 @@ void AHSRPlayerController::BeginPlay()
 			}
 		}
 	}
-	SetControlMode(EHSRPlayerControlMode::Exploration);
+	// Battle maps use UI input for the command panel.  The old unconditional
+	// Exploration mode made Mouse2D feed the exploration pawn even though the
+	// battle widget was visible, so cursor movement rotated the camera instead
+	// of reaching Slate buttons.
+	const bool bIsBattleWorld = GetWorld() && Cast<AHSRBattleGameMode>(GetWorld()->GetAuthGameMode()) != nullptr;
+	SetControlMode(bIsBattleWorld ? EHSRPlayerControlMode::Battle : EHSRPlayerControlMode::Exploration);
 }
+
+bool AHSRPlayerController::SwitchExplorationCharacter(int32 PartySlot)
+{
+	if (CurrentControlMode != EHSRPlayerControlMode::Exploration || !GetWorld()) return false;
+	UGameInstance* GI = GetGameInstance();
+	UHSRPartySubsystem* Party = GI ? GI->GetSubsystem<UHSRPartySubsystem>() : nullptr;
+	UHSRCharacterProfileSubsystem* Profiles = GI ? GI->GetSubsystem<UHSRCharacterProfileSubsystem>() : nullptr;
+	FHSRPartySnapshot PartySnapshot;
+	if (!Party || !Profiles || !Party->GetSnapshot(PartySnapshot) || !PartySnapshot.Slots.IsValidIndex(PartySlot)
+		|| PartySnapshot.Slots[PartySlot].IsEmpty()) return false;
+	const FName CharacterId = PartySnapshot.Slots[PartySlot].CharacterId;
+	const UHSRCharacterDefinition* Definition = nullptr;
+	if (!Profiles->GetDefinition(CharacterId, Definition) || !Definition || Definition->CharacterClass.IsNull()) return false;
+	UClass* CharacterClass = Definition->CharacterClass.LoadSynchronous();
+	if (!CharacterClass || !CharacterClass->IsChildOf<APawn>()) return false;
+	APawn* PreviousPawn = GetPawn();
+	const FTransform SpawnTransform = PreviousPawn ? PreviousPawn->GetActorTransform() : FTransform::Identity;
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	APawn* NewPawn = GetWorld()->SpawnActor<APawn>(CharacterClass, SpawnTransform, SpawnParameters);
+	if (!NewPawn) return false;
+	Possess(NewPawn);
+	if (GetPawn() != NewPawn)
+	{
+		NewPawn->Destroy();
+		return false;
+	}
+	if (Party->SetActiveSlot(PartySlot) != EHSRPartyResult::Success)
+	{
+		if (PreviousPawn) Possess(PreviousPawn);
+		NewPawn->Destroy();
+		return false;
+	}
+	if (PreviousPawn && PreviousPawn != NewPawn) PreviousPawn->Destroy();
+	UE_LOG(LogTemp, Log, TEXT("HSR Exploration character switched Slot=%d CharacterId=%s Pawn=%s"), PartySlot, *CharacterId.ToString(), *NewPawn->GetName());
+	return true;
+}
+
+void AHSRPlayerController::HandlePartySlot1() { SwitchExplorationCharacter(0); }
+void AHSRPlayerController::HandlePartySlot2() { SwitchExplorationCharacter(1); }
+void AHSRPlayerController::HandlePartySlot3() { SwitchExplorationCharacter(2); }
+void AHSRPlayerController::HandlePartySlot4() { SwitchExplorationCharacter(3); }
 
 void AHSRPlayerController::OnPossess(APawn* InPawn)
 {
@@ -176,8 +234,10 @@ void AHSRPlayerController::OnUnPossess()
 void AHSRPlayerController::SetControlMode(EHSRPlayerControlMode NewMode)
 {
 	FHSRInputModePolicy Policy;
-	Policy.InputIntent = NewMode == EHSRPlayerControlMode::UIOnly ? EHSRUIInputIntent::UIOnly : EHSRUIInputIntent::GameOnly;
-	Policy.bShowMouseCursor = NewMode == EHSRPlayerControlMode::UIOnly;
+	Policy.InputIntent = NewMode == EHSRPlayerControlMode::UIOnly
+		? EHSRUIInputIntent::UIOnly
+		: (NewMode == EHSRPlayerControlMode::Battle ? EHSRUIInputIntent::GameAndUI : EHSRUIInputIntent::GameOnly);
+	Policy.bShowMouseCursor = NewMode == EHSRPlayerControlMode::UIOnly || NewMode == EHSRPlayerControlMode::Battle;
 	ApplyUIInputPolicy(Policy, NewMode);
 	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::SetControlMode - Applied mode %d"),
 		static_cast<uint8>(CurrentControlMode));
@@ -194,10 +254,10 @@ bool AHSRPlayerController::ApplyUIInputPolicy(const FHSRInputModePolicy& Policy,
 	{
 		return true;
 	}
-	if (bControlModeApplied)
-	{
-		RemoveExplorationContext();
-	}
+	// The exploration mapping context only ever belongs to exploration.  Removing it on every
+	// mode switch (not just the first) keeps Mouse2D from reaching the pawn while the battle
+	// command panel is up, independent of the ApplyUIInputPolicy short-circuit above.
+	RemoveExplorationContext();
 
 	switch (Policy.InputIntent)
 	{
@@ -226,6 +286,10 @@ bool AHSRPlayerController::ApplyUIInputPolicy(const FHSRInputModePolicy& Policy,
 	CurrentControlMode = SemanticMode;
 	AppliedInputIntent = Policy.InputIntent;
 	bShowMouseCursor = Policy.bShowMouseCursor;
+	const bool bBlockPawnInput = SemanticMode == EHSRPlayerControlMode::Battle
+		|| SemanticMode == EHSRPlayerControlMode::UIOnly;
+	SetIgnoreMoveInput(bBlockPawnInput);
+	SetIgnoreLookInput(bBlockPawnInput);
 	if (SemanticMode == EHSRPlayerControlMode::Exploration && bInputSystemReady)
 	{
 		AddExplorationContext();

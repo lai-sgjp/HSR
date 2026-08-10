@@ -3,6 +3,8 @@
 #include "../Party/HSRPartySubsystem.h"
 #include "../Progression/HSRCharacterProfileSubsystem.h"
 #include "../Battle/HSRBattleTransitionSubsystem.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/TextBlock.h"
 #include "Engine/GameInstance.h"
 
 void UHSRPreBattleCandidateWidget::InitializeCandidate(const FHSREncounterRequest& Template)
@@ -84,7 +86,35 @@ void UHSRPreBattleCandidateWidget::HandlePartyChanged(int64)
 
 void UHSRPreBattleCandidateWidget::RefreshSnapshot()
 {
-	if (ViewModel) OnCandidateSnapshotChanged(ViewModel->GetSnapshot());
+	if (ViewModel)
+	{
+		const FHSRPreBattleCandidateSnapshot Snapshot = ViewModel->GetSnapshot();
+		UpdateSlotTextBlocks(Snapshot);
+		OnCandidateSnapshotChanged(Snapshot);
+	}
+}
+
+void UHSRPreBattleCandidateWidget::UpdateSlotTextBlocks(const FHSRPreBattleCandidateSnapshot& Snapshot)
+{
+	if (!WidgetTree) return;
+	// The panel renders up to four candidate slots.  Resolving by name keeps the C++ side
+	// independent of how many slot widgets the Blueprint actually places, and lets an authored
+	// panel show all committed members without hardcoding slot indices in the graph.
+	const FName SlotNames[] = { TEXT("Text_Slot0_Character"), TEXT("Text_Slot1_Character"),
+		TEXT("Text_Slot2_Character"), TEXT("Text_Slot3_Character") };
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(SlotNames); ++Index)
+	{
+		UTextBlock* TextBlock = WidgetTree->FindWidget<UTextBlock>(SlotNames[Index]);
+		if (!TextBlock) continue;
+		if (Snapshot.CandidateCharacterIds.IsValidIndex(Index) && !Snapshot.CandidateCharacterIds[Index].IsNone())
+		{
+			TextBlock->SetText(FText::FromName(Snapshot.CandidateCharacterIds[Index]));
+		}
+		else
+		{
+			TextBlock->SetText(FText::FromString(TEXT("Empty")));
+		}
+	}
 }
 
 void UHSRPreBattleCandidateWidget::NativeDestruct()

@@ -26,6 +26,7 @@ struct HSR_API FHSRPartySnapshot
 {
 	GENERATED_BODY()
 	UPROPERTY(BlueprintReadOnly) TArray<FHSRPartySlot> Slots;
+	UPROPERTY(BlueprintReadOnly) int32 ActiveSlot = 0;
 	UPROPERTY(BlueprintReadOnly) int64 Revision = 0;
 };
 

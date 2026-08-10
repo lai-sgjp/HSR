@@ -67,6 +67,13 @@ EHSRPreBattleCandidateResult UHSRPreBattleCandidateViewModel::ConfirmCandidate(F
 	}
 	OutRequest = Template;
 	OutRequest.PlayerCharacterId = CandidateCharacterIds[0];
+	// Densify: empty candidate slots are legal in the grid but meaningless as participants,
+	// so the committed request carries only filled members, leader first.
+	OutRequest.PlayerPartyIds.Reset();
+	for (const FName CharacterId : CandidateCharacterIds)
+	{
+		if (!CharacterId.IsNone()) OutRequest.PlayerPartyIds.Add(CharacterId);
+	}
 	OutRequest.BuffIds = BuffIds;
 	return EHSRPreBattleCandidateResult::Success;
 }

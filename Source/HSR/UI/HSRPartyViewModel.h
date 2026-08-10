@@ -32,6 +32,7 @@ struct HSR_API FHSRPartyFrontendSnapshot
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") TArray<FHSRPartySlotViewData> Slots;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") TArray<FName> AvailableCharacterIds;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") int64 Revision = 0;
+	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") int32 ActiveSlot = 0;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") bool bHasPendingChanges = false;
 };
 

@@ -121,18 +121,46 @@ EHSRPartyResult UHSRPartySubsystem::CommitCandidate(const FHSRPartySnapshot& Can
 		Seen.Add(Slot.CharacterId);
 	}
 	TArray<FHSRPartySlot> SlotsCandidate = Candidate.Slots;
-	return Commit(MoveTemp(SlotsCandidate)) ? EHSRPartyResult::Success : EHSRPartyResult::InvalidCandidate;
+	if (!Commit(MoveTemp(SlotsCandidate))) return EHSRPartyResult::InvalidCandidate;
+	if (Candidate.ActiveSlot >= 0 && Candidate.ActiveSlot < Capacity && !Slots[Candidate.ActiveSlot].IsEmpty())
+	{
+		if (ActiveSlot != Candidate.ActiveSlot)
+		{
+			ActiveSlot = Candidate.ActiveSlot;
+			++Revision;
+			PartyChanged.Broadcast(Revision);
+		}
+	}
+	return EHSRPartyResult::Success;
 }
 
 bool UHSRPartySubsystem::GetSnapshot(FHSRPartySnapshot& OutSnapshot) const
 {
-	OutSnapshot.Slots = Slots; OutSnapshot.Revision = Revision; return true;
+	OutSnapshot.Slots = Slots; OutSnapshot.ActiveSlot = ActiveSlot; OutSnapshot.Revision = Revision; return true;
+}
+
+EHSRPartyResult UHSRPartySubsystem::SetActiveSlot(int32 Slot)
+{
+	if (!IsValidSlot(Slot)) return EHSRPartyResult::InvalidSlot;
+	if (Slots[Slot].IsEmpty()) return EHSRPartyResult::EmptySlot;
+	if (ActiveSlot == Slot) return EHSRPartyResult::Success;
+	ActiveSlot = Slot;
+	++Revision;
+	PartyChanged.Broadcast(Revision);
+	return EHSRPartyResult::Success;
 }
 
 bool UHSRPartySubsystem::PrepareRestore(const FHSRPartySnapshot& Saved,FHSRPartySnapshot& Out) const
 {
 	// A narrower roster is accepted and padded: legacy USaveGame blobs reach restore without
 	// passing through MigrateToCurrent, so they still carry the pre-widening slot count.
-	if(Saved.Slots.Num()>Capacity||Saved.Revision<0)return false; TSet<FName> Seen;
-	for(const auto& Slot:Saved.Slots){ if(Slot.IsEmpty())continue; if(Seen.Contains(Slot.CharacterId)||!IsKnownProfile(Slot.CharacterId))return false; Seen.Add(Slot.CharacterId); } Out=Saved; Out.Slots.SetNum(Capacity); return true;
+	if(Saved.Slots.Num()>Capacity||Saved.Revision<0||Saved.ActiveSlot<0||Saved.ActiveSlot>=Capacity)return false; TSet<FName> Seen;
+	for(const auto& Slot:Saved.Slots){ if(Slot.IsEmpty())continue; if(Seen.Contains(Slot.CharacterId)||!IsKnownProfile(Slot.CharacterId))return false; Seen.Add(Slot.CharacterId); }
+	Out=Saved; Out.Slots.SetNum(Capacity);
+	if (Out.Slots[Out.ActiveSlot].IsEmpty())
+	{
+		Out.ActiveSlot = Out.Slots.IndexOfByPredicate([](const FHSRPartySlot& Slot){ return !Slot.IsEmpty(); });
+		if (Out.ActiveSlot == INDEX_NONE) Out.ActiveSlot = 0;
+	}
+	return true;
 }

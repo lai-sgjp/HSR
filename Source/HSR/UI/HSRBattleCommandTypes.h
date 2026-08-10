@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "../Battle/HSRBattleTypes.h"
+#include "../Reward/HSRRewardTypes.h"
 #include "../GAS/Ability/HSRAbilityTypes.h"
 #include "../Status/HSRStatusTypes.h"
 #include "HSRBattleCommandTypes.generated.h"
@@ -53,6 +54,9 @@ struct FHSRBattleResultViewState
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Result") FGuid RequestId;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Result") EHSRBattleOutcome Outcome = EHSRBattleOutcome::None;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Result") FName DefeatedParticipantId;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Result") FName RewardDefinitionId;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Result") TArray<FHSRInventoryGrant> RewardGrants;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Result") int64 RewardRevision = 0;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Result") bool bVisible = false;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Result") bool bConfirmPending = false;
 };

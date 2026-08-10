@@ -66,6 +66,7 @@ public:
 	void ResolveCommandSubmit(const FGuid& BattleId, const FHSRAbilityResolution& Resolution);
 	void ClearCommandLocks();
 	bool ShowBattleResult(const FHSRBattleResult& Result);
+	void SetBattleResultReward(const FHSRRewardReceipt& Receipt);
 	bool RequestBattleResultConfirm();
 	void RejectBattleResultConfirm(const FGuid& RequestId);
 	void ClearBattleResult();

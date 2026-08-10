@@ -1618,6 +1618,26 @@ UHSRBattleCoordinator* AHSRBattleGameMode::CreateRepeatableBreakAutomationFixtur
 void AHSRBattleGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+	// Battle command input is UI-driven.  Set this before any widget is created so the
+	// exploration mapping context cannot consume Mouse2D.  GetFirstPlayerController can be
+	// null during world bring-up, so defer one frame to guarantee the controller exists and
+	// the mode sticks (the PlayerController's own BeginPlay may have run before the GameMode's).
+	if (UWorld* World = GetWorld())
+	{
+		FTimerHandle UnusedHandle;
+		World->GetTimerManager().SetTimer(UnusedHandle, [this, World]()
+		{
+			if (AHSRPlayerController* PlayerController = Cast<AHSRPlayerController>(World->GetFirstPlayerController()))
+			{
+				PlayerController->SetControlMode(EHSRPlayerControlMode::Battle);
+				UE_LOG(LogTemp, Log, TEXT("HSRBattleGameMode DeferredSetControlMode Applied Battle (PC=%s)"), *PlayerController->GetName());
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("HSRBattleGameMode DeferredSetControlMode FAILED NoPC"));
+			}
+		}, 0.1f, false);
+	}
 
 	// Create the Coordinator (UObject, owned by this GameMode)
 	Coordinator = NewObject<UHSRBattleCoordinator>(this);
@@ -2352,6 +2372,16 @@ const auto RunP10001CommandHarnessLocal = [this]()
 	HandleCommandStateReady(Coordinator->GetCommandViewState());
 	if (BattleCommandWidgetClass)
 	{
+		// Guarantee battle input mode before the command panel mounts.  BeginPlay's early
+		// SetControlMode can miss the window while the player controller is still being
+		// established, and the deferred timer is best-effort; this is the deterministic gate.
+		if (APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
+		{
+			if (AHSRPlayerController* HSRPC = Cast<AHSRPlayerController>(PC))
+			{
+				HSRPC->SetControlMode(EHSRPlayerControlMode::Battle);
+			}
+		}
 		BattleCommandWidget = CreateWidget<UHSRBattleCommandWidget>(GetWorld(), BattleCommandWidgetClass);
 		if (BattleCommandWidget)
 		{
@@ -2650,6 +2680,13 @@ void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& Request
 		CommandViewModel->RejectBattleResultConfirm(RequestId);
 		UE_LOG(LogTemp, Warning, TEXT("P17-PATCH-03D2 Settlement Result=REJECTED RequestId=%s ConfirmRestored=1"), *RequestId.ToString());
 		return;
+	}
+	if (CommandViewModel && SettlementState.bSettlementCommitted)
+	{
+		// The reward authority owns the committed receipt.  Publish that exact
+		// receipt into the already-visible result view before travel, so UMG can
+		// render item ids, quantities and unique instance ids without re-rolling.
+		CommandViewModel->SetBattleResultReward(SettlementState.Receipt.RewardReceipt);
 	}
 
 	if (!SettlementState.bHasCommittedBattleResult)

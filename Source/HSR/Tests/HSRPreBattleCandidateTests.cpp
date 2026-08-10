@@ -41,6 +41,9 @@ bool FHSRPreBattleCandidateTest::RunTest(const FString&)
 	FHSREncounterRequest Request;
 	TestEqual(TEXT("confirm builds pure request"), ViewModel->ConfirmCandidate(Request), EHSRPreBattleCandidateResult::Success);
 	TestEqual(TEXT("request uses candidate leader"), Request.PlayerCharacterId, FName(TEXT("Character.A")));
+	TestEqual(TEXT("request carries full candidate party"), Request.PlayerPartyIds.Num(), 2);
+	TestEqual(TEXT("request party leader first"), Request.PlayerPartyIds[0], FName(TEXT("Character.A")));
+	TestEqual(TEXT("request party carries second member"), Request.PlayerPartyIds[1], FName(TEXT("Character.B")));
 	TestEqual(TEXT("request carries encounter"), Request.EncounterId, Template.EncounterId);
 	TestEqual(TEXT("request carries buff metadata"), ViewModel->GetSnapshot().BuffIds.Num(), 1);
 	TestEqual(TEXT("request carries buff ids"), Request.BuffIds.Num(), 1);

@@ -42,6 +42,7 @@ protected:
 private:
 	void HandlePartyChanged(int64 Revision);
 	void RefreshSnapshot();
+	void UpdateSlotTextBlocks(const FHSRPreBattleCandidateSnapshot& Snapshot);
 	UPROPERTY(Transient) TObjectPtr<UHSRPreBattleCandidateViewModel> ViewModel;
 	FDelegateHandle PartyChangedHandle;
 };

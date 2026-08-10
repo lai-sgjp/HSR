@@ -17,6 +17,7 @@ SUPPORTED_WIDGET_TYPES = [
     "HorizontalBox", "VerticalBox", "Border", "Overlay",
     "ScrollBox", "SizeBox", "CheckBox", "EditableText",
     "EditableTextBox", "ProgressBar", "Slider",
+    "ComboBoxString",
 ]
 
 
@@ -276,6 +277,18 @@ def ue_wrap_widget(asset_path: str = None, widget_name: str = None,
     try:
         return _umg_call_and_save(asset_path,
             lambda bp: unreal.MCPythonHelper.umg_wrap_widget(bp, widget_name, wrapper_type, wrapper_name))
+    except Exception as e:
+        return json.dumps({"success": False, "message": str(e), "traceback": traceback.format_exc()})
+
+
+def ue_move_widget(asset_path: str = None, widget_name: str = None, target_index: int = None) -> str:
+    """Moves a widget to a specific child index within its current panel parent."""
+    if asset_path is None or widget_name is None or target_index is None:
+        return json.dumps({"success": False,
+                           "message": "Required parameters: asset_path, widget_name, target_index."})
+    try:
+        return _umg_call_and_save(asset_path,
+            lambda bp: unreal.MCPythonHelper.umg_move_widget(bp, widget_name, target_index))
     except Exception as e:
         return json.dumps({"success": False, "message": str(e), "traceback": traceback.format_exc()})
 

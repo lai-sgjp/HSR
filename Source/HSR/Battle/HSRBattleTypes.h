@@ -142,6 +142,9 @@ struct FHSRBattleRequestContext
 	UPROPERTY(BlueprintReadOnly, Category = "Battle")
 	FName EncounterId;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Reward")
+	FName RewardDefinitionId;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Battle")
 	FName EnemyDefinitionId;
 
@@ -220,6 +223,9 @@ struct FHSRBattleResult
 
 	UPROPERTY(BlueprintReadOnly, Category = "Battle")
 	FName EncounterId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Reward")
+	FName RewardDefinitionId;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Battle")
 	FHSRBattleReturnContext ReturnContext;

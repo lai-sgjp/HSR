@@ -15,6 +15,10 @@ public:
 	void SetViewModel(UHSRPartyViewModel* InViewModel);
 	UFUNCTION(BlueprintPure, Category = "HSR|Party")
 	bool GetCurrentSnapshot(FHSRPartyFrontendSnapshot& OutSnapshot) const;
+	UFUNCTION(BlueprintPure, Category = "HSR|Party") int32 GetSlotCount() const { return Current.Slots.Num(); }
+	UFUNCTION(BlueprintPure, Category = "HSR|Party") bool GetSlotAt(int32 SlotIndex, FHSRPartySlotViewData& OutSlot) const;
+	UFUNCTION(BlueprintPure, Category = "HSR|Party") bool IsSlotOccupied(int32 SlotIndex) const;
+	UFUNCTION(BlueprintPure, Category = "HSR|Party") FName GetSlotCharacterId(int32 SlotIndex) const;
 	UFUNCTION(BlueprintCallable, Category = "HSR|Party") EHSRPartyResult SetCandidateSlot(int32 SlotIndex, FName CharacterId);
 	UFUNCTION(BlueprintCallable, Category = "HSR|Party") EHSRPartyResult ClearCandidateSlot(int32 SlotIndex);
 	UFUNCTION(BlueprintCallable, Category = "HSR|Party") EHSRPartyResult SwapCandidateSlots(int32 FirstSlot, int32 SecondSlot);
