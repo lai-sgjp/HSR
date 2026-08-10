@@ -193,44 +193,35 @@ void AHSRPlayerController::OnUnPossess()
 	Super::OnUnPossess();
 }
 
-namespace
+void AHSRPlayerController::BuildPolicyForControlMode(EHSRPlayerControlMode Mode, FHSRInputModePolicy& OutPolicy)
 {
-/**
- * Single mapping from semantic control mode to input policy. It lives here rather than on the
- * class because the header only forward-declares FHSRInputModePolicy on purpose, and returning
- * it by value from a member would force the full include on every consumer of this controller.
- */
-FHSRInputModePolicy BuildPolicyForControlMode(const EHSRPlayerControlMode Mode)
-{
-	FHSRInputModePolicy Policy;
 	switch (Mode)
 	{
 	case EHSRPlayerControlMode::UIOnly:
 		// Menus and the result panel: the pawn is not meant to receive anything.
-		Policy.InputIntent = EHSRUIInputIntent::UIOnly;
-		Policy.bShowMouseCursor = true;
+		OutPolicy.InputIntent = EHSRUIInputIntent::UIOnly;
+		OutPolicy.bShowMouseCursor = true;
 		break;
 	case EHSRPlayerControlMode::Battle:
 		// The command panel needs clicks, but the battle world still runs game input
 		// (abilities, camera framing), so this is GameAndUI rather than UIOnly. The
 		// pawn keeps ticking; ApplyUIInputPolicy suppresses look/move separately,
 		// because the exploration pawn is what the battle world possesses.
-		Policy.InputIntent = EHSRUIInputIntent::GameAndUI;
-		Policy.bShowMouseCursor = true;
+		OutPolicy.InputIntent = EHSRUIInputIntent::GameAndUI;
+		OutPolicy.bShowMouseCursor = true;
 		break;
 	case EHSRPlayerControlMode::Exploration:
 	default:
-		Policy.InputIntent = EHSRUIInputIntent::GameOnly;
-		Policy.bShowMouseCursor = false;
+		OutPolicy.InputIntent = EHSRUIInputIntent::GameOnly;
+		OutPolicy.bShowMouseCursor = false;
 		break;
 	}
-	return Policy;
-}
 }
 
 void AHSRPlayerController::SetControlMode(EHSRPlayerControlMode NewMode)
 {
-	const FHSRInputModePolicy Policy = BuildPolicyForControlMode(NewMode);
+	FHSRInputModePolicy Policy;
+	BuildPolicyForControlMode(NewMode, Policy);
 	ApplyUIInputPolicy(Policy, NewMode);
 	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::SetControlMode - Applied mode %d"),
 		static_cast<uint8>(CurrentControlMode));

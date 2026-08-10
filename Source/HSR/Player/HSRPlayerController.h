@@ -43,6 +43,15 @@ public:
 	 */
 	EHSRPlayerControlMode ResolveControlModeForCurrentWorld() const;
 
+	/**
+	 * Single mapping from semantic control mode to input policy, and the reason Battle used to
+	 * behave exactly like Exploration: the previous either/or derivation only ever tested for
+	 * UIOnly, so Battle silently fell through to GameOnly with the cursor hidden. Static and
+	 * pure so the mapping is testable without a world, and it fills a reference rather than
+	 * returning by value to keep FHSRInputModePolicy forward-declared for consumers.
+	 */
+	static void BuildPolicyForControlMode(EHSRPlayerControlMode Mode, FHSRInputModePolicy& OutPolicy);
+
 	bool ApplyUIInputPolicy(const FHSRInputModePolicy& Policy, EHSRPlayerControlMode SemanticMode);
 	static bool ShouldBindFrontendInputComponent(const UInputComponent* Bound, const UInputComponent* Current)
 	{
