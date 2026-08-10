@@ -1502,6 +1502,15 @@ int64 UHSRUIManagerSubsystem::AllocateRequestToken()
 bool UHSRUIManagerSubsystem::RestoreFrontendModuleFocus(AHSRPlayerController* PlayerController,
 	const EHSRFrontendModule Module)
 {
+	// Shared-root modules all restore focus the same way, so they route through the predicate rather
+	// than a case list. Listing them here as well meant a new module compiled and silently lost focus
+	// restore until someone noticed the missing case.
+	if (HSRFrontendModule::UsesSharedModuleRoot(Module))
+	{
+		return FrontendModuleRootInstance
+			&& ApplyFocusBackend(PlayerController, FrontendModuleRootInstance->GetPreferredFocusWidget(),
+				FrontendModuleRootInstance) != EHSRFocusApplyResult::Unavailable;
+	}
 	switch (Module)
 	{
 	case EHSRFrontendModule::Character:
@@ -1530,14 +1539,6 @@ bool UHSRUIManagerSubsystem::RestoreFrontendModuleFocus(AHSRPlayerController* Pl
 			&& ApplyFocusBackend(PlayerController, PreferredFocus,
 				FrontendModuleContentInstance) != EHSRFocusApplyResult::Unavailable;
 	}
-	case EHSRFrontendModule::Party:
-	case EHSRFrontendModule::Map:
-	case EHSRFrontendModule::Challenge:
-	case EHSRFrontendModule::Quest:
-	case EHSRFrontendModule::Save:
-		return FrontendModuleRootInstance
-			&& ApplyFocusBackend(PlayerController, FrontendModuleRootInstance->GetPreferredFocusWidget(),
-				FrontendModuleRootInstance) != EHSRFocusApplyResult::Unavailable;
 	case EHSRFrontendModule::PauseHub:
 		return FrontendShellInstance
 			&& ApplyFocusBackend(PlayerController, FrontendShellInstance->GetPreferredFocusWidget(),
