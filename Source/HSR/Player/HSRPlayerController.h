@@ -36,6 +36,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Control")
 	EHSRPlayerControlMode GetControlMode() const { return CurrentControlMode; }
 
+	/**
+	 * Control mode implied by the world this controller currently lives in. The battle GameMode's
+	 * presence is the signal, so no cross-world PlayerController lookup is needed: callers run
+	 * this on themselves at a point where `this` is already valid.
+	 */
+	EHSRPlayerControlMode ResolveControlModeForCurrentWorld() const;
+
 	bool ApplyUIInputPolicy(const FHSRInputModePolicy& Policy, EHSRPlayerControlMode SemanticMode);
 	static bool ShouldBindFrontendInputComponent(const UInputComponent* Bound, const UInputComponent* Current)
 	{
