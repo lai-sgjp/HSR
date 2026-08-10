@@ -822,9 +822,10 @@ bool FHSRRepeatableBreakPatchTest::RunTest(const FString& Parameters)
 		const FHSRBattleParticipant& Target = Coordinator->GetParticipants()[1];
 		if (!Source.AbilitySystemComponent.IsValid() || !Target.AbilitySystemComponent.IsValid() || !Coordinator->GetTurnManager()) return false;
 		const UHSRSkillDefinition* Skill = Coordinator->GetBasicAttackDefinition();
-		const FString Element = Skill->ElementTag.ToString();
-		const FGameplayTag Weakness = Element.StartsWith(TEXT("Element."))
-			? FGameplayTag::RequestGameplayTag(FName(*FString::Printf(TEXT("Weakness.%s"), *Element.RightChop(8))), false) : FGameplayTag();
+		// Derive through the production helper rather than re-deriving here. Open-coding the rule
+		// made this test validate its own copy of it, so a change to the real derivation would
+		// leave the fixture building weaknesses by the old rule and hide the regression.
+		const FGameplayTag Weakness = FHSRToughnessConfiguration::GetWeaknessTagFor(Skill->ElementTag);
 		FHSRBattleParticipant& MutableTarget = const_cast<FHSRBattleParticipant&>(Target);
 		MutableTarget.WeaknessTags.Reset();
 		if (bWeakness && Weakness.IsValid()) MutableTarget.WeaknessTags.AddTag(Weakness);
