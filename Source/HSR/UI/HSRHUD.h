@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
 #include "../Interaction/HSRInteractionTypes.h"
+#include "Frontend/HSRFrontendRouteTypes.h"
 #include "HSRHUD.generated.h"
 
 class UHSRUserWidget;
@@ -91,6 +92,15 @@ protected:
 	TSubclassOf<UUserWidget> QuestWidgetClass;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
 	TSubclassOf<UUserWidget> SaveWidgetClass;
+
+	/**
+	 * Collects the authored module widget classes into the keyed map the UI manager routes on. The
+	 * properties above stay separate named fields because they are Blueprint-authored defaults that
+	 * already carry values in the HUD asset; a single map property would drop that authoring. Adding
+	 * a module means one property here plus one line below, and no change to routing itself.
+	 */
+	TMap<EHSRFrontendModule, TSubclassOf<UUserWidget>> BuildFrontendModuleWidgetClasses() const;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P13")
 	TSubclassOf<UHSRRewardSummaryWidget> RewardSummaryWidgetClass;
 	UPROPERTY(Transient)

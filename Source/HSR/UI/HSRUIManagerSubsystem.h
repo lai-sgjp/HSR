@@ -46,11 +46,7 @@ public:
 		TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass,
 		TSubclassOf<UHSRInventoryModuleWidget> InInventoryModuleWidgetClass,
 		TSubclassOf<UHSRDialogueOverlayWidget> InDialogueOverlayWidgetClass,
-		TSubclassOf<UUserWidget> InPartyWidgetClass,
-		TSubclassOf<UUserWidget> InMapWidgetClass,
-		TSubclassOf<UUserWidget> InChallengeWidgetClass,
-		TSubclassOf<UUserWidget> InQuestWidgetClass,
-		TSubclassOf<UUserWidget> InSaveWidgetClass);
+		const TMap<EHSRFrontendModule, TSubclassOf<UUserWidget>>& InFrontendModuleWidgetClasses);
 	EHSRUIScreenResult UnregisterExplorationHost(AHSRHUD* HUD, AHSRPlayerController* PlayerController);
 	EHSRUIScreenResult TeardownExplorationHostForTravel(AHSRHUD* HUD, AHSRPlayerController* PlayerController);
 	EHSRUIScreenResult PrepareExplorationTravel();
@@ -286,21 +282,6 @@ private:
 
 	UPROPERTY(Transient)
 	TSubclassOf<UHSRDialogueOverlayWidget> DialogueOverlayWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> PartyWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> MapWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> ChallengeWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> QuestWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> SaveWidgetClass;
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AHSRHUD> RegisteredHUD;
