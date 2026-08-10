@@ -1498,6 +1498,15 @@ namespace HSRBattleDevelopmentTest
 AHSRBattleGameMode::AHSRBattleGameMode()
 {
 	PrimaryActorTick.bCanEverTick = false;
+
+	// Without this the battle world falls back to the engine's APlayerController, so none of
+	// AHSRPlayerController's battle handling runs: SetControlMode is never called, the input
+	// mode stays GameOnly, the cursor stays hidden, and the command panel cannot be clicked.
+	// Exploration only worked because BP_HSRGameMode happens to set this in the asset; relying
+	// on Blueprint wiring is what let the battle side ship with it simply missing. Setting the
+	// default here makes the requirement part of the C++ contract while leaving Blueprint free
+	// to override it.
+	PlayerControllerClass = AHSRPlayerController::StaticClass();
 }
 
 TArray<UHSRSkillDefinition*> AHSRBattleGameMode::ResolveDefaultSkillLoadout() const
@@ -1618,27 +1627,6 @@ UHSRBattleCoordinator* AHSRBattleGameMode::CreateRepeatableBreakAutomationFixtur
 void AHSRBattleGameMode::BeginPlay()
 {
 	Super::BeginPlay();
-	// Battle command input is UI-driven.  Set this before any widget is created so the
-	// exploration mapping context cannot consume Mouse2D.  GetFirstPlayerController can be
-	// null during world bring-up, so defer one frame to guarantee the controller exists and
-	// the mode sticks (the PlayerController's own BeginPlay may have run before the GameMode's).
-	if (UWorld* World = GetWorld())
-	{
-		FTimerHandle UnusedHandle;
-		World->GetTimerManager().SetTimer(UnusedHandle, [this, World]()
-		{
-			if (AHSRPlayerController* PlayerController = Cast<AHSRPlayerController>(World->GetFirstPlayerController()))
-			{
-				PlayerController->SetControlMode(EHSRPlayerControlMode::Battle);
-				UE_LOG(LogTemp, Log, TEXT("HSRBattleGameMode DeferredSetControlMode Applied Battle (PC=%s)"), *PlayerController->GetName());
-			}
-			else
-			{
-				UE_LOG(LogTemp, Warning, TEXT("HSRBattleGameMode DeferredSetControlMode FAILED NoPC"));
-			}
-		}, 0.1f, false);
-	}
-
 	// Create the Coordinator (UObject, owned by this GameMode)
 	Coordinator = NewObject<UHSRBattleCoordinator>(this);
 	if (!Coordinator)
@@ -2372,16 +2360,6 @@ const auto RunP10001CommandHarnessLocal = [this]()
 	HandleCommandStateReady(Coordinator->GetCommandViewState());
 	if (BattleCommandWidgetClass)
 	{
-		// Guarantee battle input mode before the command panel mounts.  BeginPlay's early
-		// SetControlMode can miss the window while the player controller is still being
-		// established, and the deferred timer is best-effort; this is the deterministic gate.
-		if (APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
-		{
-			if (AHSRPlayerController* HSRPC = Cast<AHSRPlayerController>(PC))
-			{
-				HSRPC->SetControlMode(EHSRPlayerControlMode::Battle);
-			}
-		}
 		BattleCommandWidget = CreateWidget<UHSRBattleCommandWidget>(GetWorld(), BattleCommandWidgetClass);
 		if (BattleCommandWidget)
 		{

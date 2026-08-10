@@ -123,12 +123,17 @@ void AHSRPlayerController::BeginPlay()
 			}
 		}
 	}
-	// Battle maps use UI input for the command panel.  The old unconditional
-	// Exploration mode made Mouse2D feed the exploration pawn even though the
-	// battle widget was visible, so cursor movement rotated the camera instead
-	// of reaching Slate buttons.
-	const bool bIsBattleWorld = GetWorld() && Cast<AHSRBattleGameMode>(GetWorld()->GetAuthGameMode()) != nullptr;
-	SetControlMode(bIsBattleWorld ? EHSRPlayerControlMode::Battle : EHSRPlayerControlMode::Exploration);
+	// Pick the mode from the world we actually landed in. Deciding here rather than from the
+	// battle GameMode avoids the PlayerController-lookup timing problem entirely: inside our
+	// own BeginPlay the controller is `this`, so there is nothing to find and nothing to defer.
+	SetControlMode(ResolveControlModeForCurrentWorld());
+}
+
+EHSRPlayerControlMode AHSRPlayerController::ResolveControlModeForCurrentWorld() const
+{
+	return Cast<AHSRBattleGameMode>(GetWorld() ? GetWorld()->GetAuthGameMode() : nullptr)
+		? EHSRPlayerControlMode::Battle
+		: EHSRPlayerControlMode::Exploration;
 }
 
 bool AHSRPlayerController::SwitchExplorationCharacter(int32 PartySlot)
@@ -202,6 +207,15 @@ void AHSRPlayerController::OnPossess(APawn* InPawn)
 		}
 	}
 
+	// Possession can land after BeginPlay in the battle world, so re-resolve rather than
+	// trusting the mode set earlier. Without this the exploration context would be added
+	// back on top of battle mode and the camera would orbit again.
+	const EHSRPlayerControlMode ResolvedMode = ResolveControlModeForCurrentWorld();
+	if (ResolvedMode != CurrentControlMode)
+	{
+		SetControlMode(ResolvedMode);
+	}
+
 	// SetupInputComponent owns the initial add, matching the UE 5.6 templates.
 	if (bInputSystemReady && CurrentControlMode == EHSRPlayerControlMode::Exploration)
 	{
@@ -231,13 +245,35 @@ void AHSRPlayerController::OnUnPossess()
 	Super::OnUnPossess();
 }
 
+void AHSRPlayerController::BuildPolicyForControlMode(EHSRPlayerControlMode Mode, FHSRInputModePolicy& OutPolicy)
+{
+	switch (Mode)
+	{
+	case EHSRPlayerControlMode::UIOnly:
+		// Menus and the result panel: the pawn is not meant to receive anything.
+		OutPolicy.InputIntent = EHSRUIInputIntent::UIOnly;
+		OutPolicy.bShowMouseCursor = true;
+		break;
+	case EHSRPlayerControlMode::Battle:
+		// The command panel needs clicks, but the battle world still runs game input
+		// (abilities, camera framing), so this is GameAndUI rather than UIOnly. The
+		// pawn keeps ticking; ApplyUIInputPolicy suppresses look/move separately,
+		// because the exploration pawn is what the battle world possesses.
+		OutPolicy.InputIntent = EHSRUIInputIntent::GameAndUI;
+		OutPolicy.bShowMouseCursor = true;
+		break;
+	case EHSRPlayerControlMode::Exploration:
+	default:
+		OutPolicy.InputIntent = EHSRUIInputIntent::GameOnly;
+		OutPolicy.bShowMouseCursor = false;
+		break;
+	}
+}
+
 void AHSRPlayerController::SetControlMode(EHSRPlayerControlMode NewMode)
 {
 	FHSRInputModePolicy Policy;
-	Policy.InputIntent = NewMode == EHSRPlayerControlMode::UIOnly
-		? EHSRUIInputIntent::UIOnly
-		: (NewMode == EHSRPlayerControlMode::Battle ? EHSRUIInputIntent::GameAndUI : EHSRUIInputIntent::GameOnly);
-	Policy.bShowMouseCursor = NewMode == EHSRPlayerControlMode::UIOnly || NewMode == EHSRPlayerControlMode::Battle;
+	BuildPolicyForControlMode(NewMode, Policy);
 	ApplyUIInputPolicy(Policy, NewMode);
 	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::SetControlMode - Applied mode %d"),
 		static_cast<uint8>(CurrentControlMode));
@@ -286,10 +322,24 @@ bool AHSRPlayerController::ApplyUIInputPolicy(const FHSRInputModePolicy& Policy,
 	CurrentControlMode = SemanticMode;
 	AppliedInputIntent = Policy.InputIntent;
 	bShowMouseCursor = Policy.bShowMouseCursor;
-	const bool bBlockPawnInput = SemanticMode == EHSRPlayerControlMode::Battle
-		|| SemanticMode == EHSRPlayerControlMode::UIOnly;
-	SetIgnoreMoveInput(bBlockPawnInput);
-	SetIgnoreLookInput(bBlockPawnInput);
+
+	// Suppress pawn look/move outside exploration. The battle world possesses the same
+	// exploration pawn, whose CameraBoom uses bUsePawnControlRotation, so a bare input-mode
+	// change is not enough: GameAndUI still delivers Mouse2D to the Look action and the
+	// camera would keep orbiting under the cursor. Gating here rather than in the pawn
+	// keeps one owner for the rule -- the pawn cannot know why input is suppressed.
+	//
+	// SetIgnoreLookInput/SetIgnoreMoveInput are reference counters, not booleans: calling
+	// the setter twice needs two matching releases. Reset first so repeated mode changes
+	// cannot strand a permanent suppression that would make exploration unrecoverable.
+	const bool bBlockPawnInput = SemanticMode != EHSRPlayerControlMode::Exploration;
+	ResetIgnoreInputFlags();
+	if (bBlockPawnInput)
+	{
+		SetIgnoreLookInput(true);
+		SetIgnoreMoveInput(true);
+	}
+
 	if (SemanticMode == EHSRPlayerControlMode::Exploration && bInputSystemReady)
 	{
 		AddExplorationContext();
