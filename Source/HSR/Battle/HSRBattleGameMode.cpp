@@ -2356,7 +2356,11 @@ const auto RunP10001CommandHarnessLocal = [this]()
 		if (BattleCommandWidget)
 		{
 			BattleCommandWidget->AddToViewport();
-			UE_LOG(LogTemp, Log, TEXT("P6-004A GameMode WidgetCreate Result=SUCCESS Class=%s Widget=%s"), *BattleCommandWidgetClass->GetName(), *BattleCommandWidget->GetName());
+			// The widget no longer fetches its own ViewModel, so the owner must hand both in. Without
+			// this the panel renders but submits nothing: every command came back InvalidBattle
+			// because the command sink was never set.
+			BattleCommandWidget->BindViewModel(CommandViewModel, Coordinator);
+			UE_LOG(LogTemp, Log, TEXT("P6-004A GameMode WidgetCreate Result=SUCCESS Class=%s Widget=%s Bound=1"), *BattleCommandWidgetClass->GetName(), *BattleCommandWidget->GetName());
 		}
 		else
 		{
