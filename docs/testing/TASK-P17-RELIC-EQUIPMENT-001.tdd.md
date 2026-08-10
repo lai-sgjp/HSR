@@ -79,3 +79,12 @@ automated evidence.
 Per user direction, failure PIE may remain unrun after code/Automation wiring
 review, and different-resolution checks are `NOT VERIFIED` and non-blocking.
 No User UAsset was created or modified in this implementation pass.
+
+## 2026-08-10 Demo handoff
+
+The user confirmed the enhancement path is fixed and chose Inventory as the
+current playable equipment entry for the demo. The dedicated relic equipment
+panel still builds candidate rows and binds their click bridges, but its visual
+candidate-list presentation is deferred for a later UI pass. This is a
+presentation backlog item, not an Equipment Authority or Inventory ownership
+gap. Unmatched relic slots are expected to publish zero candidates.

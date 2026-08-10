@@ -9,6 +9,7 @@
 #include "../Equipment/HSREquipmentSubsystem.h"
 #include "../Inventory/HSRInventorySubsystem.h"
 #include "../UI/Relic/HSRRelicEquipmentViewModel.h"
+#include "../UI/Relic/HSRRelicEquipmentWidget.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FHSRRelicEquipmentViewModelFlowTest,
@@ -264,6 +265,27 @@ bool FHSRRelicEnhancementUnaffordableTest::RunTest(const FString&)
 	TestEqual(TEXT("Enhancement level advanced"), Snapshot.CurrentEnhancementLevel, 1);
 
 	ViewModel->Shutdown();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRRelicStagePresentationPolicyTest,
+	"HSR.UI.RelicEquipment.StagePresentationPolicy",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSRRelicStagePresentationPolicyTest::RunTest(const FString&)
+{
+	TestTrue(TEXT("slot and candidate lists show during slot selection"),
+		UHSRRelicEquipmentWidget::ShouldShowSlotAndCandidateLists(EHSRRelicEquipmentStage::SlotSelection));
+	TestTrue(TEXT("slot and candidate lists show during candidate selection"),
+		UHSRRelicEquipmentWidget::ShouldShowSlotAndCandidateLists(EHSRRelicEquipmentStage::CandidateSelection));
+	TestFalse(TEXT("slot and candidate lists hide during comparison"),
+		UHSRRelicEquipmentWidget::ShouldShowSlotAndCandidateLists(EHSRRelicEquipmentStage::Comparison));
+	TestFalse(TEXT("slot and candidate lists hide during enhancement"),
+		UHSRRelicEquipmentWidget::ShouldShowSlotAndCandidateLists(EHSRRelicEquipmentStage::Enhancement));
+	TestTrue(TEXT("enhancement options show only during enhancement"),
+		UHSRRelicEquipmentWidget::ShouldShowEnhancementOptions(EHSRRelicEquipmentStage::Enhancement));
+	TestFalse(TEXT("enhancement options hide during candidate selection"),
+		UHSRRelicEquipmentWidget::ShouldShowEnhancementOptions(EHSRRelicEquipmentStage::CandidateSelection));
 	return true;
 }
 

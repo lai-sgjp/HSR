@@ -362,27 +362,50 @@ bool UHSRRelicEquipmentViewModel::BuildSlotRows(FHSREquipmentLoadout& OutLoadout
 void UHSRRelicEquipmentViewModel::BuildCandidateRows(const FHSREquipmentLoadout&)
 {
 	Snapshot.Candidates.Reset();
-	if (!MappingCatalog.IsValid()) return;
+	if (!MappingCatalog.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HSRRelic BuildCandidates NoMappingCatalog"));
+		return;
+	}
 	FHSRInventorySnapshot InventorySnapshot;
 	Inventory->GetSnapshot(InventorySnapshot);
+	UE_LOG(LogTemp, Log, TEXT("HSRRelic BuildCandidates Slot=%d UniqueItems=%d"),
+		static_cast<int32>(SelectedSlot), InventorySnapshot.UniqueItems.Num());
 	for (const FHSRItemInstance& Item : InventorySnapshot.UniqueItems)
 	{
 		FHSRItemEquipmentMappingEntry Mapping;
-		if (!MappingCatalog->Resolve(Item.DefinitionId, Mapping)
-			|| Mapping.Kind != EHSREquipmentKind::Relic
-			|| Mapping.Slot != static_cast<int32>(SelectedSlot))
+		if (!MappingCatalog->Resolve(Item.DefinitionId, Mapping))
 		{
+			UE_LOG(LogTemp, Log, TEXT("HSRRelic BuildCandidates Skip ResolveFailed ItemId=%s"), *Item.DefinitionId.ToString());
 			continue;
 		}
+		if (Mapping.Kind != EHSREquipmentKind::Relic)
+		{
+			UE_LOG(LogTemp, Log, TEXT("HSRRelic BuildCandidates Skip NotRelic ItemId=%s Kind=%d"), *Item.DefinitionId.ToString(), static_cast<int32>(Mapping.Kind));
+			continue;
+		}
+		if (Mapping.Slot != static_cast<int32>(SelectedSlot))
+		{
+			UE_LOG(LogTemp, Log, TEXT("HSRRelic BuildCandidates Skip SlotMismatch ItemId=%s MapSlot=%d SelSlot=%d"), *Item.DefinitionId.ToString(), Mapping.Slot, static_cast<int32>(SelectedSlot));
+			continue;
+		}
+		// A dropped relic has an inventory unique item but no equipment instance until one is
+		// minted; ensure it here so the candidate list shows every relic in the bag for this slot.
+		Equipment->EnsureRegisteredFromItem(Item.DefinitionId, Item.InstanceId, *MappingCatalog);
 		FHSREquipmentInstance Instance;
 		if (!Equipment->FindRegisteredInstance(Item.InstanceId, Instance)
 			|| Instance.Kind != EHSREquipmentKind::Relic
 			|| Instance.DefinitionId != Mapping.EquipmentDefinitionId)
 		{
+			UE_LOG(LogTemp, Log, TEXT("HSRRelic BuildCandidates Skip NoInstance ItemId=%s Inst=%s"), *Item.DefinitionId.ToString(), *Item.InstanceId.ToString());
 			continue;
 		}
 		FGuid Owner;
-		if (Equipment->FindInstanceOwner(Item.InstanceId, Owner)) continue;
+		if (Equipment->FindInstanceOwner(Item.InstanceId, Owner))
+		{
+			UE_LOG(LogTemp, Log, TEXT("HSRRelic BuildCandidates Skip Equipped ItemId=%s Inst=%s Owner=%s"), *Item.DefinitionId.ToString(), *Item.InstanceId.ToString(), *Owner.ToString());
+			continue;
+		}
 		FHSRRelicCandidateRow Row;
 		Row.InstanceId = Item.InstanceId;
 		Row.ItemId = Item.DefinitionId;
@@ -391,11 +414,13 @@ void UHSRRelicEquipmentViewModel::BuildCandidateRows(const FHSREquipmentLoadout&
 		Row.Instance = Instance;
 		Row.bIsSelected = Item.InstanceId == SelectedCandidateId;
 		Snapshot.Candidates.Add(MoveTemp(Row));
+		UE_LOG(LogTemp, Log, TEXT("HSRRelic BuildCandidates Added ItemId=%s Inst=%s"), *Item.DefinitionId.ToString(), *Item.InstanceId.ToString());
 	}
 	Snapshot.Candidates.Sort([](const FHSRRelicCandidateRow& A, const FHSRRelicCandidateRow& B)
 	{
 		return A.InstanceId < B.InstanceId;
 	});
+	UE_LOG(LogTemp, Log, TEXT("HSRRelic BuildCandidates Result=%d"), Snapshot.Candidates.Num());
 }
 
 bool UHSRRelicEquipmentViewModel::BuildComparison()

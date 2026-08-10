@@ -7,6 +7,7 @@
 class UInputMappingContext;
 class UInputAction;
 class UInputComponent;
+class FNavigationConfig;
 struct FHSRInputModePolicy;
 enum class EHSRUIInputIntent : uint8;
 
@@ -27,6 +28,7 @@ public:
 	AHSRPlayerController();
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
 
@@ -69,6 +71,7 @@ public:
 	{
 		return !bMarkedAdded || !bContextPresent;
 	}
+	static void ConfigureFrontendNavigation(FNavigationConfig& NavigationConfig);
 
 	UFUNCTION(BlueprintCallable, Category = "UI|Navigation")
 	void RequestOpenPauseScreen();
@@ -91,6 +94,8 @@ protected:
 	void AddExplorationContext();
 	void RemoveExplorationContext();
 	void AddFrontendNavigationContext();
+	void InstallFrontendSlateNavigation();
+	void RestoreFrontendSlateNavigation();
 	static constexpr int32 FrontendInputPriority = 100;
 	void HandlePauseBack();
 	void HandleInventory();
@@ -134,4 +139,7 @@ protected:
 	TObjectPtr<UInputComponent> FrontendBindingsInputComponent;
 	bool bInputSystemReady;
 	EHSRUIInputIntent AppliedInputIntent;
+	int32 FrontendSlateUserIndex = INDEX_NONE;
+	TSharedPtr<FNavigationConfig> PreviousSlateNavigationConfig;
+	TSharedPtr<FNavigationConfig> FrontendSlateNavigationConfig;
 };

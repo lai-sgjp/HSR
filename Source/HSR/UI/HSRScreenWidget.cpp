@@ -48,7 +48,8 @@ bool UHSRScreenWidget::ShouldConsumeCloseToRootKey(const FKey& Key) const
 
 bool UHSRScreenWidget::ShouldConsumeBackKey(const FKey& Key) const
 {
-	return OwningUIManager.IsValid() && (Key == EKeys::Escape || Key == EKeys::Gamepad_Special_Right);
+	return OwningUIManager.IsValid()
+		&& (Key == EKeys::Tab || Key == EKeys::Escape || Key == EKeys::Gamepad_Special_Right);
 }
 
 #if WITH_DEV_AUTOMATION_TESTS

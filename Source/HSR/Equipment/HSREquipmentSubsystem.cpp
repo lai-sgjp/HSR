@@ -11,6 +11,38 @@
 
 #include <cmath>
 
+void UHSREquipmentSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+
+	// Register the authored relic definitions so equipping a relic that entered the bag via a
+	// drop or reward resolves against a known definition (ExecuteMovement validates
+	// Definitions.Find(DefinitionId)).  Without this the six DA_Relic_* assets were never loaded
+	// at runtime and every relic equip was rejected with MappingRejected.
+	const TCHAR* RelicPaths[] = {
+		TEXT("/Game/Data/Relics/DA_Relic_Head.DA_Relic_Head"),
+		TEXT("/Game/Data/Relics/DA_Relic_Hands.DA_Relic_Hands"),
+		TEXT("/Game/Data/Relics/DA_Relic_Body.DA_Relic_Body"),
+		TEXT("/Game/Data/Relics/DA_Relic_Feet.DA_Relic_Feet"),
+		TEXT("/Game/Data/Relics/DA_Relic_PlanarSphere.DA_Relic_PlanarSphere"),
+		TEXT("/Game/Data/Relics/DA_Relic_LinkRope.DA_Relic_LinkRope"),
+	};
+	for (const TCHAR* Path : RelicPaths)
+	{
+		if (UHSRRelicDefinition* Relic = LoadObject<UHSRRelicDefinition>(nullptr, Path))
+		{
+			RegisterDefinition(*Relic);
+		}
+	}
+	if (UHSRRelicSetDefinition* Set = LoadObject<UHSRRelicSetDefinition>(nullptr, TEXT("/Game/Data/RelicSets/DA_RelicSet_P12_A.DA_RelicSet_P12_A")))
+	{
+		RegisterSetDefinition(*Set);
+	}
+	UE_LOG(LogTemp, Log, TEXT("HSR.Equipment Bootstrap RelicDefinitions=%d HasHead=%d HasSet=%d"),
+		Definitions.Num(), Definitions.Contains(TEXT("Relic.P12.Head")) ? 1 : 0,
+		SetThresholds.Contains(TEXT("Set.P12.A")) ? 1 : 0);
+}
+
 void UHSREquipmentSubsystem::ExportSaveData(TArray<FHSREquipmentSaveDto>& Out) const
 {
 	Out.Reset();
@@ -304,6 +336,44 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterInstance(const FHSR
 	return EHSREquipmentOperationResult::Success;
 }
 
+EHSREquipmentOperationResult UHSREquipmentSubsystem::EnsureRegisteredFromItem(
+	FName ItemId, const FGuid& InstanceId, const UHSRItemEquipmentMappingCatalog& MappingCatalog)
+{
+	if (!InstanceId.IsValid() || ItemId.IsNone()) return EHSREquipmentOperationResult::InvalidInstanceId;
+	FHSREquipmentInstance Existing;
+	if (FindRegisteredInstance(InstanceId, Existing)) return EHSREquipmentOperationResult::NoOp;
+	FHSRItemEquipmentMappingEntry Mapping;
+	if (!MappingCatalog.Resolve(ItemId, Mapping)) return EHSREquipmentOperationResult::UnknownDefinition;
+	FHSREquipmentInstance Instance;
+	Instance.InstanceId = InstanceId;
+	Instance.DefinitionId = Mapping.EquipmentDefinitionId;
+	Instance.Kind = Mapping.Kind;
+	// Carry the authored stat line so a dropped relic/weapon grants a real derived-stat increase
+	// once equipped.  Without this the minted instance has empty modifiers and the bonus is zero.
+	// Definition assets are named DA_Relic_<SlotSuffix> / DA_Equipment_<Suffix>; derive the suffix
+	// from the id's final segment (Relic.P12.Head -> Head).
+	const FString DefId = Mapping.EquipmentDefinitionId.ToString();
+	FString Suffix = DefId;
+	{
+		int32 Dot = INDEX_NONE;
+		if (DefId.FindLastChar(TEXT('.'), Dot)) Suffix = DefId.Mid(Dot + 1);
+	}
+	if (Instance.Kind == EHSREquipmentKind::Relic)
+	{
+		if (UHSRRelicDefinition* Relic = LoadObject<UHSRRelicDefinition>(nullptr,
+			*FString::Printf(TEXT("/Game/Data/Relics/DA_Relic_%s.DA_Relic_%s"), *Suffix, *Suffix)))
+		{
+			Instance.Modifiers = Relic->DefaultModifiers;
+		}
+	}
+	else if (UHSREquipmentDefinition* Weapon = LoadObject<UHSREquipmentDefinition>(nullptr,
+		*FString::Printf(TEXT("/Game/Data/Equipment/DA_Equipment_%s.DA_Equipment_%s"), *Suffix, *Suffix)))
+	{
+		Instance.Modifiers = Weapon->DefaultModifiers;
+	}
+	return RegisterInstance(Instance);
+}
+
 bool UHSREquipmentSubsystem::FindRegisteredInstance(const FGuid& InstanceId, FHSREquipmentInstance& OutInstance) const
 {
 	const FHSREquipmentInstance* Instance = InstanceRegistry.Find(InstanceId);
@@ -414,8 +484,35 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 	FHSREquipmentInstance RegistryInstance;
 	if (!FindRegisteredInstance(Request.InstanceId, RegistryInstance))
 	{
-		Result.Code = EHSREquipmentMovementResultCode::EquipmentRejected;
-		return Result;
+		// A relic (or other equipment) that entered the bag via a drop/reward has an inventory
+		// unique item but no equipment instance yet.  Mint one from the mapping so ExecuteMovement
+		// can resolve it instead of rejecting the equip.  Only Equip/Replace intents may mint an
+		// instance; Unequip of an unknown instance stays rejected.
+		if (Request.Intent == EHSREquipmentMovementIntent::Unequip)
+		{
+			Result.Code = EHSREquipmentMovementResultCode::EquipmentRejected;
+			return Result;
+		}
+		const FHSRItemInstance* InventoryMembership = InventorySnapshot.UniqueItems.FindByPredicate(
+			[&Request](const FHSRItemInstance& Item) { return Item.InstanceId == Request.InstanceId; });
+		if (!InventoryMembership)
+		{
+			Result.Code = EHSREquipmentMovementResultCode::EquipmentRejected;
+			return Result;
+		}
+		const EHSREquipmentOperationResult AutoRegistration = EnsureRegisteredFromItem(
+			InventoryMembership->DefinitionId, Request.InstanceId, MappingCatalog);
+		if (AutoRegistration != EHSREquipmentOperationResult::Success
+			&& AutoRegistration != EHSREquipmentOperationResult::NoOp)
+		{
+			Result.Code = EHSREquipmentMovementResultCode::EquipmentRejected;
+			return Result;
+		}
+		if (!FindRegisteredInstance(Request.InstanceId, RegistryInstance))
+		{
+			Result.Code = EHSREquipmentMovementResultCode::EquipmentRejected;
+			return Result;
+		}
 	}
 	FHSRItemEquipmentMappingEntry Mapping;
 	FGuid DisplacedInstanceId;

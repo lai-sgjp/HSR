@@ -6,6 +6,8 @@
 #include "../../Data/Definitions/HSRItemEquipmentMappingCatalog.h"
 #include "../../Equipment/HSREquipmentSubsystem.h"
 #include "../../Inventory/HSRInventorySubsystem.h"
+#include "../../Party/HSRPartySubsystem.h"
+#include "../../Party/HSRPartyTypes.h"
 #include "../HSRUIManagerSubsystem.h"
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
@@ -274,9 +276,44 @@ void UHSRInventoryModuleWidget::HandleSnapshot(
 {
 	CurrentSnapshot = InSnapshot;
 	bHasSnapshot = true;
+	UpdateTargetCharacterText();
 	OnInventorySnapshotChanged(InSnapshot);
 	if (InSnapshot.bIsValid) PopulateListAndDetail();
 	if (!InSnapshot.bIsValid) OnInventoryUnavailable(InSnapshot.FailureReason);
+}
+
+void UHSRInventoryModuleWidget::UpdateTargetCharacterText()
+{
+	if (!WidgetTree) return;
+	UTextBlock* TextBlock = FindTextByName(TEXT("TXT_TargetCharacter"));
+	if (!TextBlock) return;
+	FName CharacterIdName = NAME_None;
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (UHSRPartySubsystem* Party = GameInstance->GetSubsystem<UHSRPartySubsystem>())
+		{
+			FHSRPartySnapshot PartySnapshot;
+			if (Party->GetSnapshot(PartySnapshot) && !PartySnapshot.Slots.IsEmpty())
+			{
+				// Mirror ResolveInventoryCharacterGuid: the actively-controlled member, falling
+				// back to the leader when the active slot is unset or empty.
+				int32 TargetSlot = PartySnapshot.ActiveSlot;
+				if (TargetSlot < 0 || TargetSlot >= PartySnapshot.Slots.Num()
+					|| PartySnapshot.Slots[TargetSlot].IsEmpty())
+				{
+					TargetSlot = 0;
+				}
+				if (TargetSlot >= 0 && TargetSlot < PartySnapshot.Slots.Num()
+					&& !PartySnapshot.Slots[TargetSlot].IsEmpty())
+				{
+					CharacterIdName = PartySnapshot.Slots[TargetSlot].CharacterId;
+				}
+			}
+		}
+	}
+	TextBlock->SetText(CharacterIdName.IsNone()
+		? NSLOCTEXT("HSRInventory", "NoTarget", "Target: -")
+		: FText::Format(NSLOCTEXT("HSRInventory", "TargetChar", "Target: {0}"), FText::FromName(CharacterIdName)));
 }
 
 void UHSRInventoryModuleWidget::PopulateListAndDetail()

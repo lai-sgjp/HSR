@@ -3,6 +3,7 @@
 #include "HSRCharacterDetailViewModel.h"
 #include "../Party/HSRPartySubsystem.h"
 #include "../Progression/HSRCharacterProfileSubsystem.h"
+#include "../Equipment/HSREquipmentSubsystem.h"
 #include "../Save/HSRSaveSubsystem.h"
 #include "Engine/GameInstance.h"
 
@@ -16,13 +17,14 @@ void UHSRCharacterDetailWidget::NativeConstruct()
 	UHSRCharacterProfileSubsystem* Profiles = GameInstance ? GameInstance->GetSubsystem<UHSRCharacterProfileSubsystem>() : nullptr;
 	UHSRSaveSubsystem* Save = GameInstance ? GameInstance->GetSubsystem<UHSRSaveSubsystem>() : nullptr;
 	UHSRPartySubsystem* Party = GameInstance ? GameInstance->GetSubsystem<UHSRPartySubsystem>() : nullptr;
+	UHSREquipmentSubsystem* Equipment = GameInstance ? GameInstance->GetSubsystem<UHSREquipmentSubsystem>() : nullptr;
 	if (!ViewModel || !Profiles || !Save || !Party)
 	{
 		UE_LOG(LogTemp, Error, TEXT("P11-005 DetailWidgetInit Result=FAIL Reason=MissingViewModelOrSubsystems"));
 		return;
 	}
 
-	ViewModel->Initialize(Profiles, Save, Party);
+	ViewModel->Initialize(Profiles, Save, Party, Equipment);
 	DetailChangedHandle = ViewModel->OnChanged().AddUObject(this, &UHSRCharacterDetailWidget::HandleDetailChanged);
 	const EHSRCharacterDetailResult Result = ViewModel->SelectPartySlot0();
 	if (Result == EHSRCharacterDetailResult::Success)

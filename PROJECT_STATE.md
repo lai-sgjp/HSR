@@ -1,6 +1,19 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-08-09
+> 最后更新：2026-08-10
+
+## 2026-08-10 TASK-P17-RELIC-EQUIPMENT-001 / Inventory Demo 收口
+
+- 用户确认遗器强化链路已解决，当前 Demo 先通过 Inventory 装备遗器。
+- 遗器专用面板的候选数据生成和点击桥接已实现；候选列表视觉展示优化延期，
+  不阻塞当前 Demo。运行时曾确认 `PopulateCandidates ... Children=1 Rows=1`。
+- 当前库存已有候选主要对应 `Item.Relic.Head`；没有匹配遗器的槽位显示空列表是预期行为。
+- Tab 暂停/返回、角色 1/2/3/4、T、B、F 输入路径均保持；Slate Tab 焦点导航会在 PIE
+  期间关闭并在结束时恢复。
+- `HSREditor Win64 Development` 构建成功；Editor 保存的 WBP、地图、输入、遗器和掉落
+  资产随本轮提交。`.claude/**` 和辅助工作树文件不纳入提交。
+
+---
 
 ## 2026-08-09 TASK-P17-RELIC-EQUIPMENT-001 用户 PIE 收口
 

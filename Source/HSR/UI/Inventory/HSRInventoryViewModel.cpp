@@ -587,12 +587,9 @@ void UHSRInventoryViewModel::BuildActionStates(FHSRInventoryModuleSnapshot& InOu
 				ActionState.UnavailableReason = EHSRInventoryViewModelResult::CatalogUnavailable;
 				continue;
 			}
-			FHSREquipmentInstance RegisteredInstance;
-			if (!Equipment->FindRegisteredInstance(Row.Key.InstanceId, RegisteredInstance))
-			{
-				ActionState.UnavailableReason = EHSRInventoryViewModelResult::AuthorityRejected;
-				continue;
-			}
+			// A dropped reward item may not have an equipment instance registered yet; ExecuteMovement
+			// mints one on the fly.  Treat a resolvable mapping as equippable so the button is not
+			// disabled for items that just entered the bag.
 			ActionState.bIsAvailable = true;
 			ActionState.UnavailableReason = EHSRInventoryViewModelResult::Success;
 		}

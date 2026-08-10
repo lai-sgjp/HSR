@@ -1,5 +1,16 @@
 ﻿# HSR Worklog
 
+## 2026-08-10 - TASK-P17-RELIC-EQUIPMENT-001 / Inventory Demo 收口
+
+- 用户确认遗器强化问题已解决，并决定当前 Demo 先从 Inventory 装备遗器；
+  遗器专用面板候选列表的视觉展示优化延期，不阻塞本次交付。
+- 本轮生产实现覆盖遗器定义/实例注册、Equipment 装备与强化、Inventory 目标角色、
+  角色详情装备属性聚合、Tab 暂停输入和奖励/掉落接入；对应 UE 资产由用户在 Editor 保存。
+- 日志确认候选数据已生成并挂载：`BuildCandidates Result=1`、
+  `PopulateCandidates ... Children=1 Rows=1`。当前库存只有 Head 候选，其他槽位空列表属于
+  数据匹配结果。
+- `HSREditor Win64 Development` 编译成功；`.claude/**`、缓存和辅助工作树文件排除。
+
 ## 2026-08-09 - TASK-P17-INVENTORY-003 Gate 0
 
 - 用户授权下一 serial package `TASK-P17-INVENTORY-003`；活动卡从已收口的

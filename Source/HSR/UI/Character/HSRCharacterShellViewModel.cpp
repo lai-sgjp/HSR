@@ -174,7 +174,7 @@ EHSRCharacterShellResult UHSRCharacterShellViewModel::RebuildSelected(
 	EHSRCharacterDetailResult CharacterResult = EHSRCharacterDetailResult::NotInitialized;
 	if (CharacterDetailViewModel)
 	{
-		CharacterDetailViewModel->Initialize(Profiles.Get(), Save.Get(), Party.Get());
+		CharacterDetailViewModel->Initialize(Profiles.Get(), Save.Get(), Party.Get(), Equipment.Get());
 		CharacterResult = CharacterDetailViewModel->SelectCharacter(SelectedCharacterId);
 		if (CharacterResult == EHSRCharacterDetailResult::Success)
 			CharacterDetailViewModel->GetSnapshot(Snapshot.CharacterDetail);

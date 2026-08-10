@@ -17,6 +17,9 @@
 #include "GameFramework/Pawn.h"
 #include "InputCoreTypes.h"
 #include "EngineUtils.h"
+#include "Framework/Application/NavigationConfig.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/SlateUser.h"
 
 AHSRPlayerController::AHSRPlayerController()
 {
@@ -64,6 +67,16 @@ void AHSRPlayerController::SetupInputComponent()
 			{
 				return Mapping.Action == PauseBackAction;
 			});
+		if (FrontendNavigationMappingContext && PauseBackAction)
+		{
+			for (const FEnhancedActionKeyMapping& Mapping : FrontendNavigationMappingContext->GetMappings())
+			{
+				if (Mapping.Action == PauseBackAction)
+				{
+					UE_LOG(LogTemp, Log, TEXT("HSRUI Frontend PauseBack key=%s"), *Mapping.Key.ToString());
+				}
+			}
+		}
 		UE_LOG(LogTemp, Log, TEXT("HSRUI Frontend input bound Component=%s Priority=%d Context=%s PauseAction=%s PauseMapped=%s"),
 			*InputComponent->GetName(), InputComponent->Priority,
 			FrontendNavigationMappingContext ? *FrontendNavigationMappingContext->GetPathName() : TEXT("None"),
@@ -85,6 +98,7 @@ void AHSRPlayerController::BeginPlay()
 	Super::BeginPlay();
 
 	bControlModeApplied = false;
+	InstallFrontendSlateNavigation();
 
 	UE_LOG(LogTemp, Log, TEXT("AHSRPlayerController::BeginPlay - Controller=%s Local=%s Pawn=%s"),
 		*GetName(),
@@ -129,6 +143,59 @@ void AHSRPlayerController::BeginPlay()
 	SetControlMode(ResolveControlModeForCurrentWorld());
 }
 
+void AHSRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	RestoreFrontendSlateNavigation();
+	Super::EndPlay(EndPlayReason);
+}
+
+void AHSRPlayerController::ConfigureFrontendNavigation(FNavigationConfig& NavigationConfig)
+{
+	NavigationConfig.bTabNavigation = false;
+}
+
+void AHSRPlayerController::InstallFrontendSlateNavigation()
+{
+	if (!IsLocalPlayerController() || !FSlateApplication::IsInitialized() || FrontendSlateNavigationConfig)
+	{
+		return;
+	}
+
+	FSlateApplication& SlateApplication = FSlateApplication::Get();
+	FrontendSlateUserIndex = SlateApplication.GetUserIndexForKeyboard();
+	TSharedPtr<FSlateUser> SlateUser = SlateApplication.GetUser(FrontendSlateUserIndex);
+	if (!SlateUser)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HSRUI Slate navigation unavailable User=%d"), FrontendSlateUserIndex);
+		FrontendSlateUserIndex = INDEX_NONE;
+		return;
+	}
+	PreviousSlateNavigationConfig = SlateUser->GetUserNavigationConfig();
+	FrontendSlateNavigationConfig = MakeShared<FNavigationConfig>();
+	ConfigureFrontendNavigation(*FrontendSlateNavigationConfig);
+	SlateUser->SetUserNavigationConfig(FrontendSlateNavigationConfig);
+
+	UE_LOG(LogTemp, Log, TEXT("HSRUI Slate navigation installed User=%d TabNavigation=%s"),
+		FrontendSlateUserIndex, FrontendSlateNavigationConfig->bTabNavigation ? TEXT("true") : TEXT("false"));
+}
+
+void AHSRPlayerController::RestoreFrontendSlateNavigation()
+{
+	if (FrontendSlateUserIndex != INDEX_NONE && FrontendSlateNavigationConfig && FSlateApplication::IsInitialized())
+	{
+		if (TSharedPtr<FSlateUser> SlateUser = FSlateApplication::Get().GetUser(FrontendSlateUserIndex);
+			SlateUser && SlateUser->GetUserNavigationConfig() == FrontendSlateNavigationConfig)
+		{
+			SlateUser->SetUserNavigationConfig(PreviousSlateNavigationConfig);
+			UE_LOG(LogTemp, Log, TEXT("HSRUI Slate navigation restored User=%d"), FrontendSlateUserIndex);
+		}
+	}
+
+	FrontendSlateUserIndex = INDEX_NONE;
+	PreviousSlateNavigationConfig.Reset();
+	FrontendSlateNavigationConfig.Reset();
+}
+
 EHSRPlayerControlMode AHSRPlayerController::ResolveControlModeForCurrentWorld() const
 {
 	return Cast<AHSRBattleGameMode>(GetWorld() ? GetWorld()->GetAuthGameMode() : nullptr)
@@ -138,32 +205,55 @@ EHSRPlayerControlMode AHSRPlayerController::ResolveControlModeForCurrentWorld() 
 
 bool AHSRPlayerController::SwitchExplorationCharacter(int32 PartySlot)
 {
-	if (CurrentControlMode != EHSRPlayerControlMode::Exploration || !GetWorld()) return false;
+	if (CurrentControlMode != EHSRPlayerControlMode::Exploration || !GetWorld())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HSR Exploration switch REJECTED Mode=%d World=%d"), static_cast<int32>(CurrentControlMode), GetWorld() ? 1 : 0);
+		return false;
+	}
 	UGameInstance* GI = GetGameInstance();
 	UHSRPartySubsystem* Party = GI ? GI->GetSubsystem<UHSRPartySubsystem>() : nullptr;
 	UHSRCharacterProfileSubsystem* Profiles = GI ? GI->GetSubsystem<UHSRCharacterProfileSubsystem>() : nullptr;
 	FHSRPartySnapshot PartySnapshot;
 	if (!Party || !Profiles || !Party->GetSnapshot(PartySnapshot) || !PartySnapshot.Slots.IsValidIndex(PartySlot)
-		|| PartySnapshot.Slots[PartySlot].IsEmpty()) return false;
+		|| PartySnapshot.Slots[PartySlot].IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HSR Exploration switch REJECTED PartyMissingOrSlotEmpty Slot=%d Party=%d Profiles=%d Slots=%d"),
+			PartySlot, Party ? 1 : 0, Profiles ? 1 : 0, Party ? PartySnapshot.Slots.Num() : -1);
+		return false;
+	}
 	const FName CharacterId = PartySnapshot.Slots[PartySlot].CharacterId;
 	const UHSRCharacterDefinition* Definition = nullptr;
-	if (!Profiles->GetDefinition(CharacterId, Definition) || !Definition || Definition->CharacterClass.IsNull()) return false;
+	if (!Profiles->GetDefinition(CharacterId, Definition) || !Definition || Definition->CharacterClass.IsNull())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HSR Exploration switch REJECTED DefinitionMissing Char=%s"), *CharacterId.ToString());
+		return false;
+	}
 	UClass* CharacterClass = Definition->CharacterClass.LoadSynchronous();
-	if (!CharacterClass || !CharacterClass->IsChildOf<APawn>()) return false;
+	if (!CharacterClass || !CharacterClass->IsChildOf<APawn>())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HSR Exploration switch REJECTED ClassInvalid Char=%s Class=%s"), *CharacterId.ToString(), CharacterClass ? *CharacterClass->GetName() : TEXT("None"));
+		return false;
+	}
 	APawn* PreviousPawn = GetPawn();
 	const FTransform SpawnTransform = PreviousPawn ? PreviousPawn->GetActorTransform() : FTransform::Identity;
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 	APawn* NewPawn = GetWorld()->SpawnActor<APawn>(CharacterClass, SpawnTransform, SpawnParameters);
-	if (!NewPawn) return false;
+	if (!NewPawn)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HSR Exploration switch REJECTED SpawnFailed Char=%s Slot=%d"), *CharacterId.ToString(), PartySlot);
+		return false;
+	}
 	Possess(NewPawn);
 	if (GetPawn() != NewPawn)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("HSR Exploration switch REJECTED PossessFailed Char=%s Slot=%d"), *CharacterId.ToString(), PartySlot);
 		NewPawn->Destroy();
 		return false;
 	}
 	if (Party->SetActiveSlot(PartySlot) != EHSRPartyResult::Success)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("HSR Exploration switch REJECTED SetActiveSlotFailed Slot=%d"), PartySlot);
 		if (PreviousPawn) Possess(PreviousPawn);
 		NewPawn->Destroy();
 		return false;

@@ -43,6 +43,9 @@ class HSR_API UHSREquipmentSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
+	/** Registers authored relic/equipment definitions from Content assets so equipping works at runtime. */
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+
 	DECLARE_DELEGATE_RetVal_TwoParams(bool, FMovementProjectionPreflight,
 		const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&);
 	DECLARE_DELEGATE_TwoParams(FMovementProjectionCommit,
@@ -79,6 +82,13 @@ public:
 	bool HasDefinition(FName DefinitionId) const { return Definitions.Contains(DefinitionId); }
 	bool IsDefinitionCompatible(FName DefinitionId,EHSREquipmentKind Kind,int32 Slot) const;
 	EHSREquipmentOperationResult RegisterInstance(const FHSREquipmentInstance& Instance);
+	/**
+	 * Ensures an equipment instance exists for an inventory unique item (e.g. a relic dropped from
+	 * a chest or reward).  The instance is minted from the mapping when absent, so callers can rely
+	 * on it before equipping without requiring a separate registration step.
+	 */
+	EHSREquipmentOperationResult EnsureRegisteredFromItem(FName ItemId, const FGuid& InstanceId,
+		const UHSRItemEquipmentMappingCatalog& MappingCatalog);
 	bool FindRegisteredInstance(const FGuid& InstanceId, FHSREquipmentInstance& OutInstance) const;
 	EHSREquipmentOperationResult EquipById(const FGuid& CharacterId, const FGuid& InstanceId);
 	EHSREquipmentOperationResult ReplaceById(const FGuid& CharacterId, const FGuid& InstanceId);

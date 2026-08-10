@@ -1,5 +1,14 @@
 ﻿# HSR Todo Plan
 
+## 2026-08-10 - Relic/Inventory Demo checkpoint
+
+- [x] 遗器定义、实例注册、Inventory 候选数据和装备/替换链路接通。
+- [x] 遗器强化、角色详情属性刷新、Inventory 装备入口和 Tab 暂停完成。
+- [x] `HSREditor Win64 Development` 构建成功，相关 UE 资产已由 Editor 保存。
+- [ ] 遗器专用面板候选列表视觉展示优化；当前 Demo 先使用 Inventory 装备。
+
+---
+
 ## 2026-08-09 TASK-P17-INVENTORY-004 Editor/core PIE closeout — USER ACCEPTED
 
 - [x] 用户创建并保存 DA_InventoryCatalog_P17、WBP_Inventory_P17，并完成

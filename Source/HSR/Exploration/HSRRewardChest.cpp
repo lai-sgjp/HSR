@@ -7,7 +7,10 @@
 #include "../Interaction/HSRInteractionComponent.h"
 #include "../Inventory/HSRInventorySubsystem.h"
 #include "../Reward/HSRRewardSubsystem.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
+#include "UObject/ConstructorHelpers.h"
 
 AHSRRewardChest::AHSRRewardChest()
 {
@@ -16,6 +19,19 @@ AHSRRewardChest::AHSRRewardChest()
 	SetRootComponent(CollisionComponent);
 	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	CollisionComponent->SetGenerateOverlapEvents(true);
+	CollisionComponent->SetSphereRadius(80.0f);
+
+	// Visible chest body so the reward is discoverable and interactive in the world.
+	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
+	MeshComponent->SetupAttachment(CollisionComponent);
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeshFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (MeshFinder.Succeeded())
+	{
+		MeshComponent->SetStaticMesh(MeshFinder.Object);
+	}
+	MeshComponent->SetRelativeScale3D(FVector(1.2f, 1.2f, 1.0f));
+	MeshComponent->SetRelativeLocation(FVector(0.0f, 0.0f, -10.0f));
 }
 
 void AHSRRewardChest::BeginPlay()

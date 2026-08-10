@@ -8,6 +8,26 @@
 class UHSREquipmentEnhancementCatalog;
 class UHSRItemEquipmentMappingCatalog;
 class UHSRRelicEquipmentViewModel;
+class UButton;
+
+/** Forwards a candidate/option button click back to the relic widget. Dynamic UMG delegates
+ *  cannot bind lambdas with captures, so each row gets a small bridge carrying its identity. */
+UCLASS()
+class HSR_API UHSRRelicListClickBridge : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	void Initialize(UHSRRelicEquipmentWidget* InOwner, FGuid InInstanceId, int32 InTargetLevel);
+
+	UFUNCTION()
+	void HandleClicked();
+
+private:
+	TWeakObjectPtr<UHSRRelicEquipmentWidget> Owner;
+	FGuid InstanceId;
+	int32 TargetLevel = -1;
+};
 
 UCLASS(Blueprintable)
 class HSR_API UHSRRelicEquipmentWidget : public UUserWidget
@@ -55,6 +75,16 @@ public:
 	UFUNCTION(BlueprintPure, Category = "HSR|Relic Equipment")
 	bool HasEnhancementOptions() const;
 
+	static bool ShouldShowSlotAndCandidateLists(EHSRRelicEquipmentStage Stage)
+	{
+		return Stage == EHSRRelicEquipmentStage::SlotSelection
+			|| Stage == EHSRRelicEquipmentStage::CandidateSelection;
+	}
+	static bool ShouldShowEnhancementOptions(EHSRRelicEquipmentStage Stage)
+	{
+		return Stage == EHSRRelicEquipmentStage::Enhancement;
+	}
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "HSR|Relic Equipment")
 	void OnRelicSnapshotChanged(const FHSRRelicEquipmentSnapshot& Snapshot);
 
@@ -68,6 +98,16 @@ protected:
 private:
 	void InitializeRuntimeContext();
 	void HandleSnapshot(const FHSRRelicEquipmentSnapshot& InSnapshot);
+	void UpdateStatusText(const FHSRRelicEquipmentSnapshot& InSnapshot);
+	void ShowOperationResult(EHSRRelicEquipmentResult Result);
+	/** C++-driven list population so the relic panel does not depend on fragile BP graph loops. */
+	void PopulateCandidates();
+	void PopulateEnhancementOptions();
+	void ApplyStageVisibility();
+	UButton* MakeListButton(const FText& Label, const FLinearColor& Color);
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UObject>> ListBindings;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "HSR|Relic Equipment", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UHSRItemEquipmentMappingCatalog> MappingCatalog;

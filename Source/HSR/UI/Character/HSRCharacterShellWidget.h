@@ -40,6 +40,7 @@ protected:
 
 private:
 	void HandleShellChanged(const FHSRCharacterShellSnapshot& InSnapshot);
+	void UpdateDetailStats(const FHSRCharacterShellSnapshot& InSnapshot);
 
 	UPROPERTY(Transient) TObjectPtr<UHSRCharacterShellViewModel> ViewModel;
 	FDelegateHandle ShellChangedHandle;

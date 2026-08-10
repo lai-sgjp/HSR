@@ -9,6 +9,7 @@
 class UHSRDropTableDefinition;
 class UHSRItemDefinition;
 class UHSRRewardDefinition;
+class UStaticMeshComponent;
 
 UCLASS()
 class HSR_API AHSRRewardChest : public AActor, public IHSRInteractableInterface
@@ -28,6 +29,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Collision")
 	TObjectPtr<USphereComponent> CollisionComponent;
+	/** Visible representation so the chest can be seen and interacted with in the world. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Visual")
+	TObjectPtr<UStaticMeshComponent> MeshComponent;
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Reward")
 	FGuid StableClaimId;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Reward")

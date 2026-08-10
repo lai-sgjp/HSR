@@ -21,6 +21,10 @@ public class HSR : ModuleRules
 			"NavigationSystem",
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"Slate",
+			"SlateCore",
+		});
 	}
 }

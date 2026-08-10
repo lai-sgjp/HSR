@@ -19,4 +19,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment", meta = (ClampMin = "0"))
 	int32 EnhancementCap = 0;
+
+	/** Authored stat line granted when an instance of this weapon is minted, so equipping it
+	 *  produces a visible derived-stat increase. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment")
+	TArray<FHSREquipmentModifier> DefaultModifiers;
 };

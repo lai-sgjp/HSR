@@ -12,6 +12,7 @@
 #include "Components/OverlaySlot.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/Engine.h"
+#include "Framework/Application/NavigationConfig.h"
 #include "../Player/HSRPlayerController.h"
 
 namespace HSR::P17::FrontendTests
@@ -31,6 +32,19 @@ namespace HSR::P17::FrontendTests
 		Request.Operation = Operation;
 		return Request;
 	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRFrontendSlateTabPolicyTest, "HSR.UI.FrontendNavigation.SlateTabPolicy",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRFrontendSlateTabPolicyTest::RunTest(const FString&)
+{
+	FNavigationConfig NavigationConfig;
+	TestTrue(TEXT("UE default reserves Tab for focus navigation"), NavigationConfig.bTabNavigation);
+	AHSRPlayerController::ConfigureFrontendNavigation(NavigationConfig);
+	TestFalse(TEXT("frontend policy releases Tab to the game input pipeline"), NavigationConfig.bTabNavigation);
+	TestTrue(TEXT("directional key navigation remains enabled"), NavigationConfig.bKeyNavigation);
+	TestTrue(TEXT("analog navigation remains enabled"), NavigationConfig.bAnalogNavigation);
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRFrontendRouterSequenceTest, "HSR.UI.FrontendNavigation.RouterSequence",
@@ -262,12 +276,15 @@ bool FHSRFrontendInputBindingGuardTest::RunTest(const FString&)
 		AHSRPlayerController::ShouldRestoreFrontendNavigationContext(true, true));
 	UHSRScreenWidget* Widget = NewObject<UHSRScreenWidget>();
 	TestFalse(TEXT("unowned widget cannot consume X"), Widget->ShouldConsumeCloseToRootKeyForAutomation(EKeys::X));
+	TestFalse(TEXT("unowned widget cannot consume Tab"), Widget->ShouldConsumeBackKeyForAutomation(EKeys::Tab));
 	ULocalPlayer* LocalPlayer = NewObject<ULocalPlayer>(GEngine);
 	UHSRUIManagerSubsystem* Manager = NewObject<UHSRUIManagerSubsystem>(LocalPlayer);
 	Manager->InitializeForAutomation(); Manager->RegisterHostForAutomation(true, true);
 	Manager->ConfigureAutomationBackend(true, true, true, true, true, false);
 	Manager->ConfigureAutomationDetailBackend(true, true, true, true, true);
 	Widget->SetOwningUIManager(Manager);
+	TestTrue(TEXT("owned UIOnly widget consumes Tab for back"),
+		Widget->ShouldConsumeBackKeyForAutomation(EKeys::Tab));
 	TestTrue(TEXT("owned UIOnly widget consumes X for close-to-root"),
 		Widget->ShouldConsumeCloseToRootKeyForAutomation(EKeys::X));
 	TestFalse(TEXT("Escape remains back rather than close-to-root"),

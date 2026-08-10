@@ -68,7 +68,18 @@ bool UHSRPartySubsystem::IsDuplicate(const TArray<FHSRPartySlot>& Candidate, FNa
 bool UHSRPartySubsystem::Commit(TArray<FHSRPartySlot>&& Candidate)
 {
 	if (Candidate.Num() != Capacity) return false;
-	Slots = MoveTemp(Candidate); ++Revision; PartyChanged.Broadcast(Revision); return true;
+	FString Members;
+	for (int32 Index = 0; Index < Candidate.Num(); ++Index)
+	{
+		if (!Candidate[Index].IsEmpty())
+		{
+			if (!Members.IsEmpty()) Members += TEXT(",");
+			Members += FString::Printf(TEXT("%d:%s"), Index, *Candidate[Index].CharacterId.ToString());
+		}
+	}
+	Slots = MoveTemp(Candidate); ++Revision;
+	UE_LOG(LogTemp, Log, TEXT("HSR.Party Commit Revision=%lld Members=%s"), Revision, Members.IsEmpty() ? TEXT("(empty)") : *Members);
+	PartyChanged.Broadcast(Revision); return true;
 }
 
 EHSRPartyResult UHSRPartySubsystem::AddCharacter(FName CharacterId, int32 PreferredSlot)
@@ -146,6 +157,8 @@ EHSRPartyResult UHSRPartySubsystem::SetActiveSlot(int32 Slot)
 	if (ActiveSlot == Slot) return EHSRPartyResult::Success;
 	ActiveSlot = Slot;
 	++Revision;
+	UE_LOG(LogTemp, Log, TEXT("HSR.Party SetActiveSlot Slot=%d CharacterId=%s Revision=%lld"),
+		Slot, Slots[Slot].IsEmpty() ? TEXT("None") : *Slots[Slot].CharacterId.ToString(), Revision);
 	PartyChanged.Broadcast(Revision);
 	return EHSRPartyResult::Success;
 }

@@ -1684,14 +1684,29 @@ FGuid UHSRUIManagerSubsystem::ResolveInventoryCharacterGuid() const
 	UGameInstance* GameInstance = GetLocalPlayer() ? GetLocalPlayer()->GetGameInstance() : nullptr;
 	UHSRPartySubsystem* Party = GameInstance ? GameInstance->GetSubsystem<UHSRPartySubsystem>() : nullptr;
 	FHSRPartySnapshot PartySnapshot;
-	if (!Party || !Party->GetSnapshot(PartySnapshot) || !PartySnapshot.Slots.IsValidIndex(0)
-		|| PartySnapshot.Slots[0].IsEmpty())
+	if (!Party || !Party->GetSnapshot(PartySnapshot) || PartySnapshot.Slots.IsEmpty())
 	{
 		UE_LOG(LogTemp, Verbose,
-			TEXT("HSRUI P17 Inventory command context unavailable: Party slot 0 has no character"));
+			TEXT("HSRUI P17 Inventory command context unavailable: Party has no slots"));
 		return FGuid();
 	}
-	return HSRCharacterGuidFromProfileName(PartySnapshot.Slots[0].CharacterId);
+	// Inventory equips the actively-controlled party member (the slot switched to with 1-4),
+	// falling back to the leader when the active slot is unset or empty.
+	int32 TargetSlot = PartySnapshot.ActiveSlot;
+	if (TargetSlot < 0 || TargetSlot >= PartySnapshot.Slots.Num() || PartySnapshot.Slots[TargetSlot].IsEmpty())
+	{
+		TargetSlot = 0;
+	}
+	if (TargetSlot >= PartySnapshot.Slots.Num() || PartySnapshot.Slots[TargetSlot].IsEmpty())
+	{
+		UE_LOG(LogTemp, Verbose,
+			TEXT("HSRUI P17 Inventory command context unavailable: Party has no committed member"));
+		return FGuid();
+	}
+	const FGuid Result = HSRCharacterGuidFromProfileName(PartySnapshot.Slots[TargetSlot].CharacterId);
+	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Inventory target ActiveSlot=%d CharacterId=%s"),
+		TargetSlot, *PartySnapshot.Slots[TargetSlot].CharacterId.ToString());
+	return Result;
 }
 
 FName UHSRUIManagerSubsystem::SelectRestorableScreenId() const

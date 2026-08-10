@@ -48,27 +48,44 @@ void UHSRRewardSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	TArray<TObjectPtr<UHSRItemDefinition>> ItemDefinitions;
 	ItemDefinitions.Add(LoadObject<UHSRItemDefinition>(nullptr, TEXT("/Game/Data/Items/DA_Item_LumenShard_P13.DA_Item_LumenShard_P13")));
 	ItemDefinitions.Add(LoadObject<UHSRItemDefinition>(nullptr, TEXT("/Game/Data/Items/DA_Item_ArchiveToken_P13.DA_Item_ArchiveToken_P13")));
+	// Drop table also rolls the six authored relics; register their item definitions up front so
+	// bundle validation recognises them before any chest or battle tries to grant one.
+	for (const TCHAR* RelicPath :
+		{ TEXT("/Game/Data/Items/Relic/DA_Item_Relic_Head.DA_Item_Relic_Head"),
+		  TEXT("/Game/Data/Items/Relic/DA_Item_Relic_Hands.DA_Item_Relic_Hands"),
+		  TEXT("/Game/Data/Items/Relic/DA_Item_Relic_Body.DA_Item_Relic_Body"),
+		  TEXT("/Game/Data/Items/Relic/DA_Item_Relic_Feet.DA_Item_Relic_Feet"),
+		  TEXT("/Game/Data/Items/Relic/DA_Item_Relic_PlanarSphere.DA_Item_Relic_PlanarSphere"),
+		  TEXT("/Game/Data/Items/Relic/DA_Item_Relic_LinkRope.DA_Item_Relic_LinkRope") })
+	{
+		if (UHSRItemDefinition* Relic = LoadObject<UHSRItemDefinition>(nullptr, RelicPath))
+		{
+			ItemDefinitions.Add(Relic);
+		}
+	}
 	UHSRDropTableDefinition* DropTable = LoadObject<UHSRDropTableDefinition>(nullptr, TEXT("/Game/Data/Drops/DA_Drop_P13_Standard.DA_Drop_P13_Standard"));
 	UHSRRewardDefinition* RewardDefinition = LoadObject<UHSRRewardDefinition>(nullptr, TEXT("/Game/Data/Rewards/DA_Reward_P13_Standard.DA_Reward_P13_Standard"));
-	if (!ItemDefinitions[0] || !ItemDefinitions[1] || !DropTable || !RewardDefinition)
+	if (!ItemDefinitions.IsEmpty() && ItemDefinitions[0] && ItemDefinitions[1] && DropTable && RewardDefinition)
 	{
-		UE_LOG(LogTemp, Error, TEXT("P13-004 ProductionDefinitionBootstrap=FAILED Reason=AssetLoad Item0=%s Item1=%s DropTable=%s Reward=%s"),
-			ItemDefinitions[0] ? TEXT("OK") : TEXT("MISSING"),
-			ItemDefinitions[1] ? TEXT("OK") : TEXT("MISSING"),
+		const EHSRRewardOperationResult Result = RegisterBundle(ItemDefinitions, *DropTable, *RewardDefinition);
+		if (Result != EHSRRewardOperationResult::Success && Result != EHSRRewardOperationResult::NoOp)
+		{
+			UE_LOG(LogTemp, Error, TEXT("P13-004 ProductionDefinitionBootstrap=FAILED Reason=RegisterBundle Result=%d"), static_cast<int32>(Result));
+		}
+		else
+		{
+			UE_LOG(LogTemp, Log, TEXT("P13-004 ProductionDefinitionBootstrap=READY Result=%d Items=%d DropTable=%s Reward=%s"),
+				static_cast<int32>(Result), ItemDefinitions.Num(),
+				*DropTable->DropTableId.ToString(), *RewardDefinition->RewardDefinitionId.ToString());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("P13-004 ProductionDefinitionBootstrap=FAILED Reason=AssetLoad Items=%d DropTable=%s Reward=%s"),
+			ItemDefinitions.Num(),
 			DropTable ? TEXT("OK") : TEXT("MISSING"),
 			RewardDefinition ? TEXT("OK") : TEXT("MISSING"));
-		return;
 	}
-
-	const EHSRRewardOperationResult Result = RegisterBundle(ItemDefinitions, *DropTable, *RewardDefinition);
-	if (Result != EHSRRewardOperationResult::Success && Result != EHSRRewardOperationResult::NoOp)
-	{
-		UE_LOG(LogTemp, Error, TEXT("P13-004 ProductionDefinitionBootstrap=FAILED Reason=RegisterBundle Result=%d"), static_cast<int32>(Result));
-		return;
-	}
-	UE_LOG(LogTemp, Log, TEXT("P13-004 ProductionDefinitionBootstrap=READY Result=%d Item0=%s Item1=%s DropTable=%s Reward=%s"),
-		static_cast<int32>(Result), *ItemDefinitions[0]->ItemId.ToString(), *ItemDefinitions[1]->ItemId.ToString(),
-		*DropTable->DropTableId.ToString(), *RewardDefinition->RewardDefinitionId.ToString());
 }
 
 #if WITH_DEV_AUTOMATION_TESTS

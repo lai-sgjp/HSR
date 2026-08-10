@@ -121,6 +121,7 @@ private:
 	void InitializeRuntimeContext();
 	void BindAndRefresh();
 	void HandleSnapshot(const FHSRInventoryModuleSnapshot& InSnapshot);
+	void UpdateTargetCharacterText();
 	void PopulateListAndDetail();
 	void PopulateListRows();
 	UButton* FindButtonByName(const FName Name) const;
