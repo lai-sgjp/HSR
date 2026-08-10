@@ -1498,6 +1498,15 @@ namespace HSRBattleDevelopmentTest
 AHSRBattleGameMode::AHSRBattleGameMode()
 {
 	PrimaryActorTick.bCanEverTick = false;
+
+	// Without this the battle world falls back to the engine's APlayerController, so none of
+	// AHSRPlayerController's battle handling runs: SetControlMode is never called, the input
+	// mode stays GameOnly, the cursor stays hidden, and the command panel cannot be clicked.
+	// Exploration only worked because BP_HSRGameMode happens to set this in the asset; relying
+	// on Blueprint wiring is what let the battle side ship with it simply missing. Setting the
+	// default here makes the requirement part of the C++ contract while leaving Blueprint free
+	// to override it.
+	PlayerControllerClass = AHSRPlayerController::StaticClass();
 }
 
 TArray<UHSRSkillDefinition*> AHSRBattleGameMode::ResolveDefaultSkillLoadout() const
