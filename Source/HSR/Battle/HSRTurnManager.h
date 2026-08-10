@@ -46,6 +46,16 @@ public:
 	uint64 GetTurnSequence() const { return TurnSequence; }
 	/** Stable participant registry/diagnostic view, not a prediction of future turns. */
 	const TArray<FHSRBattleParticipant>& GetOrderedParticipants() const { return OrderedParticipants; }
+	/** Single definition of "can still act", shared with the Coordinator's team-wipe test so
+	 * turn eligibility and defeat resolution can never disagree. */
+	static bool IsParticipantTurnEligible(const FHSRBattleParticipant& Participant);
+	/**
+	 * Predicts the next SlotCount action slots from current action distances, for the turn-order bar.
+	 * Read-only: it simulates on a copy and never advances real turn state. Because it derives from
+	 * live EffectiveSpeed and RemainingActionDistance, speed buffs and advance/delay are reflected
+	 * immediately, unlike a fixed speed-sorted rotation.
+	 */
+	TArray<FHSRTurnForecastEntry> BuildTurnForecast(int32 SlotCount) const;
 	FHSRTurnLifecycleDelegate& OnTurnStarted() { return TurnStarted; }
 	FHSRTurnLifecycleDelegate& OnTurnEnded() { return TurnEnded; }
 	FHSRActionResolvedDelegate& OnActionResolved() { return ActionResolved; }
@@ -74,7 +84,6 @@ private:
 	static constexpr float MaximumBaseActionDistance = 10000.0f;
 	bool AdvanceToNextValidTurn();
 	bool IsCurrentParticipantValid() const;
-	static bool IsParticipantTurnEligible(const FHSRBattleParticipant& Participant);
 	void BroadcastLifecycleEvent(EHSRTurnLifecycleEventType EventType, FName ParticipantId);
 	static bool MakeBaseActionDistance(float Speed, float& OutBase);
 	bool BindSpeedDelegates();

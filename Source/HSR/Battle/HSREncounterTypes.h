@@ -52,8 +52,14 @@ struct FHSREncounterRequest
 	UPROPERTY()
 	FGuid RequestId;
 
+	/** Roster leader.  Kept as the stable single-member identity for callers that only need
+	 * one character; PlayerPartyIds carries the full committed order. */
 	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
 	FName PlayerCharacterId;
+
+	/** Committed party order, leader first.  Empty slots are dropped, so this is dense. */
+	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
+	TArray<FName> PlayerPartyIds;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Encounter")
 	FName EncounterId;

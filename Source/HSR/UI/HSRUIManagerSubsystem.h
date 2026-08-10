@@ -46,11 +46,7 @@ public:
 		TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass,
 		TSubclassOf<UHSRInventoryModuleWidget> InInventoryModuleWidgetClass,
 		TSubclassOf<UHSRDialogueOverlayWidget> InDialogueOverlayWidgetClass,
-		TSubclassOf<UUserWidget> InPartyWidgetClass,
-		TSubclassOf<UUserWidget> InMapWidgetClass,
-		TSubclassOf<UUserWidget> InChallengeWidgetClass,
-		TSubclassOf<UUserWidget> InQuestWidgetClass,
-		TSubclassOf<UUserWidget> InSaveWidgetClass);
+		const TMap<EHSRFrontendModule, TSubclassOf<UUserWidget>>& InFrontendModuleWidgetClasses);
 	EHSRUIScreenResult UnregisterExplorationHost(AHSRHUD* HUD, AHSRPlayerController* PlayerController);
 	EHSRUIScreenResult TeardownExplorationHostForTravel(AHSRHUD* HUD, AHSRPlayerController* PlayerController);
 	EHSRUIScreenResult PrepareExplorationTravel();
@@ -121,6 +117,9 @@ public:
 	void FailSecondAutomationPauseApply() { AutomationPauseCallsUntilFailure = 2; }
 	void ConfigureAutomationDetailBackend(bool bHasClass, bool bCreateSucceeds, bool bAttachSucceeds,
 		bool bPolicySucceeds, bool bFocusSucceeds);
+	// Fails focus only on the close path, so the open that sets a fixture up still succeeds.
+	void ConfigureAutomationDetailCloseFocus(bool bCloseFocusSucceeds);
+	void ConfigureAutomationInventoryCloseFocus(bool bCloseFocusSucceeds);
 	void FailNextAutomationDetailPolicyApply() { bAutomationFailNextDetailPolicyApply = true; }
 	void ConfigureAutomationInventoryBackend(bool bHasClass, bool bCreateSucceeds, bool bViewModelSucceeds,
 		bool bAttachSucceeds, bool bPolicySucceeds, bool bFocusSucceeds);
@@ -194,6 +193,13 @@ private:
 	bool IsBackendHostValid(AHSRPlayerController* PlayerController, UHSRUserWidget* RootWidget, UWorld* World) const;
 	bool IsBackendExploration(AHSRPlayerController* PlayerController) const;
 	bool IsBackendPaused(UWorld* World) const;
+
+	/** Widget-class availability, one predicate per screen.  These exist as named functions
+	 * because the inline form mixed || and && across #if boundaries, where the indentation
+	 * suggested a grouping the precedence rules did not actually produce. */
+	bool HasModuleRootClass() const;
+	bool HasCharacterDetailClass() const;
+	bool HasInventoryClass() const;
 	bool IsTravelPending() const;
 	UHSRFrontendShellWidget* CreatePauseCandidate(AHSRPlayerController* PlayerController);
 	UHSRFrontendModuleRootWidget* CreateFrontendModuleRootCandidate(AHSRPlayerController* PlayerController);
@@ -251,6 +257,20 @@ private:
 	UPROPERTY(Transient)
 	TSubclassOf<UHSRInventoryWidget> InventoryWidgetClass;
 
+	/**
+	 * Content widget class per shared-ModuleRoot module. This replaced five parallel named
+	 * properties plus a switch that mapped each module to one of them: adding a module meant
+	 * touching the property block, the switch, the registration signature, and every caller.
+	 * A new module is now one more entry in the map the host passes in.
+	 */
+	UPROPERTY(Transient)
+	TMap<EHSRFrontendModule, TSubclassOf<UUserWidget>> FrontendModuleWidgetClasses;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> FrontendModuleContentInstance;
+
+	EHSRFrontendModule FrontendModuleContentModule = EHSRFrontendModule::None;
+
 	UPROPERTY(Transient)
 	TSubclassOf<UHSRInventoryModuleWidget> InventoryModuleWidgetClass;
 
@@ -262,26 +282,6 @@ private:
 
 	UPROPERTY(Transient)
 	TSubclassOf<UHSRDialogueOverlayWidget> DialogueOverlayWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> PartyWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> MapWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> ChallengeWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> QuestWidgetClass;
-
-	UPROPERTY(Transient)
-	TSubclassOf<UUserWidget> SaveWidgetClass;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UUserWidget> FrontendModuleContentInstance;
-
-	EHSRFrontendModule FrontendModuleContentModule = EHSRFrontendModule::None;
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AHSRHUD> RegisteredHUD;
@@ -342,6 +342,10 @@ private:
 	bool bAutomationDetailAttachSucceeds = true;
 	bool bAutomationDetailPolicySucceeds = true;
 	bool bAutomationDetailFocusSucceeds = true;
+	// Close-path only: the open path focuses the detail candidate, the close path focuses the shell.
+	// Fixtures that need a close to fail while leaving the screen open set this instead of
+	// bAutomationDetailFocusSucceeds, which both paths share.
+	bool bAutomationDetailCloseFocusSucceeds = true;
 	bool bAutomationFailNextDetailPolicyApply = false;
 	bool bAutomationHasInventoryClass = true;
 	bool bAutomationHasFrontendModuleClass = true;
@@ -360,6 +364,8 @@ private:
 	bool bAutomationInventoryAttachSucceeds = true;
 	bool bAutomationInventoryPolicySucceeds = true;
 	bool bAutomationInventoryFocusSucceeds = true;
+	// Close-path only; see bAutomationDetailCloseFocusSucceeds.
+	bool bAutomationInventoryCloseFocusSucceeds = true;
 	bool bAutomationFailNextInventoryPolicyApply = false;
 	int32 LastReleasedInventoryBindCount = 0;
 	int32 LastReleasedInventoryUnbindCount = 0;

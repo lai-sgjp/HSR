@@ -6,9 +6,12 @@
 #include "GameplayEffect.h"
 #include "GameplayTagContainer.h"
 #include "../GAS/Ability/HSRAbilityTypes.h"
+#include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "../GAS/Damage/HSRDamageRuleDefinition.h"
 #include "HSRBreakTypes.h"
 #include "HSRSkillDefinition.generated.h"
+
+class UHSRStatusDefinition;
 
 UCLASS(BlueprintType)
 class HSR_API UHSRSkillDefinition : public UPrimaryDataAsset
@@ -46,6 +49,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Costs", meta = (DisplayName = "Cost Gameplay Effect Class", ToolTip = "Ultimate Energy Cost only. GAS applies this Gameplay Effect; BattleCoordinator never writes Energy."))
 	TSoftClassPtr<UGameplayEffect> CostGameplayEffectClass;
 
+	/**
+	 * Energy this skill consumes, for display only -- GAS still applies CostGameplayEffectClass and
+	 * remains the authority on the actual spend. Leave at 0 to have the cost read back off that
+	 * effect's modifiers instead, which is what pre-existing assets rely on.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Costs", meta = (ClampMin = "0.0"))
+	float DisplayEnergyCost = 0.0f;
+
 	/** Instant positive-Energy GAS compensation used only when an Ultimate
 	 * cost committed but its prepared damage application failed. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Costs")
@@ -76,6 +87,13 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage")
 	TSoftObjectPtr<UHSRDamageRuleDefinition> DamageRule;
 
+	/** Statuses applied to each resolved target after this skill lands.  Empty is the common
+	 * case and costs nothing; authoring an entry is the whole story for a debuff skill, no
+	 * C++ change required.  Entries that fail to load are skipped with a warning rather than
+	 * failing the action. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Status")
+	TArray<TSoftObjectPtr<UHSRStatusDefinition>> AppliedStatuses;
+
 	bool IsValidDefinition() const
 	{
 		return !SkillId.IsNone() && AbilityClass != nullptr;
@@ -102,5 +120,161 @@ public:
 		return IsValidDefinition() && Category == EHSRSkillCategory::Skill
 			&& TargetType == EHSRTargetType::SingleEnemy && !EffectGameplayEffectClass.IsNull();
 	}
-	bool IsValidHealDefinition() const { return IsValidDefinition() && Category == EHSRSkillCategory::Heal && (TargetType == EHSRTargetType::SingleAlly || TargetType == EHSRTargetType::Self) && !EffectGameplayEffectClass.IsNull(); }
+	bool IsValidHealDefinition() const
+	{
+		return IsValidDefinition()
+			&& Category == EHSRSkillCategory::Heal
+			&& (TargetType == EHSRTargetType::SingleAlly || TargetType == EHSRTargetType::Self)
+			&& !EffectGameplayEffectClass.IsNull();
+	}
+
+	/** Category-dispatched validation.  One entry point so callers never have to know which
+	 * per-category validator applies -- adding a category means extending this switch only. */
+	bool IsValidForCategory() const
+	{
+		switch (Category)
+		{
+		case EHSRSkillCategory::BasicAttack:
+			return IsValidDefinition() && TargetType == EHSRTargetType::SingleEnemy;
+		case EHSRSkillCategory::Skill:
+			return IsValidSkillDefinition();
+		case EHSRSkillCategory::Ultimate:
+			return IsValidUltimateDefinition();
+		case EHSRSkillCategory::Heal:
+			return IsValidHealDefinition();
+		default:
+			return false;
+		}
+	}
+
+	/** Authored skill-point delta applied when this skill commits: negative spends, positive
+	 * generates.  Authoring -1 on a Skill and +1 on a BasicAttack reproduces the legacy
+	 * hardcoded behaviour, which is what GetSkillPointDelta() falls back to when left at 0. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cost")
+	int32 SkillPointDelta = 0;
+
+	/** Effective skill-point delta.  Falls back to the historical per-category rule when the
+	 * DataAsset leaves SkillPointDelta at its default, so existing assets keep working. */
+	int32 GetSkillPointDelta() const
+	{
+		if (SkillPointDelta != 0)
+		{
+			return SkillPointDelta;
+		}
+		switch (Category)
+		{
+		case EHSRSkillCategory::BasicAttack:
+			return 1;
+		case EHSRSkillCategory::Skill:
+			return -1;
+		default:
+			return 0;
+		}
+	}
+
+	/** Skill-point cost as the UI displays it: a positive number of points consumed. */
+	int32 GetSkillPointCost() const
+	{
+		const int32 Delta = GetSkillPointDelta();
+		return Delta < 0 ? -Delta : 0;
+	}
+
+	/**
+	 * Energy cost for display, and whether it is actually known.
+	 *
+	 * Prefers the authored DisplayEnergyCost. Falling back to reading CostGameplayEffectClass's
+	 * modifiers keeps assets authored before that field working, but it can only answer for the
+	 * unambiguous shape: exactly one additive Energy modifier with a static negative magnitude.
+	 * A curve-backed, SetByCaller, or multi-modifier cost has no single display value, and a
+	 * soft class that has not been loaded cannot be inspected at all -- both report false rather
+	 * than a fabricated zero, because a UI that renders "0" for an unknown cost reads as free.
+	 */
+	bool TryGetDisplayEnergyCost(float& OutCost) const
+	{
+		if (DisplayEnergyCost > 0.0f)
+		{
+			OutCost = DisplayEnergyCost;
+			return true;
+		}
+
+		const UClass* LoadedCostClass = CostGameplayEffectClass.Get();
+		const UGameplayEffect* CostEffect = LoadedCostClass ? LoadedCostClass->GetDefaultObject<UGameplayEffect>() : nullptr;
+		if (!CostEffect)
+		{
+			return false;
+		}
+
+		int32 EnergyModifierCount = 0;
+		float StaticEnergyMagnitude = 0.0f;
+		bool bUnambiguous = true;
+		for (const FGameplayModifierInfo& Modifier : CostEffect->Modifiers)
+		{
+			if (Modifier.Attribute != UHSRCoreAttributeSet::GetEnergyAttribute())
+			{
+				continue;
+			}
+
+			++EnergyModifierCount;
+			float Magnitude = 0.0f;
+			const bool bStaticNegativeAdditive = Modifier.ModifierOp == EGameplayModOp::Additive
+				&& Modifier.ModifierMagnitude.GetStaticMagnitudeIfPossible(1.0f, Magnitude)
+				&& Magnitude < 0.0f;
+			if (bStaticNegativeAdditive)
+			{
+				StaticEnergyMagnitude = Magnitude;
+			}
+			else
+			{
+				bUnambiguous = false;
+			}
+		}
+
+		if (EnergyModifierCount != 1 || !bUnambiguous)
+		{
+			return false;
+		}
+
+		OutCost = -StaticEnergyMagnitude;
+		return true;
+	}
+
+	/**
+	 * Behavioural predicates below replace open-coded Category comparisons at the call sites.
+	 * Each answers one question a caller actually has; none of them expose Category itself, so a
+	 * new category only has to answer these rather than have every caller learn its name.
+	 *
+	 * They read Category today because that is where the authored data lives. The point is not to
+	 * hide the enum -- it is that the branch exists in one place per behaviour instead of once per
+	 * caller, so a fifth category is a change here and nowhere else.
+	 */
+
+	/** True when this skill restores Health, so callers gate full-health rejection and heal-amount
+	 *  sampling on capability rather than on being literally the Heal category. */
+	bool RestoresHealth() const
+	{
+		return Category == EHSRSkillCategory::Heal;
+	}
+
+	/** True when this skill resolves through the formal prepared-damage seam. Heal deliberately
+	 *  does not: it has no damage to prepare. */
+	bool UsesPreparedDamage() const
+	{
+		return Category == EHSRSkillCategory::BasicAttack
+			|| Category == EHSRSkillCategory::Skill
+			|| Category == EHSRSkillCategory::Ultimate;
+	}
+
+	/** True when granting this skill must also configure the ability instance. BasicAttack carries
+	 *  no per-action configuration, so granting it is complete on its own. */
+	bool RequiresAbilityConfiguration() const
+	{
+		return Category != EHSRSkillCategory::BasicAttack;
+	}
+
+	/** True when a shortage of team skill points makes this skill unavailable. Derived from the
+	 *  authored delta, so a skill authored to spend points is gated whatever its category. */
+	bool RequiresSkillPointsToCommit() const
+	{
+		return GetSkillPointDelta() < 0;
+	}
 };

@@ -185,19 +185,132 @@ void UHSRSaveSubsystem::InitializeForDevelopmentTest(UHSRCharacterProfileSubsyst
 }
 #endif
 
+namespace HSRSaveSchemaGates
+{
+	// One place that answers "which domains exist at which schema version". Validate,
+	// CanPrepareSnapshot, and LoadSnapshot all read through these, so a new schema means
+	// editing the predicates here rather than three separate ternary chains.
+	constexpr int32 InventoryAndRewardsSince = 3;
+	constexpr int32 QuestsSince = 4;
+	constexpr int32 MapSince = 5;
+	constexpr int32 EquipmentRegistrySince = 7;
+	constexpr int32 ChallengeProgressionSince = 8;
+
+	bool HasInventoryAndRewards(int32 SchemaVersion) { return SchemaVersion >= InventoryAndRewardsSince; }
+	bool HasQuests(int32 SchemaVersion) { return SchemaVersion >= QuestsSince; }
+	bool HasMap(int32 SchemaVersion) { return SchemaVersion >= MapSince; }
+	bool UsesEquipmentRegistry(int32 SchemaVersion) { return SchemaVersion >= EquipmentRegistrySince; }
+	bool HasChallengeProgression(int32 SchemaVersion) { return SchemaVersion >= ChallengeProgressionSince; }
+
+	/** Legacy flat-equipment array only exists between schema 2 and the registry cutover. */
+	bool HasLegacyEquipmentArray(int32 SchemaVersion)
+	{
+		return SchemaVersion > 1 && !UsesEquipmentRegistry(SchemaVersion);
+	}
+
+	// Effective sub-payload readers: a domain absent at this schema reads as empty rather
+	// than as whatever the caller happened to leave in the struct.
+	const FHSRInventorySaveData& EffectiveInventory(const FHSRSaveData& Data)
+	{
+		static const FHSRInventorySaveData Empty;
+		return HasInventoryAndRewards(Data.SchemaVersion) ? Data.Inventory : Empty;
+	}
+
+	const FHSRRewardSaveData& EffectiveRewards(const FHSRSaveData& Data)
+	{
+		static const FHSRRewardSaveData Empty;
+		return HasInventoryAndRewards(Data.SchemaVersion) ? Data.Rewards : Empty;
+	}
+
+	const FHSRQuestSaveData& EffectiveQuests(const FHSRSaveData& Data)
+	{
+		static const FHSRQuestSaveData Empty;
+		return HasQuests(Data.SchemaVersion) ? Data.Quests : Empty;
+	}
+
+	const FHSRMapSaveData& EffectiveMap(const FHSRSaveData& Data)
+	{
+		static const FHSRMapSaveData Empty;
+		return HasMap(Data.SchemaVersion) ? Data.Map : Empty;
+	}
+
+	const FHSRChallengeProgressionSaveData& EffectiveChallengeProgression(const FHSRSaveData& Data)
+	{
+		static const FHSRChallengeProgressionSaveData Empty;
+		return HasChallengeProgression(Data.SchemaVersion) ? Data.ChallengeProgression : Empty;
+	}
+
+	const TArray<FHSREquipmentSaveDto>& EffectiveLegacyEquipment(const FHSRSaveData& Data)
+	{
+		static const TArray<FHSREquipmentSaveDto> Empty;
+		return HasLegacyEquipmentArray(Data.SchemaVersion) ? Data.Equipment : Empty;
+	}
+
+	/** Blanks every domain the given schema did not carry, used after adopting a restored blob. */
+	void ClearDomainsAbsentAtSchema(FHSRSaveData& Target, int32 SourceSchemaVersion)
+	{
+		if (!HasInventoryAndRewards(SourceSchemaVersion))
+		{
+			Target.Inventory = FHSRInventorySaveData();
+			Target.Rewards = FHSRRewardSaveData();
+		}
+		if (!HasQuests(SourceSchemaVersion))
+		{
+			Target.Quests = FHSRQuestSaveData();
+		}
+		if (!HasMap(SourceSchemaVersion))
+		{
+			Target.Map = FHSRMapSaveData();
+		}
+		if (!HasChallengeProgression(SourceSchemaVersion))
+		{
+			Target.ChallengeProgression = FHSRChallengeProgressionSaveData();
+		}
+	}
+}
+
 bool UHSRSaveSubsystem::Validate(const FHSRSaveData& C) const {
-	if((C.SchemaVersion<1 || C.SchemaVersion>HSRSaveVersion::CurrentSchema) || C.PartyRevision<0 || C.PartySlots.Num()!=UHSRPartySubsystem::Capacity) return false;
+	if (C.SchemaVersion < 1 || C.SchemaVersion > HSRSaveVersion::CurrentSchema || C.PartyRevision < 0)
+	{
+		return false;
+	}
+
+	// Two party widths are legal here. A blob decoded straight off disk still carries the
+	// width its declared schema was written with, while a snapshot taken from the live
+	// runtime is always at current capacity even when a caller stamps an older schema onto
+	// it (LoadSnapshot does not migrate; only DecodeEnvelope does). Accept either.
+	const int32 DeclaredWidth = static_cast<int32>(HSRSaveVersion::PartySlotCountForSchema(C.SchemaVersion));
+	const int32 RuntimeWidth = static_cast<int32>(HSRSaveVersion::PartySlotCount);
+	if (C.PartySlots.Num() != DeclaredWidth && C.PartySlots.Num() != RuntimeWidth)
+	{
+		return false;
+	}
 	TSet<FName> Seen;
 	TMap<FGuid,FName> GuidOwners;
 	for(const FHSRSaveProfileDto& P:C.Profiles){ const auto& S=P.State; if(S.CharacterId.IsNone()||S.Level<1||S.Experience<0||S.Ascension<0)return false; if(Seen.Contains(S.CharacterId))return false; Seen.Add(S.CharacterId); const FGuid Guid=HSRCharacterGuidFromProfileName(S.CharacterId); if(const FName* Owner=GuidOwners.Find(Guid)){if(*Owner!=S.CharacterId)return false;}else GuidOwners.Add(Guid,S.CharacterId); for(const auto& K:S.SkillLevels) if(K.Key.IsNone()||K.Value<0)return false; }
 	TSet<FName> PartySeen; for(const FHSRPartySlot& Slot:C.PartySlots){ if(Slot.CharacterId.IsNone())continue; if(PartySeen.Contains(Slot.CharacterId))return false; PartySeen.Add(Slot.CharacterId); if(!Seen.Contains(Slot.CharacterId))return false; }
-	if(C.SchemaVersion==1 && !C.Equipment.IsEmpty())return false;
-	if(C.SchemaVersion>=7 && !C.Equipment.IsEmpty())return false;
-	if(C.SchemaVersion<3 && (!C.Inventory.Stacks.IsEmpty() || !C.Inventory.UniqueItems.IsEmpty() || C.Inventory.Revision!=0 || !C.Rewards.Receipts.IsEmpty() || C.Rewards.Revision!=0))return false;
-	if(C.SchemaVersion<4 && (!C.Quests.States.IsEmpty() || C.Quests.Revision!=0))return false;
-	if(C.SchemaVersion<5 && (!C.Map.CurrentLocation.MapId.IsNone() || !C.Map.CurrentLocation.ArrivalId.IsNone()
-		|| !C.Map.UnlockedRegionIds.IsEmpty() || !C.Map.UnlockedTeleportIds.IsEmpty()
-		|| !C.Map.ExplorationFlags.IsEmpty() || C.Map.Revision!=0))return false;
+	// A blob must not carry payload for a domain its declared schema predates.
+	if (!HSRSaveSchemaGates::HasLegacyEquipmentArray(C.SchemaVersion) && !C.Equipment.IsEmpty())
+	{
+		return false;
+	}
+	if (!HSRSaveSchemaGates::HasInventoryAndRewards(C.SchemaVersion)
+		&& (!C.Inventory.Stacks.IsEmpty() || !C.Inventory.UniqueItems.IsEmpty() || C.Inventory.Revision != 0
+			|| !C.Rewards.Receipts.IsEmpty() || C.Rewards.Revision != 0))
+	{
+		return false;
+	}
+	if (!HSRSaveSchemaGates::HasQuests(C.SchemaVersion) && (!C.Quests.States.IsEmpty() || C.Quests.Revision != 0))
+	{
+		return false;
+	}
+	if (!HSRSaveSchemaGates::HasMap(C.SchemaVersion)
+		&& (!C.Map.CurrentLocation.MapId.IsNone() || !C.Map.CurrentLocation.ArrivalId.IsNone()
+			|| !C.Map.UnlockedRegionIds.IsEmpty() || !C.Map.UnlockedTeleportIds.IsEmpty()
+			|| !C.Map.ExplorationFlags.IsEmpty() || C.Map.Revision != 0))
+	{
+		return false;
+	}
 	TSet<FGuid> OwnedInstances;
 	TMap<FGuid, const FHSREquipmentRegistryDto*> RegistryInstances;
 	TSet<FGuid> PlacedInstances;
@@ -230,8 +343,18 @@ bool UHSRSaveSubsystem::CanPrepareSnapshot(const FHSRSaveData& Candidate) const
 	}
 	TArray<FHSRCharacterProfileSnapshot> SavedProfiles;for(const FHSRSaveProfileDto& D:Candidate.Profiles){FHSRCharacterProfileSnapshot P;P.RuntimeState=D.State;P.RuntimeRevision=D.RuntimeRevision;SavedProfiles.Add(MoveTemp(P));}
 	TMap<FName,FHSRCharacterProfileSnapshot> ProfileCandidate;FHSRPartySnapshot PartySaved;PartySaved.Slots=Candidate.PartySlots;PartySaved.Revision=Candidate.PartyRevision;FHSRPartySnapshot PartyCandidate;FHSREquipmentRestoreMap EquipmentCandidate;FHSREquipmentRegistryRestoreState RegistryCandidate;FHSRInventoryRestoreState InventoryCandidate;FHSRRewardRestoreState RewardCandidate;FHSRQuestRestoreState QuestCandidate;FHSRMapRuntimeSnapshot MapCandidate;
-	const TArray<FHSREquipmentSaveDto> EmptyEquipment;const FHSRInventorySaveData EmptyInventory;const FHSRRewardSaveData EmptyRewards;const FHSRQuestSaveData EmptyQuests;const FHSRMapSaveData EmptyMap;
-	const FHSRChallengeProgressionSaveData EmptyChallengeProgression;FHSRChallengeProgressionSaveData ChallengeProgressionCandidate;const bool bProfiles=Profiles->PrepareRestore(SavedProfiles,ProfileCandidate);const bool bParty=Party->PrepareRestore(PartySaved,PartyCandidate);const bool bEquipment=Candidate.SchemaVersion>=7?Equipment->PrepareRestore(Candidate.EquipmentRegistry,Candidate.EquipmentPlacements,RegistryCandidate):Equipment->PrepareRestore(Candidate.SchemaVersion==1?EmptyEquipment:Candidate.Equipment,EquipmentCandidate);const bool bInventory=Inventory->PrepareRestore(Candidate.SchemaVersion<3?EmptyInventory:Candidate.Inventory,InventoryCandidate);const bool bReward=Reward->PrepareRestore(Candidate.SchemaVersion<3?EmptyRewards:Candidate.Rewards,RewardCandidate);const bool bQuest=Quest->PrepareRestore(Candidate.SchemaVersion<4?EmptyQuests:Candidate.Quests,QuestCandidate);const bool bMap=Map->PrepareRestore(Candidate.SchemaVersion<5?EmptyMap:Candidate.Map,MapCandidate);const bool bChallengeProgression=ChallengeProgression->PrepareRestore(Candidate.SchemaVersion>=8?Candidate.ChallengeProgression:EmptyChallengeProgression,ChallengeProgressionCandidate);
+	FHSRChallengeProgressionSaveData ChallengeProgressionCandidate;
+	const bool bProfiles = Profiles->PrepareRestore(SavedProfiles, ProfileCandidate);
+	const bool bParty = Party->PrepareRestore(PartySaved, PartyCandidate);
+	const bool bEquipment = HSRSaveSchemaGates::UsesEquipmentRegistry(Candidate.SchemaVersion)
+		? Equipment->PrepareRestore(Candidate.EquipmentRegistry, Candidate.EquipmentPlacements, RegistryCandidate)
+		: Equipment->PrepareRestore(HSRSaveSchemaGates::EffectiveLegacyEquipment(Candidate), EquipmentCandidate);
+	const bool bInventory = Inventory->PrepareRestore(HSRSaveSchemaGates::EffectiveInventory(Candidate), InventoryCandidate);
+	const bool bReward = Reward->PrepareRestore(HSRSaveSchemaGates::EffectiveRewards(Candidate), RewardCandidate);
+	const bool bQuest = Quest->PrepareRestore(HSRSaveSchemaGates::EffectiveQuests(Candidate), QuestCandidate);
+	const bool bMap = Map->PrepareRestore(HSRSaveSchemaGates::EffectiveMap(Candidate), MapCandidate);
+	const bool bChallengeProgression = ChallengeProgression->PrepareRestore(
+		HSRSaveSchemaGates::EffectiveChallengeProgression(Candidate), ChallengeProgressionCandidate);
 #if WITH_DEV_AUTOMATION_TESTS
 	if(!(bProfiles&&bParty&&bEquipment&&bInventory&&bReward&&bQuest&&bMap&&bChallengeProgression))UE_LOG(LogTemp,Warning,TEXT("HSR Save prepare rejected Profiles=%d Party=%d Equipment=%d Inventory=%d Reward=%d Quest=%d Map=%d Challenge=%d"),bProfiles,bParty,bEquipment,bInventory,bReward,bQuest,bMap,bChallengeProgression);
 #endif
@@ -308,7 +431,7 @@ bool UHSRSaveSubsystem::GetSlotSummary(const FString& SlotName, const int32 User
 			{
 				USaveGame* LegacyObject = UGameplayStatics::LoadGameFromSlot(SlotName, UserIndex);
 				const UHSRSaveGame* Legacy = Cast<UHSRSaveGame>(LegacyObject);
-				const bool bSupportedLegacy = Legacy && (Legacy->Data.SchemaVersion <= 5 || Legacy->Data.SchemaVersion == HSRSaveVersion::CurrentSchema);
+				const bool bSupportedLegacy = Legacy && (Legacy->Data.SchemaVersion <= 5 || Legacy->Data.SchemaVersion >= 8);
 				if (bSupportedLegacy)
 				{
 					PrimaryData = Legacy->Data;
@@ -415,13 +538,39 @@ EHSRSaveResult UHSRSaveSubsystem::LoadSnapshot(const FHSRSaveData& Candidate)
 	if(Candidate.SchemaVersion<1 || Candidate.SchemaVersion>HSRSaveVersion::CurrentSchema || Candidate.SchemaVersion==6)return EHSRSaveResult::UnsupportedSchema; if(!Profiles.IsValid()||!Party.IsValid()||!Equipment.IsValid()||!Inventory.IsValid()||!Reward.IsValid()||!Quest.IsValid()||!Map.IsValid()||!ChallengeProgression.IsValid()||!Validate(Candidate))return EHSRSaveResult::InvalidData;
 	TArray<FHSRCharacterProfileSnapshot> SavedProfiles;for(const auto& D:Candidate.Profiles){FHSRCharacterProfileSnapshot P;P.RuntimeState=D.State;P.RuntimeRevision=D.RuntimeRevision;SavedProfiles.Add(MoveTemp(P));}
 	TMap<FName,FHSRCharacterProfileSnapshot> ProfileCandidate;FHSRPartySnapshot PartySaved;PartySaved.Slots=Candidate.PartySlots;PartySaved.Revision=Candidate.PartyRevision;FHSRPartySnapshot PartyCandidate;
-	TMap<FGuid,FHSREquipmentRestoreState> EquipmentCandidate;FHSREquipmentRegistryRestoreState RegistryCandidate;const TArray<FHSREquipmentSaveDto> EmptyEquipment;
-	FHSRInventoryRestoreState InventoryCandidate;FHSRRewardRestoreState RewardCandidate;FHSRQuestRestoreState QuestCandidate;FHSRMapRuntimeSnapshot MapCandidate;FHSRChallengeProgressionSaveData ChallengeProgressionCandidate;const FHSRInventorySaveData EmptyInventory;const FHSRRewardSaveData EmptyRewards;const FHSRQuestSaveData EmptyQuests;const FHSRMapSaveData EmptyMap;const FHSRChallengeProgressionSaveData EmptyChallengeProgression;
-	const bool bEquipmentPrepared=Candidate.SchemaVersion>=7?Equipment->PrepareRestore(Candidate.EquipmentRegistry,Candidate.EquipmentPlacements,RegistryCandidate):Equipment->PrepareRestore(Candidate.SchemaVersion==1?EmptyEquipment:Candidate.Equipment,EquipmentCandidate);
-	if(Candidate.SchemaVersion>=7&&bEquipmentPrepared)EquipmentCandidate=RegistryCandidate.Loadouts;
-	const bool bChallengeProgressionPrepared=ChallengeProgression->PrepareRestore(Candidate.SchemaVersion>=8?Candidate.ChallengeProgression:EmptyChallengeProgression,ChallengeProgressionCandidate);
-	if(!Profiles->PrepareRestore(SavedProfiles,ProfileCandidate)||!Party->PrepareRestore(PartySaved,PartyCandidate)||!bEquipmentPrepared||!Inventory->PrepareRestore(Candidate.SchemaVersion<3?EmptyInventory:Candidate.Inventory,InventoryCandidate)||!Reward->PrepareRestore(Candidate.SchemaVersion<3?EmptyRewards:Candidate.Rewards,RewardCandidate)||!Quest->PrepareRestore(Candidate.SchemaVersion<4?EmptyQuests:Candidate.Quests,QuestCandidate)||!Map->PrepareRestore(Candidate.SchemaVersion<5?EmptyMap:Candidate.Map,MapCandidate)||!bChallengeProgressionPrepared)return EHSRSaveResult::InvalidData;
-	const FHSREquipmentRestoreMap& ProjectedEquipment=Candidate.SchemaVersion>=7?RegistryCandidate.Loadouts:EquipmentCandidate;if(!Equipment->ProjectRestore(ProjectedEquipment))return EHSRSaveResult::InvalidData;
+	TMap<FGuid,FHSREquipmentRestoreState> EquipmentCandidate;
+	FHSREquipmentRegistryRestoreState RegistryCandidate;
+	FHSRInventoryRestoreState InventoryCandidate;
+	FHSRRewardRestoreState RewardCandidate;
+	FHSRQuestRestoreState QuestCandidate;
+	FHSRMapRuntimeSnapshot MapCandidate;
+	FHSRChallengeProgressionSaveData ChallengeProgressionCandidate;
+	const bool bEquipmentPrepared = HSRSaveSchemaGates::UsesEquipmentRegistry(Candidate.SchemaVersion)
+		? Equipment->PrepareRestore(Candidate.EquipmentRegistry, Candidate.EquipmentPlacements, RegistryCandidate)
+		: Equipment->PrepareRestore(HSRSaveSchemaGates::EffectiveLegacyEquipment(Candidate), EquipmentCandidate);
+	const bool bUsesRegistry = HSRSaveSchemaGates::UsesEquipmentRegistry(Candidate.SchemaVersion);
+	if (bUsesRegistry && bEquipmentPrepared)
+	{
+		EquipmentCandidate = RegistryCandidate.Loadouts;
+	}
+	const bool bChallengeProgressionPrepared = ChallengeProgression->PrepareRestore(
+		HSRSaveSchemaGates::EffectiveChallengeProgression(Candidate), ChallengeProgressionCandidate);
+	if (!Profiles->PrepareRestore(SavedProfiles, ProfileCandidate)
+		|| !Party->PrepareRestore(PartySaved, PartyCandidate)
+		|| !bEquipmentPrepared
+		|| !Inventory->PrepareRestore(HSRSaveSchemaGates::EffectiveInventory(Candidate), InventoryCandidate)
+		|| !Reward->PrepareRestore(HSRSaveSchemaGates::EffectiveRewards(Candidate), RewardCandidate)
+		|| !Quest->PrepareRestore(HSRSaveSchemaGates::EffectiveQuests(Candidate), QuestCandidate)
+		|| !Map->PrepareRestore(HSRSaveSchemaGates::EffectiveMap(Candidate), MapCandidate)
+		|| !bChallengeProgressionPrepared)
+	{
+		return EHSRSaveResult::InvalidData;
+	}
+	const FHSREquipmentRestoreMap& ProjectedEquipment = bUsesRegistry ? RegistryCandidate.Loadouts : EquipmentCandidate;
+	if (!Equipment->ProjectRestore(ProjectedEquipment))
+	{
+		return EHSRSaveResult::InvalidData;
+	}
 	TArray<FName> ChangedIds;for(const auto& It:ProfileCandidate){FHSRCharacterProfileSnapshot Old;if(!Profiles->GetProfileSnapshot(It.Key,Old)||Old.RuntimeRevision!=It.Value.RuntimeRevision||Old.RuntimeState.Level!=It.Value.RuntimeState.Level||Old.RuntimeState.Experience!=It.Value.RuntimeState.Experience||Old.RuntimeState.Ascension!=It.Value.RuntimeState.Ascension||!Old.RuntimeState.SkillLevels.OrderIndependentCompareEqual(It.Value.RuntimeState.SkillLevels))ChangedIds.Add(It.Key);}ChangedIds.Sort(FNameLexicalLess());FHSRPartySnapshot OldParty;Party->GetSnapshot(OldParty);bool PartyChanged=OldParty.Revision!=PartyCandidate.Revision;for(int32 I=0;!PartyChanged&&I<OldParty.Slots.Num();++I)PartyChanged=OldParty.Slots[I].CharacterId!=PartyCandidate.Slots[I].CharacterId;
 	TArray<FHSREquipmentSaveDto> CandidateEquipmentRows=Candidate.Equipment;if(Candidate.SchemaVersion>=7){for(const auto& Placement:Candidate.EquipmentPlacements)for(const auto& Registry:Candidate.EquipmentRegistry)if(Registry.InstanceId==Placement.InstanceId){FHSREquipmentSaveDto D;D.DefinitionId=Registry.DefinitionId;D.InstanceId=Registry.InstanceId;D.CharacterId=Placement.CharacterId;D.Kind=Placement.Kind;D.Slot=Placement.Slot;D.EnhancementLevel=Registry.EnhancementLevel;D.Modifiers=Registry.Modifiers;D.SetId=Registry.SetId;D.AuthorityRevision=Placement.AuthorityRevision;CandidateEquipmentRows.Add(MoveTemp(D));break;}}
 	TSet<FGuid> EquipmentChanged;TArray<FHSREquipmentSaveDto> ExistingEquipment;Equipment->ExportSaveData(ExistingEquipment);TSet<FGuid> ExistingCharacters;for(const FHSREquipmentSaveDto& D:ExistingEquipment)ExistingCharacters.Add(D.CharacterId);for(const FGuid& Id:ExistingCharacters)if(!EquipmentCandidate.Contains(Id))EquipmentChanged.Add(Id);for(const auto& P:EquipmentCandidate){TArray<FHSREquipmentSaveDto> OldRows;for(const FHSREquipmentSaveDto& D:ExistingEquipment)if(D.CharacterId==P.Key)OldRows.Add(D);TArray<FHSREquipmentSaveDto> NewRows;for(const FHSREquipmentSaveDto& D:CandidateEquipmentRows)if(D.CharacterId==P.Key)NewRows.Add(D);if(OldRows.Num()!=NewRows.Num()){EquipmentChanged.Add(P.Key);continue;}OldRows.Sort([](const auto& A,const auto& B){return A.InstanceId<B.InstanceId;});NewRows.Sort([](const auto& A,const auto& B){return A.InstanceId<B.InstanceId;});for(int32 I=0;I<OldRows.Num();++I){bool bDifferent=OldRows[I].InstanceId!=NewRows[I].InstanceId||OldRows[I].DefinitionId!=NewRows[I].DefinitionId||OldRows[I].Kind!=NewRows[I].Kind||OldRows[I].Slot!=NewRows[I].Slot||OldRows[I].EnhancementLevel!=NewRows[I].EnhancementLevel||OldRows[I].AuthorityRevision!=NewRows[I].AuthorityRevision||OldRows[I].SetId!=NewRows[I].SetId||OldRows[I].Modifiers.Num()!=NewRows[I].Modifiers.Num();for(int32 M=0;!bDifferent&&M<OldRows[I].Modifiers.Num();++M)bDifferent=OldRows[I].Modifiers[M].Stat!=NewRows[I].Modifiers[M].Stat||OldRows[I].Modifiers[M].Value!=NewRows[I].Modifiers[M].Value;if(bDifferent){EquipmentChanged.Add(P.Key);break;}}}
@@ -450,7 +599,7 @@ EHSRSaveResult UHSRSaveSubsystem::LoadSnapshot(const FHSRSaveData& Candidate)
 		}
 	}
 	const bool bInventoryChanged=Inventory->IsRestoreDifferent(InventoryCandidate);const bool bRewardsChanged=Reward->IsRestoreDifferent(RewardCandidate);const bool bQuestsChanged=Quest->IsRestoreDifferent(QuestCandidate);const bool bMapChanged=Map->IsRestoreDifferent(MapCandidate);const bool bChallengeProgressionChanged=ChallengeProgression->IsRestoreDifferent(ChallengeProgressionCandidate);
-	Profiles->CommitRestoreSilent(MoveTemp(ProfileCandidate));Party->CommitRestoreSilent(MoveTemp(PartyCandidate));if(Candidate.SchemaVersion>=7)Equipment->CommitRestore(RegistryCandidate);else Equipment->CommitRestore(EquipmentCandidate);Inventory->CommitRestore(MoveTemp(InventoryCandidate),false);Reward->CommitRestore(MoveTemp(RewardCandidate),false);Quest->CommitRestore(MoveTemp(QuestCandidate),false);Map->CommitRestore(MoveTemp(MapCandidate),false);ChallengeProgression->CommitRestore(MoveTemp(ChallengeProgressionCandidate),bChallengeProgressionChanged);Current=Candidate;Current.SchemaVersion=HSRSaveVersion::CurrentSchema;if(Candidate.SchemaVersion<3){Current.Inventory=FHSRInventorySaveData();Current.Rewards=FHSRRewardSaveData();}if(Candidate.SchemaVersion<4){Current.Quests=FHSRQuestSaveData();}if(Candidate.SchemaVersion<5){Current.Map=FHSRMapSaveData();}if(Candidate.SchemaVersion<8){Current.ChallengeProgression=FHSRChallengeProgressionSaveData();}Profiles->NotifyRestored(ChangedIds);if(PartyChanged)Party->NotifyRestored();Equipment->NotifyRestored(EquipmentChanged);if(bInventoryChanged)Inventory->OnInventoryChanged().Broadcast(Current.Inventory.Revision);if(bRewardsChanged)Reward->OnRewardRestored().Broadcast(Current.Rewards.Revision);if(bQuestsChanged)Quest->OnQuestRestored().Broadcast(Current.Quests.Revision);if(bMapChanged)Map->OnMapStateChanged().Broadcast(Map->GetSnapshot());if(!ChangedIds.IsEmpty()||PartyChanged||!EquipmentChanged.IsEmpty()||bInventoryChanged||bRewardsChanged||bQuestsChanged||bMapChanged||bChallengeProgressionChanged){FHSRRestoreCommitInfo Info;Info.ChangedCharacterIds=ChangedIds;Info.bPartyChanged=PartyChanged;Info.bInventoryChanged=bInventoryChanged;Info.bRewardsChanged=bRewardsChanged;Info.bQuestsChanged=bQuestsChanged;Info.bMapChanged=bMapChanged;Info.bChallengeProgressionChanged=bChallengeProgressionChanged;Info.TransactionRevision=++RestoreTransactionRevision;RestoreCommitted.Broadcast(Info);}return EHSRSaveResult::Success;
+	Profiles->CommitRestoreSilent(MoveTemp(ProfileCandidate));Party->CommitRestoreSilent(MoveTemp(PartyCandidate));if(bUsesRegistry)Equipment->CommitRestore(RegistryCandidate);else Equipment->CommitRestore(EquipmentCandidate);Inventory->CommitRestore(MoveTemp(InventoryCandidate),false);Reward->CommitRestore(MoveTemp(RewardCandidate),false);Quest->CommitRestore(MoveTemp(QuestCandidate),false);Map->CommitRestore(MoveTemp(MapCandidate),false);ChallengeProgression->CommitRestore(MoveTemp(ChallengeProgressionCandidate),bChallengeProgressionChanged);Current=Candidate;Current.SchemaVersion=HSRSaveVersion::CurrentSchema;if(Current.PartySlots.Num()<static_cast<int32>(HSRSaveVersion::PartySlotCount))Current.PartySlots.SetNum(HSRSaveVersion::PartySlotCount);HSRSaveSchemaGates::ClearDomainsAbsentAtSchema(Current,Candidate.SchemaVersion);Profiles->NotifyRestored(ChangedIds);if(PartyChanged)Party->NotifyRestored();Equipment->NotifyRestored(EquipmentChanged);if(bInventoryChanged)Inventory->OnInventoryChanged().Broadcast(Current.Inventory.Revision);if(bRewardsChanged)Reward->OnRewardRestored().Broadcast(Current.Rewards.Revision);if(bQuestsChanged)Quest->OnQuestRestored().Broadcast(Current.Quests.Revision);if(bMapChanged)Map->OnMapStateChanged().Broadcast(Map->GetSnapshot());if(!ChangedIds.IsEmpty()||PartyChanged||!EquipmentChanged.IsEmpty()||bInventoryChanged||bRewardsChanged||bQuestsChanged||bMapChanged||bChallengeProgressionChanged){FHSRRestoreCommitInfo Info;Info.ChangedCharacterIds=ChangedIds;Info.bPartyChanged=PartyChanged;Info.bInventoryChanged=bInventoryChanged;Info.bRewardsChanged=bRewardsChanged;Info.bQuestsChanged=bQuestsChanged;Info.bMapChanged=bMapChanged;Info.bChallengeProgressionChanged=bChallengeProgressionChanged;Info.TransactionRevision=++RestoreTransactionRevision;RestoreCommitted.Broadcast(Info);}return EHSRSaveResult::Success;
 }
 
 EHSRSaveResult UHSRSaveSubsystem::SaveToSlot(const FString& SlotName,int32 UserIndex)
@@ -528,7 +677,7 @@ EHSRSaveResult UHSRSaveSubsystem::LoadFromSlot(const FString& SlotName,int32 Use
 			if(Reason==EHSRSaveDecodeResult::Success){if(CanPrepareSnapshot(PrimaryData)){Selected=MoveTemp(PrimaryData);bHaveSelected=true;LastLoadResult.Source=EHSRSaveLoadSource::Primary;LastLoadResult.SaveId=PrimaryHeader.SaveId;LastLoadResult.Generation=PrimaryHeader.Generation;}else LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::PrepareFailed;}
 			else if(Reason==EHSRSaveDecodeResult::BadMagic)
 			{
-				USaveGame* LegacyObject=UGameplayStatics::LoadGameFromSlot(SlotName,UserIndex);const UHSRSaveGame* Legacy=Cast<UHSRSaveGame>(LegacyObject);const bool bSupportedLegacy=Legacy&&(Legacy->Data.SchemaVersion<=5||Legacy->Data.SchemaVersion==HSRSaveVersion::CurrentSchema);if(bSupportedLegacy&&CanPrepareSnapshot(Legacy->Data)){Selected=Legacy->Data;bHaveSelected=true;LastLoadResult.Source=EHSRSaveLoadSource::LegacyPrimary;}else{LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::LegacyInvalid;PrimaryFailureResult=!LegacyObject?EHSRSaveResult::LoadFailed:!Legacy?EHSRSaveResult::ClassMismatch:!bSupportedLegacy?EHSRSaveResult::UnsupportedSchema:EHSRSaveResult::InvalidData;}
+				USaveGame* LegacyObject=UGameplayStatics::LoadGameFromSlot(SlotName,UserIndex);const UHSRSaveGame* Legacy=Cast<UHSRSaveGame>(LegacyObject);const bool bSupportedLegacy=Legacy&&(Legacy->Data.SchemaVersion<=5||Legacy->Data.SchemaVersion>=8);if(bSupportedLegacy&&CanPrepareSnapshot(Legacy->Data)){Selected=Legacy->Data;bHaveSelected=true;LastLoadResult.Source=EHSRSaveLoadSource::LegacyPrimary;}else{LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::LegacyInvalid;PrimaryFailureResult=!LegacyObject?EHSRSaveResult::LoadFailed:!Legacy?EHSRSaveResult::ClassMismatch:!bSupportedLegacy?EHSRSaveResult::UnsupportedSchema:EHSRSaveResult::InvalidData;}
 			}
 			else LastLoadResult.PrimaryStageReason=EHSRSaveLoadReason::DecodeFailure;
 		}

@@ -221,7 +221,101 @@ void UHSRTurnManager::BroadcastLifecycleEvent(EHSRTurnLifecycleEventType Type, F
 	if (Type == EHSRTurnLifecycleEventType::TurnStarted) TurnStarted.Broadcast(Event); else TurnEnded.Broadcast(Event);
 }
 bool UHSRTurnManager::IsCurrentParticipantValid() const { return OrderedParticipants.IsValidIndex(CurrentTurnIndex) && IsParticipantTurnEligible(OrderedParticipants[CurrentTurnIndex]); }
-bool UHSRTurnManager::IsParticipantTurnEligible(const FHSRBattleParticipant& P) { return P.IsValid() && P.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) > 0.0f; }
+bool UHSRTurnManager::IsParticipantTurnEligible(const FHSRBattleParticipant& P)
+{
+	return P.IsAlive();
+}
+TArray<FHSRTurnForecastEntry> UHSRTurnManager::BuildTurnForecast(int32 SlotCount) const
+{
+	TArray<FHSRTurnForecastEntry> Forecast;
+	if (SlotCount <= 0 || State == EHSRTurnManagerState::Finished)
+	{
+		return Forecast;
+	}
+
+	// Simulate on copies so the real turn state is untouched.
+	struct FForecastLane
+	{
+		FName ParticipantId;
+		bool bPlayerTeam = false;
+		float Remaining = 0.0f;
+		float Base = 0.0f;
+	};
+
+	TArray<FForecastLane> Lanes;
+	Lanes.Reserve(OrderedParticipants.Num());
+	for (const FHSRBattleParticipant& Participant : OrderedParticipants)
+	{
+		if (!IsParticipantTurnEligible(Participant) || !FMath::IsFinite(Participant.RemainingActionDistance))
+		{
+			continue;
+		}
+		FForecastLane& Lane = Lanes.AddDefaulted_GetRef();
+		Lane.ParticipantId = Participant.ParticipantId;
+		Lane.bPlayerTeam = Participant.Team == EHSRBattleParticipantTeam::Player;
+		Lane.Remaining = Participant.RemainingActionDistance;
+		Lane.Base = Participant.BaseActionDistance > DistanceEpsilon ? Participant.BaseActionDistance : MaximumBaseActionDistance;
+	}
+	if (Lanes.Num() == 0)
+	{
+		return Forecast;
+	}
+
+	// The participant already taking its turn owns slot 0 even though its distance was consumed.
+	const FName ActingId = GetCurrentParticipantId();
+	TSet<FName> Seen;
+	Forecast.Reserve(SlotCount);
+	float ElapsedDistance = 0.0f;
+
+	for (int32 Slot = 0; Slot < SlotCount; ++Slot)
+	{
+		int32 WinnerIndex = INDEX_NONE;
+		if (Slot == 0 && !ActingId.IsNone())
+		{
+			WinnerIndex = Lanes.IndexOfByPredicate([&ActingId](const FForecastLane& Lane)
+			{
+				return Lane.ParticipantId == ActingId;
+			});
+		}
+		if (WinnerIndex == INDEX_NONE)
+		{
+			// Ties resolve by registry order, matching AdvanceTurn's frozen-candidate rule.
+			for (int32 Index = 0; Index < Lanes.Num(); ++Index)
+			{
+				if (WinnerIndex == INDEX_NONE || Lanes[Index].Remaining < Lanes[WinnerIndex].Remaining - DistanceEpsilon)
+				{
+					WinnerIndex = Index;
+				}
+			}
+		}
+		if (WinnerIndex == INDEX_NONE)
+		{
+			break;
+		}
+
+		FForecastLane& Winner = Lanes[WinnerIndex];
+		ElapsedDistance += FMath::Max(0.0f, Winner.Remaining);
+
+		FHSRTurnForecastEntry& Entry = Forecast.AddDefaulted_GetRef();
+		Entry.ParticipantId = Winner.ParticipantId;
+		Entry.bPlayerTeam = Winner.bPlayerTeam;
+		Entry.SlotIndex = Slot;
+		Entry.DistanceUntilAction = ElapsedDistance;
+		Entry.bRepeatAction = Seen.Contains(Winner.ParticipantId);
+		Seen.Add(Winner.ParticipantId);
+
+		// Normalise the way AdvanceTurn does, then recharge the actor that just acted.
+		const float Consumed = FMath::Max(0.0f, Winner.Remaining);
+		for (FForecastLane& Lane : Lanes)
+		{
+			Lane.Remaining = FMath::Max(0.0f, Lane.Remaining - Consumed);
+		}
+		Winner.Remaining = Winner.Base;
+	}
+
+	return Forecast;
+}
+
 FHSRActionDistanceResult UHSRTurnManager::MakeAdjustmentResult(EHSRActionDistanceAdjustmentResult Result, int32 Index, const FHSRActionDistanceResult* OldSnapshot) const { FHSRActionDistanceResult Out; Out.Result = Result; Out.BattleEpoch = BattleEpoch; Out.TurnSequence = TurnSequence; Out.CurrentParticipantId = GetCurrentParticipantId(); Out.NextParticipantId = GetCurrentParticipantId(); Out.PendingOperationCount = PendingPostActionOperations.Num(); Out.OldPendingOperationCount = Out.NewPendingOperationCount = Out.PendingOperationCount; if (OrderedParticipants.IsValidIndex(Index)) { const FHSRBattleParticipant& P = OrderedParticipants[Index]; Out.OldBase = P.BaseActionDistance; Out.NewBase = P.BaseActionDistance; Out.OldRemaining = P.RemainingActionDistance; Out.NewRemaining = P.RemainingActionDistance; } if (OldSnapshot) { Out.OldBase = OldSnapshot->OldBase; Out.OldRemaining = OldSnapshot->OldRemaining; Out.OldPendingOperationCount = OldSnapshot->PendingOperationCount; } return Out; }
 #if WITH_EDITOR
 bool UHSRTurnManager::InvalidateCurrentParticipantForDevelopmentTest() { if (!OrderedParticipants.IsValidIndex(CurrentTurnIndex)) return false; OrderedParticipants[CurrentTurnIndex].Actor.Reset(); return true; }

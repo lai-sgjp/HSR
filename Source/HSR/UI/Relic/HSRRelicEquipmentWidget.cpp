@@ -123,6 +123,24 @@ bool UHSRRelicEquipmentWidget::GetCurrentSnapshot(FHSRRelicEquipmentSnapshot& Ou
 	return true;
 }
 
+bool UHSRRelicEquipmentWidget::GetEnhancementOption(const int32 Index,
+	FHSRRelicEnhancementOption& OutOption) const
+{
+	if (!bHasSnapshot || !CurrentSnapshot.EnhancementOptions.IsValidIndex(Index)) return false;
+	OutOption = CurrentSnapshot.EnhancementOptions[Index];
+	return true;
+}
+
+int32 UHSRRelicEquipmentWidget::GetEnhancementOptionCount() const
+{
+	return bHasSnapshot ? CurrentSnapshot.EnhancementOptions.Num() : 0;
+}
+
+bool UHSRRelicEquipmentWidget::HasEnhancementOptions() const
+{
+	return GetEnhancementOptionCount() > 0;
+}
+
 void UHSRRelicEquipmentWidget::HandleSnapshot(const FHSRRelicEquipmentSnapshot& InSnapshot)
 {
 	CurrentSnapshot = InSnapshot;

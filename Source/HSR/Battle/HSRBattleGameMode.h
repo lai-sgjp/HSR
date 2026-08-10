@@ -74,7 +74,33 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Battle|UI") bool IsCharacterDetailVisible() const { return bCharacterDetailVisible; }
 
 protected:
-	/** User-created SkillDefinition used by the Battle runtime; this is not owned by the exploration character. */
+	/** Preferred authoring surface for the shared default loadout: order here is presentation
+	 * order, and adding a skill is a DataAsset edit with no C++ change. When this is left empty
+	 * the four legacy named slots below are used instead, so existing Blueprints keep working. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Skills")
+	TArray<TObjectPtr<UHSRSkillDefinition>> DefaultSkillLoadout;
+
+	/** Resolves DefaultSkillLoadout when authored, otherwise the legacy named slots. */
+	TArray<UHSRSkillDefinition*> ResolveDefaultSkillLoadout() const;
+
+public:
+#if WITH_DEV_AUTOMATION_TESTS
+	TArray<UHSRSkillDefinition*> ResolveDefaultSkillLoadoutForTest() const { return ResolveDefaultSkillLoadout(); }
+	void SetDefaultSkillLoadoutForTest(const TArray<TObjectPtr<UHSRSkillDefinition>>& InSkills) { DefaultSkillLoadout = InSkills; }
+	void SetLegacySkillSlotsForTest(UHSRSkillDefinition* Basic, UHSRSkillDefinition* Skill,
+		UHSRSkillDefinition* Ultimate, UHSRSkillDefinition* Heal)
+	{
+		BasicAttackSkillDefinition = Basic;
+		SkillSkillDefinition = Skill;
+		UltimateSkillDefinition = Ultimate;
+		HealSkillDefinition = Heal;
+	}
+#endif
+
+protected:
+
+	/** Legacy slot. Superseded by DefaultSkillLoadout; kept so already-authored Blueprints
+	 * do not silently lose their configuration. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Skills")
 	TObjectPtr<UHSRSkillDefinition> BasicAttackSkillDefinition;
 

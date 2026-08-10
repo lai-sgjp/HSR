@@ -4,6 +4,8 @@
 #include "../GAS/Ability/HSRAbilityTypes.h"
 #include "HSRBattleTypes.generated.h"
 
+class UHSRSkillDefinition;
+
 UENUM(BlueprintType)
 enum class EHSRBattleParticipantTeam : uint8
 {
@@ -40,6 +42,48 @@ enum class EHSRBattleInitFailureType : uint8
 	InitFailed UMETA(DisplayName = "ASC Init Failed")
 };
 
+/** One authored slot on a side's roster, before ParticipantIds are minted.  The Coordinator
+ * turns each entry into exactly one participant, so roster length drives battle width. */
+USTRUCT(BlueprintType)
+struct FHSRBattleRosterEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FName CharacterId;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle")
+	TSubclassOf<APawn> PawnClass;
+
+	/**
+	 * Presentation resolved by whoever assembles the roster, because that caller is the one holding
+	 * the character definition. Empty is valid and means "no authored name"; the UI falls back to
+	 * the participant id. Keeping it on the entry lets the Coordinator stay free of asset lookups.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FText DisplayName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	TSoftObjectPtr<UTexture2D> Portrait;
+
+	FHSRBattleRosterEntry() = default;
+	FHSRBattleRosterEntry(FName InCharacterId, TSubclassOf<APawn> InPawnClass)
+		: CharacterId(InCharacterId), PawnClass(InPawnClass) {}
+
+	bool IsValid() const { return !CharacterId.IsNone(); }
+};
+
+/** One participant's skill list, in presentation order.  Wrapper struct exists because
+ * TMap values cannot be bare TArray in a UPROPERTY. */
+USTRUCT()
+struct FHSRSkillLoadout
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<TObjectPtr<UHSRSkillDefinition>> Skills;
+};
+
 USTRUCT(BlueprintType)
 struct FHSRBattleParticipantDefinition
 {
@@ -57,6 +101,12 @@ struct FHSRBattleParticipantDefinition
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Battle")
 	TSubclassOf<APawn> PawnClass;
 
+	/** Carried through from the roster entry; see FHSRBattleRosterEntry::DisplayName. */
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	FText DisplayName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Battle")
+	TSoftObjectPtr<UTexture2D> Portrait;
 
 	FHSRBattleParticipantDefinition() = default;
 };

@@ -100,12 +100,7 @@ bool UHSRBattleTransitionSubsystem::CanAffordStageBuffs(FName EncounterId, const
 	Inventory->GetSnapshot(Snapshot);
 	for (const TPair<FName, int32>& Entry : Required)
 	{
-		const FHSRItemStackSnapshot* Stack = Snapshot.Stacks.FindByPredicate(
-			[&Entry](const FHSRItemStackSnapshot& Candidate)
-			{
-				return Candidate.ItemId == Entry.Key;
-			});
-		if (!Stack || Stack->Quantity < Entry.Value)
+		if (Snapshot.GetStackQuantity(Entry.Key) < Entry.Value)
 		{
 			return false;
 		}
@@ -136,6 +131,7 @@ EHSREncounterResultType UHSRBattleTransitionSubsystem::BuildEncounterRequest(
 	}
 	OutRequest = Input.Template;
 	OutRequest.PlayerCharacterId = Input.CandidateParty[0];
+	OutRequest.PlayerPartyIds = Input.CandidateParty;
 	OutRequest.BuffIds = Input.BuffIds;
 	return EHSREncounterResultType::Success;
 }
@@ -244,6 +240,13 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 			FText::FromString(TEXT("Party slot 0 has no committed player selection.")));
 	}
 	const FName PlayerCharacterId = PartySnapshot.Slots[0].CharacterId;
+	// The roster is densified here: empty slots are legal in the party grid but meaningless
+	// as participants, so battle only ever sees committed members, leader first.
+	TArray<FName> PlayerPartyIds;
+	for (const FHSRPartySlot& Slot : PartySnapshot.Slots)
+	{
+		if (!Slot.IsEmpty()) PlayerPartyIds.Add(Slot.CharacterId);
+	}
 
 	if (Definition->BattleMap.IsNull())
 	{
@@ -300,6 +303,7 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 	FHSREncounterRequest NewRequest;
 	NewRequest.RequestId = NewRequestId;
 	NewRequest.PlayerCharacterId = PlayerCharacterId;
+	NewRequest.PlayerPartyIds = PlayerPartyIds;
 	NewRequest.EncounterId = Definition->EncounterId;
 	NewRequest.EnemyDefinitionId = Definition->EnemyDefinitionId;
 	NewRequest.Initiative = Initiative;

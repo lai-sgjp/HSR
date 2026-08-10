@@ -44,6 +44,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "HSR|Relic Equipment")
 	bool GetCurrentSnapshot(FHSRRelicEquipmentSnapshot& OutSnapshot) const;
 
+	/** Bounds-checked option access. Blueprints must use this instead of indexing
+	 *  EnhancementOptions, which logs an out-of-bounds access on empty slots. */
+	UFUNCTION(BlueprintPure, Category = "HSR|Relic Equipment")
+	bool GetEnhancementOption(int32 Index, FHSRRelicEnhancementOption& OutOption) const;
+
+	UFUNCTION(BlueprintPure, Category = "HSR|Relic Equipment")
+	int32 GetEnhancementOptionCount() const;
+
+	UFUNCTION(BlueprintPure, Category = "HSR|Relic Equipment")
+	bool HasEnhancementOptions() const;
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "HSR|Relic Equipment")
 	void OnRelicSnapshotChanged(const FHSRRelicEquipmentSnapshot& Snapshot);
 

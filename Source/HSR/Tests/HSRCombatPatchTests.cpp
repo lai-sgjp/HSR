@@ -24,6 +24,7 @@
 #include "../Battle/HSRBattleTransitionSubsystem.h"
 #include "../Data/HSRSkillDefinition.h"
 #include "../Data/Definitions/HSRStatusDefinition.h"
+#include "../UI/HSRBattleCommandTypes.h"
 #include "../GAS/HSRAbilitySystemComponent.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "../Status/HSRStatusComponent.h"
@@ -109,7 +110,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceLifecyclePatchTest, "HSR.Batt
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceThreeParticipantPatchTest, "HSR.Battle.Patch.ActionDistance.ThreeParticipant", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceRequestMatrixPatchTest, "HSR.Battle.Patch.ActionDistance.RequestMatrix", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRActionDistanceNumericLifecyclePatchTest, "HSR.Battle.Patch.ActionDistance.NumericAndBinding", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRTurnForecastPatchTest, "HSR.Battle.Patch.ActionDistance.TurnForecast", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRBehaviorTreeAdapterPatchTest, "HSR.Exploration.Patch.BehaviorTreeAdapter", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRSkillLoadoutPatchTest, "HSR.Battle.Patch.SkillLoadout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRAuthoredSkillContentTest, "HSR.Battle.Patch.AuthoredSkillContent", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRDefaultLoadoutResolutionTest, "HSR.Battle.Patch.DefaultLoadoutResolution", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 {
@@ -817,9 +822,10 @@ bool FHSRRepeatableBreakPatchTest::RunTest(const FString& Parameters)
 		const FHSRBattleParticipant& Target = Coordinator->GetParticipants()[1];
 		if (!Source.AbilitySystemComponent.IsValid() || !Target.AbilitySystemComponent.IsValid() || !Coordinator->GetTurnManager()) return false;
 		const UHSRSkillDefinition* Skill = Coordinator->GetBasicAttackDefinition();
-		const FString Element = Skill->ElementTag.ToString();
-		const FGameplayTag Weakness = Element.StartsWith(TEXT("Element."))
-			? FGameplayTag::RequestGameplayTag(FName(*FString::Printf(TEXT("Weakness.%s"), *Element.RightChop(8))), false) : FGameplayTag();
+		// Derive through the production helper rather than re-deriving here. Open-coding the rule
+		// made this test validate its own copy of it, so a change to the real derivation would
+		// leave the fixture building weaknesses by the old rule and hide the regression.
+		const FGameplayTag Weakness = FHSRToughnessConfiguration::GetWeaknessTagFor(Skill->ElementTag);
 		FHSRBattleParticipant& MutableTarget = const_cast<FHSRBattleParticipant&>(Target);
 		MutableTarget.WeaknessTags.Reset();
 		if (bWeakness && Weakness.IsValid()) MutableTarget.WeaknessTags.AddTag(Weakness);
@@ -1115,6 +1121,286 @@ bool FHSRStatusGenericPatchTest::RunTest(const FString& Parameters)
 	EffectDefault->DurationPolicy = OriginalDurationPolicy;
 	EffectDefault->StackingType = OriginalStackingType;
 	World->DestroyWorld(false);
+	return true;
+}
+
+bool FHSRTurnForecastPatchTest::RunTest(const FString& Parameters)
+{
+	if (!GEngine)
+	{
+		return false;
+	}
+
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GEngine);
+	GameInstance->AddToRoot();
+
+	UWorld* World = nullptr;
+	UHSRBattleCoordinator* Coordinator = nullptr;
+	ON_SCOPE_EXIT
+	{
+		if (Coordinator)
+		{
+			Coordinator->Reset();
+		}
+		if (GameInstance)
+		{
+			GameInstance->Shutdown();
+			if (World)
+			{
+				World->DestroyWorld(false);
+				GEngine->DestroyWorldContext(World);
+			}
+			GameInstance->RemoveFromRoot();
+		}
+	};
+
+	GameInstance->InitializeStandalone(FName(*FString::Printf(TEXT("HSRTurnForecast_%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits))));
+	World = GameInstance->GetWorld();
+
+	TSubclassOf<AHSRBattleGameMode> Class = LoadClass<AHSRBattleGameMode>(nullptr, TEXT("/Game/Blueprints/Framework/BP_HSRBattleGameMode.BP_HSRBattleGameMode_C"));
+
+	FText Failure;
+	Coordinator = World && Class ? AHSRBattleGameMode::CreateRepeatableBreakAutomationFixture(GameInstance, World, Class, Failure) : nullptr;
+	if (!TestNotNull(TEXT("Forecast fixture builds"), Coordinator))
+	{
+		return false;
+	}
+
+	UHSRTurnManager* Manager = Coordinator->GetTurnManager();
+	if (!TestNotNull(TEXT("Forecast manager exists"), Manager))
+	{
+		return false;
+	}
+
+	const TArray<FHSRTurnForecastEntry> Forecast = Manager->BuildTurnForecast(6);
+	TestEqual(TEXT("Forecast fills the requested slot count"), Forecast.Num(), 6);
+
+	if (Forecast.Num() > 0)
+	{
+		TestEqual(TEXT("First forecast slot is the acting participant"), Forecast[0].ParticipantId, Manager->GetCurrentParticipantId());
+		TestEqual(TEXT("First forecast slot is index zero"), Forecast[0].SlotIndex, 0);
+		TestTrue(TEXT("First forecast slot has no wait"), FMath::IsNearlyZero(Forecast[0].DistanceUntilAction));
+	}
+
+	// Distances must be monotonically non-decreasing: a later slot can never act sooner.
+	bool bMonotonic = true;
+	for (int32 Index = 1; Index < Forecast.Num(); ++Index)
+	{
+		if (Forecast[Index].DistanceUntilAction < Forecast[Index - 1].DistanceUntilAction - KINDA_SMALL_NUMBER)
+		{
+			bMonotonic = false;
+			break;
+		}
+		if (Forecast[Index].SlotIndex != Index)
+		{
+			bMonotonic = false;
+			break;
+		}
+	}
+	TestTrue(TEXT("Forecast slots are ordered by distance until action"), bMonotonic);
+
+	// Every forecast entry must name a live, non-defeated participant.
+	bool bAllResolve = true;
+	for (const FHSRTurnForecastEntry& Entry : Forecast)
+	{
+		const FHSRBattleParticipant* Found = Manager->GetOrderedParticipants().FindByPredicate(
+			[&Entry](const FHSRBattleParticipant& Candidate) { return Candidate.ParticipantId == Entry.ParticipantId; });
+		if (!Found || Found->bDefeated)
+		{
+			bAllResolve = false;
+			break;
+		}
+	}
+	TestTrue(TEXT("Forecast only names live participants"), bAllResolve);
+
+	// A zero or negative request is a valid "no bar" ask and must not produce entries.
+	TestEqual(TEXT("Zero slot request yields empty forecast"), Manager->BuildTurnForecast(0).Num(), 0);
+	TestEqual(TEXT("Negative slot request yields empty forecast"), Manager->BuildTurnForecast(-3).Num(), 0);
+
+	// Forecasting is a pure read: it must not disturb live turn state.
+	const FName BeforeCurrent = Manager->GetCurrentParticipantId();
+	const uint64 BeforeSequence = Manager->GetTurnSequence();
+	Manager->BuildTurnForecast(12);
+	TestEqual(TEXT("Forecast leaves current participant untouched"), Manager->GetCurrentParticipantId(), BeforeCurrent);
+	TestEqual(TEXT("Forecast leaves turn sequence untouched"), Manager->GetTurnSequence(), BeforeSequence);
+
+	return true;
+}
+
+/**
+ * Locks the skill list refactor: a participant's command list comes from its own authored
+ * loadout rather than four fixed slots, skill-point cost is read from the DataAsset, and
+ * adding a skill is purely additive.  Pure-value test -- no World or PIE fixture needed.
+ */
+bool FHSRSkillLoadoutPatchTest::RunTest(const FString& Parameters)
+{
+	const auto MakeSkill = [](FName Id, EHSRSkillCategory Category, int32 PointDelta)
+	{
+		UHSRSkillDefinition* Skill = NewObject<UHSRSkillDefinition>();
+		Skill->SkillId = Id;
+		Skill->Category = Category;
+		Skill->SkillPointDelta = PointDelta;
+		return Skill;
+	};
+
+	// Skill-point semantics now live in the asset, with the legacy per-category rule as fallback.
+	UHSRSkillDefinition* Basic = MakeSkill(TEXT("Basic"), EHSRSkillCategory::BasicAttack, 0);
+	UHSRSkillDefinition* Skill = MakeSkill(TEXT("Skill"), EHSRSkillCategory::Skill, 0);
+	UHSRSkillDefinition* Costly = MakeSkill(TEXT("Costly"), EHSRSkillCategory::Skill, -3);
+	TestEqual(TEXT("Unauthored basic attack still generates one point"), Basic->GetSkillPointDelta(), 1);
+	TestEqual(TEXT("Unauthored skill still spends one point"), Skill->GetSkillPointDelta(), -1);
+	TestEqual(TEXT("Authored delta overrides the category default"), Costly->GetSkillPointDelta(), -3);
+	TestEqual(TEXT("Cost is the absolute value of a spend"), Costly->GetSkillPointCost(), 3);
+	TestEqual(TEXT("A generating skill reports zero cost"), Basic->GetSkillPointCost(), 0);
+
+	UHSRBattleCoordinator* Coordinator = NewObject<UHSRBattleCoordinator>();
+	const FName MemberA = UHSRBattleCoordinator::MakeParticipantId(EHSRBattleParticipantTeam::Player, 0);
+	const FName MemberB = UHSRBattleCoordinator::MakeParticipantId(EHSRBattleParticipantTeam::Player, 1);
+
+	// The shared default applies to every slot that has no authored list of its own.
+	Coordinator->SetDefaultSkillLoadout({ Basic, Skill });
+	TestEqual(TEXT("Unconfigured participant inherits the default loadout"),
+		Coordinator->GetSkillLoadoutFor(MemberA).Num(), 2);
+	TestEqual(TEXT("Second participant inherits the same default"),
+		Coordinator->GetSkillLoadoutFor(MemberB).Num(), 2);
+
+	// An authored list overrides the default for that participant only -- this is what makes a
+	// per-character DataAsset edit sufficient to change one member's command panel.
+	Coordinator->SetParticipantSkillLoadout(MemberB, { Basic, Skill, Costly });
+	TestEqual(TEXT("Authored loadout overrides the default for its own slot"),
+		Coordinator->GetSkillLoadoutFor(MemberB).Num(), 3);
+	TestEqual(TEXT("Override does not leak onto other participants"),
+		Coordinator->GetSkillLoadoutFor(MemberA).Num(), 2);
+
+	// Order is presentation order, so the UI can render buttons by index without a lookup table.
+	const TArray<TObjectPtr<UHSRSkillDefinition>>& Ordered = Coordinator->GetSkillLoadoutFor(MemberB);
+	TestEqual(TEXT("Loadout preserves authored order at index 0"), Ordered[0]->SkillId, Basic->SkillId);
+	TestEqual(TEXT("Loadout preserves authored order at index 2"), Ordered[2]->SkillId, Costly->SkillId);
+
+	// Growth is additive: a fifth skill needs no new field, slot, or branch.
+	UHSRSkillDefinition* Extra = MakeSkill(TEXT("Extra"), EHSRSkillCategory::Skill, -2);
+	Coordinator->SetParticipantSkillLoadout(MemberB, { Basic, Skill, Costly, Extra });
+	TestEqual(TEXT("A fourth skill is accepted without code changes"),
+		Coordinator->GetSkillLoadoutFor(MemberB).Num(), 4);
+
+	// An empty authored list must fall back rather than leave a member with no commands.
+	Coordinator->SetParticipantSkillLoadout(MemberB, {});
+	TestEqual(TEXT("Empty authored loadout falls back to the default"),
+		Coordinator->GetSkillLoadoutFor(MemberB).Num(), 2);
+
+	// The authored delta is the single authority for both charging and display.  These once
+	// disagreed: the spend path recomputed the delta from Category, so a DataAsset authoring -3
+	// displayed a cost of 3 while only one point was actually deducted.  A BasicAttack authored
+	// to spend is the case that pins it down, because the old category rule forced +1 there.
+	UHSRSkillDefinition* SpendingBasic = MakeSkill(TEXT("SpendingBasic"), EHSRSkillCategory::BasicAttack, -2);
+	TestEqual(TEXT("Authored spend wins over the BasicAttack generate default"),
+		SpendingBasic->GetSkillPointDelta(), -2);
+	TestEqual(TEXT("Displayed cost matches the authored spend"),
+		SpendingBasic->GetSkillPointCost(), 2);
+
+	// Every category reads its delta from the asset, so cost is no longer category-derived.
+	UHSRSkillDefinition* PaidUltimate = MakeSkill(TEXT("PaidUltimate"), EHSRSkillCategory::Ultimate, -4);
+	TestEqual(TEXT("Ultimate can author a skill-point spend"), PaidUltimate->GetSkillPointDelta(), -4);
+	TestEqual(TEXT("Ultimate reports its authored cost"), PaidUltimate->GetSkillPointCost(), 4);
+	UHSRSkillDefinition* FreeUltimate = MakeSkill(TEXT("FreeUltimate"), EHSRSkillCategory::Ultimate, 0);
+	TestEqual(TEXT("An unauthored Ultimate still costs nothing"), FreeUltimate->GetSkillPointDelta(), 0);
+
+	return true;
+}
+
+bool FHSRAuthoredSkillContentTest::RunTest(const FString& Parameters)
+{
+	// A skill that applies a debuff should be authorable end to end: a status DA referenced from
+	// a skill DA, with no C++ edit.  Before this seam existed the only way in was three named
+	// coordinator members reachable only from development harnesses.
+	UHSRStatusDefinition* Poison = NewObject<UHSRStatusDefinition>();
+	Poison->StatusId = TEXT("Poison");
+
+	UHSRSkillDefinition* Plain = NewObject<UHSRSkillDefinition>();
+	Plain->SkillId = TEXT("Plain");
+	TestTrue(TEXT("A skill authors no statuses by default"), Plain->AppliedStatuses.IsEmpty());
+
+	UHSRSkillDefinition* Debuff = NewObject<UHSRSkillDefinition>();
+	Debuff->SkillId = TEXT("Debuff");
+	Debuff->AppliedStatuses.Add(Poison);
+	TestEqual(TEXT("Authored status survives on the asset"), Debuff->AppliedStatuses.Num(), 1);
+	TestEqual(TEXT("Authored status resolves back to its definition"),
+		Debuff->AppliedStatuses[0].LoadSynchronous()->StatusId, FName(TEXT("Poison")));
+
+	// The command view must be reachable by SkillId, not by category, or a second skill sharing a
+	// category is unreachable no matter how it is authored.
+	FHSRBattleCommandViewState ViewState;
+	FHSRBattleCommandSkillView First;
+	First.SkillId = TEXT("SkillA");
+	First.Category = EHSRSkillCategory::Skill;
+	FHSRBattleCommandSkillView Second;
+	Second.SkillId = TEXT("SkillB");
+	Second.Category = EHSRSkillCategory::Skill;
+	ViewState.Skills = { First, Second };
+
+	const FHSRBattleCommandSkillView* FoundSecond = ViewState.FindSkill(TEXT("SkillB"));
+	TestNotNull(TEXT("The second skill of a shared category is reachable by id"), FoundSecond);
+	TestNull(TEXT("An unknown id resolves to nothing"), ViewState.FindSkill(TEXT("Missing")));
+
+	const FHSRBattleCommandSkillView* ByCategory = ViewState.FindSkillByCategory(EHSRSkillCategory::Skill);
+	TestNotNull(TEXT("Category lookup still resolves"), ByCategory);
+	TestEqual(TEXT("Category lookup is first-match-wins, which is why id lookup is needed"),
+		ByCategory->SkillId, FName(TEXT("SkillA")));
+
+	return true;
+}
+
+bool FHSRDefaultLoadoutResolutionTest::RunTest(const FString& Parameters)
+{
+	// The shared default loadout used to be four named UPROPERTY slots brace-initialised at two
+	// call sites, so a fifth default skill needed a C++ edit.  DefaultSkillLoadout is now the
+	// authoring surface; the named slots survive only so already-authored Blueprints keep working.
+	auto MakeNamed = [](const TCHAR* Id)
+	{
+		UHSRSkillDefinition* Skill = NewObject<UHSRSkillDefinition>();
+		Skill->SkillId = Id;
+		return Skill;
+	};
+
+	UHSRSkillDefinition* Basic = MakeNamed(TEXT("Legacy.Basic"));
+	UHSRSkillDefinition* Skill = MakeNamed(TEXT("Legacy.Skill"));
+	UHSRSkillDefinition* Ultimate = MakeNamed(TEXT("Legacy.Ultimate"));
+	UHSRSkillDefinition* Heal = MakeNamed(TEXT("Legacy.Heal"));
+
+	AHSRBattleGameMode* GameMode = NewObject<AHSRBattleGameMode>();
+	GameMode->SetLegacySkillSlotsForTest(Basic, Skill, Ultimate, Heal);
+
+	// Legacy fallback, in historical presentation order.
+	TArray<UHSRSkillDefinition*> Resolved = GameMode->ResolveDefaultSkillLoadoutForTest();
+	TestEqual(TEXT("An unauthored array falls back to the four named slots"), Resolved.Num(), 4);
+	TestEqual(TEXT("Legacy order is preserved"), Resolved[0]->SkillId, FName(TEXT("Legacy.Basic")));
+	TestEqual(TEXT("Legacy heal stays last"), Resolved[3]->SkillId, FName(TEXT("Legacy.Heal")));
+
+	// A partially authored Blueprint must not contribute nulls to the Coordinator.
+	GameMode->SetLegacySkillSlotsForTest(Basic, nullptr, Ultimate, nullptr);
+	Resolved = GameMode->ResolveDefaultSkillLoadoutForTest();
+	TestEqual(TEXT("Unauthored legacy slots are dropped, not passed through as null"), Resolved.Num(), 2);
+
+	// Five entries: the case that previously required a new UPROPERTY plus two brace edits.
+	GameMode->SetLegacySkillSlotsForTest(Basic, Skill, Ultimate, Heal);
+	GameMode->SetDefaultSkillLoadoutForTest({ MakeNamed(TEXT("A")), MakeNamed(TEXT("B")),
+		MakeNamed(TEXT("C")), MakeNamed(TEXT("D")), MakeNamed(TEXT("E")) });
+	Resolved = GameMode->ResolveDefaultSkillLoadoutForTest();
+	TestEqual(TEXT("A fifth default skill is a DataAsset edit"), Resolved.Num(), 5);
+	TestEqual(TEXT("The authored array wins over the legacy slots"), Resolved[0]->SkillId, FName(TEXT("A")));
+	TestEqual(TEXT("Authoring order is presentation order"), Resolved[4]->SkillId, FName(TEXT("E")));
+
+	// Nulls inside the authored array are dropped too.
+	GameMode->SetDefaultSkillLoadoutForTest({ MakeNamed(TEXT("A")), nullptr, MakeNamed(TEXT("C")) });
+	Resolved = GameMode->ResolveDefaultSkillLoadoutForTest();
+	TestEqual(TEXT("Null authored entries are dropped"), Resolved.Num(), 2);
+	TestEqual(TEXT("Surviving authored entries keep their order"), Resolved[1]->SkillId, FName(TEXT("C")));
+
+	// An array holding only nulls is not an authoring intent to have no skills at all.
+	GameMode->SetDefaultSkillLoadoutForTest({ nullptr, nullptr });
+	Resolved = GameMode->ResolveDefaultSkillLoadoutForTest();
+	TestEqual(TEXT("An all-null array falls back rather than yielding an empty loadout"), Resolved.Num(), 4);
+
 	return true;
 }
 

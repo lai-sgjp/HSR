@@ -16,11 +16,10 @@ bool FHSRPartySubsystemTest::RunTest(const FString& Parameters)
 	Profiles->RegisterDefinition(A);Profiles->RegisterDefinition(B);Profiles->RegisterDefinition(C); Party->InitializeForDevelopmentTest(Profiles);
 	int32 Events=0; Party->OnPartyChanged().AddLambda([&Events](int64){++Events;});
 	TestEqual(TEXT("Add A"),Party->AddCharacter(TEXT("A")),EHSRPartyResult::Success);TestEqual(TEXT("Add B"),Party->AddCharacter(TEXT("B")),EHSRPartyResult::Success);TestEqual(TEXT("Duplicate rejected"),Party->AddCharacter(TEXT("A")),EHSRPartyResult::DuplicateCharacter);TestEqual(TEXT("Full rejected"),Party->AddCharacter(TEXT("B")),EHSRPartyResult::DuplicateCharacter);
-	FHSRPartySnapshot S;Party->GetSnapshot(S);TestEqual(TEXT("Capacity fixed"),S.Slots.Num(),2);TestEqual(TEXT("Revision once per commit"),S.Revision,static_cast<int64>(2));TestEqual(TEXT("Event count"),Events,2);
+	FHSRPartySnapshot S;Party->GetSnapshot(S);TestEqual(TEXT("Capacity fixed"),S.Slots.Num(),UHSRPartySubsystem::Capacity);TestEqual(TEXT("Revision once per commit"),S.Revision,static_cast<int64>(2));TestEqual(TEXT("Event count"),Events,2);
 	const int64 RevisionBeforeFailures=S.Revision; const int32 EventsBeforeFailures=Events; const TArray<FHSRPartySlot> SlotsBeforeFailures=S.Slots;
 	TestEqual(TEXT("None rejected"),Party->AddCharacter(NAME_None),EHSRPartyResult::ProfileNotFound);
 	TestEqual(TEXT("Unknown profile rejected"),Party->AddCharacter(TEXT("Unknown")),EHSRPartyResult::ProfileNotFound);
-	TestEqual(TEXT("Full with new C"),Party->AddCharacter(TEXT("C")),EHSRPartyResult::Full);
 	TestEqual(TEXT("Invalid add slot"),Party->AddCharacter(TEXT("C"),9),EHSRPartyResult::InvalidSlot);
 	TestEqual(TEXT("Replace unknown rejected"),Party->ReplaceCharacter(0,TEXT("Unknown")),EHSRPartyResult::ProfileNotFound);
 	TestEqual(TEXT("Replace duplicate rejected"),Party->ReplaceCharacter(0,TEXT("B")),EHSRPartyResult::DuplicateCharacter);
@@ -29,7 +28,28 @@ bool FHSRPartySubsystemTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Failure revision unchanged"),Party->GetSnapshot(S),true); TestEqual(TEXT("Failure revision"),S.Revision,RevisionBeforeFailures); TestEqual(TEXT("Failure events"),Events,EventsBeforeFailures); TestEqual(TEXT("Failure slots unchanged"),S.Slots[0].CharacterId,SlotsBeforeFailures[0].CharacterId);
 	TestEqual(TEXT("Swap succeeds"),Party->SwapSlots(0,1),EHSRPartyResult::Success);TestEqual(TEXT("Remove succeeds"),Party->RemoveCharacter(0),EHSRPartyResult::Success);TestEqual(TEXT("Replace succeeds"),Party->ReplaceCharacter(0,TEXT("B")),EHSRPartyResult::Success);TestEqual(TEXT("Invalid slot"),Party->RemoveCharacter(9),EHSRPartyResult::InvalidSlot);
 	TestEqual(TEXT("Remove to empty succeeds"),Party->RemoveCharacter(0),EHSRPartyResult::Success); TestEqual(TEXT("Swap empty rejected"),Party->SwapSlots(0,1),EHSRPartyResult::EmptySlot); TestEqual(TEXT("Remove empty rejected"),Party->RemoveCharacter(0),EHSRPartyResult::EmptySlot);
-	S.Slots[0].CharacterId=TEXT("Mutated");FHSRPartySnapshot Fresh;Party->GetSnapshot(Fresh);TestNotEqual(TEXT("Snapshot isolated"),Fresh.Slots[0].CharacterId,FName(TEXT("Mutated")));return true;
+	S.Slots[0].CharacterId=TEXT("Mutated");FHSRPartySnapshot Fresh;Party->GetSnapshot(Fresh);TestNotEqual(TEXT("Snapshot isolated"),Fresh.Slots[0].CharacterId,FName(TEXT("Mutated")));
+	// Rejection-at-capacity is asserted against Capacity rather than a literal roster size so the
+	// contract survives future widening.  A distinct profile is registered per slot to fill up.
+	UHSRPartySubsystem* Filling=NewObject<UHSRPartySubsystem>(GI);Filling->InitializeForDevelopmentTest(Profiles);
+	for(int32 Index=0;Index<UHSRPartySubsystem::Capacity;++Index)
+	{
+		const FName Id = FName(*FString::Printf(TEXT("Fill%d"), Index));
+
+		UHSRCharacterDefinition* FillDefinition = NewObject<UHSRCharacterDefinition>();
+		FillDefinition->CharacterId = Id;
+		FillDefinition->MaxLevel = 2;
+
+		UCurveFloat* FillCurve = NewObject<UCurveFloat>(FillDefinition);
+		FillCurve->FloatCurve.AddKey(2, 100);
+		FillDefinition->CumulativeExperienceCurve = FillCurve;
+
+		Profiles->RegisterDefinition(FillDefinition);
+		TestEqual(*FString::Printf(TEXT("Fill slot %d"),Index),Filling->AddCharacter(Id),EHSRPartyResult::Success);
+	}
+	UHSRCharacterDefinition* Overflow=NewObject<UHSRCharacterDefinition>();Overflow->CharacterId=TEXT("Overflow");Overflow->MaxLevel=2;UCurveFloat* CO=NewObject<UCurveFloat>(Overflow);CO->FloatCurve.AddKey(2,100);Overflow->CumulativeExperienceCurve=CO;Profiles->RegisterDefinition(Overflow);
+	TestEqual(TEXT("Full rejected at capacity"),Filling->AddCharacter(TEXT("Overflow")),EHSRPartyResult::Full);
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRPartyCandidateCommitTest,"HSR.Party.CandidateCommit",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)

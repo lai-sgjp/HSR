@@ -28,7 +28,10 @@ enum class EHSRRelicEquipmentResult : uint8
 	NoEnhancementOption,
 	InvalidTargetLevel,
 	AuthorityRejected,
-	StaleSnapshot
+	StaleSnapshot,
+	// Appended, not inserted: Blueprints serialize these by value.
+	InsufficientMaterial,
+	InvalidRequest
 };
 
 USTRUCT(BlueprintType)

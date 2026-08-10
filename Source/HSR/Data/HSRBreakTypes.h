@@ -92,9 +92,65 @@ struct HSR_API FHSRActionDistanceResult
 	uint64 TurnSequence = 0;
 };
 
+/**
+ * One upcoming action slot on the turn-order bar. It describes a predicted future action rather than
+ * present state, so any speed change or advance/delay invalidates a previously built forecast.
+ * Pure value: the UI reads it without ever touching a participant Actor or ASC.
+ */
+USTRUCT(BlueprintType)
+struct HSR_API FHSRTurnForecastEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battle|TurnOrder")
+	FName ParticipantId;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battle|TurnOrder")
+	bool bPlayerTeam = false;
+
+	/** 0 for the participant acting now, 1 for the next one, and so on. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battle|TurnOrder")
+	int32 SlotIndex = 0;
+
+	/** Action-distance units until this action, relative to now. 0 means acting immediately. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battle|TurnOrder")
+	float DistanceUntilAction = 0.0f;
+
+	/** True when this participant already occupies an earlier slot of the same forecast. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Battle|TurnOrder")
+	bool bRepeatAction = false;
+};
+
 /** Pure Phase 8 authoring validation; it has no runtime battle side effects. */
 struct HSR_API FHSRToughnessConfiguration
 {
+	/**
+	 * Single source for the Element.X -> Weakness.X naming rule. Callers used to open-code this
+	 * string surgery, so a new element only worked if every copy agreed and the derived tag had
+	 * actually been authored. Returns an invalid tag when the input is not an Element.* tag or
+	 * when no matching Weakness.* tag exists, which callers should treat as "no weakness match"
+	 * rather than assuming the tag is present.
+	 */
+	static FGameplayTag GetWeaknessTagFor(const FGameplayTag& ElementTag)
+	{
+		if (ValidateElement(ElementTag) != EHSRElementToughnessContractResult::Valid)
+		{
+			return FGameplayTag();
+		}
+
+		static const FString ElementPrefix(TEXT("Element."));
+		const FString ElementName = ElementTag.ToString();
+		if (!ElementName.StartsWith(ElementPrefix))
+		{
+			return FGameplayTag();
+		}
+
+		const FString Leaf = ElementName.RightChop(ElementPrefix.Len());
+		return Leaf.IsEmpty()
+			? FGameplayTag()
+			: FGameplayTag::RequestGameplayTag(FName(*FString::Printf(TEXT("Weakness.%s"), *Leaf)), false);
+	}
+
 	static EHSRElementToughnessContractResult ValidateElement(const FGameplayTag& Tag)
 	{
 		if (!Tag.IsValid()) return EHSRElementToughnessContractResult::MissingElement;

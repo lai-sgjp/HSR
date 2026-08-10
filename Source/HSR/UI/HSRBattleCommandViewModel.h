@@ -6,8 +6,6 @@
 #include "HSRBattleCommandViewModel.generated.h"
 
 class UHSRBattleCoordinator;
-class UAbilitySystemComponent;
-struct FOnAttributeChangeData;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleCommandStateChanged, const FHSRBattleCommandViewState&);
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleResultConfirmRequested, const FGuid&);
@@ -54,6 +52,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Battle|Presentation") FText GetPresentationText() const { return PresentationText; }
 
 	/** Selects a configured skill and automatically chooses its first valid target. */
+	/** Select by stable skill id. Use this for data-driven skill lists: it can address every entry
+	    in a loadout, including several skills sharing one category. */
+	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkillById(FName SkillId);
+
+	/** Legacy category-keyed selection; forwards to SelectSkillById on the first category match. */
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkill(EHSRSkillCategory Category);
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FName GetSelectedSkillId() const { return SelectedSkillId; }
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FName GetSelectedTargetId() const { return SelectedTargetId; }
@@ -77,7 +80,6 @@ public:
 	bool IsPresentationLockedForDevelopmentTest() const { return bPresentationLocked; }
 	FGuid GetPendingBattleIdForDevelopmentTest() const { return PendingBattleId; }
 	FGuid GetPendingActionIdForDevelopmentTest() const { return PendingActionId; }
-	bool HasObservedAttributeBindingsForDevelopmentTest() const { return ToughnessChangedHandle.IsValid() || MaxToughnessChangedHandle.IsValid(); }
 	bool HasBoundCoordinatorForDevelopmentTest() const { return Coordinator.IsValid(); }
 #endif
 
@@ -89,9 +91,6 @@ private:
 	FHSRBattleCommandStateChanged Changed;
 	FHSRBattleResultConfirmRequested ResultConfirmRequested;
 	TWeakObjectPtr<UHSRBattleCoordinator> Coordinator;
-	TWeakObjectPtr<UAbilitySystemComponent> ObservedTargetASC;
-	FDelegateHandle ToughnessChangedHandle;
-	FDelegateHandle MaxToughnessChangedHandle;
 	FGuid PendingBattleId;
 	FGuid PendingActionId;
 	bool bCommandPending = false;
@@ -100,7 +99,5 @@ private:
 	const FHSRBattleCommandSkillView* FindSelectedSkill() const;
 	void RefreshPresentationAndSelection();
 	void RefreshReadOnlyBattlePresentation();
-	void RebindTargetAttributes();
-	void HandleObservedToughnessChanged(const FOnAttributeChangeData& ChangeData);
 	void RefreshCommandState();
 };

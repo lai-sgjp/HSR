@@ -2,6 +2,40 @@
 
 > 最后更新：2026-08-09
 
+## 2026-08-09 TASK-P17-RELIC-EQUIPMENT-001 用户 PIE 收口
+
+- 用户确认 P17-007 遗器强化 PIE happy path 通过，无问题；任务按
+  `COMPLETE / USER ACCEPTED` 收口。
+- 修复了阻塞该验收的最后一个已知缺陷：开发 harness 以 999 数量发放
+  `Item.Material.LumenShard`，而 `DA_Item_LumenShard_P13.MaxStack = 99`。
+  `AddStack` 对超上限发放整体拒绝并返回 `StackLimitExceeded` 且不写入，
+  返回值被丢弃，因此玩家实际持有 0 个材料，12 个强化选项全部
+  `bAffordable=false`，`CommitEnhancement` 恒返回 `AuthorityRejected`(11)。
+  P13 生产 bootstrap 已在 PIE 启动时注册该 ItemId，故 harness 跳过自身
+  注册直接落到超上限 `AddStack`。目录规则消耗为 2-16，99 上限充足。
+- 同轮修复两处衍生问题：`Rebuild()` 的强化失败分支曾发布
+  `Stage=Enhancement` 但选项列表为空（与其上方 comparison 分支不一致），
+  导致 Blueprint 对 `EnhancementOptions[0]` 越界读取；新增
+  在 `UHSRRelicEquipmentWidget` 上新增
+  `GetEnhancementOption(Index, OutOption)`、`GetEnhancementOptionCount`、
+  `HasEnhancementOptions` 三个边界安全 BlueprintPure 访问器供 Blueprint 使用。
+- 诊断增强：`CommitEnhancement` 现逐项打印 option 命中/bAffordable/
+  bAvailable/CurrentInstance 及材料 id、消耗、实际持有量和原始子系统码。
+  此前 `MapEnhancementResult` 将 `InventoryRejected`、`EquipmentRejected`、
+  `InvalidRequest`、`ProjectionRejected`、`OperationIdConflict` 一律折叠为
+  `AuthorityRejected`(11)，无法区分来源。
+- `HSR.UI.RelicEquipment` 聚焦 Automation 4/4 通过，含两个新回归：
+  `MaterialGrantRespectsStackCap`、
+  `EmptySlotNeverPublishesEnhancementStage`。Build
+  `HSREditor Win64 Development` 通过，DLL 时间戳晚于全部改动源文件。
+- 本轮按用户明确指令提交（任务卡原有的禁止自动提交约束由该指令覆盖）。
+- 既有回归边界保持不变、不在本任务扩张：`HSR.UI.ScreenLifecycle` 的
+  CharacterDetail/Inventory/TravelRestore 3 个测试失败（已诊断为测试
+  fixture 的 `bFocusSucceeds=false` 配置错误加一处缺失的
+  `AttachForAutomation()` 自动化挂载 hook，非产品缺陷），以及
+  `HSR.UI.CharacterDetail.ViewModel` 的 5 个 Save fixture 断言失败。
+  两项需在 P17-016 收尾前清除。
+=======
 ## 2026-08-09 TASK-P17-DIALOGUE-004 complete / USER ACCEPTED
 
 - 用户已授权无歧义任务 `TASK-P17-DIALOGUE-004`，对应执行计划语义 P17-012，
@@ -950,6 +984,7 @@
 - Party ViewModel/Widget 支持候选 Set/Clear/Swap、Confirm、Cancel、重复/未知/stale 拒绝与蓝图转发；Widget 初始化顺序修复后 Construct 可读快照。
 - User Build、`HSR.Party` 2/2、`HSR.UI.Party` 4/4、`HSR.UI.FrontendNavigation` 11/11 与用户 PIE 均通过。
 - TASK-P17-009B 以 `PASS / USER ACCEPTED` 归档；P17-009C 战前候选队伍、Buff、Encounter Request 与取消零污染仍未完成。
+
 ## 2026-08-09 TASK-P17-INVENTORY-004 code gate complete / Editor-PIE pending
 
 - `TASK-P17-INVENTORY-004` completed its independent Gate 0, real TDD RED, and

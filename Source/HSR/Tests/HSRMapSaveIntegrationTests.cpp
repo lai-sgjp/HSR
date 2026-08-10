@@ -71,7 +71,7 @@ bool FHSRMapSaveV5IntegrationTest::RunTest(const FString&)
 
 	FHSRSaveData Captured;
 	TestEqual(TEXT("v5 capture succeeds"), F.Save->SaveSnapshot(Captured), EHSRSaveResult::Success);
-	TestEqual(TEXT("schema is v8"), Captured.SchemaVersion, 8);
+	TestEqual(TEXT("schema is current"), Captured.SchemaVersion, HSRSaveVersion::CurrentSchema);
 	TestEqual(TEXT("capture carries map"), Captured.Map.CurrentLocation.MapId, FName(TEXT("Map.B")));
 	TestTrue(TEXT("capture carries region"), Captured.Map.UnlockedRegionIds.Contains(TEXT("Region.B")));
 	TestTrue(TEXT("capture carries teleport"), Captured.Map.UnlockedTeleportIds.Contains(TEXT("Teleport.AB")));
@@ -125,7 +125,7 @@ bool FHSRMapSaveV5IntegrationTest::RunTest(const FString&)
 		Legacy.Map = FHSRMapSaveData();
 		TestEqual(FString::Printf(TEXT("v%d empty map migration succeeds"), LegacyVersion),
 			F.Save->LoadSnapshot(Legacy), EHSRSaveResult::Success);
-		TestEqual(FString::Printf(TEXT("v%d normalizes schema"), LegacyVersion), F.Save->GetSnapshot().SchemaVersion, 8);
+		TestEqual(FString::Printf(TEXT("v%d normalizes schema"), LegacyVersion), F.Save->GetSnapshot().SchemaVersion, HSRSaveVersion::CurrentSchema);
 		TestTrue(FString::Printf(TEXT("v%d normalizes empty map"), LegacyVersion),
 			F.Save->GetSnapshot().Map.CurrentLocation.MapId.IsNone());
 		TestFalse(FString::Printf(TEXT("v%d migration does not travel"), LegacyVersion), F.Maps->HasPendingTravel());

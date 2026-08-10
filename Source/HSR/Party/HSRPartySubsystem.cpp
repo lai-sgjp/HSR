@@ -131,6 +131,8 @@ bool UHSRPartySubsystem::GetSnapshot(FHSRPartySnapshot& OutSnapshot) const
 
 bool UHSRPartySubsystem::PrepareRestore(const FHSRPartySnapshot& Saved,FHSRPartySnapshot& Out) const
 {
-	if(Saved.Slots.Num()!=Capacity||Saved.Revision<0)return false; TSet<FName> Seen;
-	for(const auto& Slot:Saved.Slots){ if(Slot.IsEmpty())continue; if(Seen.Contains(Slot.CharacterId)||!IsKnownProfile(Slot.CharacterId))return false; Seen.Add(Slot.CharacterId); } Out=Saved; return true;
+	// A narrower roster is accepted and padded: legacy USaveGame blobs reach restore without
+	// passing through MigrateToCurrent, so they still carry the pre-widening slot count.
+	if(Saved.Slots.Num()>Capacity||Saved.Revision<0)return false; TSet<FName> Seen;
+	for(const auto& Slot:Saved.Slots){ if(Slot.IsEmpty())continue; if(Seen.Contains(Slot.CharacterId)||!IsKnownProfile(Slot.CharacterId))return false; Seen.Add(Slot.CharacterId); } Out=Saved; Out.Slots.SetNum(Capacity); return true;
 }

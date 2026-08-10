@@ -141,11 +141,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
 	TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass,
 	TSubclassOf<UHSRInventoryModuleWidget> InInventoryModuleWidgetClass,
 	TSubclassOf<UHSRDialogueOverlayWidget> InDialogueOverlayWidgetClass,
-	TSubclassOf<UUserWidget> InPartyWidgetClass,
-	TSubclassOf<UUserWidget> InMapWidgetClass,
-	TSubclassOf<UUserWidget> InChallengeWidgetClass,
-	TSubclassOf<UUserWidget> InQuestWidgetClass,
-	TSubclassOf<UUserWidget> InSaveWidgetClass)
+	const TMap<EHSRFrontendModule, TSubclassOf<UUserWidget>>& InFrontendModuleWidgetClasses)
 {
 	if (!bInitialized || !ScreenStack || !InputModeCoordinator)
 	{
@@ -170,11 +166,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
 		InventoryWidgetClass = InInventoryWidgetClass;
 		InventoryModuleWidgetClass = InInventoryModuleWidgetClass;
 		DialogueOverlayWidgetClass = InDialogueOverlayWidgetClass;
-		PartyWidgetClass = InPartyWidgetClass;
-		MapWidgetClass = InMapWidgetClass;
-		ChallengeWidgetClass = InChallengeWidgetClass;
-		QuestWidgetClass = InQuestWidgetClass;
-		SaveWidgetClass = InSaveWidgetClass;
+		FrontendModuleWidgetClasses = InFrontendModuleWidgetClasses;
 		return EHSRUIScreenResult::NoOp;
 	}
 	if (RegisteredHUD.IsValid() || FrontendShellInstance || FrontendModuleContentInstance
@@ -206,11 +198,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
 	InventoryWidgetClass = InInventoryWidgetClass;
 	InventoryModuleWidgetClass = InInventoryModuleWidgetClass;
 	DialogueOverlayWidgetClass = InDialogueOverlayWidgetClass;
-	PartyWidgetClass = InPartyWidgetClass;
-	MapWidgetClass = InMapWidgetClass;
-	ChallengeWidgetClass = InChallengeWidgetClass;
-	QuestWidgetClass = InQuestWidgetClass;
-	SaveWidgetClass = InSaveWidgetClass;
+	FrontendModuleWidgetClasses = InFrontendModuleWidgetClasses;
 	// Clear before restoring: a travel-scoped inconsistency would otherwise reject the restore
 	// and every later OpenFrontendModule call on this otherwise-healthy host.
 	TryClearRecoverableInconsistency();
@@ -521,16 +509,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenCharacterDetailInternal()
 		bInconsistent = true;
 		return EHSRUIScreenResult::Inconsistent;
 	}
-	if ((!FrontendModuleRootClass
-#if WITH_DEV_AUTOMATION_TESTS
-		&& !bUseAutomationBackend
-#endif
-		)
-		|| !CharacterDetailWidgetClass
-#if WITH_DEV_AUTOMATION_TESTS
-		&& !(bUseAutomationBackend && bAutomationHasDetailClass)
-#endif
-	)
+	if (!HasModuleRootClass() || !HasCharacterDetailClass())
 	{
 		return EHSRUIScreenResult::MissingWidgetClass;
 	}
@@ -648,16 +627,10 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenInventoryInternal()
 		bInconsistent = true;
 		return EHSRUIScreenResult::Inconsistent;
 	}
-	if ((!FrontendModuleRootClass
-#if WITH_DEV_AUTOMATION_TESTS
-		&& !bUseAutomationBackend
-#endif
-		)
-		|| !InventoryWidgetClass
-#if WITH_DEV_AUTOMATION_TESTS
-		&& !(bUseAutomationBackend && bAutomationHasInventoryClass)
-#endif
-	) return EHSRUIScreenResult::MissingWidgetClass;
+	if (!HasModuleRootClass() || !HasInventoryClass())
+	{
+		return EHSRUIScreenResult::MissingWidgetClass;
+	}
 
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend && !bAutomationInventoryDependenciesSucceed)
@@ -702,6 +675,15 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenInventoryInternal()
 	}
 	Candidate->SetOwningUIManager(this);
 	Candidate->SetViewModel(ViewModelCandidate);
+#if WITH_DEV_AUTOMATION_TESTS
+	// Automation widgets are NewObject'd and never enter the UMG construct path, so
+	// SetViewModel's IsConstructed() guard skips the bind. Real attach reaches it via
+	// NativeConstruct; mirror that here so bind/unbind accounting matches production.
+	if (bUseAutomationBackend)
+	{
+		Candidate->AttachForAutomation();
+	}
+#endif
 	UHSRFrontendModuleRootWidget* RootCandidate = CreateFrontendModuleRootCandidate(PC);
 	if (!RootCandidate)
 	{
@@ -806,8 +788,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 	}
 	const EHSRFrontendModule ActiveFrontendModule = FrontendRouter
 		? FrontendRouter->GetSnapshot().GetActiveRoute().Module : EHSRFrontendModule::None;
-	if (FrontendModuleRootInstance || (ActiveFrontendModule >= EHSRFrontendModule::Party
-		&& ActiveFrontendModule <= EHSRFrontendModule::Save))
+	if (FrontendModuleRootInstance || HSRFrontendModule::UsesSharedModuleRoot(ActiveFrontendModule))
 	{
 		const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter->GetSnapshot();
 		const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
@@ -835,8 +816,15 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 				return ApplyFocusBackend(RegisteredPlayerController.Get(), FrontendShellInstance->GetPreferredFocusWidget(), FrontendShellInstance);
 			}
 		};
-		if (!ApplyActiveModulePolicy(GetResolvedInputPolicy())
-			|| ApplyActiveModuleFocus() == EHSRFocusApplyResult::Unavailable)
+		// Policy and focus report separately on purpose: a caller that sees FocusApplyFailed for a
+		// policy rejection cannot tell which backend refused, and the close-path tests distinguish
+		// the two. Both arms compensate by restoring the previous policy before returning.
+		if (!ApplyActiveModulePolicy(GetResolvedInputPolicy()))
+		{
+			const bool bPolicyRestored = ApplyActiveModulePolicy(OldPolicy);
+			return ResolveCompensation(bPolicyRestored, EHSRUIScreenResult::PolicyApplyFailed);
+		}
+		if (ApplyActiveModuleFocus() == EHSRFocusApplyResult::Unavailable)
 		{
 			const bool bPolicyRestored = ApplyActiveModulePolicy(OldPolicy);
 			return ResolveCompensation(bPolicyRestored, EHSRUIScreenResult::FocusApplyFailed);
@@ -878,6 +866,14 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 			ShutdownInventoryViewModelCandidate(ViewModelToShutdown);
 		}
 		FrontendShellInstance->PresentRoute(FrontendRouter->GetSnapshot());
+		// A module reopened by travel restore has no shell layer beneath it to fall back to, so
+		// backing out of it must land on the root rather than leaving the shell on the stack.
+		// Placed after the compensating early returns above: a failed close must not close to root.
+		if (bTravelRestoredModule)
+		{
+			bTravelRestoredModule = false;
+			return CloseFrontendToRoot();
+		}
 		return EHSRUIScreenResult::Success;
 	}
 	if (ActiveFrontendModule == EHSRFrontendModule::Inventory)
@@ -1494,6 +1490,15 @@ int64 UHSRUIManagerSubsystem::AllocateRequestToken()
 bool UHSRUIManagerSubsystem::RestoreFrontendModuleFocus(AHSRPlayerController* PlayerController,
 	const EHSRFrontendModule Module)
 {
+	// Shared-root modules all restore focus the same way, so they route through the predicate rather
+	// than a case list. Listing them here as well meant a new module compiled and silently lost focus
+	// restore until someone noticed the missing case.
+	if (HSRFrontendModule::UsesSharedModuleRoot(Module))
+	{
+		return FrontendModuleRootInstance
+			&& ApplyFocusBackend(PlayerController, FrontendModuleRootInstance->GetPreferredFocusWidget(),
+				FrontendModuleRootInstance) != EHSRFocusApplyResult::Unavailable;
+	}
 	switch (Module)
 	{
 	case EHSRFrontendModule::Character:
@@ -1522,14 +1527,6 @@ bool UHSRUIManagerSubsystem::RestoreFrontendModuleFocus(AHSRPlayerController* Pl
 			&& ApplyFocusBackend(PlayerController, PreferredFocus,
 				FrontendModuleContentInstance) != EHSRFocusApplyResult::Unavailable;
 	}
-	case EHSRFrontendModule::Party:
-	case EHSRFrontendModule::Map:
-	case EHSRFrontendModule::Challenge:
-	case EHSRFrontendModule::Quest:
-	case EHSRFrontendModule::Save:
-		return FrontendModuleRootInstance
-			&& ApplyFocusBackend(PlayerController, FrontendModuleRootInstance->GetPreferredFocusWidget(),
-				FrontendModuleRootInstance) != EHSRFocusApplyResult::Unavailable;
 	case EHSRFrontendModule::PauseHub:
 		return FrontendShellInstance
 			&& ApplyFocusBackend(PlayerController, FrontendShellInstance->GetPreferredFocusWidget(),
@@ -1676,11 +1673,7 @@ void UHSRUIManagerSubsystem::ClearHostReferences()
 	InventoryWidgetClass = nullptr;
 	InventoryModuleWidgetClass = nullptr;
 	DialogueOverlayWidgetClass = nullptr;
-	PartyWidgetClass = nullptr;
-	MapWidgetClass = nullptr;
-	ChallengeWidgetClass = nullptr;
-	QuestWidgetClass = nullptr;
-	SaveWidgetClass = nullptr;
+	FrontendModuleWidgetClasses.Reset();
 	FrontendModuleContentInstance = nullptr;
 	FrontendModuleContentModule = EHSRFrontendModule::None;
 	ActiveHostGeneration = 0;
@@ -1892,6 +1885,39 @@ bool UHSRUIManagerSubsystem::IsBackendPaused(UWorld* World) const
 	return World && World->IsPaused();
 }
 
+bool UHSRUIManagerSubsystem::HasModuleRootClass() const
+{
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend)
+	{
+		return true;
+	}
+#endif
+	return FrontendModuleRootClass != nullptr;
+}
+
+bool UHSRUIManagerSubsystem::HasCharacterDetailClass() const
+{
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend)
+	{
+		return bAutomationHasDetailClass;
+	}
+#endif
+	return CharacterDetailWidgetClass != nullptr;
+}
+
+bool UHSRUIManagerSubsystem::HasInventoryClass() const
+{
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend)
+	{
+		return bAutomationHasInventoryClass;
+	}
+#endif
+	return InventoryWidgetClass != nullptr;
+}
+
 bool UHSRUIManagerSubsystem::IsTravelPending() const
 {
 #if WITH_DEV_AUTOMATION_TESTS
@@ -1979,16 +2005,15 @@ bool UHSRUIManagerSubsystem::AttachFrontendModuleRootCandidate(UHSRFrontendModul
 
 TSubclassOf<UUserWidget> UHSRUIManagerSubsystem::GetFrontendModuleWidgetClass(const EHSRFrontendModule Module) const
 {
-	switch (Module)
+	// Inventory stays a named field rather than a map entry: it is typed to the concrete
+	// UHSRInventoryModuleWidget because the inventory path needs that type for its own content
+	// creation, and widening it to UUserWidget just to unify the lookup would lose that.
+	if (Module == EHSRFrontendModule::Inventory)
 	{
-	case EHSRFrontendModule::Inventory: return InventoryModuleWidgetClass;
-	case EHSRFrontendModule::Party: return PartyWidgetClass;
-	case EHSRFrontendModule::Map: return MapWidgetClass;
-	case EHSRFrontendModule::Challenge: return ChallengeWidgetClass;
-	case EHSRFrontendModule::Quest: return QuestWidgetClass;
-	case EHSRFrontendModule::Save: return SaveWidgetClass;
-	default: return nullptr;
+		return InventoryModuleWidgetClass;
 	}
+	const TSubclassOf<UUserWidget>* Found = FrontendModuleWidgetClasses.Find(Module);
+	return Found ? *Found : nullptr;
 }
 
 UUserWidget* UHSRUIManagerSubsystem::CreateFrontendModuleContentCandidate(
@@ -2130,7 +2155,15 @@ EHSRFocusApplyResult UHSRUIManagerSubsystem::ApplyCharacterDetailFocusBackend(AH
 	{
 		if (bAutomationFailOldModuleFocusRestore && (Preferred == CharacterDetailWidgetInstance || Fallback == CharacterDetailWidgetInstance))
 		{
-			bAutomationFailOldModuleFocusRestore = false; return EHSRFocusApplyResult::Unavailable;
+			bAutomationFailOldModuleFocusRestore = false;
+			return EHSRFocusApplyResult::Unavailable;
+		}
+		// Focusing the shell rather than the detail widget means this is the close direction, which
+		// tests fail independently of the open direction.
+		const bool bIsCloseFocus = FrontendShellInstance && Preferred == FrontendShellInstance;
+		if (bIsCloseFocus && !bAutomationDetailCloseFocusSucceeds)
+		{
+			return EHSRFocusApplyResult::Unavailable;
 		}
 		LastAutomationFocusModule = (Preferred == CharacterDetailWidgetInstance || Fallback == CharacterDetailWidgetInstance) ? EHSRFrontendModule::Character : EHSRFrontendModule::PauseHub;
 		return bAutomationDetailFocusSucceeds ? EHSRFocusApplyResult::Preferred : EHSRFocusApplyResult::Unavailable;
@@ -2147,7 +2180,14 @@ EHSRFocusApplyResult UHSRUIManagerSubsystem::ApplyInventoryFocusBackend(AHSRPlay
 	{
 		if (bAutomationFailOldModuleFocusRestore && (Preferred == InventoryWidgetInstance || Fallback == InventoryWidgetInstance))
 		{
-			bAutomationFailOldModuleFocusRestore = false; return EHSRFocusApplyResult::Unavailable;
+			bAutomationFailOldModuleFocusRestore = false;
+			return EHSRFocusApplyResult::Unavailable;
+		}
+		// Close direction, as in the detail twin above.
+		const bool bIsCloseFocus = FrontendShellInstance && Preferred == FrontendShellInstance;
+		if (bIsCloseFocus && !bAutomationInventoryCloseFocusSucceeds)
+		{
+			return EHSRFocusApplyResult::Unavailable;
 		}
 		LastAutomationFocusModule = (Preferred == InventoryWidgetInstance || Fallback == InventoryWidgetInstance) ? EHSRFrontendModule::Inventory : EHSRFrontendModule::PauseHub;
 		return bAutomationInventoryFocusSucceeds ? EHSRFocusApplyResult::Preferred : EHSRFocusApplyResult::Unavailable;
@@ -2303,6 +2343,18 @@ void UHSRUIManagerSubsystem::ConfigureAutomationDetailBackend(const bool bHasCla
 	bAutomationDetailAttachSucceeds = bAttachSucceeds;
 	bAutomationDetailPolicySucceeds = bPolicySucceeds;
 	bAutomationDetailFocusSucceeds = bFocusSucceeds;
+}
+
+void UHSRUIManagerSubsystem::ConfigureAutomationDetailCloseFocus(const bool bCloseFocusSucceeds)
+{
+	bUseAutomationBackend = true;
+	bAutomationDetailCloseFocusSucceeds = bCloseFocusSucceeds;
+}
+
+void UHSRUIManagerSubsystem::ConfigureAutomationInventoryCloseFocus(const bool bCloseFocusSucceeds)
+{
+	bUseAutomationBackend = true;
+	bAutomationInventoryCloseFocusSucceeds = bCloseFocusSucceeds;
 }
 
 void UHSRUIManagerSubsystem::ConfigureAutomationInventoryBackend(const bool bHasClass, const bool bCreateSucceeds,

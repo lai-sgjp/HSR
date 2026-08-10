@@ -3,7 +3,9 @@
 #include "../Data/Definitions/HSREquipmentDefinition.h"
 #include "../Data/Definitions/HSREquipmentEnhancementCatalog.h"
 #include "../Data/Definitions/HSRRelicDefinition.h"
+#include "../Data/Definitions/HSRRelicSetDefinition.h"
 #include "../Data/Definitions/HSRItemEquipmentMappingCatalog.h"
+#include "HSRRelicSetResolver.h"
 #include "../Inventory/HSRInventorySubsystem.h"
 #include "../Save/HSRSaveTypes.h"
 
@@ -42,15 +44,92 @@ void UHSREquipmentSubsystem::ExportSaveData(TArray<FHSREquipmentRegistryDto>& Ou
 	OutPlacements.Sort([](const auto& A,const auto& B){if(A.CharacterId!=B.CharacterId)return A.CharacterId<B.CharacterId;if(A.Kind!=B.Kind)return A.Kind<B.Kind;if(A.Slot!=B.Slot)return A.Slot<B.Slot;return A.InstanceId<B.InstanceId;});
 }
 
+bool UHSREquipmentSubsystem::ValidateRestoreInstance(FName DefinitionId, EHSREquipmentKind Kind, int32 Slot,
+	int32 EnhancementLevel, FName SetId, const TArray<FHSREquipmentModifier>& Modifiers) const
+{
+	if (!IsSlotValid(Kind, Slot))
+	{
+		return false;
+	}
+	const FDefinitionRule* Rule = Definitions.Find(DefinitionId);
+	if (!Rule || Rule->Kind != Kind || Rule->Slot != Slot)
+	{
+		return false;
+	}
+	if (EnhancementLevel < 0 || EnhancementLevel > Rule->EnhancementCap)
+	{
+		return false;
+	}
+	if (!IsValidModifiers(Modifiers))
+	{
+		return false;
+	}
+	return Kind != EHSREquipmentKind::Relic || SetId == Rule->SetId;
+}
+
+bool UHSREquipmentSubsystem::InsertIntoRestoreState(FHSREquipmentRestoreState& State,
+	const FHSREquipmentInstance& Instance, int32 Slot, FName SetId)
+{
+	FHSREquipmentLoadout& Loadout = State.Loadout;
+	if (Instance.Kind == EHSREquipmentKind::Equipment)
+	{
+		const EHSREquipmentSlot EquipmentSlot = static_cast<EHSREquipmentSlot>(Slot);
+		if (Loadout.Equipment.Contains(EquipmentSlot))
+		{
+			return false;
+		}
+		Loadout.Equipment.Add(EquipmentSlot, Instance);
+		return true;
+	}
+
+	const EHSRRelicSlot RelicSlot = static_cast<EHSRRelicSlot>(Slot);
+	if (Loadout.Relics.Contains(RelicSlot))
+	{
+		return false;
+	}
+	Loadout.Relics.Add(RelicSlot, Instance);
+	++State.RelicSetCounts.FindOrAdd(SetId);
+	return true;
+}
+
 bool UHSREquipmentSubsystem::PrepareRestore(const TArray<FHSREquipmentSaveDto>& In, FHSREquipmentRestoreMap& Out) const
 {
-	Out.Reset(); TSet<FGuid> Seen;
-	for (const FHSREquipmentSaveDto& D : In)
+	Out.Reset();
+	TSet<FGuid> Seen;
+	for (const FHSREquipmentSaveDto& Dto : In)
 	{
-		if (!D.CharacterId.IsValid() || !D.InstanceId.IsValid() || Seen.Contains(D.InstanceId) || !IsSlotValid((EHSREquipmentKind)D.Kind,D.Slot)) return false;
-		Seen.Add(D.InstanceId); FHSREquipmentInstance I; I.InstanceId=D.InstanceId; I.EnhancementLevel=D.EnhancementLevel; I.Modifiers=D.Modifiers; I.Kind=(EHSREquipmentKind)D.Kind;
-		const FDefinitionRule* Rule=Definitions.Find(D.DefinitionId); if(!Rule || Rule->Kind!=I.Kind || D.EnhancementLevel<0 || D.EnhancementLevel>Rule->EnhancementCap || D.AuthorityRevision<0 || !IsValidModifiers(I.Modifiers) || (I.Kind==EHSREquipmentKind::Relic && D.SetId!=Rule->SetId)) return false;
-		I.DefinitionId=D.DefinitionId; const bool bExistingCharacter=Out.Contains(D.CharacterId); FHSREquipmentRestoreState& State=Out.FindOrAdd(D.CharacterId); if(bExistingCharacter && State.Revision!=D.AuthorityRevision)return false; State.Revision=D.AuthorityRevision; FHSREquipmentLoadout& L=State.Loadout; if (I.Kind==EHSREquipmentKind::Equipment) { if(L.Equipment.Contains((EHSREquipmentSlot)D.Slot)) return false; L.Equipment.Add((EHSREquipmentSlot)D.Slot,I);} else {if(L.Relics.Contains((EHSRRelicSlot)D.Slot)) return false; L.Relics.Add((EHSRRelicSlot)D.Slot,I); ++State.RelicSetCounts.FindOrAdd(D.SetId);}
+		if (!Dto.CharacterId.IsValid() || !Dto.InstanceId.IsValid() || Seen.Contains(Dto.InstanceId)
+			|| Dto.AuthorityRevision < 0)
+		{
+			return false;
+		}
+
+		const EHSREquipmentKind Kind = static_cast<EHSREquipmentKind>(Dto.Kind);
+		if (!ValidateRestoreInstance(Dto.DefinitionId, Kind, Dto.Slot, Dto.EnhancementLevel, Dto.SetId, Dto.Modifiers))
+		{
+			return false;
+		}
+		Seen.Add(Dto.InstanceId);
+
+		FHSREquipmentInstance Instance;
+		Instance.InstanceId = Dto.InstanceId;
+		Instance.DefinitionId = Dto.DefinitionId;
+		Instance.Kind = Kind;
+		Instance.EnhancementLevel = Dto.EnhancementLevel;
+		Instance.Modifiers = Dto.Modifiers;
+
+		const bool bExistingCharacter = Out.Contains(Dto.CharacterId);
+		FHSREquipmentRestoreState& State = Out.FindOrAdd(Dto.CharacterId);
+		if (bExistingCharacter && State.Revision != Dto.AuthorityRevision)
+		{
+			return false;
+		}
+		State.Revision = Dto.AuthorityRevision;
+
+		if (!InsertIntoRestoreState(State, Instance, Dto.Slot, Dto.SetId))
+		{
+			return false;
+		}
 	}
 	return true;
 }
@@ -58,9 +137,63 @@ bool UHSREquipmentSubsystem::PrepareRestore(const TArray<FHSREquipmentSaveDto>& 
 bool UHSREquipmentSubsystem::PrepareRestore(const TArray<FHSREquipmentRegistryDto>& Registry, const TArray<FHSREquipmentPlacementDto>& Placements, FHSREquipmentRegistryRestoreState& Out) const
 {
 	Out = FHSREquipmentRegistryRestoreState();
-	for(const auto& D:Registry){FHSREquipmentInstance I;I.InstanceId=D.InstanceId;I.DefinitionId=D.DefinitionId;I.Kind=static_cast<EHSREquipmentKind>(D.Kind);I.EnhancementLevel=D.EnhancementLevel;I.Modifiers=D.Modifiers;const FDefinitionRule* Rule=Definitions.Find(I.DefinitionId);if(!I.InstanceId.IsValid()||Out.Registry.Contains(I.InstanceId)||!Rule||Rule->Kind!=I.Kind||D.EnhancementLevel<0||D.EnhancementLevel>Rule->EnhancementCap||!IsValidModifiers(I.Modifiers)||(I.Kind==EHSREquipmentKind::Relic&&D.SetId!=Rule->SetId))return false;Out.Registry.Add(I.InstanceId,MoveTemp(I));}
+
+	// The registry carries instances without placement, so slot agreement is checked per placement below.
+	for (const FHSREquipmentRegistryDto& Dto : Registry)
+	{
+		if (!Dto.InstanceId.IsValid() || Out.Registry.Contains(Dto.InstanceId))
+		{
+			return false;
+		}
+
+		FHSREquipmentInstance Instance;
+		Instance.InstanceId = Dto.InstanceId;
+		Instance.DefinitionId = Dto.DefinitionId;
+		Instance.Kind = static_cast<EHSREquipmentKind>(Dto.Kind);
+		Instance.EnhancementLevel = Dto.EnhancementLevel;
+		Instance.Modifiers = Dto.Modifiers;
+
+		const FDefinitionRule* Rule = Definitions.Find(Instance.DefinitionId);
+		if (!Rule
+			|| !ValidateRestoreInstance(Instance.DefinitionId, Instance.Kind, Rule->Slot,
+				Dto.EnhancementLevel, Dto.SetId, Instance.Modifiers))
+		{
+			return false;
+		}
+		Out.Registry.Add(Instance.InstanceId, MoveTemp(Instance));
+	}
+
 	TSet<FGuid> Seen;
-	for(const auto& D:Placements){const FHSREquipmentInstance* I=Out.Registry.Find(D.InstanceId);if(!I||!D.CharacterId.IsValid()||Seen.Contains(D.InstanceId)||D.AuthorityRevision<0||D.Kind!=static_cast<int32>(I->Kind)||!IsSlotValid(I->Kind,D.Slot))return false;const FDefinitionRule* Rule=FindDefinition(*I);if(!Rule||Rule->Slot!=D.Slot)return false;Seen.Add(D.InstanceId);const bool bExisting=Out.Loadouts.Contains(D.CharacterId);FHSREquipmentRestoreState& S=Out.Loadouts.FindOrAdd(D.CharacterId);if(bExisting&&S.Revision!=D.AuthorityRevision)return false;S.Revision=D.AuthorityRevision;if(I->Kind==EHSREquipmentKind::Equipment){if(S.Loadout.Equipment.Contains(static_cast<EHSREquipmentSlot>(D.Slot)))return false;S.Loadout.Equipment.Add(static_cast<EHSREquipmentSlot>(D.Slot),*I);}else{if(S.Loadout.Relics.Contains(static_cast<EHSRRelicSlot>(D.Slot)))return false;S.Loadout.Relics.Add(static_cast<EHSRRelicSlot>(D.Slot),*I);++S.RelicSetCounts.FindOrAdd(Rule->SetId);}}
+	for (const FHSREquipmentPlacementDto& Dto : Placements)
+	{
+		const FHSREquipmentInstance* Instance = Out.Registry.Find(Dto.InstanceId);
+		if (!Instance || !Dto.CharacterId.IsValid() || Seen.Contains(Dto.InstanceId)
+			|| Dto.AuthorityRevision < 0 || Dto.Kind != static_cast<int32>(Instance->Kind))
+		{
+			return false;
+		}
+
+		const FDefinitionRule* Rule = FindDefinition(*Instance);
+		if (!Rule || !ValidateRestoreInstance(Instance->DefinitionId, Instance->Kind, Dto.Slot,
+				Instance->EnhancementLevel, Rule->SetId, Instance->Modifiers))
+		{
+			return false;
+		}
+		Seen.Add(Dto.InstanceId);
+
+		const bool bExistingCharacter = Out.Loadouts.Contains(Dto.CharacterId);
+		FHSREquipmentRestoreState& State = Out.Loadouts.FindOrAdd(Dto.CharacterId);
+		if (bExistingCharacter && State.Revision != Dto.AuthorityRevision)
+		{
+			return false;
+		}
+		State.Revision = Dto.AuthorityRevision;
+
+		if (!InsertIntoRestoreState(State, *Instance, Dto.Slot, Rule->SetId))
+		{
+			return false;
+		}
+	}
 	return true;
 }
 
@@ -121,6 +254,32 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UH
 	Rule.SetId = Definition.SetId;
 	Definitions.Add(Definition.DefinitionId, Rule);
 	return EHSREquipmentOperationResult::Success;
+}
+
+EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterSetDefinition(const UHSRRelicSetDefinition& Definition)
+{
+	if (Definition.SetId.IsNone())
+	{
+		return EHSREquipmentOperationResult::InvalidDefinitionId;
+	}
+	if (Definition.Threshold <= 0)
+	{
+		return EHSREquipmentOperationResult::InvalidEnhancementLevel;
+	}
+	if (SetThresholds.Contains(Definition.SetId))
+	{
+		return EHSREquipmentOperationResult::DuplicateDefinitionId;
+	}
+
+	SetThresholds.Add(Definition.SetId, Definition.Threshold);
+	return EHSREquipmentOperationResult::Success;
+}
+
+int32 UHSREquipmentSubsystem::GetSetThreshold(const FName SetId) const
+{
+	// Unregistered sets keep the historical two-piece behaviour rather than becoming unactivatable.
+	const int32* Authored = SetThresholds.Find(SetId);
+	return Authored ? *Authored : FHSRRelicSetResolver::DefaultThreshold;
 }
 
 bool UHSREquipmentSubsystem::IsDefinitionCompatible(const FName DefinitionId,const EHSREquipmentKind Kind,const int32 Slot) const
@@ -408,14 +567,8 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 	Result.NewEquipmentRevision = InstalledLoadout.Revision;
 	Result.Code = EHSREquipmentMovementResultCode::Success;
 	Result.bCommitted = true;
-	MovementLedger.Add(Request.OperationId, {Request, Result});
-	MovementLedgerOrder.Add(Request.OperationId);
-	constexpr int32 MaxMovementLedgerEntries = 128;
-	if (MovementLedgerOrder.Num() > MaxMovementLedgerEntries)
-	{
-		MovementLedger.Remove(MovementLedgerOrder[0]);
-		MovementLedgerOrder.RemoveAt(0);
-	}
+	RecordLedgerEntry(MovementLedger, MovementLedgerOrder, Request.OperationId,
+		FMovementLedgerEntry{Request, Result});
 	Inventory.PublishEquipmentMovementCommit(NewInventoryRevision);
 	LoadoutChanged.Broadcast(Request.CharacterId, InstalledLoadout.Revision);
 	if (bHasProjectionCommit)
@@ -510,14 +663,8 @@ FHSREquipmentEnhancementResult UHSREquipmentSubsystem::ExecuteEnhancement(
 	if (Request.TargetLevel == CurrentInstance->EnhancementLevel)
 	{
 		Result.Code = EHSREquipmentEnhancementResultCode::NoOp;
-		EnhancementLedger.Add(Request.OperationId, {Request, Result});
-		EnhancementLedgerOrder.Add(Request.OperationId);
-		constexpr int32 MaxEnhancementLedgerEntries = 128;
-		if (EnhancementLedgerOrder.Num() > MaxEnhancementLedgerEntries)
-		{
-			EnhancementLedger.Remove(EnhancementLedgerOrder[0]);
-			EnhancementLedgerOrder.RemoveAt(0);
-		}
+		RecordLedgerEntry(EnhancementLedger, EnhancementLedgerOrder, Request.OperationId,
+			FEnhancementLedgerEntry{Request, Result});
 		return Result;
 	}
 
@@ -550,14 +697,8 @@ FHSREquipmentEnhancementResult UHSREquipmentSubsystem::ExecuteEnhancement(
 	Result.NewEnhancementLevel = CandidateInstance.EnhancementLevel;
 	Result.Code = EHSREquipmentEnhancementResultCode::Success;
 	Result.bCommitted = true;
-	EnhancementLedger.Add(Request.OperationId, {Request, Result});
-	EnhancementLedgerOrder.Add(Request.OperationId);
-	constexpr int32 MaxEnhancementLedgerEntries = 128;
-	if (EnhancementLedgerOrder.Num() > MaxEnhancementLedgerEntries)
-	{
-		EnhancementLedger.Remove(EnhancementLedgerOrder[0]);
-		EnhancementLedgerOrder.RemoveAt(0);
-	}
+	RecordLedgerEntry(EnhancementLedger, EnhancementLedgerOrder, Request.OperationId,
+		FEnhancementLedgerEntry{Request, Result});
 	Inventory.PublishEquipmentEnhancementCommit(Result.NewInventoryRevision);
 	LoadoutChanged.Broadcast(Request.CharacterId, InstalledLoadout.Revision);
 	if (EnhancementProjectionCommit.IsBound())
@@ -629,7 +770,18 @@ void UHSREquipmentSubsystem::GetRelicSetSnapshots(const FGuid& CharacterId, TArr
 	if(!State)return;
 	TMap<FName,int32> Counts;
 	for(const auto& Pair:State->Relics)if(const FHSREquipmentInstance* Instance=InstanceRegistry.Find(Pair.Value))if(const FDefinitionRule* Rule=Definitions.Find(Instance->DefinitionId))if(!Rule->SetId.IsNone())++Counts.FindOrAdd(Rule->SetId);
-	for(const auto& Pair:Counts){FHSRRelicSetSnapshot Row;Row.SetId=Pair.Key;Row.EquippedCount=Pair.Value;Row.bActive=Row.EquippedCount>=Row.Threshold;Row.SetSourceId=Row.bActive?Row.SetId:NAME_None;Out.Add(Row);}
+	// Row.Threshold used to be compared before it was ever assigned, so this always tested against
+	// the struct's two-piece default and ignored the authored value.
+	for (const auto& Pair : Counts)
+	{
+		FHSRRelicSetSnapshot Row;
+		Row.SetId = Pair.Key;
+		Row.EquippedCount = Pair.Value;
+		Row.Threshold = GetSetThreshold(Pair.Key);
+		Row.bActive = Row.EquippedCount >= Row.Threshold;
+		Row.SetSourceId = Row.bActive ? Row.SetId : NAME_None;
+		Out.Add(Row);
+	}
 	Out.Sort([](const FHSRRelicSetSnapshot& A,const FHSRRelicSetSnapshot& B){return A.SetId.LexicalLess(B.SetId);});
 }
 

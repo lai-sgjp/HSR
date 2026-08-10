@@ -128,7 +128,7 @@ struct HSR_API FHSREquipmentPlacementDto { GENERATED_BODY()
 
 USTRUCT(BlueprintType)
 struct HSR_API FHSRSaveData { GENERATED_BODY()
-	UPROPERTY(BlueprintReadWrite) int32 SchemaVersion = 8;
+	UPROPERTY(BlueprintReadWrite) int32 SchemaVersion = 9;
 	UPROPERTY(BlueprintReadWrite) TArray<FHSRSaveProfileDto> Profiles;
 	UPROPERTY(BlueprintReadWrite) TArray<FHSRPartySlot> PartySlots;
 	UPROPERTY(BlueprintReadWrite) int64 PartyRevision = 0;

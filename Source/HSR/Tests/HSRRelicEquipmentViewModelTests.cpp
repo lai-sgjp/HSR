@@ -232,10 +232,20 @@ bool FHSRRelicEnhancementUnaffordableTest::RunTest(const FString&)
 	TestFalse(TEXT("Zero material makes the option unaffordable"),
 		Snapshot.EnhancementOptions[0].bAffordable);
 
-	// Reproduces the reported symptom: every click returned AuthorityRejected because
-	// the harness grant was silently rejected and no material was ever held.
-	TestEqual(TEXT("Unaffordable commit is rejected"), ViewModel->CommitEnhancement(1),
-		EHSRRelicEquipmentResult::AuthorityRejected);
+	// Reproduces the reported symptom: every click was rejected because the harness grant was
+	// silently dropped and no material was ever held. The reason must name the shortfall --
+	// this used to report AuthorityRejected, which told the player nothing actionable and
+	// made the original bug indistinguishable from an authority refusal during triage.
+	TestEqual(TEXT("Unaffordable commit reports the shortfall"), ViewModel->CommitEnhancement(1),
+		EHSRRelicEquipmentResult::InsufficientMaterial);
+	TestTrue(TEXT("Failure reason reaches the snapshot"), ViewModel->GetSnapshot(Snapshot));
+	TestEqual(TEXT("Snapshot surfaces the shortfall to the widget"), Snapshot.FailureReason,
+		EHSRRelicEquipmentResult::InsufficientMaterial);
+
+	// A target level that no rule covers is a different failure and must stay distinct,
+	// so the new code cannot become a catch-all for every rejected commit.
+	TestEqual(TEXT("Unknown target level stays InvalidTargetLevel"), ViewModel->CommitEnhancement(99),
+		EHSRRelicEquipmentResult::InvalidTargetLevel);
 
 	EHSRItemStorageKind StorageKind = EHSRItemStorageKind::Unique;
 	int32 MaxStack = 0;
@@ -252,6 +262,40 @@ bool FHSRRelicEnhancementUnaffordableTest::RunTest(const FString&)
 		EHSRRelicEquipmentResult::Success);
 	TestTrue(TEXT("Committed snapshot available"), ViewModel->GetSnapshot(Snapshot));
 	TestEqual(TEXT("Enhancement level advanced"), Snapshot.CurrentEnhancementLevel, 1);
+
+	ViewModel->Shutdown();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRRelicEmptySlotStageTest,
+	"HSR.UI.RelicEquipment.EmptySlotNeverPublishesEnhancementStage",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSRRelicEmptySlotStageTest::RunTest(const FString&)
+{
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GetTransientPackage());
+	UHSRInventorySubsystem* Inventory = NewObject<UHSRInventorySubsystem>(GameInstance);
+	UHSREquipmentSubsystem* Equipment = NewObject<UHSREquipmentSubsystem>(GameInstance);
+	UHSRItemEquipmentMappingCatalog* MappingCatalog = NewObject<UHSRItemEquipmentMappingCatalog>(GameInstance);
+	UHSREquipmentEnhancementCatalog* EnhancementCatalog = NewObject<UHSREquipmentEnhancementCatalog>(GameInstance);
+
+	UHSRRelicEquipmentViewModel* ViewModel = NewObject<UHSRRelicEquipmentViewModel>(GameInstance);
+	ViewModel->Initialize(Equipment, Inventory, MappingCatalog, EnhancementCatalog, FGuid::NewGuid());
+
+	// Body slot is empty: nothing is equipped, so there is no option list to enhance.
+	TestEqual(TEXT("Empty slot selection succeeds"), ViewModel->SelectSlot(EHSRRelicSlot::Body),
+		EHSRRelicEquipmentResult::Success);
+	TestEqual(TEXT("Enhancement is refused on an empty slot"), ViewModel->OpenEnhancement(),
+		EHSRRelicEquipmentResult::NoEnhancementOption);
+
+	// The bug: the snapshot used to keep Stage=Enhancement with zero options, so the widget
+	// rendered an option list that did not exist and logged an out-of-bounds read at index 0.
+	FHSRRelicEquipmentSnapshot Snapshot;
+	TestTrue(TEXT("Snapshot is published"), ViewModel->GetSnapshot(Snapshot));
+	TestEqual(TEXT("Option list is empty"), Snapshot.EnhancementOptions.Num(), 0);
+	TestNotEqual(TEXT("Stage reverts instead of claiming Enhancement"), Snapshot.Stage,
+		EHSRRelicEquipmentStage::Enhancement);
+	TestFalse(TEXT("Snapshot is marked invalid"), Snapshot.bIsValid);
 
 	ViewModel->Shutdown();
 	return true;

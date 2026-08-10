@@ -2,6 +2,14 @@
 #include "CoreMinimal.h"
 #include "HSRPartyTypes.generated.h"
 
+/**
+ * Party width, owned here because it is a party-domain concept that the save layer merely persists.
+ * It stays compile-time on purpose: the save encoder treats slot width as part of the canonical
+ * format and rejects any payload that disagrees, so a runtime-configurable width would make the
+ * on-disk format ambiguous. Changing this value is a schema change and needs a migration step.
+ */
+constexpr int32 HSRPartyCapacity = 4;
+
 UENUM(BlueprintType)
 enum class EHSRPartyResult : uint8 { Success, InvalidSlot, ProfileNotFound, DuplicateCharacter, EmptySlot, Full, InvalidCandidate, RevisionConflict };
 

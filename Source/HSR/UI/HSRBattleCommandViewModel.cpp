@@ -3,8 +3,6 @@
 #include "../Battle/HSRBattleCoordinator.h"
 #include "../Battle/HSRBattleParticipant.h"
 #include "../Battle/HSRBattleTypes.h"
-#include "../GAS/Attribute/HSRCoreAttributeSet.h"
-#include "AbilitySystemComponent.h"
 
 void UHSRBattleCommandViewModel::BeginDestroy()
 {
@@ -32,38 +30,32 @@ void UHSRBattleCommandViewModel::BindCoordinator(UHSRBattleCoordinator* InCoordi
 {
 	UnbindCoordinator();
 	Coordinator = InCoordinator;
-	RebindTargetAttributes();
 	RefreshReadOnlyBattlePresentation();
-	UE_LOG(LogTemp, Log, TEXT("P8-005 ViewModel Bind Coordinator=%s Target=%s Bound=%d"), InCoordinator ? TEXT("valid") : TEXT("null"), *SelectedTargetId.ToString(), ObservedTargetASC.IsValid() ? 1 : 0);
+	UE_LOG(LogTemp, Log, TEXT("P8-005 ViewModel Bind Coordinator=%s Target=%s"), InCoordinator ? TEXT("valid") : TEXT("null"), *SelectedTargetId.ToString());
 }
 
 void UHSRBattleCommandViewModel::UnbindCoordinator()
 {
-	if (ObservedTargetASC.IsValid())
-	{
-		if (ToughnessChangedHandle.IsValid()) ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetToughnessAttribute()).Remove(ToughnessChangedHandle);
-		if (MaxToughnessChangedHandle.IsValid()) ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetMaxToughnessAttribute()).Remove(MaxToughnessChangedHandle);
-	}
-	ToughnessChangedHandle.Reset(); MaxToughnessChangedHandle.Reset(); ObservedTargetASC.Reset(); Coordinator.Reset();
+	Coordinator.Reset();
 	ClearCommandLocks();
 	UE_LOG(LogTemp, Log, TEXT("P8-005 ViewModel Unbind"));
 }
 
 const FHSRBattleCommandSkillView* UHSRBattleCommandViewModel::FindSelectedSkill() const
 {
-	return State.Skills.FindByPredicate([this](const FHSRBattleCommandSkillView& Skill) { return Skill.SkillId == SelectedSkillId; });
+	return State.FindSkill(SelectedSkillId);
 }
 
 void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
 {
-	CurrentActorText = FText::Format(NSLOCTEXT("HSRCommand", "CurrentActor", "Actor: {0}"), FText::FromName(State.CurrentActorId));
+	CurrentActorText = FText::Format(NSLOCTEXT("HSRCommand", "CurrentActor", "Actor: {0}"), State.GetParticipantLabel(State.CurrentActorId));
 	EnergyText = FText::Format(NSLOCTEXT("HSRCommand", "Energy", "Energy: {0} / {1}"), FText::AsNumber(FMath::RoundToInt(State.Energy)), FText::AsNumber(FMath::RoundToInt(State.MaxEnergy)));
 	SkillPointsText = FText::Format(NSLOCTEXT("HSRCommand", "SkillPoints", "Skill Points: {0} / {1}"), FText::AsNumber(State.SkillPoints), FText::AsNumber(State.MaxSkillPoints));
 	LastResolutionText = FText::Format(NSLOCTEXT("HSRCommand", "Resolution", "Last Resolution: {0} ({1})"), FText::AsNumber(static_cast<int32>(State.LastResolution.Status)), FText::AsNumber(static_cast<int32>(State.LastResolution.FailureReason)));
 	TArray<FString> StatusLines;
 	for (const FHSRStatusPublicSnapshot& Status : State.Statuses)
 	{
-		StatusLines.Add(FString::Printf(TEXT("%s | %s | %s | %s | x%d | %d"), *Status.TargetParticipantId.ToString(), *Status.StatusId.ToString(), *Status.DisplayName.ToString(),
+		StatusLines.Add(FString::Printf(TEXT("%s | %s | %s | %s | x%d | %d"), *State.GetParticipantLabel(Status.TargetParticipantId).ToString(), *Status.StatusId.ToString(), *Status.DisplayName.ToString(),
 			Status.Classification == EHSRStatusClassification::Buff ? TEXT("Buff") : TEXT("Debuff"), Status.Stacks, Status.RemainingTurns));
 	}
 	StatusText = FText::FromString(FString::Join(StatusLines, TEXT("\n")));
@@ -72,7 +64,10 @@ void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
 		? FText::FromString(FString::Printf(TEXT("%s | %s | op=%d | result=%d | #%lld"), *Operation.TargetParticipantId.ToString(), *Operation.StatusId.ToString(), static_cast<int32>(Operation.Operation), static_cast<int32>(Operation.Result), Operation.Sequence))
 		: FText::GetEmpty();
 	TArray<FString> OrderLines;
-	for (const FName ParticipantId : State.TurnOrderParticipantIds) OrderLines.Add(ParticipantId.ToString());
+	for (const FName ParticipantId : State.TurnOrderParticipantIds)
+	{
+		OrderLines.Add(State.GetParticipantLabel(ParticipantId).ToString());
+	}
 	TurnOrderText = FText::FromString(FString::Join(OrderLines, TEXT(" -> ")));
 	TArray<FString> ParticipantLines;
 	for (const FHSRBattleParticipantView& Participant : State.Participants)
@@ -85,15 +80,20 @@ void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
 		WeaknessNames.Sort();
 		const FString ParticipantWeaknessText = WeaknessNames.IsEmpty() ? TEXT("None") : FString::Join(WeaknessNames, TEXT(", "));
 		ParticipantLines.Add(FString::Printf(TEXT("%s | HP %.0f/%.0f | Energy %.0f/%.0f | Toughness %.0f/%.0f | Weakness %s%s"),
-			*Participant.ParticipantId.ToString(), Participant.Health, Participant.MaxHealth, Participant.Energy, Participant.MaxEnergy,
+			*Participant.GetDisplayLabel().ToString(), Participant.Health, Participant.MaxHealth, Participant.Energy, Participant.MaxEnergy,
 			Participant.Toughness, Participant.MaxToughness, *ParticipantWeaknessText, Participant.bDefeated ? TEXT(" | Defeated") : TEXT("")));
 	}
 	ParticipantsText = FText::FromString(FString::Join(ParticipantLines, TEXT("\n")));
 	TArray<FString> PresentationLines;
 	for (const FHSRBattlePresentationEvent& Event : State.PresentationEvents)
 	{
-		const TCHAR* Label = Event.EventType == EHSRPresentationEventType::Damage ? TEXT("Damage") : Event.EventType == EHSRPresentationEventType::Toughness ? TEXT("Toughness") : Event.EventType == EHSRPresentationEventType::Break ? TEXT("Break") : TEXT("Heal");
-		PresentationLines.Add(FString::Printf(TEXT("%s -> %s | %s %.0f%s%s"), *Event.SourceParticipantId.ToString(), *Event.TargetParticipantId.ToString(), Label, Event.Value, Event.bCritical ? TEXT(" | Critical") : TEXT(""), Event.bBreak ? TEXT(" | Break") : TEXT("")));
+		PresentationLines.Add(FString::Printf(TEXT("%s -> %s | %s %.0f%s%s"),
+			*State.GetParticipantLabel(Event.SourceParticipantId).ToString(),
+			*State.GetParticipantLabel(Event.TargetParticipantId).ToString(),
+			*Event.GetEventTypeLabel().ToString(),
+			Event.Value,
+			Event.bCritical ? TEXT(" | Critical") : TEXT(""),
+			Event.bBreak ? TEXT(" | Break") : TEXT("")));
 	}
 	PresentationText = FText::FromString(FString::Join(PresentationLines, TEXT("\n")));
 
@@ -107,18 +107,33 @@ void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
 	{
 		SelectedTargetId = SelectedSkill && SelectedSkill->CandidateTargetIds.Num() > 0 ? SelectedSkill->CandidateTargetIds[0] : NAME_None;
 	}
-	RebindTargetAttributes();
+	RefreshReadOnlyBattlePresentation();
 	RefreshCommandState();
 }
 
-bool UHSRBattleCommandViewModel::SelectSkill(EHSRSkillCategory Category)
+bool UHSRBattleCommandViewModel::SelectSkillById(FName SkillId)
 {
-	const FHSRBattleCommandSkillView* Skill = State.Skills.FindByPredicate([Category](const FHSRBattleCommandSkillView& Candidate) { return Candidate.Category == Category; });
-	if (!Skill) return false;
+	const FHSRBattleCommandSkillView* Skill = State.FindSkill(SkillId);
+	if (!Skill)
+	{
+		return false;
+	}
+
 	SelectedSkillId = Skill->SkillId;
 	SelectedTargetId = Skill->CandidateTargetIds.Num() > 0 ? Skill->CandidateTargetIds[0] : NAME_None;
-	RebindTargetAttributes(); RefreshReadOnlyBattlePresentation(); RefreshCommandState(); Changed.Broadcast(State);
+
+	RefreshReadOnlyBattlePresentation();
+	RefreshCommandState();
+	Changed.Broadcast(State);
 	return true;
+}
+
+// Category-keyed selection is first-match-wins, so it cannot reach a second skill sharing a
+// category. Kept as a shim for existing callers; new code should use SelectSkillById.
+bool UHSRBattleCommandViewModel::SelectSkill(EHSRSkillCategory Category)
+{
+	const FHSRBattleCommandSkillView* Skill = State.FindSkillByCategory(Category);
+	return Skill ? SelectSkillById(Skill->SkillId) : false;
 }
 
 TArray<FName> UHSRBattleCommandViewModel::GetTargetOptions() const
@@ -131,13 +146,15 @@ bool UHSRBattleCommandViewModel::SelectTarget(FName TargetId)
 {
 	if (!GetTargetOptions().Contains(TargetId)) return false;
 	SelectedTargetId = TargetId;
-	RebindTargetAttributes(); RefreshReadOnlyBattlePresentation(); RefreshCommandState(); Changed.Broadcast(State);
+	RefreshReadOnlyBattlePresentation();
+	RefreshCommandState();
+	Changed.Broadcast(State);
 	return true;
 }
 
 bool UHSRBattleCommandViewModel::BeginCommandSubmit(const FGuid& ActionId, FName ActorParticipantId, FName SkillId, FName TargetParticipantId)
 {
-	const FHSRBattleCommandSkillView* Skill = State.Skills.FindByPredicate([SkillId](const FHSRBattleCommandSkillView& Candidate) { return Candidate.SkillId == SkillId; });
+	const FHSRBattleCommandSkillView* Skill = State.FindSkill(SkillId);
 	if (!ActionId.IsValid() || !State.BattleId.IsValid() || !State.bCurrentActorPlayerControlled || bCommandPending || bPresentationLocked || ActorParticipantId != State.CurrentActorId
 		|| !Skill || !Skill->bAvailable || SkillId != SelectedSkillId || TargetParticipantId != SelectedTargetId || !Skill->CandidateTargetIds.Contains(TargetParticipantId)) return false;
 	PendingBattleId = State.BattleId;
@@ -216,39 +233,44 @@ void UHSRBattleCommandViewModel::RefreshCommandState()
 		&& Skill && Skill->bAvailable && Skill->CandidateTargetIds.Contains(SelectedTargetId);
 }
 
-void UHSRBattleCommandViewModel::RebindTargetAttributes()
-{
-	if (ObservedTargetASC.IsValid())
-	{
-		if (ToughnessChangedHandle.IsValid()) ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetToughnessAttribute()).Remove(ToughnessChangedHandle);
-		if (MaxToughnessChangedHandle.IsValid()) ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetMaxToughnessAttribute()).Remove(MaxToughnessChangedHandle);
-	}
-	ToughnessChangedHandle.Reset(); MaxToughnessChangedHandle.Reset(); ObservedTargetASC.Reset();
-	if (!Coordinator.IsValid()) return;
-	const FHSRBattleParticipant* Target = Coordinator->GetParticipants().FindByPredicate([this](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == SelectedTargetId; });
-	if (!Target || !Target->AbilitySystemComponent.IsValid()) return;
-	ObservedTargetASC = Target->AbilitySystemComponent;
-	ToughnessChangedHandle = ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetToughnessAttribute()).AddUObject(this, &UHSRBattleCommandViewModel::HandleObservedToughnessChanged);
-	MaxToughnessChangedHandle = ObservedTargetASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetMaxToughnessAttribute()).AddUObject(this, &UHSRBattleCommandViewModel::HandleObservedToughnessChanged);
-}
-
-void UHSRBattleCommandViewModel::HandleObservedToughnessChanged(const FOnAttributeChangeData& ChangeData)
-{
-	RefreshReadOnlyBattlePresentation();
-	Changed.Broadcast(State);
-}
-
 void UHSRBattleCommandViewModel::RefreshReadOnlyBattlePresentation()
 {
-	WeaknessText = FText::GetEmpty(); ToughnessText = FText::GetEmpty(); BreakText = FText::GetEmpty(); DelayText = FText::GetEmpty();
-	if (!Coordinator.IsValid()) return;
-	const FHSRBattleParticipant* Target = Coordinator->GetParticipants().FindByPredicate([this](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == SelectedTargetId; });
-	if (Target && Target->AbilitySystemComponent.IsValid())
+	WeaknessText = FText::GetEmpty();
+	ToughnessText = FText::GetEmpty();
+	BreakText = FText::GetEmpty();
+	DelayText = FText::GetEmpty();
+
+	// Toughness and weaknesses come from the participant view the Coordinator already baked from the
+	// ASC, so the UI never observes a live ASC of its own. bHasAttributes distinguishes "never read"
+	// from a genuine zero, which is why an ASC-less participant still renders no text at all.
+	const FHSRBattleParticipantView* TargetView = State.Participants.FindByPredicate(
+		[this](const FHSRBattleParticipantView& Candidate)
+		{
+			return Candidate.ParticipantId == SelectedTargetId;
+		});
+	if (TargetView && TargetView->bHasAttributes)
 	{
 		FString Weaknesses;
-		for (const FGameplayTag& Tag : Target->WeaknessTags) { if (!Weaknesses.IsEmpty()) Weaknesses += TEXT(", "); Weaknesses += Tag.ToString(); }
-		WeaknessText = FText::Format(NSLOCTEXT("HSRCommand", "Weakness", "Weakness: {0}"), FText::FromString(Weaknesses.IsEmpty() ? TEXT("None") : Weaknesses));
-		ToughnessText = FText::Format(NSLOCTEXT("HSRCommand", "Toughness", "Toughness: {0} / {1}"), FText::AsNumber(FMath::RoundToInt(Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetToughnessAttribute()))), FText::AsNumber(FMath::RoundToInt(Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxToughnessAttribute()))));
+		for (const FGameplayTag& Tag : TargetView->WeaknessTags)
+		{
+			if (!Weaknesses.IsEmpty())
+			{
+				Weaknesses += TEXT(", ");
+			}
+			Weaknesses += Tag.ToString();
+		}
+		WeaknessText = FText::Format(
+			NSLOCTEXT("HSRCommand", "Weakness", "Weakness: {0}"),
+			FText::FromString(Weaknesses.IsEmpty() ? TEXT("None") : Weaknesses));
+		ToughnessText = FText::Format(
+			NSLOCTEXT("HSRCommand", "Toughness", "Toughness: {0} / {1}"),
+			FText::AsNumber(FMath::RoundToInt(TargetView->Toughness)),
+			FText::AsNumber(FMath::RoundToInt(TargetView->MaxToughness)));
+	}
+
+	if (!Coordinator.IsValid())
+	{
+		return;
 	}
 	if (State.LastResolution.bHasBreakResult)
 	{

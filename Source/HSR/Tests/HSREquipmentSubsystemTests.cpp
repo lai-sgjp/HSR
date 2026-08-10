@@ -3,6 +3,7 @@
 #include "../Equipment/HSREquipmentSubsystem.h"
 #include "../Data/Definitions/HSREquipmentDefinition.h"
 #include "../Data/Definitions/HSRRelicDefinition.h"
+#include "../Data/Definitions/HSRRelicSetDefinition.h"
 #include "Misc/AutomationTest.h"
 #include "Engine/GameInstance.h"
 
@@ -115,6 +116,67 @@ bool FHSREquipmentValidationTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Replace absent target"), Subsystem->Replace(CharacterB, MakeInstance(TEXT("WeaponA"), EHSREquipmentKind::Equipment, 607)), EHSREquipmentOperationResult::TargetNotFound);
 	TestEqual(TEXT("Cross-character enhancement"), Subsystem->SetEnhancementLevel(CharacterB, Equipped.InstanceId, 1), EHSREquipmentOperationResult::InstanceMismatch);
 	TestEqual(TEXT("Invalid enhancement request"), Subsystem->SetEnhancementLevel(CharacterA, Equipped.InstanceId, 6), EHSREquipmentOperationResult::InvalidEnhancementLevel);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSREquipmentSetThresholdTest, "HSR.Equipment.SetThreshold", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSREquipmentSetThresholdTest::RunTest(const FString&)
+{
+	using namespace HSR::Equipment::Tests;
+	UHSREquipmentSubsystem* Subsystem = MakeSubsystem();
+
+	// Unregistered sets keep the historical two-piece rule.
+	TestEqual(TEXT("Unknown set falls back to default"), Subsystem->GetSetThreshold(TEXT("Set.Unknown")), 2);
+
+	UHSRRelicSetDefinition* FourPiece = NewObject<UHSRRelicSetDefinition>();
+	FourPiece->SetId = TEXT("Set.Four");
+	FourPiece->Threshold = 4;
+	TestEqual(TEXT("Register four-piece set"), Subsystem->RegisterSetDefinition(*FourPiece),
+		EHSREquipmentOperationResult::Success);
+	TestEqual(TEXT("Authored threshold is honoured"), Subsystem->GetSetThreshold(TEXT("Set.Four")), 4);
+	TestEqual(TEXT("Duplicate set rejected"), Subsystem->RegisterSetDefinition(*FourPiece),
+		EHSREquipmentOperationResult::DuplicateDefinitionId);
+
+	UHSRRelicSetDefinition* Unnamed = NewObject<UHSRRelicSetDefinition>();
+	Unnamed->Threshold = 2;
+	TestEqual(TEXT("Missing set id rejected"), Subsystem->RegisterSetDefinition(*Unnamed),
+		EHSREquipmentOperationResult::InvalidDefinitionId);
+
+	UHSRRelicSetDefinition* NonPositive = NewObject<UHSRRelicSetDefinition>();
+	NonPositive->SetId = TEXT("Set.Zero");
+	NonPositive->Threshold = 0;
+	TestEqual(TEXT("Non-positive threshold rejected"), Subsystem->RegisterSetDefinition(*NonPositive),
+		EHSREquipmentOperationResult::InvalidEnhancementLevel);
+
+	// Two equipped pieces of a four-piece set must not activate.
+	const FGuid CharacterId = Id(400);
+	UHSRRelicDefinition* Head = NewObject<UHSRRelicDefinition>();
+	Head->DefinitionId = TEXT("Relic.Four.Head");
+	Head->Slot = EHSRRelicSlot::Head;
+	Head->SetId = TEXT("Set.Four");
+	UHSRRelicDefinition* Hands = NewObject<UHSRRelicDefinition>();
+	Hands->DefinitionId = TEXT("Relic.Four.Hands");
+	Hands->Slot = EHSRRelicSlot::Hands;
+	Hands->SetId = TEXT("Set.Four");
+	TestEqual(TEXT("Register set head"), Subsystem->RegisterDefinition(*Head), EHSREquipmentOperationResult::Success);
+	TestEqual(TEXT("Register set hands"), Subsystem->RegisterDefinition(*Hands), EHSREquipmentOperationResult::Success);
+	TestEqual(TEXT("Equip head"),
+		Subsystem->Equip(CharacterId, MakeInstance(TEXT("Relic.Four.Head"), EHSREquipmentKind::Relic, 410)),
+		EHSREquipmentOperationResult::Success);
+	TestEqual(TEXT("Equip hands"),
+		Subsystem->Equip(CharacterId, MakeInstance(TEXT("Relic.Four.Hands"), EHSREquipmentKind::Relic, 420)),
+		EHSREquipmentOperationResult::Success);
+
+	TArray<FHSRRelicSetSnapshot> Snapshots;
+	Subsystem->GetRelicSetSnapshots(CharacterId, Snapshots);
+	const FHSRRelicSetSnapshot* Row = Snapshots.FindByPredicate(
+		[](const FHSRRelicSetSnapshot& Candidate) { return Candidate.SetId == TEXT("Set.Four"); });
+	if (TestNotNull(TEXT("Set row present"), Row))
+	{
+		TestEqual(TEXT("Snapshot reports authored threshold"), Row->Threshold, 4);
+		TestEqual(TEXT("Two pieces counted"), Row->EquippedCount, 2);
+		TestFalse(TEXT("Two of four does not activate"), Row->bActive);
+	}
 	return true;
 }
 

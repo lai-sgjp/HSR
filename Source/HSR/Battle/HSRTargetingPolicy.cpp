@@ -9,14 +9,14 @@ TArray<FName> FHSRTargetingPolicy::BuildCandidateTargetIds(
 	const TArray<FHSRBattleParticipant>& Participants)
 {
 	TArray<FName> CandidateIds;
-	if (!Actor.IsValid() || Actor.bDefeated)
+	if (!Actor.IsAlive())
 	{
 		return CandidateIds;
 	}
 
 	for (const FHSRBattleParticipant& Candidate : Participants)
 	{
-		if (!Candidate.IsValid() || Candidate.bDefeated)
+		if (!Candidate.IsAlive())
 		{
 			continue;
 		}

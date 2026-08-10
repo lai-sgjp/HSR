@@ -65,7 +65,6 @@ private:
 	void BuildCandidateRows(const FHSREquipmentLoadout& Loadout);
 	bool BuildComparison();
 	bool BuildEnhancementOptions();
-	int32 FindStackQuantity(const FHSRInventorySnapshot& InventorySnapshot, FName ItemId) const;
 	int32 GetHeldMaterialQuantity(FName ItemId) const;
 	void HandleEquipmentChanged(const FGuid& CharacterId, int32 Revision);
 	void HandleInventoryChanged(int64 Revision);

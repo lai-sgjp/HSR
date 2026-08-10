@@ -3,12 +3,14 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "HSRBattleCommandTypes.h"
+#include "HSRBattleCommandSink.h"
 #include "HSRBattleCommandWidget.generated.h"
 
 class UHSRBattleCommandViewModel;
-class UHSRBattleCoordinator;
 class UButton;
 class UComboBoxString;
+class UHSRSkillButtonWidget;
+class UPanelWidget;
 class UTextBlock;
 
 UCLASS(Abstract)
@@ -18,7 +20,13 @@ class HSR_API UHSRBattleCommandWidget : public UUserWidget
 
 public:
 	UHSRBattleCommandWidget(const FObjectInitializer& ObjectInitializer);
-	void BindViewModel(UHSRBattleCommandViewModel* InViewModel, UHSRBattleCoordinator* InCoordinator);
+
+	/**
+	 * Pushed in by whoever owns the battle presentation; the widget never reaches back for its own
+	 * dependencies. InCommandSink must implement IHSRBattleCommandSink -- pass the Coordinator in
+	 * production, or a double in tests.
+	 */
+	void BindViewModel(UHSRBattleCommandViewModel* InViewModel, UObject* InCommandSink);
 #if WITH_EDITOR
 	int32 GetBindGenerationForDevelopmentTest() const { return BindGeneration; }
 	bool HasActiveViewModelBindingForDevelopmentTest() const { return StateChangedHandle.IsValid(); }
@@ -40,6 +48,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Battle|Presentation") FText GetPresentationText() const;
 	UFUNCTION(BlueprintPure, Category = "Battle|Status") FText GetStatusText() const;
 	UFUNCTION(BlueprintPure, Category = "Battle|Status") FText GetStatusOperationText() const;
+	/** Preferred selection entry point: reaches every authored skill, including several sharing a category. */
+	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkillById(FName SkillId);
+
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkill(EHSRSkillCategory Category);
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectTarget(FName TargetId);
 	UFUNCTION(BlueprintPure, Category = "Battle|Command") FName GetSelectedSkillId() const;
@@ -79,6 +90,12 @@ private:
 	void UnbindDesignerEvents();
 	void RefreshDesignerControls(const FHSRBattleCommandViewState& State);
 	void RefreshSkillControls(const FHSRBattleCommandViewState& State, EHSRSkillCategory Category, UButton* Button, UTextBlock* NameText, UTextBlock* DescriptionText, UTextBlock* CostText);
+
+	/** Data-driven path: one entry per skill in the view state, keyed by SkillId. Used when both
+	    SkillListContainer and SkillEntryClass are set; otherwise the legacy four-button path runs. */
+	void RefreshSkillList(const FHSRBattleCommandViewState& State);
+	bool UsesSkillList() const;
+	void HandleSkillEntryClicked(FName SkillId);
 	const FHSRBattleCommandSkillView* FindSkillView(const FHSRBattleCommandViewState& State, EHSRSkillCategory Category) const;
 	void FocusResultConfirm();
 
@@ -118,8 +135,21 @@ private:
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UButton> BTN_ResultConfirm;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> PendingOverlay;
 
+	/** Bind a panel with this name to render one entry per authored skill instead of the fixed
+	    four buttons. Adding a fifth skill then needs no widget change at all. */
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UPanelWidget> SkillListContainer;
+
+	/** Entry class spawned into SkillListContainer. Required for the data-driven path. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Battle|Command", meta=(AllowPrivateAccess="true"))
+	TSubclassOf<UHSRSkillButtonWidget> SkillEntryClass;
+
+	/** Live entries, index-aligned with nothing -- looked up by SkillId. */
+	UPROPERTY(Transient) TArray<TObjectPtr<UHSRSkillButtonWidget>> SkillEntries;
+
 	TWeakObjectPtr<UHSRBattleCommandViewModel> ViewModel;
-	TWeakObjectPtr<UHSRBattleCoordinator> Coordinator;
+
+	/** Held as the interface, so the UI can only call the two sink methods. */
+	TWeakInterfacePtr<IHSRBattleCommandSink> CommandSink;
 	FDelegateHandle StateChangedHandle;
 	int32 BindGeneration = 0;
 	int32 SubmitCount = 0;

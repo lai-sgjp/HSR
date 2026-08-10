@@ -11,6 +11,7 @@
 #include "../Progression/HSRCharacterDerivedStats.h"
 #include "../Equipment/HSREquipmentEffectBridge.h"
 #include "../Equipment/HSREquipmentSubsystem.h"
+#include "../UI/HSRBattleCommandSink.h"
 #include "HSRBattleCoordinator.generated.h"
 
 class UWorld;
@@ -28,6 +29,8 @@ struct FOnAttributeChangeData;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleResultReadyDelegate, const FHSRBattleResult&);
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleCommandStateReadyDelegate, const FHSRBattleCommandViewState&);
+/** Fires for every casualty, including ones that do not end the battle. */
+DECLARE_MULTICAST_DELEGATE_OneParam(FHSRParticipantDefeatedDelegate, FName /* ParticipantId */);
 
 /**
  * State machine for battle initialization.
@@ -37,11 +40,16 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FHSRBattleCommandStateReadyDelegate, const F
  * Exactly-once consumption enforced by RequestId.
  */
 UCLASS()
-class HSR_API UHSRBattleCoordinator : public UObject
+class HSR_API UHSRBattleCoordinator : public UObject, public IHSRBattleCommandSink
 {
 	GENERATED_BODY()
 
 public:
+	// IHSRBattleCommandSink: the narrow surface the command UI is allowed to see. Both forward to the
+	// existing authority methods, so implementing the interface adds no second code path.
+	virtual FGuid GetActiveBattleId() const override { return CurrentRequestId; }
+	virtual FHSRAbilityResolution SubmitBattleCommand(const FHSRBattleActionCommand& Command) override { return RequestAction(Command); }
+
 	EHSRBattleCoordinatorState GetCurrentState() const { return CurrentState; }
 	FGuid GetCurrentRequestId() const { return CurrentRequestId; }
 	FName GetCurrentRewardDefinitionId() const { return CurrentRewardDefinitionId; }
@@ -61,21 +69,71 @@ public:
 	const TArray<FHSRBattleParticipant>& GetParticipants() const { return Participants; }
 	UHSRTurnManager* GetTurnManager() const { return TurnManager; }
 
+	/** Participant with this id, or nullptr.  The single lookup used across the battle layer;
+	 * callers must not re-open-code the predicate, since Participants is reallocated on spawn
+	 * and every copy of the search would need to agree on the id-matching rule. */
+	const FHSRBattleParticipant* FindParticipant(FName ParticipantId) const;
+	FHSRBattleParticipant* FindParticipant(FName ParticipantId);
+
+	/** First participant on the given team, or nullptr.  Team order is roster order. */
+	const FHSRBattleParticipant* FindFirstOfTeam(EHSRBattleParticipantTeam Team) const;
+
+	/** Id of the given team's leader (roster slot 0).  Use this rather than the literal "Player":
+	 * the naming rule lives in MakeParticipantId and slot 0 only happens to be unsuffixed. */
+	static FName GetLeaderParticipantId(EHSRBattleParticipantTeam Team) { return MakeParticipantId(Team, 0); }
+
 	/** Requests one synchronous basic attack. Only a current participant may attack an opposing valid target. */
 	bool RequestBasicAttack(FName AttackerParticipantId, FName TargetParticipantId);
 	FHSRAbilityResolution RequestAction(const FHSRBattleActionCommand& Command);
 	FHSRDamageResult ResolveStatusDamage(FName SourceParticipantId, FName TargetParticipantId, const FGuid& ActionId, const UHSRStatusDefinition* Definition);
 	void FinalizeStatusDamage();
-	void SetBasicAttackDefinition(UHSRSkillDefinition* InDefinition) { BasicAttackDefinition = InDefinition; }
-	const UHSRSkillDefinition* GetBasicAttackDefinition() const { return BasicAttackDefinition; }
-	void SetUltimateDefinition(UHSRSkillDefinition* InDefinition) { UltimateDefinition = InDefinition; }
-	void SetSkillDefinition(UHSRSkillDefinition* InDefinition) { SkillDefinition = InDefinition; }
-	void SetHealDefinition(UHSRSkillDefinition* InDefinition) { HealDefinition = InDefinition; }
+	/** Replaces the default loadout wholesale.  Order becomes command-panel order. */
+	void SetDefaultSkillLoadout(const TArray<UHSRSkillDefinition*>& InSkills);
+
+	/** Appends one skill to the default loadout, replacing any existing entry with the same
+	 * SkillId so repeated registration stays idempotent. */
+	void AddSkillToDefaultLoadout(UHSRSkillDefinition* InDefinition);
+
+	/** Per-participant override.  Falls back to the default loadout when never set. */
+	void SetParticipantSkillLoadout(FName ParticipantId, const TArray<UHSRSkillDefinition*>& InSkills);
+
+	/** Resolved loadout for one participant: its override when present, else the default. */
+	const TArray<TObjectPtr<UHSRSkillDefinition>>& GetSkillLoadoutFor(FName ParticipantId) const;
+
+	const TArray<TObjectPtr<UHSRSkillDefinition>>& GetDefaultSkillLoadout() const { return DefaultSkillLoadout; }
+
+	/** First entry of the given category in the default loadout, or nullptr. */
+	const UHSRSkillDefinition* FindDefaultSkillByCategory(EHSRSkillCategory Category) const;
+
+	/** Convenience accessor for the harnesses, which drive a default basic attack. */
+	const UHSRSkillDefinition* GetBasicAttackDefinition() const { return FindDefaultSkillByCategory(EHSRSkillCategory::BasicAttack); }
 	void SetEnemyDefinition(UHSREnemyDefinition* InDefinition) { EnemyDefinition = InDefinition; }
 	void SetParticipantInitializationGameplayEffect(TSubclassOf<UGameplayEffect> InEffect) { ParticipantInitializationGameplayEffect = InEffect; }
 	void SetCharacterProgressionGameplayEffect(TSubclassOf<UGameplayEffect> InEffect) { CharacterProgressionGameplayEffect = InEffect; }
 	void SetCharacterProgressionContext(FName ParticipantId, const FHSRCharacterProgressionContext& Context) { CharacterProgressionContexts.Add(ParticipantId, Context); }
-	void SetPlayerCharacterDefinition(FName CharacterId, TSubclassOf<APawn> CharacterClass) { PlayerCharacterId = CharacterId; PlayerCharacterClass = CharacterClass; }
+	/** Single-member convenience form.  It collapses to a one-entry roster so callers that
+	 * only ever field a leader keep working unchanged. */
+	void SetPlayerCharacterDefinition(FName CharacterId, TSubclassOf<APawn> CharacterClass)
+	{
+		PlayerCharacterId = CharacterId;
+		PlayerCharacterClass = CharacterClass;
+		PlayerRoster.Reset();
+		if (!CharacterId.IsNone())
+		{
+			PlayerRoster.Add({ CharacterId, CharacterClass });
+		}
+	}
+
+	/** Full roster form, leader first.  Each member becomes its own participant with its own
+	 * action-distance state, progression context, and equipment projection. */
+	void SetPlayerRoster(const TArray<FHSRBattleRosterEntry>& InRoster)
+	{
+		PlayerRoster = InRoster;
+		PlayerCharacterId = InRoster.IsEmpty() ? NAME_None : InRoster[0].CharacterId;
+		PlayerCharacterClass = InRoster.IsEmpty() ? nullptr : InRoster[0].PawnClass;
+	}
+	void SetEnemyRoster(const TArray<FHSRBattleRosterEntry>& InRoster) { EnemyRoster = InRoster; }
+	const TArray<FHSRBattleRosterEntry>& GetPlayerRoster() const { return PlayerRoster; }
 	void SetStatusDefinition(UHSRStatusDefinition* InDefinition) { StatusDefinition = InDefinition; }
 	void SetDamageOverTimeStatusDefinition(UHSRStatusDefinition* InDefinition) { DamageOverTimeStatusDefinition = InDefinition; }
 	void SetBreakStatusDefinition(UHSRStatusDefinition* InDefinition) { BreakStatusDefinition = InDefinition; }
@@ -160,11 +218,26 @@ public:
 	/** Read-only terminal result inspection for preflight; it never consumes or changes authority. */
 	bool GetBattleResultForPresentation(FHSRBattleResult& OutResult) const;
 	FHSRBattleResultReadyDelegate& OnBattleResultReady() { return BattleResultReady; }
+	FHSRParticipantDefeatedDelegate& OnParticipantDefeated() { return ParticipantDefeated; }
+	/** True when no member of Team can still act.  False for an unknown/empty team. */
+	bool IsTeamWiped(EHSRBattleParticipantTeam Team) const;
+	/** ASC of the team's first roster entry (its leader), or null when the team is absent. */
+	UAbilitySystemComponent* FindLeaderAbilitySystemComponent(EHSRBattleParticipantTeam Team) const;
+	/**
+	 * Participant id for a roster slot.  Index 0 keeps the unsuffixed "Player"/"Enemy" id so
+	 * single-member encounters, their save projections, and existing harnesses observe exactly
+	 * the ids they did before; later slots get a 1-based suffix ("Player2", "Enemy3", ...).
+	 * Public because callers keyed by participant id (progression, UI) must not re-derive it.
+	 */
+	static FName MakeParticipantId(EHSRBattleParticipantTeam Team, int32 RosterIndex);
 
 	/** Reset to Idle for a fresh battle session. */
 	void Reset();
 
 private:
+	/** How many upcoming action slots the turn-order bar receives per view-state publish. */
+	static constexpr int32 TurnForecastSlotCount = 8;
+
 	EHSRBattleCoordinatorState CurrentState = EHSRBattleCoordinatorState::Idle;
 	FGuid CurrentRequestId;
 	FName CurrentRewardDefinitionId;
@@ -234,13 +307,15 @@ private:
 	bool bLastBreakDelayAcceptedForTest = false;
 #endif
 	TMap<FGuid, FHSRSkillPointReservation> SkillPointReservations;
+	/** Loadout used by any participant without an explicit per-participant entry.  Order is the
+	 * order the command panel presents, so authoring order is presentation order. */
 	UPROPERTY()
-	TObjectPtr<UHSRSkillDefinition> BasicAttackDefinition;
+	TArray<TObjectPtr<UHSRSkillDefinition>> DefaultSkillLoadout;
+
+	/** Per-participant loadouts, keyed by ParticipantId.  Populated from each roster member's
+	 * character definition so two party members can field entirely different skills. */
 	UPROPERTY()
-	TObjectPtr<UHSRSkillDefinition> UltimateDefinition;
-	UPROPERTY()
-	TObjectPtr<UHSRSkillDefinition> SkillDefinition;
-	UPROPERTY() TObjectPtr<UHSRSkillDefinition> HealDefinition;
+	TMap<FName, FHSRSkillLoadout> ParticipantSkillLoadouts;
 	UPROPERTY() TObjectPtr<UHSREnemyDefinition> EnemyDefinition;
 	UPROPERTY() TObjectPtr<UHSRStatusDefinition> StatusDefinition;
 	UPROPERTY() TObjectPtr<UHSRStatusDefinition> DamageOverTimeStatusDefinition;
@@ -263,8 +338,12 @@ private:
 	bool bForceEquipmentRestoreProjectionFailure=false;
 	int32 EquipmentRestoreFailureAfterOperations=-1;
 #endif
+	/** Leader mirror of PlayerRoster[0], kept for the many call sites that legitimately want
+	 * just the leading character rather than the whole team. */
 	FName PlayerCharacterId;
 	TSubclassOf<APawn> PlayerCharacterClass;
+	TArray<FHSRBattleRosterEntry> PlayerRoster;
+	TArray<FHSRBattleRosterEntry> EnemyRoster;
 	uint64 ProgressionEpoch = 0;
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	int32 ProgressionRefreshCountForTest=0;
@@ -274,6 +353,7 @@ private:
 #endif
 	FHSRBattleResultReadyDelegate BattleResultReady;
 	FHSRBattleCommandStateReadyDelegate CommandStateReady;
+	FHSRParticipantDefeatedDelegate ParticipantDefeated;
 	FRandomStream DevelopmentDamageRandomStream;
 	int32 DevelopmentDamageSeed = 1337;
 	int32 DevelopmentDamageConsumeCount = 0;
@@ -306,10 +386,10 @@ private:
 	void CommitEquipmentMovementProjection(const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&) {}
 	bool ApplyCharacterProgressionGameplayEffect(const FHSRBattleParticipant& Participant);
 	bool ClearProgressionGameplayEffects();
-	bool GrantBasicAttackAbility(const FHSRBattleParticipant& Participant);
-	bool GrantUltimateAbility(const FHSRBattleParticipant& Participant);
-	bool GrantSkillAbility(const FHSRBattleParticipant& Participant);
-	bool GrantHealAbility(const FHSRBattleParticipant& Participant);
+	/** Grants every skill in the participant's resolved loadout.  Invalid entries are skipped
+	 * with a warning; a hard grant failure aborts the build. */
+	bool GrantSkillLoadout(const FHSRBattleParticipant& Participant);
+	bool GrantSingleSkill(const FHSRBattleParticipant& Participant, const UHSRSkillDefinition& Definition);
 	const UHSRSkillDefinition* FindSkillDefinition(FName SkillId) const;
 	FHSRAbilityResolution RequestActionCore(const FHSRBattleActionCommand& Command);
 	void BindEnemyTurnManager(UHSRTurnManager* InManager);
@@ -322,7 +402,15 @@ private:
 	void RollbackSkillPoints(const FGuid& ActionId);
 	void CommitSkillPoints(const FGuid& ActionId);
 	void CommitActionEnergyGain(const FGuid& ActionId, const UHSRSkillDefinition& ActionSkillDefinition, UAbilitySystemComponent& SourceASC);
+
+	/** Applies every status authored on the skill DA to each resolved target.  Advisory: a
+	 * refused or unloadable status never rewrites the committed damage transaction. */
+	void ApplyAuthoredSkillStatuses(const UHSRSkillDefinition& ActionSkillDefinition, FName SourceParticipantId, const TArray<FName>& TargetParticipantIds);
 	FHSRBattleInitResult BuildAndValidateParticipantDefinitions();
+	static void AppendRosterDefinitions(const TArray<FHSRBattleRosterEntry>& Roster,
+		EHSRBattleParticipantTeam Team, TArray<FHSRBattleParticipantDefinition>& OutDefinitions);
+	TArray<FHSRBattleRosterEntry> BuildEffectivePlayerRoster() const;
+	TArray<FHSRBattleRosterEntry> BuildEffectiveEnemyRoster() const;
 	const FHSRBattleParticipant* FindStageBuffPlayerParticipant() const;
 	bool ApplyStageBuffs(UWorld* BattleWorld);
 	void RollbackStageBuffs(bool bRefundResources);

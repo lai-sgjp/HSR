@@ -48,6 +48,13 @@ private:
 	};
 
 	int32 GetUsedSlots(const TMap<FName, int32>& CandidateStacks, const TMap<FGuid, FHSRItemInstance>& CandidateUniqueItems) const;
+	/**
+	 * Applies grants onto candidate state without touching authoritative storage. Shared by the
+	 * direct-grant and settlement-transaction paths so both reject identical input identically.
+	 */
+	EHSRInventoryOperationResult ApplyGrantsToCandidate(const TArray<FHSRInventoryGrant>& Grants,
+		TMap<FName, int32>& CandidateStacks, TMap<FGuid, FHSRItemInstance>& CandidateUniqueItems) const;
+
 	EHSRInventoryOperationResult ApplyGrantsInternal(const TArray<FHSRInventoryGrant>& Grants, bool bBroadcast, int64& OutRevision);
 	void BroadcastRevision(int64 CommittedRevision) { InventoryChanged.Broadcast(CommittedRevision); }
 	void Commit(TMap<FName, int32>&& CandidateStacks, TMap<FGuid, FHSRItemInstance>&& CandidateUniqueItems);

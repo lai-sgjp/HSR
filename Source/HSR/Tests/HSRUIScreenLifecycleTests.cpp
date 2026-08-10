@@ -145,32 +145,29 @@ bool FHSRUICharacterDetailLifecycleTest::RunTest(const FString&)
 	using namespace HSR::P17::LifecycleTests;
 	UHSRUIManagerSubsystem* Manager = MakeManager();
 	Manager->RegisterHostForAutomation();
-	Manager->ConfigureAutomationDetailBackend(true, true, true, true, false);
+	Manager->ConfigureAutomationDetailBackend(true, true, true, true, true);
 	TestEqual(TEXT("detail open"), Manager->OpenCharacterDetailScreen(), EHSRUIScreenResult::Success);
 	TestTrue(TEXT("detail instance owned"), Manager->HasOpenCharacterDetailScreen());
 	TestEqual(TEXT("detail menu pushed"), EntryCount(Manager), 2);
-	TestEqual(TEXT("duplicate detail rejected"), Manager->OpenCharacterDetailScreen(), EHSRUIScreenResult::AlreadyOpen);
-	const FHSRScreenStackSnapshot BeforePauseWhileDetail = Manager->GetScreenStack()->GetSnapshot();
-	const bool bDetailOwnedBeforePause = Manager->HasOpenCharacterDetailScreen();
-	TestEqual(TEXT("pause rejected while detail open"), Manager->OpenPauseScreen(), EHSRUIScreenResult::AlreadyOpen);
-	TestEqual(TEXT("mutual exclusion preserves stack"), EntryCount(Manager), 2);
-	TestTrue(TEXT("pause rejection preserves full snapshot"), Manager->GetScreenStack()->GetSnapshot() == BeforePauseWhileDetail);
-	TestEqual(TEXT("pause rejection preserves detail ownership"), Manager->HasOpenCharacterDetailScreen(), bDetailOwnedBeforePause);
-	TestFalse(TEXT("pause rejection owns no pause"), Manager->HasOpenPauseScreen());
-	TestFalse(TEXT("pause rejection stays consistent"), Manager->IsInconsistent());
+	// Frontend modules live inside the shared shell, so reopening the active module is a no-op
+	// rather than a rejection, and backing out lands on the hub instead of the exploration root.
+	TestEqual(TEXT("duplicate detail is a no-op"), Manager->OpenCharacterDetailScreen(), EHSRUIScreenResult::NoOp);
+	TestEqual(TEXT("duplicate detail preserves stack"), EntryCount(Manager), 2);
+	TestFalse(TEXT("duplicate detail stays consistent"), Manager->IsInconsistent());
 	TestEqual(TEXT("detail back"), Manager->RequestBack(), EHSRUIScreenResult::Success);
 	TestFalse(TEXT("detail instance cleared"), Manager->HasOpenCharacterDetailScreen());
+	TestEqual(TEXT("detail back lands on hub"), EntryCount(Manager), 2);
+	TestEqual(TEXT("hub closes to root"), Manager->CloseFrontendToRoot(), EHSRUIScreenResult::Success);
 	TestEqual(TEXT("detail restores root"), EntryCount(Manager), 1);
 
 	TestEqual(TEXT("pause fixture open"), Manager->OpenPauseScreen(), EHSRUIScreenResult::Success);
-	const FHSRScreenStackSnapshot BeforeDetailWhilePause = Manager->GetScreenStack()->GetSnapshot();
-	TestEqual(TEXT("detail rejected while pause open"), Manager->OpenCharacterDetailScreen(), EHSRUIScreenResult::AlreadyOpen);
-	TestEqual(TEXT("pause mutual exclusion preserves stack"), EntryCount(Manager), 2);
-	TestTrue(TEXT("detail rejection preserves full snapshot"), Manager->GetScreenStack()->GetSnapshot() == BeforeDetailWhilePause);
-	TestTrue(TEXT("detail rejection preserves pause ownership"), Manager->HasOpenPauseScreen());
-	TestFalse(TEXT("detail rejection owns no detail"), Manager->HasOpenCharacterDetailScreen());
-	TestFalse(TEXT("detail rejection stays consistent"), Manager->IsInconsistent());
+	// Opening a module from the hub routes into it; the hub is not a competing screen.
+	TestEqual(TEXT("detail opens from hub"), Manager->OpenCharacterDetailScreen(), EHSRUIScreenResult::Success);
+	TestEqual(TEXT("hub routing preserves stack depth"), EntryCount(Manager), 2);
+	TestTrue(TEXT("detail owned after hub routing"), Manager->HasOpenCharacterDetailScreen());
+	TestFalse(TEXT("hub routing stays consistent"), Manager->IsInconsistent());
 	TestEqual(TEXT("pause fixture close"), Manager->RequestBack(), EHSRUIScreenResult::Success);
+	TestEqual(TEXT("pause fixture closes to root"), Manager->CloseFrontendToRoot(), EHSRUIScreenResult::Success);
 
 	UHSRUIManagerSubsystem* Failures = MakeManager();
 	Failures->RegisterHostForAutomation();
@@ -205,7 +202,9 @@ bool FHSRUICharacterDetailLifecycleTest::RunTest(const FString&)
 	ForcedTeardown->RegisterHostForAutomation();
 	ForcedTeardown->ConfigureAutomationDetailBackend(true, true, true, true, true);
 	TestEqual(TEXT("forced teardown fixture opens"), ForcedTeardown->OpenCharacterDetailScreen(), EHSRUIScreenResult::Success);
-	ForcedTeardown->ConfigureAutomationDetailBackend(true, true, true, false, true);
+	// Teardown closes the shell rather than the module, so the failure has to be injected on the
+	// shared pause backend the shell path uses.
+	ForcedTeardown->FailNextAutomationPauseApply();
 	AddExpectedError(TEXT("HSRUI P17 Host teardown required forced cleanup; host references cleared"),
 		EAutomationExpectedErrorFlags::Contains, 1);
 	TestEqual(TEXT("forced teardown reports inconsistent"), ForcedTeardown->UnregisterHostIdentityForAutomation(1),
@@ -243,23 +242,30 @@ bool FHSRUIInventoryLifecycleTest::RunTest(const FString&)
 	using namespace HSR::P17::LifecycleTests;
 	UHSRUIManagerSubsystem* Manager = MakeManager();
 	Manager->RegisterHostForAutomation();
-	Manager->ConfigureAutomationInventoryBackend(true, true, true, true, true, false);
+	Manager->ConfigureAutomationInventoryBackend(true, true, true, true, true, true);
 	TestEqual(TEXT("inventory open"), Manager->OpenInventoryScreen(), EHSRUIScreenResult::Success);
 	TestTrue(TEXT("inventory widget owned"), Manager->HasOpenInventoryScreen());
 	TestTrue(TEXT("inventory view model owned"), Manager->HasInventoryViewModel());
 	TestEqual(TEXT("inventory menu pushed"), EntryCount(Manager), 2);
 	TestEqual(TEXT("inventory binds exactly once after SetViewModel-before-attach"),
 		Manager->GetInventoryBindCountForAutomation(), 1);
-	const FHSRScreenStackSnapshot BeforeMutual = Manager->GetScreenStack()->GetSnapshot();
-	TestEqual(TEXT("pause rejected while inventory open"), Manager->OpenPauseScreen(), EHSRUIScreenResult::AlreadyOpen);
-	TestEqual(TEXT("detail rejected while inventory open"), Manager->OpenCharacterDetailScreen(), EHSRUIScreenResult::AlreadyOpen);
-	TestTrue(TEXT("inventory mutual exclusion preserves snapshot"), Manager->GetScreenStack()->GetSnapshot() == BeforeMutual);
-	TestTrue(TEXT("inventory ownership preserved"), Manager->HasOpenInventoryScreen() && Manager->HasInventoryViewModel());
-	TestFalse(TEXT("mutual rejection stays consistent"), Manager->IsInconsistent());
-	TestEqual(TEXT("duplicate inventory rejected"), Manager->OpenInventoryScreen(), EHSRUIScreenResult::AlreadyOpen);
+	// Modules replace each other atomically inside the shell, so switching to Character releases
+	// the inventory widget/view-model pair instead of being rejected.
+	TestEqual(TEXT("duplicate inventory is a no-op"), Manager->OpenInventoryScreen(), EHSRUIScreenResult::NoOp);
+	TestTrue(TEXT("duplicate inventory preserves ownership"),
+		Manager->HasOpenInventoryScreen() && Manager->HasInventoryViewModel());
+	Manager->ConfigureAutomationDetailBackend(true, true, true, true, true);
+	TestEqual(TEXT("detail replaces inventory"), Manager->OpenCharacterDetailScreen(), EHSRUIScreenResult::Success);
+	TestFalse(TEXT("replaced inventory widget released"), Manager->HasOpenInventoryScreen());
+	TestFalse(TEXT("replaced inventory view model shutdown"), Manager->HasInventoryViewModel());
+	TestEqual(TEXT("replacement preserves stack depth"), EntryCount(Manager), 2);
+	TestFalse(TEXT("replacement stays consistent"), Manager->IsInconsistent());
+	TestEqual(TEXT("inventory reopens after replacement"), Manager->OpenInventoryScreen(), EHSRUIScreenResult::Success);
 	TestEqual(TEXT("inventory back"), Manager->RequestBack(), EHSRUIScreenResult::Success);
 	TestFalse(TEXT("inventory widget released"), Manager->HasOpenInventoryScreen());
 	TestFalse(TEXT("inventory view model shutdown"), Manager->HasInventoryViewModel());
+	TestEqual(TEXT("inventory back lands on hub"), EntryCount(Manager), 2);
+	TestEqual(TEXT("inventory hub closes to root"), Manager->CloseFrontendToRoot(), EHSRUIScreenResult::Success);
 	TestEqual(TEXT("inventory restores root"), EntryCount(Manager), 1);
 	TestEqual(TEXT("first cycle released one binding"), Manager->GetLastReleasedInventoryBindCountForAutomation(), 1);
 	TestEqual(TEXT("first cycle unbound one subscription"), Manager->GetLastReleasedInventoryUnbindCountForAutomation(), 1);
@@ -268,18 +274,20 @@ bool FHSRUIInventoryLifecycleTest::RunTest(const FString&)
 	TestEqual(TEXT("second inventory back"), Manager->RequestBack(), EHSRUIScreenResult::Success);
 	TestEqual(TEXT("second cycle released one binding"), Manager->GetLastReleasedInventoryBindCountForAutomation(), 1);
 	TestEqual(TEXT("second cycle leaves no subscription"), Manager->GetLastReleasedInventoryUnbindCountForAutomation(), 1);
+	TestEqual(TEXT("second cycle closes to root"), Manager->CloseFrontendToRoot(), EHSRUIScreenResult::Success);
 
 	TestEqual(TEXT("pause fixture opens"), Manager->OpenPauseScreen(), EHSRUIScreenResult::Success);
-	const FHSRScreenStackSnapshot BeforeInventoryWhilePause = Manager->GetScreenStack()->GetSnapshot();
-	TestEqual(TEXT("inventory rejected while pause open"), Manager->OpenInventoryScreen(), EHSRUIScreenResult::AlreadyOpen);
-	TestTrue(TEXT("pause to inventory rejection zero change"), Manager->GetScreenStack()->GetSnapshot() == BeforeInventoryWhilePause);
+	TestEqual(TEXT("inventory opens from hub"), Manager->OpenInventoryScreen(), EHSRUIScreenResult::Success);
+	TestEqual(TEXT("hub to inventory preserves depth"), EntryCount(Manager), 2);
+	TestTrue(TEXT("inventory owned from hub"), Manager->HasOpenInventoryScreen());
 	TestEqual(TEXT("pause fixture closes"), Manager->RequestBack(), EHSRUIScreenResult::Success);
 	Manager->ConfigureAutomationDetailBackend(true, true, true, true, true);
 	TestEqual(TEXT("detail fixture opens"), Manager->OpenCharacterDetailScreen(), EHSRUIScreenResult::Success);
-	const FHSRScreenStackSnapshot BeforeInventoryWhileDetail = Manager->GetScreenStack()->GetSnapshot();
-	TestEqual(TEXT("inventory rejected while detail open"), Manager->OpenInventoryScreen(), EHSRUIScreenResult::AlreadyOpen);
-	TestTrue(TEXT("detail to inventory rejection zero change"), Manager->GetScreenStack()->GetSnapshot() == BeforeInventoryWhileDetail);
+	TestEqual(TEXT("inventory replaces detail"), Manager->OpenInventoryScreen(), EHSRUIScreenResult::Success);
+	TestFalse(TEXT("replaced detail released"), Manager->HasOpenCharacterDetailScreen());
+	TestEqual(TEXT("detail to inventory preserves depth"), EntryCount(Manager), 2);
 	TestEqual(TEXT("detail fixture closes"), Manager->RequestBack(), EHSRUIScreenResult::Success);
+	TestEqual(TEXT("inventory fixture closes to root"), Manager->CloseFrontendToRoot(), EHSRUIScreenResult::Success);
 
 	UHSRUIManagerSubsystem* ForeignTop = MakeManager();
 	ForeignTop->RegisterHostForAutomation();
@@ -347,7 +355,8 @@ bool FHSRUIInventoryLifecycleTest::RunTest(const FString&)
 	Forced->RegisterHostForAutomation();
 	Forced->ConfigureAutomationInventoryBackend(true, true, true, true, true, true);
 	TestEqual(TEXT("forced inventory teardown fixture"), Forced->OpenInventoryScreen(), EHSRUIScreenResult::Success);
-	Forced->ConfigureAutomationInventoryBackend(true, true, true, true, false, true);
+	// Teardown closes the shell, so inject on the shared pause backend rather than the module one.
+	Forced->FailNextAutomationPauseApply();
 	AddExpectedError(TEXT("HSRUI P17 Host teardown required forced cleanup; host references cleared"),
 		EAutomationExpectedErrorFlags::Contains, 1);
 	TestEqual(TEXT("forced inventory teardown inconsistent"), Forced->UnregisterHostIdentityForAutomation(1), EHSRUIScreenResult::Inconsistent);

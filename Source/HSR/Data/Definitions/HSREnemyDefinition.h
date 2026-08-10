@@ -25,6 +25,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
 	FName EnemyDefinitionId;
 
+	/**
+	 * Player-facing name. Leave empty and the UI falls back to the participant id, which is how
+	 * every existing asset behaves today -- authoring this is opt-in, not a migration.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
+	FText DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy")
+	TSoftObjectPtr<UTexture2D> Portrait;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
 	TObjectPtr<UHSREncounterDefinition> EncounterDefinition;
 

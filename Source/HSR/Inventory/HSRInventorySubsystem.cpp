@@ -177,15 +177,9 @@ EHSRInventoryOperationResult UHSRInventorySubsystem::ApplyGrants(const TArray<FH
 	return ApplyGrantsInternal(Grants, true, CommittedRevision);
 }
 
-EHSRInventoryOperationResult UHSRInventorySubsystem::ApplyGrantsInternal(const TArray<FHSRInventoryGrant>& Grants, bool bBroadcast, int64& OutRevision)
+EHSRInventoryOperationResult UHSRInventorySubsystem::ApplyGrantsToCandidate(const TArray<FHSRInventoryGrant>& Grants,
+	TMap<FName, int32>& CandidateStacks, TMap<FGuid, FHSRItemInstance>& CandidateUniqueItems) const
 {
-	if (Grants.IsEmpty())
-	{
-		return EHSRInventoryOperationResult::NoOp;
-	}
-
-	TMap<FName, int32> CandidateStacks = Stacks;
-	TMap<FGuid, FHSRItemInstance> CandidateUniqueItems = UniqueItems;
 	for (const FHSRInventoryGrant& Grant : Grants)
 	{
 		if (Grant.ItemId.IsNone())
@@ -219,26 +213,43 @@ EHSRInventoryOperationResult UHSRInventorySubsystem::ApplyGrantsInternal(const T
 				return EHSRInventoryOperationResult::StackLimitExceeded;
 			}
 			CandidateStacks.Add(Grant.ItemId, NewQuantity);
+			continue;
 		}
-		else
+
+		if (Grant.InstanceIds.Num() != Grant.Quantity)
 		{
-			if (Grant.InstanceIds.Num() != Grant.Quantity)
-			{
-				return EHSRInventoryOperationResult::StorageKindMismatch;
-			}
-			for (const FGuid& InstanceId : Grant.InstanceIds)
-			{
-				if (!InstanceId.IsValid())
-				{
-					return EHSRInventoryOperationResult::InvalidInstanceId;
-				}
-				if (CandidateUniqueItems.Contains(InstanceId))
-				{
-					return EHSRInventoryOperationResult::DuplicateInstanceId;
-				}
-				CandidateUniqueItems.Add(InstanceId, {InstanceId, Grant.ItemId});
-			}
+			return EHSRInventoryOperationResult::StorageKindMismatch;
 		}
+		for (const FGuid& InstanceId : Grant.InstanceIds)
+		{
+			if (!InstanceId.IsValid())
+			{
+				return EHSRInventoryOperationResult::InvalidInstanceId;
+			}
+			if (CandidateUniqueItems.Contains(InstanceId))
+			{
+				return EHSRInventoryOperationResult::DuplicateInstanceId;
+			}
+			CandidateUniqueItems.Add(InstanceId, {InstanceId, Grant.ItemId});
+		}
+	}
+	return EHSRInventoryOperationResult::Success;
+}
+
+EHSRInventoryOperationResult UHSRInventorySubsystem::ApplyGrantsInternal(const TArray<FHSRInventoryGrant>& Grants, bool bBroadcast, int64& OutRevision)
+{
+	if (Grants.IsEmpty())
+	{
+		return EHSRInventoryOperationResult::NoOp;
+	}
+
+	TMap<FName, int32> CandidateStacks = Stacks;
+	TMap<FGuid, FHSRItemInstance> CandidateUniqueItems = UniqueItems;
+	if (const EHSRInventoryOperationResult GrantResult =
+			ApplyGrantsToCandidate(Grants, CandidateStacks, CandidateUniqueItems);
+		GrantResult != EHSRInventoryOperationResult::Success)
+	{
+		return GrantResult;
 	}
 
 	if (GetUsedSlots(CandidateStacks, CandidateUniqueItems) > Capacity)
@@ -382,36 +393,11 @@ EHSRInventoryOperationResult UHSRInventorySubsystem::PrepareSettlementCandidate(
 	Candidate.TransactionId = TransactionId;
 	Candidate.Stacks = Stacks;
 	Candidate.UniqueItems = UniqueItems;
-	for (const FHSRInventoryGrant& Grant : Grants)
+	if (const EHSRInventoryOperationResult GrantResult =
+			ApplyGrantsToCandidate(Grants, Candidate.Stacks, Candidate.UniqueItems);
+		GrantResult != EHSRInventoryOperationResult::Success)
 	{
-		if (Grant.ItemId.IsNone() || Grant.Quantity <= 0)
-		{
-			return EHSRInventoryOperationResult::InvalidQuantity;
-		}
-		const FDefinitionRule* Rule = Definitions.Find(Grant.ItemId);
-		if (!Rule)
-		{
-			return EHSRInventoryOperationResult::UnknownDefinition;
-		}
-		if (Rule->StorageKind == EHSRItemStorageKind::Stackable)
-		{
-			if (!Grant.InstanceIds.IsEmpty()) return EHSRInventoryOperationResult::StorageKindMismatch;
-			const int32 Existing = Candidate.Stacks.FindRef(Grant.ItemId);
-			if (Grant.Quantity > MAX_int32 - Existing) return EHSRInventoryOperationResult::QuantityOverflow;
-			const int32 NewQuantity = Existing + Grant.Quantity;
-			if (NewQuantity > Rule->MaxStack) return EHSRInventoryOperationResult::StackLimitExceeded;
-			Candidate.Stacks.Add(Grant.ItemId, NewQuantity);
-		}
-		else
-		{
-			if (Grant.InstanceIds.Num() != Grant.Quantity) return EHSRInventoryOperationResult::StorageKindMismatch;
-			for (const FGuid& InstanceId : Grant.InstanceIds)
-			{
-				if (!InstanceId.IsValid()) return EHSRInventoryOperationResult::InvalidInstanceId;
-				if (Candidate.UniqueItems.Contains(InstanceId)) return EHSRInventoryOperationResult::DuplicateInstanceId;
-				Candidate.UniqueItems.Add(InstanceId, {InstanceId, Grant.ItemId});
-			}
-		}
+		return GrantResult;
 	}
 	if (GetUsedSlots(Candidate.Stacks, Candidate.UniqueItems) > Capacity)
 	{

@@ -1,9 +1,9 @@
 #include "HSRBattleCommandWidget.h"
 
 #include "HSRBattleCommandViewModel.h"
-#include "../Battle/HSRBattleCoordinator.h"
-#include "../Battle/HSRBattleGameMode.h"
+#include "HSRSkillButtonWidget.h"
 #include "Components/Button.h"
+#include "Components/PanelWidget.h"
 #include "Components/ComboBoxString.h"
 #include "Components/TextBlock.h"
 #include "InputCoreTypes.h"
@@ -20,8 +20,9 @@ void UHSRBattleCommandWidget::NativeConstruct()
 
 	SetIsFocusable(true);
 	BindDesignerEvents();
-	AHSRBattleGameMode* BattleGameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AHSRBattleGameMode>() : nullptr;
-	BindViewModel(BattleGameMode ? BattleGameMode->GetCommandViewModel() : nullptr, BattleGameMode ? BattleGameMode->GetCoordinator() : nullptr);
+	// No GetAuthGameMode reach-back: the owner calls BindViewModel. This widget used to fetch its own
+	// ViewModel and Coordinator here as well, which meant a battle-map GameMode was a hard
+	// requirement just to construct the widget, and duplicated the push the owner already performs.
 	UE_LOG(LogTemp, Log, TEXT("P6-004A Widget NativeConstruct Widget=%s Generation=%d Bound=%d"), *GetName(), BindGeneration, StateChangedHandle.IsValid() ? 1 : 0);
 }
 
@@ -37,14 +38,18 @@ FReply UHSRBattleCommandWidget::NativeOnKeyDown(const FGeometry& InGeometry, con
 	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
 }
 
-void UHSRBattleCommandWidget::BindViewModel(UHSRBattleCommandViewModel* InViewModel, UHSRBattleCoordinator* InCoordinator)
+void UHSRBattleCommandWidget::BindViewModel(UHSRBattleCommandViewModel* InViewModel, UObject* InCommandSink)
 {
 	UnbindViewModel();
 	ViewModel = InViewModel;
-	Coordinator = InCoordinator;
-	if (!InViewModel || !InCoordinator)
+	// A non-null object that does not implement the sink interface is a wiring mistake, not a
+	// degraded mode, so it fails the bind the same way a null one does rather than silently
+	// producing a widget that renders state but drops every command.
+	IHSRBattleCommandSink* Sink = Cast<IHSRBattleCommandSink>(InCommandSink);
+	CommandSink = Sink;
+	if (!InViewModel || !Sink)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("P6-004A Widget Bind Result=FAILED Widget=%s ViewModel=%s Coordinator=%s"), *GetName(), InViewModel ? TEXT("valid") : TEXT("null"), InCoordinator ? TEXT("valid") : TEXT("null"));
+		UE_LOG(LogTemp, Warning, TEXT("P6-004A Widget Bind Result=FAILED Widget=%s ViewModel=%s Sink=%s"), *GetName(), InViewModel ? TEXT("valid") : TEXT("null"), Sink ? TEXT("valid") : (InCommandSink ? TEXT("not-a-sink") : TEXT("null")));
 		return;
 	}
 
@@ -73,6 +78,69 @@ FText UHSRBattleCommandWidget::GetPresentationText() const { return ViewModel.Is
 FText UHSRBattleCommandWidget::GetStatusText() const { return ViewModel.IsValid() ? ViewModel->GetStatusText() : FText::GetEmpty(); }
 FText UHSRBattleCommandWidget::GetStatusOperationText() const { return ViewModel.IsValid() ? ViewModel->GetStatusOperationText() : FText::GetEmpty(); }
 bool UHSRBattleCommandWidget::SelectSkill(EHSRSkillCategory Category) { return ViewModel.IsValid() && ViewModel->SelectSkill(Category); }
+
+bool UHSRBattleCommandWidget::SelectSkillById(FName SkillId) { return ViewModel.IsValid() && ViewModel->SelectSkillById(SkillId); }
+
+bool UHSRBattleCommandWidget::UsesSkillList() const
+{
+	return SkillListContainer != nullptr && SkillEntryClass != nullptr;
+}
+
+// One entry per authored skill. Entries are reused across refreshes and only created/destroyed when
+// the skill count changes, so a loadout swap between participants does not churn the whole panel.
+void UHSRBattleCommandWidget::RefreshSkillList(const FHSRBattleCommandViewState& State)
+{
+	if (!UsesSkillList())
+	{
+		return;
+	}
+
+	const int32 DesiredCount = State.Skills.Num();
+
+	while (SkillEntries.Num() > DesiredCount)
+	{
+		if (UHSRSkillButtonWidget* Removed = SkillEntries.Pop())
+		{
+			Removed->OnSkillClicked.Unbind();
+			Removed->RemoveFromParent();
+		}
+	}
+
+	while (SkillEntries.Num() < DesiredCount)
+	{
+		UHSRSkillButtonWidget* Entry = CreateWidget<UHSRSkillButtonWidget>(this, SkillEntryClass);
+		if (!Entry)
+		{
+			break;
+		}
+		Entry->OnSkillClicked.BindUObject(this, &UHSRBattleCommandWidget::HandleSkillEntryClicked);
+		SkillListContainer->AddChild(Entry);
+		SkillEntries.Add(Entry);
+	}
+
+	const bool bUnlockedPlayerTurn = !State.ResultViewState.bVisible && State.bCurrentActorPlayerControlled
+		&& !State.bCommandPending && !State.bPresentationLocked;
+
+	for (int32 Index = 0; Index < SkillEntries.Num(); ++Index)
+	{
+		if (UHSRSkillButtonWidget* Entry = SkillEntries[Index])
+		{
+			FHSRBattleCommandSkillView EntryView = State.Skills[Index];
+			// Turn-level locks gate every entry, on top of each skill's own availability.
+			EntryView.bAvailable = EntryView.bAvailable && bUnlockedPlayerTurn;
+			Entry->SetSkillView(EntryView, EntryView.SkillId == State.SelectedSkillId);
+		}
+	}
+}
+
+void UHSRBattleCommandWidget::HandleSkillEntryClicked(FName SkillId)
+{
+	if (bRefreshingDesignerControls)
+	{
+		return;
+	}
+	SelectSkillById(SkillId);
+}
 bool UHSRBattleCommandWidget::SelectTarget(FName TargetId) { return ViewModel.IsValid() && ViewModel->SelectTarget(TargetId); }
 FName UHSRBattleCommandWidget::GetSelectedSkillId() const { return ViewModel.IsValid() ? ViewModel->GetSelectedSkillId() : NAME_None; }
 FName UHSRBattleCommandWidget::GetSelectedTargetId() const { return ViewModel.IsValid() ? ViewModel->GetSelectedTargetId() : NAME_None; }
@@ -90,7 +158,7 @@ FHSRAbilityResolution UHSRBattleCommandWidget::SubmitCommand(FGuid ActionId, FNa
 		return LastSubmittedResolution;
 	}
 	const FHSRBattleCommandViewState VerifiedSnapshot = GetCurrentViewState();
-	if (!Coordinator.IsValid())
+	if (!CommandSink.IsValid())
 	{
 		Resolution.Status = EHSRAbilityResolutionStatus::Rejected;
 		Resolution.FailureReason = EHSRAbilityFailureReason::InvalidBattle;
@@ -106,19 +174,19 @@ FHSRAbilityResolution UHSRBattleCommandWidget::SubmitCommand(FGuid ActionId, FNa
 	FHSRBattleActionCommand Command;
 	Command.ActionId = ActionId;
 	// Use the same snapshot that passed BeginCommandSubmit.  Reading the live
-	// Coordinator id after locking could route a stale UI command into a reset battle.
+	// sink id after locking could route a stale UI command into a reset battle.
 	Command.BattleId = VerifiedSnapshot.BattleId;
 	Command.ActorParticipantId = ActorParticipantId;
 	Command.SkillId = SkillId;
 	Command.TargetParticipantIds.Add(TargetParticipantId);
-	if (Command.BattleId != Coordinator->GetCurrentRequestId())
+	if (Command.BattleId != CommandSink->GetActiveBattleId())
 	{
 		Resolution.Status = EHSRAbilityResolutionStatus::Rejected;
 		Resolution.FailureReason = EHSRAbilityFailureReason::InvalidBattle;
 		ViewModel->ResolveCommandSubmit(Command.BattleId, Resolution);
 		return Resolution;
 	}
-	Resolution = Coordinator->RequestAction(Command);
+	Resolution = CommandSink->SubmitBattleCommand(Command);
 	LastSubmittedActionId = ActionId;
 	LastSubmittedResolution = Resolution;
 	ViewModel->ResolveCommandSubmit(Command.BattleId, Resolution);
@@ -147,7 +215,7 @@ void UHSRBattleCommandWidget::HandleViewStateChanged(const FHSRBattleCommandView
 
 const FHSRBattleCommandSkillView* UHSRBattleCommandWidget::FindSkillView(const FHSRBattleCommandViewState& State, EHSRSkillCategory Category) const
 {
-	return State.Skills.FindByPredicate([Category](const FHSRBattleCommandSkillView& Skill) { return Skill.Category == Category; });
+	return State.FindSkillByCategory(Category);
 }
 
 void UHSRBattleCommandWidget::RefreshSkillControls(const FHSRBattleCommandViewState& State, EHSRSkillCategory Category, UButton* Button, UTextBlock* NameText, UTextBlock* DescriptionText, UTextBlock* CostText)
@@ -160,23 +228,9 @@ void UHSRBattleCommandWidget::RefreshSkillControls(const FHSRBattleCommandViewSt
 	if (DescriptionText) DescriptionText->SetVisibility(ESlateVisibility::Collapsed);
 	if (!CostText) return;
 
-	FText Cost = FText::GetEmpty();
-	if (Skill)
-	{
-		switch (Category)
-		{
-		case EHSRSkillCategory::BasicAttack: Cost = NSLOCTEXT("HSRCommand", "BasicCost", "SP +1"); break;
-		case EHSRSkillCategory::Skill: Cost = FText::Format(NSLOCTEXT("HSRCommand", "SkillCost", "SP -{0}"), FText::AsNumber(Skill->SkillPointCost)); break;
-		case EHSRSkillCategory::Ultimate:
-			Cost = Skill->bEnergyCostIsKnown
-				? FText::Format(NSLOCTEXT("HSRCommand", "UltimateCost", "Energy -{0}"), FText::AsNumber(Skill->EnergyCost))
-				: NSLOCTEXT("HSRCommand", "UnknownUltimateCost", "Energy ?");
-			break;
-		case EHSRSkillCategory::Heal: Cost = NSLOCTEXT("HSRCommand", "HealCost", "Cost --"); break;
-		default: break;
-		}
-	}
-	CostText->SetText(Cost);
+	// Shared with the skill-list entries so both surfaces render one cost rule. The old chain here
+	// hardcoded "SP +1" for BasicAttack, which silently misreported any other authored delta.
+	CostText->SetText(Skill ? Skill->BuildCostText() : FText::GetEmpty());
 }
 
 void UHSRBattleCommandWidget::RefreshDesignerControls(const FHSRBattleCommandViewState& State)
@@ -209,12 +263,19 @@ void UHSRBattleCommandWidget::RefreshDesignerControls(const FHSRBattleCommandVie
 	}
 	if (State.ResultViewState.bVisible) FocusResultConfirm();
 
-	RefreshSkillControls(State, EHSRSkillCategory::BasicAttack, BTN_Basic, TXT_BasicName, TXT_BasicDescription, TXT_BasicCost);
-	RefreshSkillControls(State, EHSRSkillCategory::Skill, BTN_Skill, TXT_SkillName, TXT_SkillDescription, TXT_SkillCost);
-	RefreshSkillControls(State, EHSRSkillCategory::Ultimate, BTN_Ultimate, TXT_UltimateName, TXT_UltimateDescription, TXT_UltimateCost);
-	RefreshSkillControls(State, EHSRSkillCategory::Heal, Button_Heal, TXT_HealName, TXT_HealDescription, TXT_HealCost);
+	if (UsesSkillList())
+	{
+		RefreshSkillList(State);
+	}
+	else
+	{
+		RefreshSkillControls(State, EHSRSkillCategory::BasicAttack, BTN_Basic, TXT_BasicName, TXT_BasicDescription, TXT_BasicCost);
+		RefreshSkillControls(State, EHSRSkillCategory::Skill, BTN_Skill, TXT_SkillName, TXT_SkillDescription, TXT_SkillCost);
+		RefreshSkillControls(State, EHSRSkillCategory::Ultimate, BTN_Ultimate, TXT_UltimateName, TXT_UltimateDescription, TXT_UltimateCost);
+		RefreshSkillControls(State, EHSRSkillCategory::Heal, Button_Heal, TXT_HealName, TXT_HealDescription, TXT_HealCost);
+	}
 
-	const FHSRBattleCommandSkillView* SelectedSkill = State.Skills.FindByPredicate([&State](const FHSRBattleCommandSkillView& Skill) { return Skill.SkillId == State.SelectedSkillId; });
+	const FHSRBattleCommandSkillView* SelectedSkill = State.FindSelectedSkill();
 	if (TXT_DisabledReason)
 	{
 		FText Reason = FText::GetEmpty();
@@ -298,7 +359,7 @@ void UHSRBattleCommandWidget::UnbindViewModel()
 	}
 	StateChangedHandle.Reset();
 	ViewModel.Reset();
-	Coordinator.Reset();
+	CommandSink.Reset();
 	LastSubmittedActionId.Invalidate();
 	LastSubmittedResolution = FHSRAbilityResolution();
 }
