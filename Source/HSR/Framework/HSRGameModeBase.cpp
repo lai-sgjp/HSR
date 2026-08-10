@@ -4,6 +4,7 @@
 #include "../Data/Definitions/HSRCharacterCatalog.h"
 #include "../Data/Definitions/HSRCharacterDefinition.h"
 #include "../Party/HSRPartySubsystem.h"
+#include "../Player/HSRPlayerController.h"
 #include "../Progression/HSRCharacterProfileSubsystem.h"
 #include "Curves/CurveFloat.h"
 #include "Engine/GameInstance.h"
@@ -12,6 +13,11 @@
 
 AHSRGameModeBase::AHSRGameModeBase()
 {
+	// BP_HSRGameMode already sets this in the asset, so exploration works today. Pinning the
+	// same default in C++ costs nothing and stops a newly authored GameMode Blueprint from
+	// silently inheriting the engine controller -- exactly how the battle GameMode lost its
+	// input handling.
+	PlayerControllerClass = AHSRPlayerController::StaticClass();
 }
 
 void AHSRGameModeBase::RestartPlayer(AController* NewPlayer)

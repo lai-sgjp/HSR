@@ -1,6 +1,8 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "../Battle/HSRBattleGameMode.h"
+#include "../Framework/HSRGameModeBase.h"
 #include "../Player/HSRPlayerController.h"
 #include "../UI/HSRScreenStackTypes.h"
 
@@ -54,6 +56,41 @@ bool FHSRPlayerControlModePolicyTest::RunTest(const FString&)
 		Battle.InputIntent, Exploration.InputIntent);
 	TestNotEqual(TEXT("battle cursor visibility differs from exploration"),
 		Battle.bShowMouseCursor, Exploration.bShowMouseCursor);
+
+	return true;
+}
+
+/**
+ * Guards the other half of the same failure, which the policy test above cannot see. The mapping
+ * was correct and every assertion passed while battle input stayed broken, because the battle
+ * GameMode never named AHSRPlayerController: PlayerControllerClass was set only in
+ * BP_HSRGameMode's asset, and the battle GameMode Blueprint simply omitted it. The battle world
+ * therefore spawned the engine's APlayerController and no HSR control-mode code ran at all.
+ *
+ * Asserted against the CDO rather than a live world: the defect is a class default, so it
+ * reproduces without PIE, and a world-based test would need a map load to say the same thing.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRGameModeControllerClassTest, "HSR.Player.ControlMode.GameModeControllerClass",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRGameModeControllerClassTest::RunTest(const FString&)
+{
+	const AHSRBattleGameMode* BattleDefaults = GetDefault<AHSRBattleGameMode>();
+	TestNotNull(TEXT("battle GameMode CDO resolves"), BattleDefaults);
+	if (BattleDefaults)
+	{
+		TestEqual(TEXT("battle GameMode spawns the HSR player controller"),
+			BattleDefaults->PlayerControllerClass.Get(),
+			static_cast<UClass*>(AHSRPlayerController::StaticClass()));
+	}
+
+	const AHSRGameModeBase* ExplorationDefaults = GetDefault<AHSRGameModeBase>();
+	TestNotNull(TEXT("exploration GameMode CDO resolves"), ExplorationDefaults);
+	if (ExplorationDefaults)
+	{
+		TestEqual(TEXT("exploration GameMode spawns the HSR player controller"),
+			ExplorationDefaults->PlayerControllerClass.Get(),
+			static_cast<UClass*>(AHSRPlayerController::StaticClass()));
+	}
 
 	return true;
 }
