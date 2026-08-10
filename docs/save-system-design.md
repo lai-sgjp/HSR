@@ -37,3 +37,65 @@ The closeout gate uses five separately launched Editor-Cmd processes against one
 Cold-process testing exposed that `GetTypeHash(FName)` is process-local and therefore unsuitable for persisted equipment ownership. Character profile IDs now map to owner GUIDs with deterministic FNV-1a over their canonical UTF-8 bytes. Any future persisted derived identifier must follow the same rule: derive from canonical serialized bytes, never UE name-table indices or process-local hashes.
 
 This commandlet evidence verifies authority recovery across real process restarts on the current Windows Editor build. It does not verify graphical Editor operation, packaged/Shipping builds, other platforms, real crash/power loss/disk-full/permissions/locking, concurrent writers, cloud saves, or multiplayer.
+
+## Post-Phase-20 save evolution (optional)
+
+The following directions are deliberately deferred until Phase 20 is complete. They are not part of the Phase 16 disk contract, the current single-player MVP, or any Phase 17-20 gate. Each direction requires a separate design/task gate, schema migration, failure matrix, and platform/cloud-provider evidence before implementation.
+
+### Sync-domain classification
+
+Introduce an explicit persisted sync-domain value in the save envelope header, domain manifest, or each independently stored domain DTO:
+
+```cpp
+UENUM()
+enum class EHSRSyncDomain : uint8
+{
+	Global,
+	LocalOnly,
+	PlayerBound,
+};
+```
+
+- `Global`: participates in cloud synchronization, schema migration, integrity validation, and merge/conflict policy.
+- `LocalOnly`: remains on the local device and is excluded from cloud upload. Transient Runtime objects still remain outside Save entirely; this value is only for intentionally persisted local metadata or caches.
+- `PlayerBound`: belongs to a stable player/profile identity, is stored and restored separately, and must not be merged across players.
+
+The enum alone is not sufficient. The later design must freeze the default for legacy saves, unknown-value rejection, domain-to-file mapping, player identity rules, cloud conflict behavior, checksum coverage, and migration between domains. Changing a record's sync domain is a data migration, not a display/configuration change.
+
+### Independent inventory/equipment persistence
+
+Consider extracting high-churn Inventory/Equipment data from the main save payload into an independently revisioned stream with its own write queue and integrity envelope. The main save would reference an immutable Inventory generation/revision instead of embedding the complete inventory payload, avoiding a full main-save SHA-256 rewrite for inventory-only changes.
+
+This split must not be implemented as two unrelated overwrites. A crash between writing `Inventory.sav` and updating the main reference can otherwise create a mismatched snapshot. The later transaction design must use immutable generation files plus a verified manifest/commit marker, or an equivalent recoverable two-phase publication protocol:
+
+1. Capture and validate the changed Inventory snapshot.
+2. Write and fully read back a new Inventory generation with its own checksum and monotonic revision.
+3. Publish a main-save/manifest reference only after the Inventory generation is verified.
+4. Load only a mutually compatible main/inventory generation pair; reject missing, future, wrong-player, or checksum-invalid references without partially restoring authorities.
+5. Garbage-collect unreferenced generations only after a later verified commit, never in the publication transaction.
+
+The Inventory writer remains a single authority with serialized requests, idempotent revision handling, backpressure/coalescing rules, and explicit behavior for concurrent Save/Load/travel. Equipment ownership and Inventory revision must commit as one logical snapshot even when their bytes live in separate files.
+
+### Cloud slot degradation and recovery rotation
+
+For a future cloud-save adapter, use a bounded generation rotation inspired by recoverable slot histories:
+
+```text
+upload verified new generation -> Slot 1
+previous Slot 1              -> Slot 2
+previous Slot 2              -> Slot 3
+previous Slot 3              -> Slot 4 (manual-recovery history)
+```
+
+Rotation is allowed only after the new upload is acknowledged and readback/metadata validation succeeds. Slot entries require stable SaveId/player identity, monotonic generation, schema/codec version, checksum, timestamp, sync domain, and provider revision/ETag where available. Failed upload or rotation must preserve the last known-good Slot 1; retry must be idempotent. Slot 4 is never auto-loaded over a valid newer slot and is exposed only through an explicit manual-recovery flow.
+
+The cloud adapter must also define offline writes, divergent-device conflicts, quota exhaustion, cancellation, partial provider failure, encryption/privacy, deletion/tombstone behavior, and provider-specific atomicity. No cloud claim may reuse the Phase 16 local verified-copy evidence.
+
+### Required post-Phase-20 evidence
+
+- Migration tests for legacy saves without a sync-domain field and for every supported domain transition.
+- Cross-file crash/failure injection at every Inventory generation and manifest publication boundary.
+- Repeated/high-frequency Inventory writes proving coalescing does not lose committed transactions.
+- Wrong-player, stale revision, missing generation, checksum corruption, and partial-restore rejection.
+- Four-slot upload/rotation/retry tests, including failed upload preserving the previous Slot 1 and explicit Slot 4 manual recovery.
+- Two-device/offline conflict tests against the selected cloud provider; unavailable provider or packaged-platform evidence remains `NOT VERIFIED`.

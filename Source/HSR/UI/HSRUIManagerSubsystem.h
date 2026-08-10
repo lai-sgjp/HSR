@@ -11,7 +11,10 @@ class UHSRInputModeCoordinator;
 class UHSRScreenStack;
 class UHSRScreenWidget;
 class UHSRInventoryWidget;
+class UHSRInventoryModuleWidget;
 class UHSRInventoryRewardViewModel;
+class UHSRDialoguePresentationViewModel;
+class UHSRDialogueOverlayWidget;
 class UHSRUserWidget;
 class UHSRFrontendRouter;
 class UHSRFrontendShellWidget;
@@ -41,7 +44,13 @@ public:
 		TSubclassOf<UHSRFrontendModuleRootWidget> InFrontendModuleRootClass,
 		TSubclassOf<UHSRScreenWidget> InCharacterDetailWidgetClass,
 		TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass,
-		const TMap<EHSRFrontendModule, TSubclassOf<UUserWidget>>& InModuleWidgetClasses);
+		TSubclassOf<UHSRInventoryModuleWidget> InInventoryModuleWidgetClass,
+		TSubclassOf<UHSRDialogueOverlayWidget> InDialogueOverlayWidgetClass,
+		TSubclassOf<UUserWidget> InPartyWidgetClass,
+		TSubclassOf<UUserWidget> InMapWidgetClass,
+		TSubclassOf<UUserWidget> InChallengeWidgetClass,
+		TSubclassOf<UUserWidget> InQuestWidgetClass,
+		TSubclassOf<UUserWidget> InSaveWidgetClass);
 	EHSRUIScreenResult UnregisterExplorationHost(AHSRHUD* HUD, AHSRPlayerController* PlayerController);
 	EHSRUIScreenResult TeardownExplorationHostForTravel(AHSRHUD* HUD, AHSRPlayerController* PlayerController);
 	EHSRUIScreenResult PrepareExplorationTravel();
@@ -64,6 +73,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "HSR|UI|Frontend")
 	EHSRUIScreenResult CloseFrontendToRoot();
 
+	UFUNCTION(BlueprintCallable, Category = "HSR|UI|Dialogue")
+	EHSRUIScreenResult OpenDialogueOverlay(FName DialogueId, FName NodeId);
+
+	UFUNCTION(BlueprintCallable, Category = "HSR|UI|Dialogue")
+	EHSRUIScreenResult CloseDialogueOverlay();
+
+	UFUNCTION(BlueprintPure, Category = "HSR|UI|Dialogue")
+	bool HasOpenDialogueOverlay() const { return DialogueOverlayWidgetInstance != nullptr; }
+
 	UFUNCTION(BlueprintPure, Category = "HSR|UI")
 	bool HasOpenPauseScreen() const { return FrontendShellInstance != nullptr; }
 	const UHSRFrontendRouter* GetFrontendRouter() const { return FrontendRouter; }
@@ -72,7 +90,12 @@ public:
 	bool HasOpenCharacterDetailScreen() const { return CharacterDetailWidgetInstance != nullptr; }
 
 	UFUNCTION(BlueprintPure, Category = "HSR|UI")
-	bool HasOpenInventoryScreen() const { return InventoryWidgetInstance != nullptr; }
+	bool HasOpenInventoryScreen() const
+	{
+		return InventoryWidgetInstance != nullptr
+			|| (FrontendModuleContentModule == EHSRFrontendModule::Inventory
+				&& FrontendModuleContentInstance != nullptr);
+	}
 	bool HasInventoryViewModel() const { return InventoryViewModelInstance != nullptr; }
 
 	UFUNCTION(BlueprintPure, Category = "HSR|UI")
@@ -121,6 +144,10 @@ public:
 	int64 GetHostGenerationForAutomation() const { return ActiveHostGeneration; }
 	void FailNextAutomationInventoryPolicyApply() { bAutomationFailNextInventoryPolicyApply = true; }
 	void ConfigureAutomationFrontendModuleBackend(bool bHasClass, bool bCreateSucceeds, bool bAttachSucceeds);
+	void ConfigureAutomationInventoryModuleBackend(bool bHasClass, bool bCreateSucceeds,
+		bool bAttachSucceeds);
+	void ConfigureAutomationDialogueOverlayBackend(bool bHasClass, bool bCreateSucceeds,
+		bool bAttachSucceeds);
 	int32 GetFrontendModuleContentCountForAutomation() const;
 	EHSRFrontendModule GetFrontendModuleContentModuleForAutomation() const;
 #endif
@@ -147,12 +174,21 @@ private:
 	void TryRestoreTravelDescriptor();
 	FName SelectRestorableScreenId() const;
 	EHSRUIScreenResult CaptureAndTeardownTravelHost();
-	EHSRUIScreenResult TeardownCurrentHost();
+	EHSRUIScreenResult TeardownCurrentHost(bool bForTravel = false);
+	EHSRUIScreenResult OpenDialogueOverlayInternal(FName DialogueId, FName NodeId);
+	EHSRUIScreenResult CloseDialogueOverlayInternal(bool bRestoreInputPolicy);
+	void ReleaseDialogueOverlay();
+	UHSRDialogueOverlayWidget* CreateDialogueOverlayCandidate(AHSRPlayerController* PlayerController);
+	bool AttachDialogueOverlayCandidate(UHSRDialogueOverlayWidget* Candidate);
+	EHSRFocusApplyResult ApplyDialogueFocusBackend(AHSRPlayerController* PlayerController,
+		UWidget* Preferred, UWidget* Fallback);
+	bool HasDialogueOverlayBlockingFrontend() const;
 	/** True when the stack is exactly the exploration root and no module instance is owned. */
 	bool IsAtCleanExplorationRoot() const;
 	/** Clears a travel-scoped inconsistency once a fresh host proves the UI is coherent again. */
 	void TryClearRecoverableInconsistency();
 	void ClearHostReferences();
+	FGuid ResolveInventoryCharacterGuid() const;
 	TSubclassOf<UUserWidget> GetFrontendModuleWidgetClass(EHSRFrontendModule Module) const;
 	UUserWidget* CreateFrontendModuleContentCandidate(AHSRPlayerController* PlayerController,
 		EHSRFrontendModule Module);
@@ -240,6 +276,33 @@ private:
 	EHSRFrontendModule FrontendModuleContentModule = EHSRFrontendModule::None;
 
 	UPROPERTY(Transient)
+	TSubclassOf<UHSRInventoryModuleWidget> InventoryModuleWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UHSRDialogueOverlayWidget> DialogueOverlayWidgetInstance;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UHSRDialoguePresentationViewModel> DialogueViewModelInstance;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UHSRDialogueOverlayWidget> DialogueOverlayWidgetClass;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UUserWidget> PartyWidgetClass;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UUserWidget> MapWidgetClass;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UUserWidget> ChallengeWidgetClass;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UUserWidget> QuestWidgetClass;
+
+	UPROPERTY(Transient)
+	TSubclassOf<UUserWidget> SaveWidgetClass;
+
+	UPROPERTY(Transient)
 	TWeakObjectPtr<AHSRHUD> RegisteredHUD;
 
 	UPROPERTY(Transient)
@@ -307,6 +370,12 @@ private:
 	bool bAutomationHasFrontendModuleClass = true;
 	bool bAutomationFrontendModuleCreateSucceeds = true;
 	bool bAutomationFrontendModuleAttachSucceeds = true;
+	bool bAutomationUseInventoryModuleContent = false;
+	bool bAutomationInventoryModuleCreateSucceeds = true;
+	bool bAutomationInventoryModuleAttachSucceeds = true;
+	bool bAutomationHasDialogueOverlayClass = true;
+	bool bAutomationDialogueOverlayCreateSucceeds = true;
+	bool bAutomationDialogueOverlayAttachSucceeds = true;
 	bool bAutomationInventoryCreateSucceeds = true;
 	bool bAutomationInventoryViewModelSucceeds = true;
 	bool bAutomationInventoryDependenciesSucceed = true;

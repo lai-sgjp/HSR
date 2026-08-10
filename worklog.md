@@ -1,5 +1,176 @@
 ﻿# HSR Worklog
 
+## 2026-08-09 - TASK-P17-INVENTORY-003 Gate 0
+
+- 用户授权下一 serial package `TASK-P17-INVENTORY-003`；活动卡从已收口的
+  Inventory-002 切换，本轮不复用 `P17-008` 编号。
+- Gate 0 冻结现有 Inventory/Equipment Authority 所有权、稳定 InstanceId、真实
+  双 revision、OperationId、typed unavailable 和完整快照保持边界；没有修改生产
+  Source，尚未开始 RED。
+- 明确普通背包实例没有 Equipment owner 时，Enhance 不得在 UI 中补造持有关系；
+  由 Authority 真实拒绝/不可用并保持快照。Use/Disassemble 不得调用 RemoveStack。
+- 003 不包含 B/Back/X、动态 Host 接入、UAsset、旅行 teardown 或 PIE；下一步是
+  添加并运行真实失败的命令测试。
+
+## 2026-08-09 - TASK-P17-INVENTORY-002 GREEN / code gate complete
+
+- 用户授权继续执行 Inventory-002；沿用 001 的真实 RED，不复用计划编号
+  `P17-008` 或归档任务编号。
+- 新增显式 Inventory catalog、纯值 snapshot/types、分类/筛选/确定性排序/稳定键
+  ViewModel，以及只读 Widget delegate boundary；未修改 Inventory/Equipment
+  Authority、Reward Summary、UIManager、Router、Save、Content 或 `.claude/**`。
+- Development Editor Build 通过；聚焦 `HSR.UI.Inventory` Automation 发现 4 项，
+  4/4 `Result={Success}`，Editor-Cmd exit code 0。首次运行发现测试 fixture 的
+  `beta` 同时命中显示名和另一个 ItemId，已将测试查询收窄为 `beta relic` 后复跑通过。
+- `SameSnapshot` 已覆盖详情、数量/上限、排序序号、Unique payload、选择、revision、
+  validity、failure reason 和全部 action states。
+- 002 不包含 B/Back/X、ModuleContentHost/UIManager 接入、合法操作、UAsset 或 PIE；
+  下一包为 `TASK-P17-INVENTORY-003`。本轮没有 Git stage/commit/push。
+
+## 2026-08-09 - TASK-P17-INVENTORY-001 Gate 0 / TDD RED
+
+- 用户授权开始 Inventory 无歧义任务；活动卡从 Relic closeout 切换，Relic 历史保留在
+  `tasks/archive/TASK-P17-RELIC-EQUIPMENT-001-active-task.md` 和既有 TDD 证据中。
+- Gate 0 选择显式 `UHSRInventoryCatalog` 作为分类/展示元数据来源；没有扩展现有
+  Inventory Authority 定义规则，也没有猜测 ItemId 前缀。稳定键、排序/筛选、失败快照
+  保持、Authority gating 和 `ModuleContentHost` 边界已写入活动任务卡。
+- 新增 `Source/HSR/Tests/HSRInventoryViewModelTests.cpp`。默认 Build 因 UBT 外部 cache
+  权限先失败；同命令授权重跑后实际编译测试，并在缺失
+  `HSRInventoryCatalog.h` 处得到预期 RED。
+- 本轮只完成 Gate 0/RED；没有修改生产 Source、Content、Config 或 UAsset，没有 Git
+  stage/commit/push。下一步是用户另行授权 `TASK-P17-INVENTORY-002`。
+## 2026-08-09 - Phase 17 Inventory/Dialogue 子任务与 Phase 18 顺序规划
+
+- 用户将优先级调整为：先完成 Inventory UI、Dialogue Presentation 和 Phase 18，之后再制作 Demo。
+- 现有执行计划只定义 P17-008/P17-012 顶层产品结果；仓库没有 Inventory/Dialogue 的 `002` 等正式任务卡。
+- 规划 backlog 已拆为 `TASK-P17-INVENTORY-001`～`004` 和
+  `TASK-P17-DIALOGUE-001`～`004`，分别覆盖 Gate 0/RED、UI 投影、合法命令或
+  Authority 分支、生命周期与收口。
+- Phase 18 预规划为 `TASK-P18-PRESENTATION-001`～`004`，必须等待 P17-016
+  收尾 Gate；表现层只能消费事件，不能成为 Gameplay 规则真源。
+- 实际归档的 `TASK-P17-012` 仍代表五模块动态挂载，未被重新解释为 Dialogue。
+- 本次仅更新规划文档和状态文档；没有修改 Source、Content、Config，没有创建活动
+  `002` 任务卡，没有执行 Build/Automation/PIE，也没有 Git commit 或 push。
+
+## 2026-08-06 - TASK-P17-CHAR-SHELL-001 C++ and Automation GREEN
+
+- 用户授权了新的无歧义 Character Shell 任务；活动卡已从已归档的实际 P17-012 切换为 `TASK-P17-CHAR-SHELL-001`，未修改 P17-012 归档或 `.claude/**`。
+- TDD RED：新 `HSRCharacterShellTests.cpp` 首次 Build 进入测试编译后，因 `HSRCharacterShellViewModel.h` 尚不存在而失败；没有创建 Git checkpoint commit。
+- 新增纯值 Shell types、Character/Equipment snapshot composition、Character/Tab selection persistence、explicit unavailable-tab state、Widget lifecycle 和 focused Automation。
+- 将 HUD/UIManager 的 Character class slot/candidate 泛化为 `UHSRScreenWidget`，保留既有 Frontend Screen Stack、Pause、Focus、Back/X、Travel 和 ModuleContentHost 事务路径。
+- 最新 `HSREditor Win64 Development` Build 通过；`HSR.UI.CharacterShell` 2/2。
+- 相邻回归通过：`HSR.UI.FrontendDynamicMount` 3/3、`HSR.UI.FrontendNavigation` 11/11、`HSR.UI.EquipmentDetail` 2/2、`HSR.Progression.Profile.Authority` 1/1、`HSR.Equipment.Transactions` 1/1，合计 20/20。
+- 单独组合回归发现当前既有 `HSR.UI.CharacterDetail.ViewModel` 的 5 个 Save fixture 断言失败；未修改其生产代码，保留为已知基线边界。
+- `git diff --check` 通过；用户 WBP 创建、Save All/Editor 重开、PIE happy/failure 和双分辨率证据仍待用户完成。
+
+## 2026-08-06 - TASK-P17-005 用户指令收口与 Phase 17 计划对照
+
+- 用户明确要求 TASK-P17-005 不再作为阻塞项，任务状态按
+  `COMPLETE / USER ACCEPTED` 收口；没有修改 Source、Blueprint 或 UAsset。
+- 既有 P17-005 Code Gate/Automation 与用户运行证据继续有效；此前未独立重跑的
+  双分辨率、Standalone、Packaged、Shipping、物理手柄及部分完整 Editor/PIE
+  证据保留为 `NOT VERIFIED`，不再阻塞该任务。
+- 对照 `docs/phase-17-execution-plan.md` 第 7 节确认，计划范围为 P17-005～016。
+  当前实际归档编号与计划语义存在偏移：实际 P17-006 是 Quest Frontend，实际
+  P17-012 是五模块统一动态挂载；计划中的 Character 养成 Shell 与 Dialogue
+  Presentation 仍须作为独立未完成包处理。
+
+## 2026-08-05 - TASK-P17-009D C++ and commandlet gates
+
+- Gate 0 frozen in code: `UHSRStageBuffDefinition` is Encounter-owned;
+  `UHSRStageBuffAuthority` validates registered IDs; Inventory preflights and
+  debits resources; Coordinator applies GE then debits, refunds only failed
+  builds, and removes only runtime GE handles on normal Reset.
+- TDD RED caught a GE-less definition replacing a valid registry. Registration
+  now rejects it before mutation; Development Editor build and
+  `HSR.Battle.StageBuff` 1/1 passed GREEN.
+- Regression commandlets passed: PreBattle 3/3, Admission 1/1, Challenge
+  Directory 3/3, Frontend Navigation 11/11, Map 5/5, BattleReturn 2/2.
+- No UAsset was authored. Final acceptance waits for user-created Stage Buff,
+  GE, and resource assets plus PIE evidence for apply/debit, cancel, duplicate,
+  insufficient-resource, application-failure/refund, and return travel.
+
+- Follow-up correction: Battle participant IDs use `Player`, while the selected
+  character definition ID is `Character.A`. Stage Buff application now resolves
+  the player by team plus valid ASC rather than comparing those unrelated IDs;
+  Development Editor and `HSR.Battle.StageBuff` 2/2 passed.
+
+- User PIE accepted the corrected route: `SubmitEncounterRequest`, battle
+  `BuildParticipants`, `P17-009D Stage Buffs applied Count=1 Debits=0`, real
+  `P6-004A` command-panel binding and action submissions, victory settlement,
+  battle return, and post-return Pause reopen all completed successfully.
+
+## 2026-08-05 - TASK-P17-010B user-confirmed closeout and TASK-P17-009D handoff
+
+- User confirmed that the 010B Challenge failure-matrix implementation is complete; its build/Automation evidence was moved to the 010B archive with the independent-review and fresh Editor/PIE boundaries preserved as `NOT VERIFIED`.
+- Created the sole active card `TASK-P17-009D - Pre-Battle Buff GameplayEffect and Resource Authority`.
+- Frozen the 009D outcome: a valid stable Buff ID is validated by authority, applies one configured GameplayEffect, and debits one resource; invalid, duplicate, insufficient, or failed paths are zero-mutation and exactly-once.
+- Gate 0 is intentionally open because the current code has only `BuffIds` metadata and no Buff-specific definition/registry, resource type/API, or authorized Stage Buff GameplayEffect asset contract. No 009D production or asset implementation started.
+
+## 2026-08-05 - TASK-P17-010B Task Gate created
+
+- Audited the accepted P17-010A directory evidence against the Phase 17 plan and adjacent PATCH-03F/03G/03H, P17-006, and PATCH-03E2 records.
+- Archived the 010A handoff summary and created the only active card `TASK-P17-010B - Challenge Directory Failure Matrix and Formal Closeout`.
+- Frozen scope: invalid/locked/unknown/unavailable Challenge rejection, preservation of the last valid selection, and zero BattleTransition travel side effects. Map, Save, Quest, Equipment, Party authority, Content, Config, Build, Automation, and PIE implementation are not authorized.
+- No Source/Content/Config/Build/Automation/PIE action was performed. Independent Task Gate review and separate user implementation confirmation are still required.
+
+## 2026-08-05 - TASK-P17-010B implementation checkpoint
+
+- User confirmed implementation. TDD RED compiled against the missing selection seam, then the minimal Widget selection transaction was implemented.
+- Final focused Challenge Automation passed 3/3; final adjacent regression passed 21/21: PreBattle 3, Admission 1, FrontendNavigation 11, Map 5, TravelRestore 1.
+- Final Development Editor Build passed UHT, compile, link and metadata. The first sandbox UBT permission failure and intended compile RED remain preserved in the execution report.
+- User Editor/PIE is still required for Blueprint binding/reopen, valid and controlled failure routes, focus/input recovery, resolutions and visual runtime errors. No final PASS or asset provenance claim is made.
+
+## 2026-08-05 - TASK-P17-010A data-driven Challenge Directory
+
+- Added deterministic Challenge source projection, locked/invalid/duplicate handling, stable-ID selection, and a Blueprint-safe template-build facade; Build and `HSR.UI.ChallengeDirectory` 2/2 passed with PreBattle 3/3 and Admission 1/1 regression.
+- User created the Challenge Directory and Entry widgets, configured three sources yielding two unique entries, and confirmed selection/locked behavior with no runtime errors. Final supplied log records `Sources=3 Entries=2 Result=0`; it does not independently record an encounter submission (`CaptureTravel=false`).
+- TASK-P17-010A closes as `PASS / USER ACCEPTED`; dynamic progression locks, completion persistence, costs, rewards and category rules remain out of scope.
+
+## 2026-08-05 - TASK-P17-009C pre-battle panel vertical slice
+
+- Added the user-authored `WBP_HSRPreBattlePanel_P17`; the Shell now routes to the dedicated Challenge module, whose Enter action builds the encounter template and opens the pre-battle overlay.
+- The panel displays the local Party candidate, rejects duplicate/invalid selections, selects local Buff IDs, supports Cancel, and confirms through the Blueprint-safe pure build/authoritative submit boundary.
+- User PIE verified the pre-battle overlay above Pause, Cancel returning to Pause, and Confirm submitting `Enc_Test_Phase5` before successful battle travel. Final log recorded `SubmitEncounterRequest`, `CaptureTravel=true`, and no Blueprint Runtime Error or `Accessed None`.
+- User PIE subsequently verified the formal `Pause -> Challenge module -> Enter -> PreBattle -> Confirm -> Battle` route. Stage Buff authority/effects remain out of scope.
+- Final commandlet regression passed: `HSR.UI.PreBattleCandidate` 3/3 and `HSR.InteractionBattle.Admission` 1/1. TASK-P17-009C is accepted for local candidate/Buff metadata and encounter admission; Buff GameplayEffect/resource authority remains a separate future task.
+
+## 2026-08-04 - TASK-P17-009B Party permanent candidate editing archived
+
+- Added atomic revision-aware Party candidate confirmation, deterministic profile option projection, ViewModel candidate editing and Blueprint-safe Widget intent forwarding.
+- RED checkpoints `a891716`, `f1b0857`, `6a31a2a`; GREEN commits `da2affc`, `e0a75cd`, `053a2f3`, `aeff321`.
+- User Build succeeded; `HSR.Party` 2/2, `HSR.UI.Party` 4/4 and `HSR.UI.FrontendNavigation` 11/11 succeeded.
+- User PIE accepted candidate edit, duplicate rejection, Cancel restore, Confirm persistence, Back/Close and Party navigation. `WBP_HSRPartyPanel_P17.uasset` recorded as user-authored provenance.
+- P17-009C pre-battle candidate Party/Buff/Encounter Request remains open.
+
+## 2026-07-29｜TASK-P17-PATCH-03R Automation seam compatibility archived
+
+- 03E2 首次 `HSREditor` Build 暴露既有 Automation development API guard 不一致；用户授权独立 03R，只恢复测试编译/API seam，不改变业务行为。
+- Implementation commits `e3ecf06`、`28114c4` 将 Party、Save、Reward、Quest、Battle、Status、Equipment Effect 与 Damage 既有测试 seam 对齐到 `WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS`。
+- 初次验证误跑 `HSR Win64 Development`，Reviewer 在 `4572ef0` 给出 `REVISE`，同时发现两个 Damage injection consumer 仍为 Editor-only；历史缺口保留，不被最终结果覆盖。
+- 修订 `badae3e` 对齐 `HSRGameplayAbilityBase` 与 `HSRDamageExecutionCalculation` guard。真实 `HSREditor Win64 Development` 15/15 actions 成功；修订后 `HSR.Battle` 10/10 Success。
+- 其余受影响回归为 Save 16/16、Party 1/1、Reward 6/6、QuestDialogue 1/1、Equipment Effect 1/1。`HSR.Status` 无匹配测试，保持 `NOT APPLICABLE`；Battle `StatusGeneric` 已通过。
+- Independent Reviewer 最终 `PASS`=`3321bf4`。03R 三件套已归档，03E2 保存包原样恢复为活动任务；未修改或提交用户 Content/Blueprint/Map/DataAsset、Config、学习文档或 03E2 生产行为。
+
+## 2026-07-28｜P17-005 checkpoint 与 P17-PATCH-03 Gate 0
+
+- 按用户要求暂停 P17-005，并以 commit `4ef49f7` 精确提交 32 个 Frontend C++、测试、Input/WBP 与任务证据文件；未 push，未夹带 Enemy/Player Character、Enemy DataAsset、Map、`Content/AI/**`、`.claude/**`、学习文档或 Phase 20 存档演进改动。
+- P17-005 当前证据为代码 Gate 与 11/11 窄域 Automation 通过、Input/WBP 存在、Character route 用户 PIE 可打开/返回；Character read model 仍报 `PartySlotEmpty`，因此任务暂停且没有最终 PASS。
+- 新建 `P17-PATCH-03` 总系统整合草案与总操作流程，覆盖 Battle、Interaction、Character Progression、Equipment、Inventory、Map、Save、UI，拆为串行 03A～03H。
+- Gate 0 当前仍在四角色复审和修订中，PATCH-03 实施尚未开始。首先处理 03A ScreenStack/Router 重复导航权威，再在 03B 统一 Exploration Pawn 与稳定 CharacterId/Profile/Party。
+- 跨 Reward/Inventory/Profile 结算冻结为单一 SettlementAuthority 聚合候选、非失败安装与单一发布点；各 Domain 仍保留数据权威。每个 03A～03G 包均要求独立 Editor happy/failure exercise，03H 从可丢弃 clean-save fixture 完成端到端证据。
+- Implementation feasibility 复审根据现有直接 mutation API 要求继续拆分 03D：03D1 先建立并测试三域 candidate/private install seam 与 SettlementAuthority，03D2 才切换 Battle production caller；Map/Save 新 ViewModel/Widget 也已冻结候选文件路径。
+- 最终 Gate 0：Coordinator=`PASS`、Independent Reviewer=`PASS`、Teacher=`PASS`（唯一 PATCH-02 陈旧状态项已校正）、Implementation feasibility=`PASS`。该结论只允许建立 03A Task Gate，不授权实施。
+- P17-005 三件套以暂停状态归档；新活动卡为 `TASK-P17-PATCH-03A`，等待独立 Task Gate 与用户再次确认。
+
+## 2026-07-28｜TASK-P17-PATCH-03A 收口
+
+- 03A 最终为 `PASS WITH FOLLOW-UP`。全局 ScreenStack 稳定状态仅为 ExplorationRoot depth 1 或 ExplorationRoot -> FrontendShell depth 2；Character、Inventory 与 placeholder 历史仅由 FrontendRouter 拥有。
+- Development Editor Build 成功，`HSR.UI.FrontendNavigation` 11/11 Success、0 Fail；真实 PIE 记录 Frontend/Character 均为 Stack=2。
+- 用户明确确认按 X 已从 Character 返回探索；日志同时显示鼠标捕获恢复和 `IMC_Exploration` 重新加入，证据等级为 `USER PROVIDED`。
+- 缺失 module class 的旧 Character 保留行为按 `USER PROVIDED` 记录，但没有结构化拒绝日志。1920x1080 与 1280x720 经用户明确暂缓，为 `USER ACCEPTED / NOT VERIFIED`；控制器、Standalone、Packaged、Shipping 仍未验证。
+- `PartySlotEmpty` 不属于 03A，转为 03B 的首要前置事实。03A 三件套归档后仅创建 03B 计划卡；Task Gate 与用户再次确认前不得实施。
+
 ## 2026-07-27｜TASK-P17-PATCH-01C complete action-distance model archived
 
 - Implementation chain culminated in `adb11d2`; Independent Reviewer final conclusion is `PASS` in `28d3213` after preserving all intermediate `REVISE` history.
@@ -2159,3 +2330,367 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - User PIE established the final return gate: chase, sight loss `4 -> 7 -> 8`, one `ReturnComplete` at distance `41.38` with no active request, `8 -> 2` patrol resume, rejection of overlap while Returning, and a later single admitted/consumed Encounter. Evidence remains `USER PROVIDED`; Reviewer inspected but did not rerun PIE.
 - `UHSREnemyDefinition` now data-drives Sight/LoseSight/Encounter radii with compatible `1000 / 1500 / 200` defaults and tested normalization/fallback. User-owned Blueprint, DataAsset, map and `Content/AI/**` changes were not staged by agents.
 - Overall Independent Review `ff8f213` is `PASS WITH FOLLOW-UP`; radius addendum review `990d95d` is closed. The task triplet is archived; P17-005 remains not started.
+# 2026-07-28 | Coordinator: close 03B and draft TASK-P17-PATCH-03C
+
+- `TASK-P17-PATCH-03B` completed Code Gate, focused/regression Automation, happy-path PIE, controlled `NoCommittedSelection / PartySlotEmpty` PIE and final `BP_HSRGameMode=NewGameDefaults` Compile/Save/reopen confirmation; final status is `PASS`.
+- Archived the 03B active task, execution result and final review. User-owned Blueprint/map/input/AI/learning changes remain unstaged and untouched.
+- Created the only active card `TASK-P17-PATCH-03C - Interaction to Battle Admission` at `TASK GATE REVIEW REQUIRED`; no 03C implementation, Content, Build, Automation or PIE action is authorized yet.
+- Source audit found the Gate-0 candidate list omitted the actual neutral encounter adapter `AHSRGrayboxInteractable`; the draft freezes it while keeping Enemy/Behavior Tree and BattleGameMode/Coordinator read-only.
+- The draft freezes candidate observation, adapter intent, BattleTransition admission/travel authority, pure-value request DTO, duplicate/resolved/lost-target rejection, cross-World single consumption, exact TDD and User Asset Gate evidence.
+- 03C Task Gate revisions added a const Reward bundle preflight, Party-owned PlayerCharacterId in the cross-World request, consumed-ID use in BattleGameMode, null-World stale-failure handling and deterministic Editor evidence. Independent Reviewer returned PASS; final Task Gate is PASS and implementation remains user-confirmation gated.
+
+# 2026-07-28 | TASK-P17-PATCH-03C final closeout
+
+- Implementation commit `2988e11` established Interaction -> Battle admission through one pure-value request carrying Party slot-0 `PlayerCharacterId`; BattleGameMode rebuilds `Character.A` from the consumed request, while Reward admission remains metadata-only with no settlement.
+- Fresh Build passed. Focused/regression Automation passed: Admission 1/1, Exploration/BT 1/1, Battle 9/9, Map 5/5, Reward 6/6, FrontendNavigation 11/11 and CharacterIdentity 1/1.
+- User victory PIE preserved RequestId `73E3CA114E061EE8D2C32DAA16DA8205` through admission/consume/return and rejected resolved replay. Out-of-overlap returned `NoCandidate`; unavailable returned `Unavailable`; neither traveled.
+- User defeat PIE resolved RequestId `4B5E7C584592346472D88394F8120B4D` with `Defeated=Player Outcome=2`, then admitted fresh RequestId `0F26AE034F768F2C7AA05FB8C092C55B` for the same Encounter and consumed it with `PlayerDefId=Character.A`.
+- Asset Gate commit `6942b9a` contains only the user-configured neutral Encounter Blueprint and execution evidence. Unrelated Content/map/learning/ECC changes remain excluded.
+- Independent Reviewer found no code blocker; two stale execution-report statements were corrected. Final verdict is `PASS`. Physical controller, Standalone, Packaged and Shipping remain `NOT VERIFIED`.
+- 03C three-file task packet is archived. The only adjacent next task is 03D1 Atomic Settlement Foundation Task Gate; no 03D1 Source or production-flow change is authorized.
+# 2026-07-28 | TASK-P17-PATCH-03D1 final closeout
+
+- Atomic Settlement Foundation implemented in `773e1f6`; Reviewer REVISE findings for callback-time publication coherence, candidate TransactionId defense and zero-EXP Profile publication were fixed in `2bbcd47`.
+- Fresh HSREditor Build passed UHT, compile, lib/dll link and metadata. Settlement 1, Inventory 3, Reward 6 and Progression 3 Automation tests all passed (13/13).
+- Independent Reviewer rereviewed the fix, recorded `PASS` and committed `tasks/final-review.md` as `dc30603`.
+- User confirmed `DA_Reward_P13_Standard` and `DA_CharacterCatalog_P11` Save All/reopen with stable `Character.A`.
+- User PIE log proves defeat `Outcome=2` emitted no BattleReward and returned to Exploration; victory `Outcome=1` emitted one `P13-003 BattleReward Result=SUCCESS Revision=1` and returned to Exploration. Both return contexts were consumed once and duplicate consumption returned `AlreadyConsumed`.
+- 03D1 is complete. The adjacent next task is 03D2 Task Gate only; production settlement integration remains unauthorized until separate confirmation.
+
+# 2026-07-28 | TASK-P17-PATCH-03D2 Task Gate
+
+- Initial Coordinator evidence audit returned REVISE because no authoritative victory EXP crossed the World boundary and rebuilding expected revisions after settlement-success/return-failure would conflict with the same TransactionId.
+- The revised card freezes data-driven `VictoryExperience` on EncounterDefinition/EncounterRequest, exact Battle RequestId reuse, first-request/receipt/BattleResult caching, defeat zero-settlement, post-settlement return retry and canonical `/Game/UI/WBP_RewardSummary_P13` ownership.
+- The implementation write set was reduced to BattleGameMode, EncounterTypes, BattleTransition cpp, EncounterDefinition header, one new integration test and execution evidence. Reward/Inventory/Profile/UI/Coordinator implementations remain read-only.
+- Independent Reviewer commit `6e42517` returned PASS and confirmed feasibility, TDD sufficiency, exact minimum allowlist and Editor boundaries. 03D2 implementation remains separately user-confirmation gated.
+
+# 2026-07-28 | TASK-P17-PATCH-03D2 final closeout
+
+- User authorized implementation. TDD RED `3036609` failed on the intended missing `VictoryExperience` and GameMode settlement seam; GREEN implementation `05c0549` replaced the BattleGameMode legacy reward call with the immutable SettlementAuthority transaction.
+- HSREditor Development build passed. `HSR.BattleSettlement.Integration` passed, followed by 29/29 frozen Battle/Settlement/Inventory/Reward/Progression/Map/UI regressions.
+- User configured and saved `DA_Encounter_Phase5Test` with `VictoryExperience=100`; evidence commit `998ed6e` records the asset and PIE results.
+- PIE verified defeat zero-settlement, victory `Revision=0/EXP=0 -> Revision=1/EXP=100`, duplicate confirmation without a second mutation/consume/return, exactly-once return commit and `AlreadyConsumed` on the second context read.
+- Final review is `PASS`. 03D2 is ready for archive; the only adjacent next action is 03E Task Gate, not implementation.
+
+# 2026-07-29 | TASK-P17-PATCH-03E Task Gate
+
+- Read-only evidence found that Inventory unique items persist only InstanceId/DefinitionId, while Equipment instances additionally require Kind, enhancement and modifiers. Once unequipped, the complete payload has no durable authority and cold restore would be lossy.
+- Current Inventory removal, Equipment equip/replace/unequip and ASC EffectBridge calls mutate independently; there is no OperationId, expected Inventory/Equipment revision pair, aggregate candidate or delayed publication boundary.
+- Save correctly rejects one InstanceId appearing in both Inventory and equipped rows, but has no independent full-payload registry. Existing isolated tests cannot prove owned bag -> equip -> replace -> unequip -> cold restore.
+- Task Gate verdict is `REVISE`. Recommended next planning unit is `03E1 - Equipment Instance Ownership Foundation`; Source/Content implementation remains unauthorized.
+
+# 2026-07-29 | TASK-P17-PATCH-03E1 revised Task Gate
+
+- User accepted the recommended model: Equipment Registry owns complete instance payload permanently; Inventory owns bag membership; loadout owns ID-only placement.
+- 03E is split into 03E1 ownership/persistence foundation and 03E2 aggregate movement/projection. 03E1 excludes Inventory mutation, live ASC changes and UI routing.
+- 03E1 freezes Save schema 7 with separate registry/placement DTOs. Schema 6 equipped rows migrate losslessly; Inventory unique rows are not guessed into equipment records.
+- Exact Equipment/Save allowlist and registry/migration/restore TDD matrix are frozen. Task Gate review is `PASS`; implementation awaits separate user confirmation.
+
+# 2026-07-29 | TASK-P17-PATCH-03E1 final closeout
+
+- Commits `473f46c`, `7eaa388` and `6fe6268` establish Registry-owned payloads, schema-7 Registry/Placement persistence, disk-restore preservation, failed-placement registration rollback and strict canonical placement decoding; Independent Review `786a202` is `PASS`.
+- HSREditor Development Build passed. Registry 3/3, Equipment 8/8, Save 16/16, Inventory 3/3 and Equipment Detail ViewModel 1/1 Automation passed; `git diff --check` passed.
+- User-provided Editor/PIE evidence confirms `Map_Exploration_P15_B` startup, `BP_HSRExplorationCharacter_C_0` possession, Enhanced Input bindings, `Character.A` bootstrap and normal teardown. The existing GameplayCue path fallback warning is unrelated and non-blocking.
+- Character/Inventory/Equipment and Save/Load UI are not complete, so UI-driven equipment payload inspection and PIE save/load comparison remain `NOT APPLICABLE / NOT VERIFIED`; no temporary Content or debug entry was created.
+- 03E1 is complete and archived. 03E2 may proceed only to Task Gate preparation; no 03E2 implementation is authorized.
+# 2026-07-31 | TASK-P17-PATCH-03F final closeout
+
+- User PIE accepted the complete Map.A -> Teleport.AB -> Map.B -> Teleport.BA -> Map.A loop. Each leg has one UI freeze, matching arrival commit and one restore; Pause reopened on Map.B.
+- The C++ work remains covered by focused Build and Map/UI Automation logs. Final user-owned UI integration assets were committed separately in `b9d992a`, including the intentionally deleted obsolete Pause WBP.
+- The pre-travel freeze leaves a duplicate HUD EndPlay teardown log (`Result=3`); it is behaviorally harmless in the accepted loop and is preserved as a UI lifecycle follow-up, not reported as fixed.
+- Archived the 03F task packet. Created 03G as the next authorized task gate for Save UI and integrated cold restore; no 03G source or binary asset implementation has started.
+# 2026-08-01 TASK-P17-006 Quest Frontend
+
+- 基线提交：`1a14a6c`；Quest 差异与此前 Save/Travel 工作隔离。
+- C++：新增 Quest 只读 DTO/ViewModel/Widget，并将 `EHSRFrontendModule::Quest` 接入通用 module-root route。
+- Automation：`HSR.UI.Quest` 3/3、`HSR.QuestDialogue` 1/1、`HSR.UI.FrontendNavigation` 11/11、`HSR.UI.MapFrontend` 1/1 通过；Development Editor Build exit 0。
+- 用户 Editor：创建并接入 Quest Panel/Entry/Objective Entry；确认 Empty 显示、Back、A↔B 后重开均正常。
+- 归档：`PASS WITH FOLLOW-UP / USER ACCEPTED`。生产 active Quest 的 Ready/Objective/Reward 展示仍待相邻任务验证。
+# 2026-08-04 TASK-P17-009A Party 只读投影
+
+- 新增固定两槽 Party DTO/ViewModel/Widget，复用既有通用 Party route，不暴露 Party mutation。
+- Development Editor Build、`HSR.UI.Party` 3/3、`HSR.Party` 1/1、`HSR.UI.FrontendNavigation` 11/11 通过。
+- 用户创建并接入 Party Panel/Slot Entry；PIE 确认 Character.A、两个槽位、Back/Close 与 A↔B 后重开正常。
+- 归档结论：`PASS / USER ACCEPTED`，仅覆盖只读投影前置切片；不代表权威执行计划 P17-009 整体通过。
+
+## 2026-08-05 - TASK-P17-005 final code-gate rerun after Party bootstrap
+
+- Reopened P17-005 only for final acceptance evidence after P17-009A/009B removed the former `PartySlotEmpty` dependency; archived completed 009D before switching the active task.
+- Fresh `HSREditor Win64 Development` build succeeded.
+- Approved UE commandlets passed: FrontendNavigation 11/11, Party 4/4, ChallengeDirectory 3/3, Map 5/5, BattleReturn 2/2, PreBattleCandidate 3/3, and InteractionBattle Admission 1/1.
+- Frontend log records CharacterDetail and Inventory open success plus TravelRestore consume; no `PartySlotEmpty` appeared in the approved run.
+- First sandbox run hit the known Zen `CreateProc Access Denied` assertion; the identical command passed outside the sandbox and the environment failure is retained in `tasks/execution-result.md`.
+- `git diff --check` passed. User Editor Save All/reopen, PIE route/focus/input, post-return `1` Pause, and both resolutions remain pending; task is not yet final PASS.
+
+## 2026-08-06 - TASK-P17-010C C++ implementation GREEN
+
+- Authorized implementation continued from RED checkpoint `24e3f35`.
+- Added runtime Challenge progression ownership, prerequisite-based Directory
+  projection, Save schema 8 capture/restore/migration, and post-Settlement
+  victory completion. Static `bUnlocked` is no longer authoritative.
+- Fresh `HSREditor Win64 Development` build passed. Combined Battle, Challenge,
+  Save, and Challenge Directory Automation passed 36/36; `git diff --check`
+  passed.
+- User-owned Editor prerequisite/status bindings and PIE acceptance remain
+  pending. No UAsset, frontend root, Pause input, Reward, Inventory, Map,
+  Party, or BattleTransition production logic was modified. `.claude/**` stays
+  untracked and excluded.
+
+## 2026-08-06 - TASK-P17-010C final closeout
+
+- User confirmed the current tests pass. The latest PIE evidence is
+  `C:\Users\Lai\.codex\attachments\ecbdfb99-7b64-4738-8ec9-fcca586d3e62\pasted-text.txt`.
+- The directory initialized with `Sources=3 Entries=3`, proving the locked
+  Encounter now has a unique runtime ID and is projected as an independent
+  entry.
+- `Enc_Test_Phase5` submitted and consumed successfully, applied one Stage
+  Buff with `Count=1 Debits=0`, completed the real battle with `Outcome=1`,
+  and committed the return context.
+- `Enc_Test_Phase5_locked` submitted and consumed successfully after the
+  prerequisite was completed, completed the real battle with `Outcome=1`,
+  and committed the return context without an invalid-buff failure.
+- The Phase4 segment used the existing `Map_BattleTest` consumer and returned
+  successfully; it is retained as an adjacent regression observation rather
+  than counted as a new battle-rule implementation.
+- No new code or asset was authored by Codex in this closeout turn. The two
+  user-owned UAsset modifications remain in scope for the exact closeout
+  delivery; `.claude/**` remains excluded.
+- 010C is archived as `USER ACCEPTED / INDEPENDENT REVIEW NOT RUN`. No next
+  task was created automatically.
+# 2026-08-07 | TASK-P17-CHAR-SHELL-001 user closeout
+
+- User supplied the Character Shell Entry/Shell Designer and Blueprint graph
+  hierarchy plus a PIE log from `Map_Exploration_P15_A`.
+- The supplied evidence shows Frontend input binding, numeric `1` Pause open,
+  Character route success at `Stack=2`, repeat Pause reopening, restoration of
+  exploration input context, and normal HUD teardown. No Error, Ensure, or
+  Blueprint Runtime Error appears in the supplied filtered evidence.
+- Read-only click-path audit found no blocking defect in dynamic
+  `ModuleContentHost` mounting, Entry dispatcher -> `SelectCharacter`, tab
+  buttons -> `SelectTab`, typed unavailable presentation, Back, native X, or
+  delegate teardown. Character/Inventory still do not use Blueprint
+  `AddToViewport`.
+- User explicitly accepted failure-path PIE and 1920x1080/1280x720 PIE as
+  non-blocking omissions. They remain `NOT RUN` / `NOT VERIFIED` rather than
+  being represented as passed evidence.
+- Two low-risk follow-ups are recorded without implementation: the initial
+  snapshot is presented once by `Initialize()` and once by the explicit
+  `GetSnapshot()` handoff, and Entry's local NameText write follows the
+  synchronous dispatcher-triggered Shell rebuild. Neither affects authority
+  state or the accepted user-visible result.
+- Task status is `COMPLETE / USER ACCEPTED`. No Git commit or `.claude/**`
+  change was made.
+
+# 2026-08-09 | TASK-P17-INVENTORY-003 code gate complete
+
+- Continued the user-authorized Inventory-003 package after its independent
+  Gate 0. The TDD command tests reached the intended RED compiler failures
+  (`SetCommandContext` missing, two-argument `SubmitAction` missing, and
+  `AuthorityRejected` missing) before the production seam was implemented.
+- Added the allowlisted Inventory command context and Equip/Enhance forwarding:
+  stable `InstanceId`, real Inventory/Equipment revisions, `CharacterId`, fresh
+  `OperationId`, Equipment loadout refresh, typed result mapping/logging,
+  enhancement options, and bounds-safe Widget accessors. Use/Disassemble remain
+  typed unavailable; no direct Inventory mutation was added.
+- The first sandboxed UE launch hit the known Zen access-denied startup failure;
+  the identical local command then ran with the required controlled permission.
+  `HSR.UI.Inventory` discovered 7 tests and all 7 returned `Result={Success}`.
+  Development Editor Build returned `Result: Succeeded` (target up to date), and
+  `git diff --check` passed.
+- The Equipment Authority only enhances owned instances. Inventory-003 reports
+  a non-owned bag item as typed `AuthorityRejected` without inventing ownership,
+  consuming material, or replacing the complete snapshot. Editor/UMG, B/Back/X,
+  travel teardown and PIE remain the separately authorized Inventory-004 gate.
+- No UAsset, Config, Authority, `.claude/**`, stage, commit, push, reset, clean,
+  or history rewrite was performed.
+
+# 2026-08-09 | TASK-P17-INVENTORY-004 code gate complete
+
+- Continued the explicitly authorized Inventory-004 package from the completed
+  Inventory-003 command seam. Gate 0 froze the shared Frontend Shell/UIManager/
+  `ModuleContentHost` path, P13 fallback, dynamic focus/lifecycle behavior, and
+  the existing Inventory/Equipment Authority boundaries.
+- Added the P17 Inventory class slot to HUD host registration, routed the module
+  through the shared dynamic root, added production snapshot validity checking,
+  preferred-content focus, party slot-0 character context, Back/X close-to-root,
+  and dynamic travel teardown/arrival restore. The P13 widget remains available
+  when the new class is not assigned.
+- TDD RED reached the intended missing
+  `ConfigureAutomationInventoryModuleBackend` compiler seam. The first real
+  GREEN build exposed a switch-scope error in the new Inventory focus fallback;
+  a minimal case scope fixed it, and the subsequent Build returned
+  `Result: Succeeded`.
+- Headless UE5.6 Automation discovered 9 Inventory tests and passed 9/9,
+  including DynamicRoute and DynamicTravelRestore. FrontendNavigation discovered
+  11 tests and passed 11/11. `git diff --check` passed.
+- UAsset/UMG, Editor Save All/reopen, and PIE remain user-owned and unverified.
+  Known ScreenLifecycle fixture failures remain outside this package's product
+  claim. No Authority, `.claude/**`, stage, commit, push, reset, clean, or UAsset
+  operation was performed.
+# 2026-08-09 | TASK-P17-INVENTORY-004 Editor/core PIE closeout
+
+- User completed and saved DA_InventoryCatalog_P17 and WBP_Inventory_P17. The
+  catalog contains 12 real ItemIds, validates successfully, and the Widget is
+  parented to UHSRInventoryModuleWidget with the 41-control HSR-style layout.
+- User assigned the three catalog references in the Widget, connected the P17
+  HUD class while retaining the P13 fallback, and confirmed Inventory=B and
+  CloseToRoot=X in the existing frontend input setup.
+- The authorized Inventory widget C++ additions provide pure-value Blueprint
+  seams, eager initialization, dynamic row creation/click bridging, detail
+  projection, and action enablement. Authority ownership remains unchanged.
+- User-provided Map_Exploration_P15_A PIE evidence confirms Inventory open,
+  Back to Pause Hub, X to exploration, and no Blueprint Runtime Error, Ensure,
+  or invalid snapshot log. SortBox glyph warning was fixed.
+- Remaining work is manual visual/gamepad experience of the complete list,
+  details, actions, travel restore, and failure preservation. No stage, commit,
+  push, or .claude/** modification was performed.
+
+# 2026-08-09 | TASK-P17-INVENTORY-004 user acceptance and commit closeout
+
+- User completed the remaining manual Inventory PIE experience and confirmed
+  that the visual and interaction experience is normal.
+- TASK-P17-INVENTORY-004 is now `COMPLETE / USER ACCEPTED`. The implementation
+  and asset checkpoint is `bda00e8`; the user explicitly authorized the
+  closeout commit, no push was performed, and `.claude/**` plus the unrelated
+  Relic archive remain excluded.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-001 Gate 0 started
+
+- User authorized the unambiguous Dialogue-001 package. It maps to the Phase 17
+  execution-plan meaning of P17-012; the archived `TASK-P17-012` dynamic-mount
+  package is not reused.
+- Read-only audit covers `HSRDialogueSubsystem`, `HSRDialogueInteractable`,
+  `HSRInteractionComponent`, Dialogue Definition, Quest/Reward authorities, and
+  the existing Quest/Dialogue Automation fixture.
+- Gate 0 freezes InteractionComponent candidate/F ownership, Dialogue authority
+  progression, Exploration Overlay ownership outside the Pause Router, pure-value
+  active-query identity, stable Node/Choice IDs, and failure snapshot retention.
+- The current generic interaction result lacks a typed DialogueId/NodeId start
+  payload, and Dialogue Definition lacks speaker/choice display text. Both are
+  recorded as explicit future API/data decisions; no UI inference is allowed.
+- Added `Source/HSR/Tests/HSRDialoguePresentationTests.cpp` as the TDD RED
+  reproducer. No production code, UAsset, Config, Git, or `.claude/**` change
+  was made; the real UBT RED run was the next verification step and is recorded
+  in the closeout entry below.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-001 TDD RED confirmed
+
+- User fully exited Unreal Editor, allowing the controlled UE5.6 UBT command to
+  reach compilation.
+- The first failure was the intentional missing
+  `../UI/Dialogue/HSRDialoguePresentationTypes.h` include in
+  `HSRDialoguePresentationTests.cpp`; this confirms the Dialogue presentation
+  contract RED boundary.
+- The same build reported an unrelated `NameLess` duplicate definition between
+  `HSRSaveVersion.cpp` and `HSRChallengeProgressionSubsystem.cpp`. It is outside
+  the Dialogue-001 allowlist and was not changed or reclassified as a Dialogue
+  defect.
+- Dialogue-001 is closed at `GATE 0 PASS / TDD RED CONFIRMED / GREEN NOT
+  STARTED`; no UAsset, production UI, Git stage/commit/push, or `.claude/**`
+  operation was performed. Dialogue-002 requires separate authorization.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-002 implementation / verification pending
+
+- User authorized Dialogue-002. Gate 0 keeps `F`/Candidate with
+  `UHSRInteractionComponent`, keeps the Overlay outside the Pause Router, and
+  defers Quest/Encounter/Reward branch submission to Dialogue-003.
+- TDD RED was extended for authored speaker/choice text, stable selection,
+  stale rejection, exit and unavailable behavior. The real UBT first failed at
+  the intentionally missing Presentation header.
+- Added `SpeakerText`/`DisplayText`, read-only `GetNode`/`PreviewChoice`, and the
+  pure-value `UHSRDialoguePresentationViewModel`. Preview does not submit Quest
+  events; raw Authority result codes remain exposed.
+- Post-implementation UBT Build returned `Result: Succeeded`. First focused
+  Automation discovered 4 tests: 3 passed; ActiveQuery failed only because the
+  test fixture created a GameInstance subsystem without a valid Outer. The
+  fixture was corrected.
+- Corrected-fixture rebuild/rerun is pending: the controlled command was
+  rejected by the approval service due server overload, while the default
+  sandbox hit the known UnrealBuildTool cache permission. No UAsset, Git,
+  `.claude/**`, Overlay or PIE operation was performed.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-002 code/Automation closeout
+
+- Rebuilt after correcting the test fixture's valid `UGameInstance` Outer;
+  `HSREditor Win64 Development` returned `Result: Succeeded`.
+- `HSR.Dialogue.Presentation` discovered 4 tests and all 4 returned
+  `Result={Success}`: ActiveQuery, ExitAndUnavailable,
+  FailurePreservesSnapshot and Selection.
+- Existing `HSR.QuestDialogue` discovered 1 test and returned
+  `Result={Success}` for BranchingReward. Both command runs ended with exit
+  code 0 and no Ensure/Error.
+- Dialogue-002 is complete at the code/Automation gate. No Overlay/UAsset,
+  Editor/PIE, Git stage/commit/push, or `.claude/**` operation was performed;
+  Dialogue-003 requires separate authorization.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-003 code/Automation closeout
+
+- User authorized the unambiguous Dialogue-003 package for the Phase 17 P17-012
+  meaning; the archived `TASK-P17-012` dynamic-mount task was not reused.
+- Gate 0 froze the explicit None/Quest/Encounter/Reward branch contract,
+  stable `BranchOperationId`, complete authored Encounter request, existing
+  Authority ownership, exactly-once semantics and failure snapshot retention.
+- Added Authority forwarding and a branch ledger. Quest uses Quest Authority;
+  Reward uses `BranchOperationId` as `ClaimId`; Encounter uses it as `RequestId`.
+  Replays return `NoOp`, cross-choice operation reuse returns
+  `OperationIdConflict`, and rejected branches do not enter the ledger.
+- TDD RED reached the intended missing branch contract/API compiler failures
+  before production implementation. GREEN Development Editor Build returned
+  `Result: Succeeded`.
+- Focused Automation passed `HSR.Dialogue.Authority` 5/5,
+  `HSR.Dialogue.Presentation` 4/4 and `HSR.QuestDialogue` 1/1. `git diff
+  --check` passed.
+- Dialogue-003 is complete at the code/Automation gate. Overlay/HUD/input,
+  focus, travel teardown, Editor/PIE and UAsset work remain Dialogue-004; no
+  Git stage/commit/push or `.claude/**` operation was performed.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-004 Gate 0 started
+
+- User authorized the unambiguous Dialogue-004 package for the Phase 17 P17-012
+  meaning; archived `TASK-P17-012` remains the unrelated dynamic-mount task.
+- Gate 0 freezes the typed Dialogue start payload from the InteractionComponent,
+  an Exploration-local Overlay outside the Pause Hub Router, UIManager-owned
+  input/focus/close/compensation, and clean-root travel teardown without stale
+  query restoration.
+- Runtime WBP creation/binding, Input assets/Config, Editor Save All/reopen and
+  visual PIE remain user-owned. The package has not performed Git stage/commit/
+  push and `.claude/**` remains excluded.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-004 code/Automation gate complete
+
+- The new `HSRDialogueOverlayLifecycleTests.cpp` reached the intended RED
+  before production implementation: the real UBT compile could not find
+  `../UI/Dialogue/HSRDialogueOverlayWidget.h`.
+- Implemented the typed interaction payload, Exploration-local Overlay Widget,
+  HUD forwarding, UIManager-owned create/attach/UIOnly/focus/close compensation,
+  Escape/Gamepad Back/X precedence, frontend blocking and travel teardown. The
+  Overlay remains outside the Screen Stack/Frontend Router and never calls an
+  Authority or owns viewport state.
+- Final build command used the local UE5.6 path with the Editor closed:
+  `Build.bat HSREditor Win64 Development -Project=E:\\work\\unreal_projects\\HSR\\HSR.uproject -WaitMutex -NoHotReload`;
+  it returned `Result: Succeeded`.
+- Focused Automation returned `HSR.Dialogue.Overlay` 4/4,
+  `HSR.Dialogue.Authority` 5/5, `HSR.Dialogue.Presentation` 4/4 and
+  `HSR.QuestDialogue` 1/1, with every test `Result={Success}` and exit code 0.
+  `git diff --check` passed.
+- User Editor authoring, Save All/close/reopen, visual PIE, input/focus feel and
+  travel teardown remain the only required acceptance evidence. No Git
+  stage/commit/push, UAsset/Config/Input asset change or `.claude/**` operation
+  was performed.
+
+# 2026-08-09 | TASK-P17-DIALOGUE-004 Editor/PIE closeout — USER ACCEPTED
+
+- User created and saved `DA_Dialogue_P17_Demo` and
+  `WBP_DialogueOverlay_P17`; the Widget is parented to
+  `UHSRDialogueOverlayWidget` and its four choice/close bindings persisted.
+- `BP_HSRHUD` persists `DialogueOverlayWidgetClass`. `Map_Exploration_P15_A`
+  contains the configured `AHSRDialogueInteractable` at `(0,300,92)`. The
+  visible Sphere marker and interaction radius 260 make the actor discoverable;
+  PIE observed Talk at distance 140.
+- PIE evidence: typed start payload `Dialogue.P17.Demo / Node.Start`, Overlay
+  open result 0 with `FocusResult=1`, frontend request rejected as
+  `AlreadyOpen` result 12, and no Blueprint Runtime Error, Ensure or array
+  bounds error. User confirmed choice progression, Escape/Gamepad Back/X and
+  CloseButton close, plus authorized travel teardown without stale restoration.
+- `TASK-P17-DIALOGUE-004` is now `COMPLETE / USER ACCEPTED`. No Git stage,
+  commit, push or `.claude/**` operation was performed.

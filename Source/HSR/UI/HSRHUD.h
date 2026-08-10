@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
-#include "Frontend/HSRFrontendRouteTypes.h"
+#include "../Interaction/HSRInteractionTypes.h"
 #include "HSRHUD.generated.h"
 
 class UHSRUserWidget;
@@ -13,6 +13,9 @@ class UHSRRewardSummaryWidget;
 class UHSRScreenWidget;
 class UHSRFrontendShellWidget;
 class UHSRFrontendModuleRootWidget;
+class UHSRInventoryModuleWidget;
+class UHSRDialogueOverlayWidget;
+class UHSRInteractionComponent;
 class UUserWidget;
 
 UCLASS()
@@ -42,6 +45,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void ClearInteractionObserverInstance();
 
+	UFUNCTION()
+	void HandleInteractionCompleted(const FHSRInteractionResult& Result);
+
 	// Development-only Phase 2 test interface
 	UFUNCTION(BlueprintCallable, Category = "HUD|Development", meta = (DevelopmentOnly))
 	void RequestRebuildExplorationHUDForPhase2Test();
@@ -62,11 +68,19 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
 	TSubclassOf<UHSRScreenWidget> CharacterDetailWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
+	TSubclassOf<UHSRDialogueOverlayWidget> DialogueOverlayWidgetClass;
+
 	UPROPERTY()
 	TObjectPtr<UHSRInteractionViewModel> InteractionViewModel;
 
+	UPROPERTY(Transient)
+	TWeakObjectPtr<UHSRInteractionComponent> ObservedInteractionComponent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P13")
 	TSubclassOf<UHSRInventoryWidget> InventoryWidgetClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
+	TSubclassOf<UHSRInventoryModuleWidget> InventoryModuleWidgetClass;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
 	TSubclassOf<UUserWidget> PartyWidgetClass;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
@@ -77,14 +91,6 @@ protected:
 	TSubclassOf<UUserWidget> QuestWidgetClass;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P17")
 	TSubclassOf<UUserWidget> SaveWidgetClass;
-
-	/**
-	 * Collects the authored module widget classes into the keyed map the UI manager routes on. The
-	 * properties above stay separate named fields because they are Blueprint-authored defaults that
-	 * already carry values in the HUD asset; a single map property would drop that authoring. Adding
-	 * a module means one property here plus one line below, and no change to routing itself.
-	 */
-	TMap<EHSRFrontendModule, TSubclassOf<UUserWidget>> BuildFrontendModuleWidgetClasses() const;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HUD|P13")
 	TSubclassOf<UHSRRewardSummaryWidget> RewardSummaryWidgetClass;
 	UPROPERTY(Transient)

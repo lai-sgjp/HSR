@@ -4,10 +4,31 @@
 #include "../Quest/HSRQuestSubsystem.h"
 #include "../Data/Definitions/HSRQuestDefinition.h"
 #include "../Data/Definitions/HSRDialogueDefinition.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "UObject/ConstructorHelpers.h"
 
 AHSRDialogueInteractable::AHSRDialogueInteractable()
 {
 	PrimaryActorTick.bCanEverTick = false;
+
+	// Give the graybox a discoverable marker and a forgiving interaction radius.
+	// The base CollisionComponent starts at radius 32 and is hidden in game, which
+	// makes the Dialogue interactable impossible to find or reach during PIE.
+	CollisionComponent->SetSphereRadius(260.f);
+	CollisionComponent->SetHiddenInGame(false);
+
+	VisualMarker = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("VisualMarker"));
+	VisualMarker->SetupAttachment(RootComponent);
+	VisualMarker->SetRelativeLocation(FVector(0.f, 0.f, 60.f));
+	VisualMarker->SetRelativeScale3D(FVector(0.6f, 0.6f, 0.6f));
+	VisualMarker->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> MarkerMesh(
+		TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	if (MarkerMesh.Succeeded())
+	{
+		VisualMarker->SetStaticMesh(MarkerMesh.Object);
+	}
 }
 
 void AHSRDialogueInteractable::BeginPlay()
@@ -53,7 +74,7 @@ FHSRInteractionResult AHSRDialogueInteractable::ExecuteInteraction_Implementatio
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("AHSRDialogueInteractable::ExecuteInteraction - DialogueId=%s StartNode=%s"), *DialogueId.ToString(), *StartNode.NodeId.ToString());
-	return FHSRInteractionResult::MakeSuccess();
+	return FHSRInteractionResult::MakeDialogueSuccess(DialogueId, StartNode.NodeId);
 }
 
 bool AHSRDialogueInteractable::GetStartDialogueNode(FHSRDialogueNodeDefinition& OutNode) const

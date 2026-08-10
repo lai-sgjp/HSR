@@ -5,7 +5,14 @@
 #include "HSRCharacterDetailWidget.h"
 #include "HSRInventoryRewardWidget.h"
 #include "HSRInventoryRewardViewModel.h"
+#include "Inventory/HSRInventoryModuleWidget.h"
+#include "Dialogue/HSRDialogueOverlayWidget.h"
+#include "Dialogue/HSRDialoguePresentationViewModel.h"
 #include "../Inventory/HSRInventorySubsystem.h"
+#include "../Dialogue/HSRDialogueSubsystem.h"
+#include "../Equipment/HSREquipmentTypes.h"
+#include "../Party/HSRPartySubsystem.h"
+#include "../Party/HSRPartyTypes.h"
 #include "../Reward/HSRRewardSubsystem.h"
 #include "../Map/HSRMapSubsystem.h"
 #include "../Battle/HSRBattleTransitionSubsystem.h"
@@ -64,6 +71,7 @@ void UHSRUIManagerSubsystem::Deinitialize()
 	bTravelRestorePending = false;
 	bTravelArrivalObserved = false;
 	TravelRestoreScreenId = NAME_None;
+	ReleaseDialogueOverlay();
 	if (InventoryWidgetInstance)
 	{
 		InventoryWidgetInstance->SetViewModel(nullptr);
@@ -131,7 +139,13 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
 	TSubclassOf<UHSRFrontendModuleRootWidget> InFrontendModuleRootClass,
 	TSubclassOf<UHSRScreenWidget> InCharacterDetailWidgetClass,
 	TSubclassOf<UHSRInventoryWidget> InInventoryWidgetClass,
-	const TMap<EHSRFrontendModule, TSubclassOf<UUserWidget>>& InModuleWidgetClasses)
+	TSubclassOf<UHSRInventoryModuleWidget> InInventoryModuleWidgetClass,
+	TSubclassOf<UHSRDialogueOverlayWidget> InDialogueOverlayWidgetClass,
+	TSubclassOf<UUserWidget> InPartyWidgetClass,
+	TSubclassOf<UUserWidget> InMapWidgetClass,
+	TSubclassOf<UUserWidget> InChallengeWidgetClass,
+	TSubclassOf<UUserWidget> InQuestWidgetClass,
+	TSubclassOf<UUserWidget> InSaveWidgetClass)
 {
 	if (!bInitialized || !ScreenStack || !InputModeCoordinator)
 	{
@@ -154,11 +168,18 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
 		FrontendModuleRootClass = InFrontendModuleRootClass;
 		CharacterDetailWidgetClass = InCharacterDetailWidgetClass;
 		InventoryWidgetClass = InInventoryWidgetClass;
-		FrontendModuleWidgetClasses = InModuleWidgetClasses;
+		InventoryModuleWidgetClass = InInventoryModuleWidgetClass;
+		DialogueOverlayWidgetClass = InDialogueOverlayWidgetClass;
+		PartyWidgetClass = InPartyWidgetClass;
+		MapWidgetClass = InMapWidgetClass;
+		ChallengeWidgetClass = InChallengeWidgetClass;
+		QuestWidgetClass = InQuestWidgetClass;
+		SaveWidgetClass = InSaveWidgetClass;
 		return EHSRUIScreenResult::NoOp;
 	}
 	if (RegisteredHUD.IsValid() || FrontendShellInstance || FrontendModuleContentInstance
-		|| CharacterDetailWidgetInstance || InventoryWidgetInstance || InventoryViewModelInstance)
+		|| CharacterDetailWidgetInstance || InventoryWidgetInstance || InventoryViewModelInstance
+		|| DialogueOverlayWidgetInstance || DialogueViewModelInstance)
 	{
 		return EHSRUIScreenResult::InvalidHost;
 	}
@@ -183,7 +204,13 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterExplorationHost(AHSRHUD* HUD,
 	FrontendModuleRootClass = InFrontendModuleRootClass;
 	CharacterDetailWidgetClass = InCharacterDetailWidgetClass;
 	InventoryWidgetClass = InInventoryWidgetClass;
-	FrontendModuleWidgetClasses = InModuleWidgetClasses;
+	InventoryModuleWidgetClass = InInventoryModuleWidgetClass;
+	DialogueOverlayWidgetClass = InDialogueOverlayWidgetClass;
+	PartyWidgetClass = InPartyWidgetClass;
+	MapWidgetClass = InMapWidgetClass;
+	ChallengeWidgetClass = InChallengeWidgetClass;
+	QuestWidgetClass = InQuestWidgetClass;
+	SaveWidgetClass = InSaveWidgetClass;
 	// Clear before restoring: a travel-scoped inconsistency would otherwise reject the restore
 	// and every later OpenFrontendModule call on this otherwise-healthy host.
 	TryClearRecoverableInconsistency();
@@ -197,7 +224,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::UnregisterExplorationHost(AHSRHUD* HU
 	{
 		return EHSRUIScreenResult::InvalidHost;
 	}
-	return TeardownCurrentHost();
+	return TeardownCurrentHost(false);
 }
 
 EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownExplorationHostForTravel(AHSRHUD* HUD,
@@ -225,11 +252,21 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::PrepareExplorationTravel()
 	return CaptureAndTeardownTravelHost();
 }
 
-EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownCurrentHost()
+EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownCurrentHost(const bool bForTravel)
 {
 	bool bRecovered = true;
 	AHSRPlayerController* PC = RegisteredPlayerController.Get();
 	UWorld* World = PC ? PC->GetWorld() : nullptr;
+	if (DialogueOverlayWidgetInstance || DialogueViewModelInstance)
+	{
+		const EHSRUIScreenResult DialogueCloseResult = CloseDialogueOverlayInternal(!bForTravel);
+		bRecovered &= DialogueCloseResult == EHSRUIScreenResult::Success
+			|| DialogueCloseResult == EHSRUIScreenResult::NothingOpen;
+		if (DialogueOverlayWidgetInstance || DialogueViewModelInstance)
+		{
+			ReleaseDialogueOverlay();
+		}
+	}
 	if (FrontendShellInstance)
 	{
 		bRecovered &= CloseFrontendToRoot() == EHSRUIScreenResult::Success;
@@ -332,6 +369,10 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenPauseScreen()
 	if (bInconsistent)
 	{
 		return EHSRUIScreenResult::Inconsistent;
+	}
+	if (HasDialogueOverlayBlockingFrontend())
+	{
+		return EHSRUIScreenResult::AlreadyOpen;
 	}
 	if (IsTravelPending()) return EHSRUIScreenResult::InvalidHost;
 	if (HasInventoryOwnershipMismatch())
@@ -743,6 +784,10 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 	{
 		return EHSRUIScreenResult::Inconsistent;
 	}
+	if (HasOpenDialogueOverlay())
+	{
+		return CloseDialogueOverlay();
+	}
 	if (HasInventoryOwnershipMismatch())
 	{
 		bInconsistent = true;
@@ -783,6 +828,9 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 				return ApplyFocusBackend(RegisteredPlayerController.Get(), FrontendShellInstance->GetPreferredFocusWidget(), FrontendShellInstance);
 			}
 		};
+		// Policy and focus report separately on purpose: a caller that sees FocusApplyFailed for a
+		// policy rejection cannot tell which backend refused, and the close-path tests distinguish
+		// the two. Both arms compensate by restoring the previous policy before returning.
 		if (!ApplyActiveModulePolicy(GetResolvedInputPolicy()))
 		{
 			const bool bPolicyRestored = ApplyActiveModulePolicy(OldPolicy);
@@ -832,6 +880,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 		FrontendShellInstance->PresentRoute(FrontendRouter->GetSnapshot());
 		// A module reopened by travel restore has no shell layer beneath it to fall back to, so
 		// backing out of it must land on the root rather than leaving the shell on the stack.
+		// Placed after the compensating early returns above: a failed close must not close to root.
 		if (bTravelRestoredModule)
 		{
 			bTravelRestoredModule = false;
@@ -887,6 +936,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 EHSRUIScreenResult UHSRUIManagerSubsystem::OpenFrontendModule(const EHSRFrontendModule Module)
 {
 	if (Module == EHSRFrontendModule::None) return EHSRUIScreenResult::StackRejected;
+	if (HasDialogueOverlayBlockingFrontend()) return EHSRUIScreenResult::AlreadyOpen;
 	bool bOpenedShell = false;
 	if (!FrontendShellInstance)
 	{
@@ -923,7 +973,15 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenFrontendModule(const EHSRFrontend
 	case EHSRFrontendModule::Character:
 		return CompleteModuleAttempt(OpenCharacterDetailInternal());
 	case EHSRFrontendModule::Inventory:
-		return CompleteModuleAttempt(OpenInventoryInternal());
+	#if WITH_DEV_AUTOMATION_TESTS
+		if (!InventoryModuleWidgetClass && !bAutomationUseInventoryModuleContent)
+	#else
+		if (!InventoryModuleWidgetClass)
+	#endif
+		{
+			return CompleteModuleAttempt(OpenInventoryInternal());
+		}
+		[[fallthrough]];
 	case EHSRFrontendModule::Party:
 	case EHSRFrontendModule::Map:
 	case EHSRFrontendModule::Challenge:
@@ -947,10 +1005,29 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenFrontendModule(const EHSRFrontend
 			RootCandidate->RemoveFromParent();
 			return CompleteModuleAttempt(EHSRUIScreenResult::WidgetCreationFailed);
 		}
+		if (UHSRInventoryModuleWidget* InventoryContent = Cast<UHSRInventoryModuleWidget>(ContentCandidate))
+		{
+			InventoryContent->InitializeCommandContext(ResolveInventoryCharacterGuid());
+#if WITH_DEV_AUTOMATION_TESTS
+			if (!bUseAutomationBackend)
+#endif
+			{
+				FHSRInventoryModuleSnapshot InventorySnapshot;
+				if (!InventoryContent->GetCurrentSnapshot(InventorySnapshot)
+					|| !InventorySnapshot.bIsValid)
+				{
+					RootCandidate->RemoveFromParent();
+					ContentCandidate->RemoveFromParent();
+					return CompleteModuleAttempt(EHSRUIScreenResult::ViewModelInitializationFailed);
+				}
+			}
+		}
 		RootCandidate->SetOwningUIManager(this);
+		UWidget* ContentPreferredFocus = nullptr;
 		if (UHSRScreenWidget* ScreenContent = Cast<UHSRScreenWidget>(ContentCandidate))
 		{
 			ScreenContent->SetOwningUIManager(this);
+			ContentPreferredFocus = ScreenContent->GetPreferredFocusWidget();
 		}
 		RootCandidate->PresentModule(Module);
 		const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter->GetSnapshot();
@@ -971,7 +1048,13 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenFrontendModule(const EHSRFrontend
 			const bool bPolicyRestored = ApplyPolicyBackend(RegisteredPlayerController.Get(), OldPolicy, EHSRPlayerControlMode::UIOnly);
 			return CompleteModuleAttempt(ResolveCompensation(bPolicyRestored, EHSRUIScreenResult::PolicyApplyFailed));
 		}
-		if (ApplyFocusBackend(RegisteredPlayerController.Get(), RootCandidate->GetPreferredFocusWidget(), RootCandidate) == EHSRFocusApplyResult::Unavailable)
+		UWidget* PreferredFocus = RootCandidate->GetPreferredFocusWidget();
+		if (ContentPreferredFocus)
+		{
+			PreferredFocus = ContentPreferredFocus;
+		}
+		if (ApplyFocusBackend(RegisteredPlayerController.Get(), PreferredFocus, RootCandidate)
+			== EHSRFocusApplyResult::Unavailable)
 		{
 			RootCandidate->ClearModuleContent();
 			RootCandidate->RemoveFromParent();
@@ -1019,8 +1102,253 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenFrontendModule(const EHSRFrontend
 	}
 }
 
+bool UHSRUIManagerSubsystem::HasDialogueOverlayBlockingFrontend() const
+{
+	return DialogueOverlayWidgetInstance != nullptr || DialogueViewModelInstance != nullptr;
+}
+
+EHSRUIScreenResult UHSRUIManagerSubsystem::OpenDialogueOverlay(const FName DialogueId, const FName NodeId)
+{
+	return OpenDialogueOverlayInternal(DialogueId, NodeId);
+}
+
+EHSRUIScreenResult UHSRUIManagerSubsystem::OpenDialogueOverlayInternal(
+	const FName DialogueId, const FName NodeId)
+{
+	if (!bInitialized || !ScreenStack || !InputModeCoordinator)
+	{
+		return EHSRUIScreenResult::NotInitialized;
+	}
+	if (DialogueId.IsNone() || NodeId.IsNone())
+	{
+		return EHSRUIScreenResult::InvalidHost;
+	}
+	if (bInconsistent)
+	{
+		return EHSRUIScreenResult::Inconsistent;
+	}
+	if (IsTravelPending())
+	{
+		return EHSRUIScreenResult::InvalidHost;
+	}
+	if (HasDialogueOverlayBlockingFrontend())
+	{
+		return EHSRUIScreenResult::AlreadyOpen;
+	}
+	if (FrontendShellInstance || FrontendModuleRootInstance || FrontendModuleContentInstance
+		|| CharacterDetailWidgetInstance || InventoryWidgetInstance)
+	{
+		return EHSRUIScreenResult::AlreadyOpen;
+	}
+
+	AHSRPlayerController* PC = RegisteredPlayerController.Get();
+	UHSRUserWidget* RootWidget = RegisteredRootWidget.Get();
+	UWorld* World = PC ? PC->GetWorld() : nullptr;
+	if (!IsBackendHostValid(PC, RootWidget, World))
+	{
+		return EHSRUIScreenResult::InvalidHost;
+	}
+	if (!IsBackendExploration(PC))
+	{
+		return EHSRUIScreenResult::NotExploration;
+	}
+	const FHSRScreenStackSnapshot StackSnapshot = ScreenStack->GetSnapshot();
+	if (StackSnapshot.Entries.Num() != 1 || StackSnapshot.Entries[0].ScreenId != ExplorationRootId)
+	{
+		return EHSRUIScreenResult::AlreadyOpen;
+	}
+
+#if WITH_DEV_AUTOMATION_TESTS
+	if ((!bUseAutomationBackend && !DialogueOverlayWidgetClass)
+		|| (bUseAutomationBackend && !bAutomationHasDialogueOverlayClass))
+#else
+	if (!DialogueOverlayWidgetClass)
+#endif
+	{
+		return EHSRUIScreenResult::MissingWidgetClass;
+	}
+
+	UHSRDialoguePresentationViewModel* ViewModelCandidate = NewObject<UHSRDialoguePresentationViewModel>(this);
+	if (!ViewModelCandidate)
+	{
+		return EHSRUIScreenResult::ViewModelInitializationFailed;
+	}
+
+#if WITH_DEV_AUTOMATION_TESTS
+	if (!bUseAutomationBackend)
+#endif
+	{
+		UGameInstance* GameInstance = GetLocalPlayer() ? GetLocalPlayer()->GetGameInstance() : nullptr;
+		UHSRDialogueSubsystem* Dialogue = GameInstance
+			? GameInstance->GetSubsystem<UHSRDialogueSubsystem>() : nullptr;
+		if (!Dialogue)
+		{
+			return EHSRUIScreenResult::ViewModelInitializationFailed;
+		}
+		ViewModelCandidate->Initialize(Dialogue);
+		FHSRDialoguePresentationRequest Request;
+		Request.QueryId = FGuid::NewGuid();
+		Request.DialogueId = DialogueId;
+		Request.NodeId = NodeId;
+		if (ViewModelCandidate->BeginDialogue(Request) != EHSRDialoguePresentationResult::Success)
+		{
+			ViewModelCandidate->Shutdown();
+			return EHSRUIScreenResult::ViewModelInitializationFailed;
+		}
+	}
+#if WITH_DEV_AUTOMATION_TESTS
+	else
+	{
+		ViewModelCandidate->Initialize(nullptr);
+	}
+#endif
+
+	UHSRDialogueOverlayWidget* WidgetCandidate = CreateDialogueOverlayCandidate(PC);
+	if (!WidgetCandidate)
+	{
+		ViewModelCandidate->Shutdown();
+		return EHSRUIScreenResult::WidgetCreationFailed;
+	}
+	WidgetCandidate->SetOwningUIManager(this);
+	WidgetCandidate->SetViewModel(ViewModelCandidate);
+	if (!AttachDialogueOverlayCandidate(WidgetCandidate))
+	{
+		WidgetCandidate->SetViewModel(nullptr);
+		WidgetCandidate->RemoveFromParent();
+		ViewModelCandidate->Shutdown();
+		return EHSRUIScreenResult::ViewportAttachFailed;
+	}
+
+	const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
+	FHSRInputModePolicy DialoguePolicy;
+	DialoguePolicy.InputIntent = EHSRUIInputIntent::UIOnly;
+	DialoguePolicy.bShowMouseCursor = true;
+	DialoguePolicy.PreferredFocusToken = TEXT("UI.Focus.DialogueOverlay");
+	DialoguePolicy.OwningScreenId = TEXT("UI.Screen.DialogueOverlay");
+	if (!ApplyPolicyBackend(PC, DialoguePolicy, EHSRPlayerControlMode::UIOnly))
+	{
+		WidgetCandidate->SetViewModel(nullptr);
+		WidgetCandidate->RemoveFromParent();
+		ViewModelCandidate->Shutdown();
+		if (!ApplyPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::Exploration))
+		{
+			bInconsistent = true;
+			return EHSRUIScreenResult::CompensationFailed;
+		}
+		return EHSRUIScreenResult::PolicyApplyFailed;
+	}
+
+	const EHSRFocusApplyResult FocusResult = ApplyDialogueFocusBackend(
+		PC, WidgetCandidate->GetPreferredFocusWidget(), WidgetCandidate);
+	if (FocusResult == EHSRFocusApplyResult::Unavailable)
+	{
+		WidgetCandidate->SetViewModel(nullptr);
+		WidgetCandidate->RemoveFromParent();
+		ViewModelCandidate->Shutdown();
+		if (!ApplyPolicyBackend(PC, OldPolicy, EHSRPlayerControlMode::Exploration))
+		{
+			bInconsistent = true;
+			return EHSRUIScreenResult::CompensationFailed;
+		}
+		return EHSRUIScreenResult::FocusApplyFailed;
+	}
+
+	DialogueOverlayWidgetInstance = WidgetCandidate;
+	DialogueViewModelInstance = ViewModelCandidate;
+	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Dialogue Overlay Open Success Dialogue=%s Node=%s FocusResult=%d"),
+		*DialogueId.ToString(), *NodeId.ToString(), static_cast<uint8>(FocusResult));
+	return EHSRUIScreenResult::Success;
+}
+
+EHSRUIScreenResult UHSRUIManagerSubsystem::CloseDialogueOverlay()
+{
+	return CloseDialogueOverlayInternal(true);
+}
+
+EHSRUIScreenResult UHSRUIManagerSubsystem::CloseDialogueOverlayInternal(const bool bRestoreInputPolicy)
+{
+	if (!DialogueOverlayWidgetInstance && !DialogueViewModelInstance)
+	{
+		return EHSRUIScreenResult::NothingOpen;
+	}
+	if (!bRestoreInputPolicy)
+	{
+		ReleaseDialogueOverlay();
+		return EHSRUIScreenResult::Success;
+	}
+
+	AHSRPlayerController* PC = RegisteredPlayerController.Get();
+	UHSRUserWidget* RootWidget = RegisteredRootWidget.Get();
+	UWorld* World = PC ? PC->GetWorld() : nullptr;
+	if (!IsBackendHostValid(PC, RootWidget, World))
+	{
+		return EHSRUIScreenResult::InvalidHost;
+	}
+	if (!ApplyPolicyBackend(PC, GetResolvedInputPolicy(), EHSRPlayerControlMode::Exploration))
+	{
+		return EHSRUIScreenResult::PolicyApplyFailed;
+	}
+	ReleaseDialogueOverlay();
+	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Dialogue Overlay Closed"));
+	return EHSRUIScreenResult::Success;
+}
+
+void UHSRUIManagerSubsystem::ReleaseDialogueOverlay()
+{
+	if (DialogueOverlayWidgetInstance)
+	{
+		DialogueOverlayWidgetInstance->SetViewModel(nullptr);
+		DialogueOverlayWidgetInstance->RemoveFromParent();
+		DialogueOverlayWidgetInstance = nullptr;
+	}
+	if (DialogueViewModelInstance)
+	{
+		DialogueViewModelInstance->Shutdown();
+		DialogueViewModelInstance = nullptr;
+	}
+}
+
+UHSRDialogueOverlayWidget* UHSRUIManagerSubsystem::CreateDialogueOverlayCandidate(
+	AHSRPlayerController* PlayerController)
+{
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend)
+	{
+		return bAutomationDialogueOverlayCreateSucceeds
+			? NewObject<UHSRDialogueOverlayWidget>(this) : nullptr;
+	}
+#endif
+	return CreateWidget<UHSRDialogueOverlayWidget>(PlayerController, DialogueOverlayWidgetClass);
+}
+
+bool UHSRUIManagerSubsystem::AttachDialogueOverlayCandidate(UHSRDialogueOverlayWidget* Candidate)
+{
+	if (!Candidate)
+	{
+		return false;
+	}
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bUseAutomationBackend)
+	{
+		return bAutomationDialogueOverlayAttachSucceeds;
+	}
+#endif
+	Candidate->AddToViewport(120);
+	return Candidate->IsInViewport();
+}
+
+EHSRFocusApplyResult UHSRUIManagerSubsystem::ApplyDialogueFocusBackend(
+	AHSRPlayerController* PlayerController, UWidget* Preferred, UWidget* Fallback)
+{
+	return ApplyFocusBackend(PlayerController, Preferred, Fallback);
+}
+
 EHSRUIScreenResult UHSRUIManagerSubsystem::CloseFrontendToRoot()
 {
+	if (HasOpenDialogueOverlay())
+	{
+		return CloseDialogueOverlay();
+	}
 	if (!FrontendShellInstance) return EHSRUIScreenResult::NothingOpen;
 	AHSRPlayerController* PC = RegisteredPlayerController.Get();
 	UHSRUserWidget* RootWidget = RegisteredRootWidget.Get();
@@ -1182,10 +1510,26 @@ bool UHSRUIManagerSubsystem::RestoreFrontendModuleFocus(AHSRPlayerController* Pl
 				CharacterDetailWidgetInstance->GetPreferredFocusWidget(), CharacterDetailWidgetInstance)
 				!= EHSRFocusApplyResult::Unavailable;
 	case EHSRFrontendModule::Inventory:
-		return InventoryWidgetInstance
-			&& ApplyInventoryFocusBackend(PlayerController,
+	{
+		if (InventoryWidgetInstance)
+		{
+			return ApplyInventoryFocusBackend(PlayerController,
 				InventoryWidgetInstance->GetPreferredFocusWidget(), InventoryWidgetInstance)
 				!= EHSRFocusApplyResult::Unavailable;
+		}
+		UWidget* PreferredFocus = FrontendModuleContentInstance;
+		if (UHSRScreenWidget* ScreenContent = Cast<UHSRScreenWidget>(FrontendModuleContentInstance))
+		{
+			if (UWidget* ContentPreferredFocus = ScreenContent->GetPreferredFocusWidget())
+			{
+				PreferredFocus = ContentPreferredFocus;
+			}
+		}
+		return FrontendModuleContentInstance
+			&& FrontendModuleContentModule == EHSRFrontendModule::Inventory
+			&& ApplyFocusBackend(PlayerController, PreferredFocus,
+				FrontendModuleContentInstance) != EHSRFocusApplyResult::Unavailable;
+	}
 	case EHSRFrontendModule::Party:
 	case EHSRFrontendModule::Map:
 	case EHSRFrontendModule::Challenge:
@@ -1322,7 +1666,11 @@ void UHSRUIManagerSubsystem::ShutdownInventoryViewModelCandidate(UHSRInventoryRe
 
 bool UHSRUIManagerSubsystem::HasInventoryOwnershipMismatch() const
 {
-	return (InventoryWidgetInstance != nullptr) != (InventoryViewModelInstance != nullptr);
+	const bool bLegacyMismatch = (InventoryWidgetInstance != nullptr)
+		!= (InventoryViewModelInstance != nullptr);
+	const bool bDynamicInventoryMissingContent = FrontendModuleContentModule
+		== EHSRFrontendModule::Inventory && FrontendModuleContentInstance == nullptr;
+	return bLegacyMismatch || bDynamicInventoryMissingContent;
 }
 
 void UHSRUIManagerSubsystem::ClearHostReferences()
@@ -1334,10 +1682,31 @@ void UHSRUIManagerSubsystem::ClearHostReferences()
 	FrontendModuleRootClass = nullptr;
 	CharacterDetailWidgetClass = nullptr;
 	InventoryWidgetClass = nullptr;
-	FrontendModuleWidgetClasses.Reset();
+	InventoryModuleWidgetClass = nullptr;
+	DialogueOverlayWidgetClass = nullptr;
+	PartyWidgetClass = nullptr;
+	MapWidgetClass = nullptr;
+	ChallengeWidgetClass = nullptr;
+	QuestWidgetClass = nullptr;
+	SaveWidgetClass = nullptr;
 	FrontendModuleContentInstance = nullptr;
 	FrontendModuleContentModule = EHSRFrontendModule::None;
 	ActiveHostGeneration = 0;
+}
+
+FGuid UHSRUIManagerSubsystem::ResolveInventoryCharacterGuid() const
+{
+	UGameInstance* GameInstance = GetLocalPlayer() ? GetLocalPlayer()->GetGameInstance() : nullptr;
+	UHSRPartySubsystem* Party = GameInstance ? GameInstance->GetSubsystem<UHSRPartySubsystem>() : nullptr;
+	FHSRPartySnapshot PartySnapshot;
+	if (!Party || !Party->GetSnapshot(PartySnapshot) || !PartySnapshot.Slots.IsValidIndex(0)
+		|| PartySnapshot.Slots[0].IsEmpty())
+	{
+		UE_LOG(LogTemp, Verbose,
+			TEXT("HSRUI P17 Inventory command context unavailable: Party slot 0 has no character"));
+		return FGuid();
+	}
+	return HSRCharacterGuidFromProfileName(PartySnapshot.Slots[0].CharacterId);
 }
 
 FName UHSRUIManagerSubsystem::SelectRestorableScreenId() const
@@ -1352,8 +1721,12 @@ FName UHSRUIManagerSubsystem::SelectRestorableScreenId() const
 		? FrontendRouter->GetSnapshot().GetActiveRoute().Module : EHSRFrontendModule::None;
 	if (ActiveModule == EHSRFrontendModule::Character && CharacterDetailWidgetInstance
 		&& !InventoryWidgetInstance && !InventoryViewModelInstance) return CharacterDetailScreenId;
-	if (ActiveModule == EHSRFrontendModule::Inventory && InventoryWidgetInstance && InventoryViewModelInstance
-		&& !CharacterDetailWidgetInstance) return InventoryScreenId;
+	const bool bLegacyInventoryOpen = InventoryWidgetInstance && InventoryViewModelInstance;
+	const bool bDynamicInventoryOpen = FrontendModuleContentModule == EHSRFrontendModule::Inventory
+		&& FrontendModuleContentInstance != nullptr;
+	if (ActiveModule == EHSRFrontendModule::Inventory
+		&& (bLegacyInventoryOpen || bDynamicInventoryOpen) && !CharacterDetailWidgetInstance)
+		return InventoryScreenId;
 	return NAME_None;
 }
 
@@ -1393,7 +1766,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::CaptureAndTeardownTravelHost()
 		if (const UHSRMapSubsystem* Maps = GameInstance->GetSubsystem<UHSRMapSubsystem>())
 			ArrivalBaseline = FMath::Max(ArrivalBaseline, Maps->GetArrivalCommitGeneration());
 
-	EHSRUIScreenResult Result = TeardownCurrentHost();
+	EHSRUIScreenResult Result = TeardownCurrentHost(true);
 	bool bForcedRootCleanup = false;
 	while (ScreenStack && ScreenStack->GetSnapshot().Entries.Num() > 1)
 	{
@@ -1647,8 +2020,16 @@ bool UHSRUIManagerSubsystem::AttachFrontendModuleRootCandidate(UHSRFrontendModul
 
 TSubclassOf<UUserWidget> UHSRUIManagerSubsystem::GetFrontendModuleWidgetClass(const EHSRFrontendModule Module) const
 {
-	const TSubclassOf<UUserWidget>* Found = FrontendModuleWidgetClasses.Find(Module);
-	return Found ? *Found : nullptr;
+	switch (Module)
+	{
+	case EHSRFrontendModule::Inventory: return InventoryModuleWidgetClass;
+	case EHSRFrontendModule::Party: return PartyWidgetClass;
+	case EHSRFrontendModule::Map: return MapWidgetClass;
+	case EHSRFrontendModule::Challenge: return ChallengeWidgetClass;
+	case EHSRFrontendModule::Quest: return QuestWidgetClass;
+	case EHSRFrontendModule::Save: return SaveWidgetClass;
+	default: return nullptr;
+	}
 }
 
 UUserWidget* UHSRUIManagerSubsystem::CreateFrontendModuleContentCandidate(
@@ -1657,6 +2038,11 @@ UUserWidget* UHSRUIManagerSubsystem::CreateFrontendModuleContentCandidate(
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend)
 	{
+		if (Module == EHSRFrontendModule::Inventory && bAutomationUseInventoryModuleContent)
+		{
+			return bAutomationInventoryModuleCreateSucceeds
+				? NewObject<UHSRInventoryModuleWidget>(this) : nullptr;
+		}
 		return bAutomationFrontendModuleCreateSucceeds ? NewObject<UHSRUserWidget>(this) : nullptr;
 	}
 #endif
@@ -1674,7 +2060,9 @@ bool UHSRUIManagerSubsystem::AttachFrontendModuleContentCandidate(
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bUseAutomationBackend)
 	{
-		return bAutomationFrontendModuleAttachSucceeds;
+		return Cast<UHSRInventoryModuleWidget>(ContentCandidate)
+			&& bAutomationUseInventoryModuleContent
+			? bAutomationInventoryModuleAttachSucceeds : bAutomationFrontendModuleAttachSucceeds;
 	}
 #endif
 	return RootCandidate->SetModuleContent(ContentCandidate);
@@ -1783,14 +2171,17 @@ EHSRFocusApplyResult UHSRUIManagerSubsystem::ApplyCharacterDetailFocusBackend(AH
 	{
 		if (bAutomationFailOldModuleFocusRestore && (Preferred == CharacterDetailWidgetInstance || Fallback == CharacterDetailWidgetInstance))
 		{
-			bAutomationFailOldModuleFocusRestore = false; return EHSRFocusApplyResult::Unavailable;
+			bAutomationFailOldModuleFocusRestore = false;
+			return EHSRFocusApplyResult::Unavailable;
 		}
-		LastAutomationFocusModule = (Preferred == CharacterDetailWidgetInstance || Fallback == CharacterDetailWidgetInstance) ? EHSRFrontendModule::Character : EHSRFrontendModule::PauseHub;
+		// Focusing the shell rather than the detail widget means this is the close direction, which
+		// tests fail independently of the open direction.
 		const bool bIsCloseFocus = FrontendShellInstance && Preferred == FrontendShellInstance;
 		if (bIsCloseFocus && !bAutomationDetailCloseFocusSucceeds)
 		{
 			return EHSRFocusApplyResult::Unavailable;
 		}
+		LastAutomationFocusModule = (Preferred == CharacterDetailWidgetInstance || Fallback == CharacterDetailWidgetInstance) ? EHSRFrontendModule::Character : EHSRFrontendModule::PauseHub;
 		return bAutomationDetailFocusSucceeds ? EHSRFocusApplyResult::Preferred : EHSRFocusApplyResult::Unavailable;
 	}
 #endif
@@ -1805,14 +2196,16 @@ EHSRFocusApplyResult UHSRUIManagerSubsystem::ApplyInventoryFocusBackend(AHSRPlay
 	{
 		if (bAutomationFailOldModuleFocusRestore && (Preferred == InventoryWidgetInstance || Fallback == InventoryWidgetInstance))
 		{
-			bAutomationFailOldModuleFocusRestore = false; return EHSRFocusApplyResult::Unavailable;
+			bAutomationFailOldModuleFocusRestore = false;
+			return EHSRFocusApplyResult::Unavailable;
 		}
-		LastAutomationFocusModule = (Preferred == InventoryWidgetInstance || Fallback == InventoryWidgetInstance) ? EHSRFrontendModule::Inventory : EHSRFrontendModule::PauseHub;
+		// Close direction, as in the detail twin above.
 		const bool bIsCloseFocus = FrontendShellInstance && Preferred == FrontendShellInstance;
 		if (bIsCloseFocus && !bAutomationInventoryCloseFocusSucceeds)
 		{
 			return EHSRFocusApplyResult::Unavailable;
 		}
+		LastAutomationFocusModule = (Preferred == InventoryWidgetInstance || Fallback == InventoryWidgetInstance) ? EHSRFrontendModule::Inventory : EHSRFrontendModule::PauseHub;
 		return bAutomationInventoryFocusSucceeds ? EHSRFocusApplyResult::Preferred : EHSRFocusApplyResult::Unavailable;
 	}
 #endif
@@ -1860,7 +2253,8 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RegisterHostIdentityForAutomation(con
 		return EHSRUIScreenResult::NoOp;
 	}
 	if (AutomationHostIdentity != 0 || FrontendShellInstance || FrontendModuleContentInstance
-		|| CharacterDetailWidgetInstance || InventoryWidgetInstance || InventoryViewModelInstance)
+		|| CharacterDetailWidgetInstance || InventoryWidgetInstance || InventoryViewModelInstance
+		|| DialogueOverlayWidgetInstance || DialogueViewModelInstance)
 	{
 		return EHSRUIScreenResult::InvalidHost;
 	}
@@ -1927,6 +2321,25 @@ void UHSRUIManagerSubsystem::ConfigureAutomationFrontendModuleBackend(
 	bAutomationFrontendModuleAttachSucceeds = bAttachSucceeds;
 }
 
+void UHSRUIManagerSubsystem::ConfigureAutomationInventoryModuleBackend(
+	const bool bHasClass, const bool bCreateSucceeds, const bool bAttachSucceeds)
+{
+	bUseAutomationBackend = true;
+	bAutomationHasFrontendModuleClass = bHasClass;
+	bAutomationUseInventoryModuleContent = bHasClass;
+	bAutomationInventoryModuleCreateSucceeds = bCreateSucceeds;
+	bAutomationInventoryModuleAttachSucceeds = bAttachSucceeds;
+}
+
+void UHSRUIManagerSubsystem::ConfigureAutomationDialogueOverlayBackend(
+	const bool bHasClass, const bool bCreateSucceeds, const bool bAttachSucceeds)
+{
+	bUseAutomationBackend = true;
+	bAutomationHasDialogueOverlayClass = bHasClass;
+	bAutomationDialogueOverlayCreateSucceeds = bCreateSucceeds;
+	bAutomationDialogueOverlayAttachSucceeds = bAttachSucceeds;
+}
+
 int32 UHSRUIManagerSubsystem::GetFrontendModuleContentCountForAutomation() const
 {
 	return FrontendModuleContentInstance ? 1 : 0;
@@ -1946,7 +2359,6 @@ void UHSRUIManagerSubsystem::ConfigureAutomationDetailBackend(const bool bHasCla
 	bAutomationDetailAttachSucceeds = bAttachSucceeds;
 	bAutomationDetailPolicySucceeds = bPolicySucceeds;
 	bAutomationDetailFocusSucceeds = bFocusSucceeds;
-	bAutomationDetailCloseFocusSucceeds = bFocusSucceeds;
 }
 
 void UHSRUIManagerSubsystem::ConfigureAutomationDetailCloseFocus(const bool bCloseFocusSucceeds)
@@ -1973,7 +2385,6 @@ void UHSRUIManagerSubsystem::ConfigureAutomationInventoryBackend(const bool bHas
 	bAutomationInventoryAttachSucceeds = bAttachSucceeds;
 	bAutomationInventoryPolicySucceeds = bPolicySucceeds;
 	bAutomationInventoryFocusSucceeds = bFocusSucceeds;
-	bAutomationInventoryCloseFocusSucceeds = bFocusSucceeds;
 }
 
 void UHSRUIManagerSubsystem::ConfigureAutomationInventoryViewModelStages(const bool bDependenciesSucceed,
@@ -1999,6 +2410,7 @@ int32 UHSRUIManagerSubsystem::GetInventoryBindCountForAutomation() const
 
 void UHSRUIManagerSubsystem::DeinitializeForAutomation()
 {
+	ReleaseDialogueOverlay();
 	FrontendShellInstance = nullptr;
 	FrontendModuleRootInstance = nullptr;
 	CharacterDetailWidgetInstance = nullptr;
@@ -2016,6 +2428,7 @@ void UHSRUIManagerSubsystem::DeinitializeForAutomation()
 	bInconsistencyIsTravelRecoverable = false;
 	bUseAutomationBackend = false;
 	bAutomationHostValid = false;
+	bAutomationUseInventoryModuleContent = false;
 	AutomationHostIdentity = 0;
 	ActiveHostGeneration = 0;
 	bTravelRestorePending = false;

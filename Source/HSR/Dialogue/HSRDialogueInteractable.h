@@ -8,6 +8,7 @@
 
 class UHSRQuestDefinition;
 class UHSRDialogueDefinition;
+class UStaticMeshComponent;
 
 UCLASS()
 class HSR_API AHSRDialogueInteractable : public AHSRGrayboxInteractable
@@ -35,4 +36,9 @@ public:
 
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Dialogue")
 	TObjectPtr<UHSRDialogueDefinition> DialogueDefinition;
+
+protected:
+	/** Visible graybox marker so the interactable is discoverable in-game. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Collision", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> VisualMarker;
 };

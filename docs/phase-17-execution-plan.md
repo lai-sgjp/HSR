@@ -339,7 +339,7 @@ Select Command
 - `P17-003B`：Inventory 接入与 Reward Summary 隔离 — `PASS WITH FOLLOW-UP`。
 - `P17-004`：Travel teardown/rebuild 与逻辑恢复 — `PASS`。
 
-### P17-005：Frontend Shell、Router 与快捷导航
+### P17-005：Frontend Shell、Router 与快捷导航（当前状态：COMPLETE / USER ACCEPTED）
 
 唯一结果：探索中 Esc/B/T/M/F4 打开正确模块；所有模块保持暂停；Esc/Back 逐级返回，`X` 直接回探索；重复输入零副作用；关闭后 W/A/S/D、鼠标、焦点和 Exploration IMC 恢复。
 
@@ -350,6 +350,12 @@ Select Command
 唯一结果：玩家可在角色列表和 Detail/Weapon/Traces/Relics/Eidolon/Information/Outfit 页签间导航，切角色保持页签、切页签保持角色，Back/X 规则正确；数据至少来自真实 Character/Equipment/Relic 快照。
 
 升级、替换和强化若 Authority 合同不足，分离成后续任务，不在 UI 内补造规则。
+
+> 编号校准（2026-08-06）：当前仓库的 `TASK-P17-006` 归档包实际记录的是
+> Quest Frontend；它不等于本计划定义的 Character 养成 Shell。当前仓库的
+> `TASK-P17-012` 归档包实际记录的是五模块统一动态挂载；它也不等于本计划
+> 定义的 Dialogue Presentation。因此这两个实际任务的完成状态不能倒推本计划
+> P17-006 或 P17-012 已完成。
 
 ### P17-007：Relic/Equipment 多级选择与强化
 
@@ -390,6 +396,63 @@ Select Command
 ### P17-016：阶段收尾
 
 唯一结果：Fresh Build、全量 HSR.UI 定向 Automation、两种分辨率、键鼠、可用时物理手柄、Editor 重开、旅行/战斗/存档回归、Teacher、Independent Review、版权/provenance 审核和文档归档全部完成。
+
+### 7.1 Inventory 与 Dialogue 无歧义子任务分解（规划更新：2026-08-09）
+
+以下子任务是 P17-008/P17-012 的实施 backlog，不代表任何实现或验收已经完成。
+仓库中实际归档的 `TASK-P17-012` 是五模块统一动态挂载，不能复用为 Dialogue
+任务；计划语义的 P17-008 也不作为任务编号。任何时刻只创建一个活动任务卡，
+先完成 Gate 0 和前一包收口，再进入下一包。
+
+#### Inventory（计划语义 P17-008）
+
+1. `TASK-P17-INVENTORY-001` — Gate 0、数据/Authority 合同与 TDD RED
+   - 核对 `B` 路由、`WBP_FrontendModuleRoot_P17.ModuleContentHost`、定义数据、
+     Inventory/Equipment Authority 和已知生命周期 fixture 边界。
+   - 冻结分类元数据来源、堆叠/Unique 详情模型、操作结果码、失败快照规则和
+     精确 Source/Content allowlist；先加入会真实失败的自动化测试。
+2. `TASK-P17-INVENTORY-002` — 分类、详情与稳定列表投影
+   - 实现纯值 Inventory snapshot、分类、筛选、稳定排序、稳定选择、堆叠/Unique
+     详情和 ViewModel/Widget 的 delegate 生命周期。
+   - Widget 只读快照，不直接写 Inventory、SaveGame 或 Widget viewport。
+3. `TASK-P17-INVENTORY-003` — 合法命令与失败保持
+   - Equip/Enhance 仅通过现有 Equipment Authority，携带真实 revision 和稳定 ID。
+   - Use/Disassemble 没有对应 Authority 时必须为 typed unavailable；不得用
+     `RemoveStack` 冒充业务成功。
+   - Authority 拒绝、并发冲突、空列表、缺 Definition 和重复请求均保持完整旧快照。
+4. `TASK-P17-INVENTORY-004` — Editor 集成、PIE 与收口
+   - 用户创建/接线 `Content/UI/P17/Inventory/` 资产并接入现有动态 Host。
+   - 完成 Build、Inventory 窄 Automation、Editor reopen、B/Back/X、旅行 teardown
+     和 happy/failure PIE 证据后再归档。
+
+#### Dialogue（计划语义 P17-012）
+
+1. `TASK-P17-DIALOGUE-001` — Gate 0、Interaction/Dialogue 合同与 TDD RED
+   - 审计现有 `HSRDialogueSubsystem`、Interaction candidate、Dialogue definition、
+     Quest/Encounter/Reward 入口，冻结 active-query、稳定 Node/Choice ID、Overlay
+     所有权和失败矩阵；缺 API 时单独申请扩权，不在 UI 中臆造。
+2. `TASK-P17-DIALOGUE-002` — 事件驱动对话 Presentation
+   - 实现说话者、正文、选项、选择/退出和 unavailable/失败状态的纯值投影；`F`
+     仍由 InteractionComponent 选择 Candidate，对话 Overlay 不进入 Pause Hub Router。
+3. `TASK-P17-DIALOGUE-003` — 分支 Authority 转发与 exactly-once
+   - 选项只提交稳定 Dialogue Node/Choice ID；Quest、Encounter、Reward 分支只调用
+     对应 Authority，重复选择、无效选择和 Authority 失败不得重复推进或领奖。
+4. `TASK-P17-DIALOGUE-004` — 生命周期、旅行恢复、Editor/PIE 与收口
+   - 完成 Overlay 与 Exploration HUD 的输入/焦点、关闭、重建、旅行 teardown，
+     再执行 Build、Automation、Editor reopen 和用户 PIE 归档。
+
+#### Phase 18 进入条件与预规划
+
+Phase 18 不在 Inventory/Dialogue 尚未收口时提前实施。至少完成 P17-016 阶段收尾
+门禁后，另建 Phase 18 Gate 0，并暂定以下无歧义任务名：
+
+- `TASK-P18-PRESENTATION-001`：授权台账、资源隔离、表现事件和缺失资源回退合同。
+- `TASK-P18-PRESENTATION-002`：骨骼/动画/Montage、Camera Sequence 与 UI 动效。
+- `TASK-P18-PRESENTATION-003`：Audio、VFX、GameplayCue、受击反馈与简单过场。
+- `TASK-P18-PRESENTATION-004`：低画质/重复 Cue/中断/性能/回退验证与 Phase 18 收口。
+
+这些 Phase 18 任务只消费表现事件，不改变 Gameplay、Save、Inventory 或 Battle
+规则；合法素材、Editor 资产创建、接线、来源和授权证据由用户负责。
 
 ## 8. Codex 与用户 Editor 分工
 
@@ -547,8 +610,15 @@ Phase 收尾再更新 `PROJECT_STATE.md`、README 和 Phase 17 最终总结。�
 
 ## 15. 下一步
 
-唯一建议的下一任务是：
+在 P17-005、Character Shell 和 Relic/Equipment 用户验收结果已经明确后，当前唯一
+建议的下一任务是：
 
-`P17-005 — Frontend Shell、内部 Router 与 Esc/B/T/M/F4 统一快捷导航`。
+`TASK-P17-INVENTORY-001 — Inventory Gate 0、数据/Authority 合同与 TDD RED`。
 
-开始实现前必须创建独立任务卡，冻结精确 Source/Content allowlist、路由 DTO、Pause 所有权、输入资产边界、WBP Editor 步骤、Automation 和 PIE 验收；未经用户明确授权不得开始实现。
+该任务实现计划语义 P17-008 的第一包，不复用 `TASK-P17-008` 编号。完成
+Inventory-001～004 后，才依序创建 `TASK-P17-DIALOGUE-001`～`004`；实际归档的
+`TASK-P17-012` 是动态挂载，不能作为 Dialogue 任务。Phase 18 必须等待 P17-016
+收尾 Gate，并另建独立 Gate 0 与 `TASK-P18-PRESENTATION-*` 任务卡。
+
+开始每一包前必须冻结精确 Source/Content allowlist、Authority/快照边界、用户
+Editor 步骤、Automation、PIE 和失败验收；一次只保留一个活动任务卡。
