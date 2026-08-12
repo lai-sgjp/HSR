@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 HSR 作品集演示 PPT 生成器
-面向面试/作品集的 15 页演示，全中文，画面与图示为主，不放代码/IDE。
+面向面试/作品集的 17 页演示，全中文，画面与图示为主，不放代码/IDE。
 深色 HSR 风格：近黑背景 #14171d，青色强调 #6fd7ff，金色点缀 #ffd479。
 """
 import os
@@ -113,7 +113,7 @@ def add_header(slide, kicker, title, page_no):
     add_text(slide, Inches(0.55), Inches(0.55), Inches(9), Inches(0.7),
              title, size=28, color=WHITE, bold=True)
     add_text(slide, SLIDE_W - Inches(1.2), Inches(0.4), Inches(0.7), Inches(0.4),
-             f"{page_no:02d} / 15", size=11, color=DIM, align=PP_ALIGN.RIGHT)
+             f"{page_no:02d} / 17", size=11, color=DIM, align=PP_ALIGN.RIGHT)
 
 def add_image_fit(slide, img_path, x, y, w, h, border=True):
     """按比例放入图片，保持纵横比居中"""
@@ -466,10 +466,93 @@ add_card(s, Inches(0.55), Inches(6.35), Inches(12.2), Inches(0.9), "", "核心�
 add_footer_note(s, "这是面试重点：能讲清“为什么用纯值 DTO”比讲“用了什么库”重要得多。")
 
 # ═══════════════════════════════════════════════════════════════════
+# P13 项目数据流动图
+# ═══════════════════════════════════════════════════════════════════
+s = new_slide()
+add_header(s, "DATA FLOW", "数据怎么流动 · 一次完整游戏循环", 13)
+flow_nodes = [
+    ("探索地图", "移动 / 交互 / 敌人感知\n追击触发遭遇", CYAN),
+    ("遭遇", "FHSREncounterRequest\n纯值请求 · 世界切换", BLUE),
+    ("回合战斗", "速度排序 → 指令 → 结算\nCoordinator 单一权威", GOLD),
+    ("结算 / 养成", "经验 · 掉落 · 遗器\n写回运行时数据", GREEN),
+    ("存档", "FHSRSaveData 快照\n事务写入 · 版本迁移", GRAY),
+]
+fx = Inches(0.55); fw = Inches(2.32); fgap = Inches(0.18)
+for i, (t, d, c) in enumerate(flow_nodes):
+    x = fx + (fw + fgap) * i
+    add_card(s, x, Inches(1.5), fw, Inches(1.5), t, d, title_color=c, title_size=16, body_size=11)
+    if i < 4:
+        add_arrow(s, x + fw + Inches(0.01), Inches(2.0), Inches(0.16), Inches(0.45))
+add_rect(s, Inches(0.55), Inches(3.25), Inches(12.23), Inches(0.62), fill=PANEL, line=CYAN, radius=True)
+add_text(s, Inches(0.85), Inches(3.35), Inches(11.6), Inches(0.45),
+         "跨地图、跨系统的每一次握手都只传纯值结构体：DTO 里没有 Actor / Widget / GameplayEffect 引用",
+         size=14, color=CYAN, bold=True, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+add_text(s, Inches(0.55), Inches(4.1), Inches(12), Inches(0.35), "从探索到存档，数据一路经过的边界", size=15, color=WHITE, bold=True)
+detail = [
+    ("① 探索 → 遭遇", "AHSREnemyCharacter 重叠 → 构造 FHSREncounterRequest（纯值请求，含队伍 / 遭遇 ID）", CYAN),
+    ("② 遭遇 → 战斗", "UHSRBattleTransitionSubsystem 携带请求跨世界，AHSRBattleGameMode 读取", BLUE),
+    ("③ 战斗内部", "FHSRBattleParticipant / FHSRDamageResult / FHSRStatusInstance —— 全程无指针", GOLD),
+    ("④ 战斗 → 结算", "FHSRBattleResult → UHSRRewardSubsystem 生成经验 / 掉落 / 遗器", GREEN),
+    ("⑤ 结算 → 存档", "各子系统 ExportSaveData → FHSRSaveData 快照 → 事务写入磁盘", GRAY),
+]
+dy = Inches(4.5)
+for t, d, c in detail:
+    add_rect(s, Inches(0.55), dy, Inches(12.23), Inches(0.52), fill=PANEL, line=PANEL2, radius=True)
+    add_text(s, Inches(0.85), dy + Inches(0.05), Inches(2.4), Inches(0.4), t, size=13, color=c, bold=True)
+    add_text(s, Inches(3.3), dy + Inches(0.05), Inches(9.3), Inches(0.42), d, size=12, color=GRAY)
+    dy += Inches(0.6)
+add_footer_note(s, "核心：权威结果永远是一份可回放、可存档、可测试的纯值数据，UI 只是它的投影。")
+
+# ═══════════════════════════════════════════════════════════════════
+# P14 各子系统关系图
+# ═══════════════════════════════════════════════════════════════════
+s = new_slide()
+add_header(s, "SUBSYSTEMS", "各子系统关系 · 单一权威 + 纯值汇聚", 14)
+add_text(s, Inches(0.55), Inches(1.4), Inches(5.5), Inches(0.35), "GameInstance 常驻 · 数据中心", size=15, color=CYAN, bold=True)
+subsystems = [
+    ("UHSRCharacterProfileSubsystem", "角色定义 / 成长 / 属性"),
+    ("UHSRPartySubsystem", "队伍编成 / 切换"),
+    ("UHSREquipmentSubsystem", "装备 · 遗器 · 套装 / 属性投影"),
+    ("UHSRInventorySubsystem", "背包 / 物品 / 唯一实例"),
+    ("UHSRRewardSubsystem", "掉落 / 奖励账本"),
+    ("UHSRQuestSubsystem", "任务状态 / 目标事件"),
+    ("UHSRMapSubsystem", "地图 / 传送 / 探索标志"),
+    ("UHSRChallengeProgressionSubsystem", "挑战进度"),
+]
+sx = Inches(0.55); sw = Inches(3.95); sgap = Inches(0.1)
+for i, (t, d) in enumerate(subsystems):
+    col = i % 2; row = i // 2
+    x = sx + (sw + sgap) * col
+    y = Inches(1.8) + row * Inches(0.6)
+    add_rect(s, x, y, sw, Inches(0.54), fill=PANEL, line=PANEL2, radius=True)
+    add_text(s, x + Inches(0.15), y + Inches(0.05), Inches(1.9), Inches(0.45), t.replace('UHSR', ''), size=10.5, color=WHITE, bold=True)
+    add_text(s, x + Inches(1.95), y + Inches(0.07), Inches(1.95), Inches(0.45), d, size=10.5, color=GRAY)
+add_text(s, Inches(4.75), Inches(1.4), Inches(5.5), Inches(0.35), "存档是唯一汇聚点", size=15, color=GOLD, bold=True)
+add_rect(s, Inches(4.75), Inches(1.8), Inches(8.05), Inches(2.3), fill=PANEL, line=GOLD, radius=True)
+add_text(s, Inches(5.0), Inches(1.95), Inches(7.5), Inches(0.4), "UHSRSaveSubsystem", size=15, color=GOLD, bold=True)
+add_text(s, Inches(5.0), Inches(2.35), Inches(7.5), Inches(0.5),
+         "读所有子系统 → ExportSaveData → FHSRSaveData\n纯值 DTO 序列化 · 不保存任何 Actor / Widget 引用", size=12, color=GRAY)
+add_text(s, Inches(5.0), Inches(3.15), Inches(7.5), Inches(0.4),
+         "依赖关系：Reward → Inventory · Quest → Reward · Equipment 投影到角色 ASC", size=11, color=DIM)
+add_text(s, Inches(4.75), Inches(4.35), Inches(5.5), Inches(0.35), "战斗世界 · 独立于探索", size=15, color=CYAN, bold=True)
+add_rect(s, Inches(4.75), Inches(4.75), Inches(8.05), Inches(2.0), fill=PANEL, line=CYAN, radius=True)
+add_text(s, Inches(5.0), Inches(4.9), Inches(7.5), Inches(0.4), "AHSRBattleGameMode → UHSRBattleCoordinator", size=13, color=CYAN, bold=True)
+add_text(s, Inches(5.0), Inches(5.3), Inches(7.5), Inches(1.3),
+         "· TurnManager 速度行动条（事件驱动，无 Tick）\n"
+         "· Targeting 目标策略 · Status 状态系统\n"
+         "· 与探索仅经 UHSRBattleTransitionSubsystem 握手\n"
+         "  返回时携带 FHSRBattleResult 纯值结算", size=12, color=GRAY)
+add_rect(s, Inches(0.55), Inches(6.35), Inches(12.23), Inches(0.75), fill=PANEL, line=GREEN, radius=True)
+add_text(s, Inches(0.85), Inches(6.45), Inches(11.6), Inches(0.55),
+         "两大世界（探索 / 战斗）各自完整，靠纯值请求与纯值结算对接；所有子系统最终在存档处归一。",
+         size=13, color=GREEN, bold=True, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+add_footer_note(s, "面试要点：能画清「谁拥有权威、数据在哪汇聚、边界传什么」比背类名更重要。")
+
+# ═══════════════════════════════════════════════════════════════════
 # P13 质量保障
 # ═══════════════════════════════════════════════════════════════════
 s = new_slide()
-add_header(s, "QUALITY", "质量保障 · 每个阶段都可验证", 13)
+add_header(s, "QUALITY", "质量保障 · 每个阶段都可验证", 15)
 # 流程
 add_text(s, Inches(0.55), Inches(1.5), Inches(6), Inches(0.35), "TDD 流程（每个功能包）", size=15, color=CYAN, bold=True)
 tdd = ["写失败测试\n(Red)", "实现\n(Green)", "构建 + 回归", "用户 PIE 验收"]
@@ -494,7 +577,7 @@ add_footer_note(s, "数字为示意口径，具体测试/构建计数按当前�
 # P14 当前进度
 # ═══════════════════════════════════════════════════════════════════
 s = new_slide()
-add_header(s, "CURRENT STATUS", "当前进度", 14)
+add_header(s, "CURRENT STATUS", "当前进度", 16)
 # 三栏
 add_card(s, Inches(0.55), Inches(1.6), Inches(4.0), Inches(4.2), "已完成（可玩）",
          "探索 → 遭遇 → 回合战斗\n→ 结算 → 养成 → 存档\n\n完整闭环可玩\n全 UI 族（角色/队伍/背包/\n遗器/任务/地图/挑战/存档）\n18 阶段工程推进完成",
