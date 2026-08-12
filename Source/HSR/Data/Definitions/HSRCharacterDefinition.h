@@ -38,6 +38,7 @@ public:
 	TMap<FName, int32> SkillMaxLevels;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats", meta=(ClampMin="0.0")) float BaseMaxHealth = 100.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats", meta=(ClampMin="0.0")) float BaseMaxEnergy = 100.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats", meta=(ClampMin="0.0")) float BaseAttack = 10.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats", meta=(ClampMin="0.0")) float BaseDefense = 10.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stats", meta=(ClampMin="0.000001")) float BaseSpeed = 100.0f;

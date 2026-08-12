@@ -270,9 +270,18 @@ namespace HSRSaveSchemaGates
 }
 
 bool UHSRSaveSubsystem::Validate(const FHSRSaveData& C) const {
+#if WITH_DEV_AUTOMATION_TESTS
+	const auto Reject = [](const TCHAR* Reason) -> bool
+	{
+		UE_LOG(LogTemp, Warning, TEXT("HSR Save Validate REJECTED reason=%s"), Reason);
+		return false;
+	};
+#else
+	const auto Reject = [](const TCHAR* Reason) -> bool { (void)Reason; return false; };
+#endif
 	if (C.SchemaVersion < 1 || C.SchemaVersion > HSRSaveVersion::CurrentSchema || C.PartyRevision < 0)
 	{
-		return false;
+		return Reject(TEXT("schema-or-party-revision"));
 	}
 
 	// Two party widths are legal here. A blob decoded straight off disk still carries the
@@ -283,53 +292,53 @@ bool UHSRSaveSubsystem::Validate(const FHSRSaveData& C) const {
 	const int32 RuntimeWidth = static_cast<int32>(HSRSaveVersion::PartySlotCount);
 	if (C.PartySlots.Num() != DeclaredWidth && C.PartySlots.Num() != RuntimeWidth)
 	{
-		return false;
+		return Reject(TEXT("party-width"));
 	}
 	TSet<FName> Seen;
 	TMap<FGuid,FName> GuidOwners;
-	for(const FHSRSaveProfileDto& P:C.Profiles){ const auto& S=P.State; if(S.CharacterId.IsNone()||S.Level<1||S.Experience<0||S.Ascension<0)return false; if(Seen.Contains(S.CharacterId))return false; Seen.Add(S.CharacterId); const FGuid Guid=HSRCharacterGuidFromProfileName(S.CharacterId); if(const FName* Owner=GuidOwners.Find(Guid)){if(*Owner!=S.CharacterId)return false;}else GuidOwners.Add(Guid,S.CharacterId); for(const auto& K:S.SkillLevels) if(K.Key.IsNone()||K.Value<0)return false; }
-	TSet<FName> PartySeen; for(const FHSRPartySlot& Slot:C.PartySlots){ if(Slot.CharacterId.IsNone())continue; if(PartySeen.Contains(Slot.CharacterId))return false; PartySeen.Add(Slot.CharacterId); if(!Seen.Contains(Slot.CharacterId))return false; }
+	for(const FHSRSaveProfileDto& P:C.Profiles){ const auto& S=P.State; if(S.CharacterId.IsNone()||S.Level<1||S.Experience<0||S.Ascension<0)return Reject(TEXT("profile-state")); if(Seen.Contains(S.CharacterId))return Reject(TEXT("profile-duplicate")); Seen.Add(S.CharacterId); const FGuid Guid=HSRCharacterGuidFromProfileName(S.CharacterId); if(const FName* Owner=GuidOwners.Find(Guid)){if(*Owner!=S.CharacterId)return Reject(TEXT("profile-guid-collision"));}else GuidOwners.Add(Guid,S.CharacterId); for(const auto& K:S.SkillLevels) if(K.Key.IsNone()||K.Value<0)return Reject(TEXT("profile-skill")); }
+	TSet<FName> PartySeen; for(const FHSRPartySlot& Slot:C.PartySlots){ if(Slot.CharacterId.IsNone())continue; if(PartySeen.Contains(Slot.CharacterId))return Reject(TEXT("party-duplicate")); PartySeen.Add(Slot.CharacterId); if(!Seen.Contains(Slot.CharacterId))return Reject(TEXT("party-unknown-character")); }
 	// A blob must not carry payload for a domain its declared schema predates.
 	if (!HSRSaveSchemaGates::HasLegacyEquipmentArray(C.SchemaVersion) && !C.Equipment.IsEmpty())
 	{
-		return false;
+		return Reject(TEXT("legacy-equipment-at-schema"));
 	}
 	if (!HSRSaveSchemaGates::HasInventoryAndRewards(C.SchemaVersion)
 		&& (!C.Inventory.Stacks.IsEmpty() || !C.Inventory.UniqueItems.IsEmpty() || C.Inventory.Revision != 0
 			|| !C.Rewards.Receipts.IsEmpty() || C.Rewards.Revision != 0))
 	{
-		return false;
+		return Reject(TEXT("inventory-rewards-at-schema"));
 	}
 	if (!HSRSaveSchemaGates::HasQuests(C.SchemaVersion) && (!C.Quests.States.IsEmpty() || C.Quests.Revision != 0))
 	{
-		return false;
+		return Reject(TEXT("quests-at-schema"));
 	}
 	if (!HSRSaveSchemaGates::HasMap(C.SchemaVersion)
 		&& (!C.Map.CurrentLocation.MapId.IsNone() || !C.Map.CurrentLocation.ArrivalId.IsNone()
 			|| !C.Map.UnlockedRegionIds.IsEmpty() || !C.Map.UnlockedTeleportIds.IsEmpty()
 			|| !C.Map.ExplorationFlags.IsEmpty() || C.Map.Revision != 0))
 	{
-		return false;
+		return Reject(TEXT("map-at-schema"));
 	}
 	TSet<FGuid> OwnedInstances;
 	TMap<FGuid, const FHSREquipmentRegistryDto*> RegistryInstances;
 	TSet<FGuid> PlacedInstances;
-	if(C.SchemaVersion>=7){for(const auto& D:C.EquipmentRegistry){if(!D.InstanceId.IsValid()||OwnedInstances.Contains(D.InstanceId))return false;OwnedInstances.Add(D.InstanceId);RegistryInstances.Add(D.InstanceId,&D);}TSet<FString> Slots;for(const auto& D:C.EquipmentPlacements){const FName* Owner=GuidOwners.Find(D.CharacterId);const FString Slot=FString::Printf(TEXT("%s:%d:%d"),*D.CharacterId.ToString(),D.Kind,D.Slot);if(!Owner||HSRCharacterGuidFromProfileName(*Owner)!=D.CharacterId||!OwnedInstances.Contains(D.InstanceId)||PlacedInstances.Contains(D.InstanceId)||Slots.Contains(Slot))return false;PlacedInstances.Add(D.InstanceId);Slots.Add(Slot);}}
-	else for(const FHSREquipmentSaveDto& D:C.Equipment){const FName* Owner=GuidOwners.Find(D.CharacterId);if(!Owner||HSRCharacterGuidFromProfileName(*Owner)!=D.CharacterId||!D.InstanceId.IsValid()||OwnedInstances.Contains(D.InstanceId))return false;OwnedInstances.Add(D.InstanceId);}
+	if(C.SchemaVersion>=7){for(const auto& D:C.EquipmentRegistry){if(!D.InstanceId.IsValid()||OwnedInstances.Contains(D.InstanceId))return Reject(TEXT("equipment-registry-instance"));OwnedInstances.Add(D.InstanceId);RegistryInstances.Add(D.InstanceId,&D);}TSet<FString> Slots;for(const auto& D:C.EquipmentPlacements){const FName* Owner=GuidOwners.Find(D.CharacterId);const FString Slot=FString::Printf(TEXT("%s:%d:%d"),*D.CharacterId.ToString(),D.Kind,D.Slot);if(!Owner||HSRCharacterGuidFromProfileName(*Owner)!=D.CharacterId||!OwnedInstances.Contains(D.InstanceId)||PlacedInstances.Contains(D.InstanceId)||Slots.Contains(Slot))return Reject(TEXT("equipment-placement"));PlacedInstances.Add(D.InstanceId);Slots.Add(Slot);}}
+	else for(const FHSREquipmentSaveDto& D:C.Equipment){const FName* Owner=GuidOwners.Find(D.CharacterId);if(!Owner||HSRCharacterGuidFromProfileName(*Owner)!=D.CharacterId||!D.InstanceId.IsValid()||OwnedInstances.Contains(D.InstanceId))return Reject(TEXT("legacy-equipment-row"));OwnedInstances.Add(D.InstanceId);}
 	TSet<FGuid> InventoryInstances;
-	for(const FHSRItemInstance& I:C.Inventory.UniqueItems){if(!I.InstanceId.IsValid()||InventoryInstances.Contains(I.InstanceId)||(C.SchemaVersion>=7?PlacedInstances.Contains(I.InstanceId):OwnedInstances.Contains(I.InstanceId)))return false;InventoryInstances.Add(I.InstanceId);if(const FHSREquipmentRegistryDto* const* Registry=RegistryInstances.Find(I.InstanceId)){FHSRItemEquipmentMappingEntry Mapping;if(!MappingCatalog||!MappingCatalog->Resolve(I.DefinitionId,Mapping)||Mapping.EquipmentDefinitionId!=(*Registry)->DefinitionId||static_cast<int32>(Mapping.Kind)!=(*Registry)->Kind||!Equipment.IsValid()||!Equipment->IsDefinitionCompatible(Mapping.EquipmentDefinitionId,Mapping.Kind,Mapping.Slot))return false;}}
+	for(const FHSRItemInstance& I:C.Inventory.UniqueItems){if(!I.InstanceId.IsValid()||InventoryInstances.Contains(I.InstanceId)||(C.SchemaVersion>=7?PlacedInstances.Contains(I.InstanceId):OwnedInstances.Contains(I.InstanceId)))return Reject(TEXT("inventory-instance"));InventoryInstances.Add(I.InstanceId);if(const FHSREquipmentRegistryDto* const* Registry=RegistryInstances.Find(I.InstanceId)){FHSRItemEquipmentMappingEntry Mapping;if(!MappingCatalog||!MappingCatalog->Resolve(I.DefinitionId,Mapping)||Mapping.EquipmentDefinitionId!=(*Registry)->DefinitionId||static_cast<int32>(Mapping.Kind)!=(*Registry)->Kind||!Equipment.IsValid()||!Equipment->IsDefinitionCompatible(Mapping.EquipmentDefinitionId,Mapping.Kind,Mapping.Slot))return Reject(TEXT("inventory-equipment-mapping"));}}
 	// Read-only cross-domain preflight: this must complete before any domain PrepareRestore or equipment projection.
-	if(!Profiles.IsValid()||!Equipment.IsValid()||!Inventory.IsValid()||!Reward.IsValid()||!Quest.IsValid()||!Map.IsValid())return false;
-	for(const FHSRSaveProfileDto& P:C.Profiles)if(!Profiles->HasDefinition(P.State.CharacterId))return false;
-	if(C.SchemaVersion>=7){for(const auto& D:C.EquipmentRegistry)if(!Equipment->HasDefinition(D.DefinitionId))return false;}else for(const FHSREquipmentSaveDto& D:C.Equipment)if(!Equipment->HasDefinition(D.DefinitionId))return false;
-	for(const FHSRItemStackSnapshot& S:C.Inventory.Stacks)if(!Inventory->HasDefinition(S.ItemId))return false;
-	for(const FHSRItemInstance& I:C.Inventory.UniqueItems)if(!Inventory->HasDefinition(I.DefinitionId))return false;
-	for(const FHSRRewardReceipt& R:C.Rewards.Receipts){if(!Reward->HasDefinition(R.Request.RewardDefinitionId))return false;for(const FHSRInventoryGrant& G:R.Grants)if(!Inventory->HasDefinition(G.ItemId))return false;}
-	for(const FHSRQuestRuntimeState& Q:C.Quests.States)if(!Quest->HasDefinition(Q.QuestId))return false;
-	if(!C.Map.CurrentLocation.MapId.IsNone()&&!Map->HasMapDefinition(C.Map.CurrentLocation.MapId))return false;
-	for(const FName& R:C.Map.UnlockedRegionIds)if(!Map->HasRegionDefinition(R))return false;
-	for(const FName& T:C.Map.UnlockedTeleportIds)if(!Map->HasTeleportDefinition(T))return false;
-	if(!UHSRChallengeProgressionSubsystem::ValidateSaveData(C.ChallengeProgression))return false;
+	if(!Profiles.IsValid()||!Equipment.IsValid()||!Inventory.IsValid()||!Reward.IsValid()||!Quest.IsValid()||!Map.IsValid())return Reject(TEXT("subsystem-missing"));
+	for(const FHSRSaveProfileDto& P:C.Profiles)if(!Profiles->HasDefinition(P.State.CharacterId))return Reject(TEXT("profile-definition"));
+	if(C.SchemaVersion>=7){for(const auto& D:C.EquipmentRegistry)if(!Equipment->HasDefinition(D.DefinitionId))return Reject(TEXT("equipment-definition"));}else for(const FHSREquipmentSaveDto& D:C.Equipment)if(!Equipment->HasDefinition(D.DefinitionId))return Reject(TEXT("legacy-equipment-definition"));
+	for(const FHSRItemStackSnapshot& S:C.Inventory.Stacks)if(!Inventory->HasDefinition(S.ItemId))return Reject(TEXT("stack-definition"));
+	for(const FHSRItemInstance& I:C.Inventory.UniqueItems)if(!Inventory->HasDefinition(I.DefinitionId))return Reject(TEXT("unique-definition"));
+	for(const FHSRRewardReceipt& R:C.Rewards.Receipts){if(!Reward->HasDefinition(R.Request.RewardDefinitionId))return Reject(TEXT("reward-definition"));for(const FHSRInventoryGrant& G:R.Grants)if(!Inventory->HasDefinition(G.ItemId))return Reject(TEXT("reward-grant-definition"));}
+	for(const FHSRQuestRuntimeState& Q:C.Quests.States)if(!Quest->HasDefinition(Q.QuestId))return Reject(TEXT("quest-definition"));
+	if(!C.Map.CurrentLocation.MapId.IsNone()&&!Map->HasMapDefinition(C.Map.CurrentLocation.MapId))return Reject(TEXT("map-definition"));
+	for(const FName& R:C.Map.UnlockedRegionIds)if(!Map->HasRegionDefinition(R))return Reject(TEXT("region-definition"));
+	for(const FName& T:C.Map.UnlockedTeleportIds)if(!Map->HasTeleportDefinition(T))return Reject(TEXT("teleport-definition"));
+	if(!UHSRChallengeProgressionSubsystem::ValidateSaveData(C.ChallengeProgression))return Reject(TEXT("challenge-progression"));
 	return true;
 }
 bool UHSRSaveSubsystem::CanPrepareSnapshot(const FHSRSaveData& Candidate) const

@@ -38,6 +38,33 @@ void UHSREquipmentSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	{
 		RegisterSetDefinition(*Set);
 	}
+
+	// Register the formal VerticalSlice relics so the demo bags' relics (granted by chests and
+	// the demo encounters) resolve against a known definition on equip. Without this the
+	// ExecuteMovement validation rejects every Demo.Relic.* equip with MappingRejected.
+	const TCHAR* DemoRelicPaths[] = {
+		TEXT("/Game/Data/VerticalSlice/Relics/Pieces/DA_Relic_HeavenLiveRoom_LinkRope.DA_Relic_HeavenLiveRoom_LinkRope"),
+		TEXT("/Game/Data/VerticalSlice/Relics/Pieces/DA_Relic_HeavenLiveRoom_PlanarSphere.DA_Relic_HeavenLiveRoom_PlanarSphere"),
+		TEXT("/Game/Data/VerticalSlice/Relics/Pieces/DA_Relic_ShiningMagicalGirl_Head.DA_Relic_ShiningMagicalGirl_Head"),
+		TEXT("/Game/Data/VerticalSlice/Relics/Pieces/DA_Relic_ShiningMagicalGirl_Hands.DA_Relic_ShiningMagicalGirl_Hands"),
+		TEXT("/Game/Data/VerticalSlice/Relics/Pieces/DA_Relic_ShiningMagicalGirl_Body.DA_Relic_ShiningMagicalGirl_Body"),
+		TEXT("/Game/Data/VerticalSlice/Relics/Pieces/DA_Relic_ShiningMagicalGirl_Feet.DA_Relic_ShiningMagicalGirl_Feet"),
+	};
+	for (const TCHAR* Path : DemoRelicPaths)
+	{
+		if (UHSRRelicDefinition* Relic = LoadObject<UHSRRelicDefinition>(nullptr, Path))
+		{
+			RegisterDefinition(*Relic);
+		}
+	}
+	if (UHSRRelicSetDefinition* MagicalGirl = LoadObject<UHSRRelicSetDefinition>(nullptr, TEXT("/Game/Data/VerticalSlice/Relics/Sets/DA_RelicSet_ShiningMagicalGirl.DA_RelicSet_ShiningMagicalGirl")))
+	{
+		RegisterSetDefinition(*MagicalGirl);
+	}
+	if (UHSRRelicSetDefinition* LiveRoom = LoadObject<UHSRRelicSetDefinition>(nullptr, TEXT("/Game/Data/VerticalSlice/Relics/Sets/DA_RelicSet_HeavenLiveRoom.DA_RelicSet_HeavenLiveRoom")))
+	{
+		RegisterSetDefinition(*LiveRoom);
+	}
 	UE_LOG(LogTemp, Log, TEXT("HSR.Equipment Bootstrap RelicDefinitions=%d HasHead=%d HasSet=%d"),
 		Definitions.Num(), Definitions.Contains(TEXT("Relic.P12.Head")) ? 1 : 0,
 		SetThresholds.Contains(TEXT("Set.P12.A")) ? 1 : 0);

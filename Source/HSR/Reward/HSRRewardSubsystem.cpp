@@ -86,6 +86,72 @@ void UHSRRewardSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 			DropTable ? TEXT("OK") : TEXT("MISSING"),
 			RewardDefinition ? TEXT("OK") : TEXT("MISSING"));
 	}
+
+	// Register the formal VerticalSlice item definitions into Inventory so the Demo encounter
+	// reward bundles (fixed relics + drop-table materials) validate. The six demo relics are
+	// Unique items and the growth material is stackable.
+	const TCHAR* DemoItemPaths[] =
+	{
+		TEXT("/Game/Data/VerticalSlice/Items/Relics/DA_Item_HeavenLiveRoom_LinkRope.DA_Item_HeavenLiveRoom_LinkRope"),
+		TEXT("/Game/Data/VerticalSlice/Items/Relics/DA_Item_HeavenLiveRoom_PlanarSphere.DA_Item_HeavenLiveRoom_PlanarSphere"),
+		TEXT("/Game/Data/VerticalSlice/Items/Relics/DA_Item_ShiningMagicalGirl_Head.DA_Item_ShiningMagicalGirl_Head"),
+		TEXT("/Game/Data/VerticalSlice/Items/Relics/DA_Item_ShiningMagicalGirl_Hands.DA_Item_ShiningMagicalGirl_Hands"),
+		TEXT("/Game/Data/VerticalSlice/Items/Relics/DA_Item_ShiningMagicalGirl_Body.DA_Item_ShiningMagicalGirl_Body"),
+		TEXT("/Game/Data/VerticalSlice/Items/Relics/DA_Item_ShiningMagicalGirl_Feet.DA_Item_ShiningMagicalGirl_Feet"),
+		TEXT("/Game/Data/VerticalSlice/Items/Materials/DA_Item_DomainEchoGrowthMaterial.DA_Item_DomainEchoGrowthMaterial"),
+	};
+	int32 DemoItemsRegistered = 0;
+	for (const TCHAR* DemoItemPath : DemoItemPaths)
+	{
+		if (UHSRItemDefinition* DemoItem = LoadObject<UHSRItemDefinition>(nullptr, DemoItemPath))
+		{
+			const EHSRInventoryOperationResult DemoResult = Inventory->RegisterDefinition(*DemoItem);
+			if (DemoResult == EHSRInventoryOperationResult::Success || DemoResult == EHSRInventoryOperationResult::NoOp)
+			{
+				++DemoItemsRegistered;
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("P18 DemoItemBootstrap=FAILED Reason=RegisterDefinition ItemId=%s Result=%d"),
+					*DemoItem->ItemId.ToString(), static_cast<int32>(DemoResult));
+			}
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("P18 DemoItemBootstrap=READY Items=%d/%d"), DemoItemsRegistered, static_cast<int32>(UE_ARRAY_COUNT(DemoItemPaths)));
+
+	// Register the demo reward definitions up front so save validation recognises a receipt
+	// that references them even before any chest or encounter has granted it. A receipt is
+	// persisted the moment a reward is submitted, but the definition was only ever registered
+	// as a side effect of the granting Actor (chest BeginPlay / battle transition). On a cold
+	// boot the save layer validates before any of those Actors exist, so a stored receipt for a
+	// not-yet-registered demo reward made the whole blob InvalidData and every save/load failed.
+	// The demo rewards carry no drop table (DropRolls=0) and their fixed items are registered by
+	// DemoItemBootstrap above, so plain RegisterRewardDefinition is sufficient.
+	const TCHAR* DemoRewardPaths[] =
+	{
+		TEXT("/Game/Data/VerticalSlice/Rewards/DA_Reward_WangXiaYiTong.DA_Reward_WangXiaYiTong"),
+		TEXT("/Game/Data/VerticalSlice/Rewards/DA_Reward_Laigushi.DA_Reward_Laigushi"),
+		TEXT("/Game/Data/VerticalSlice/Rewards/DA_Reward_SupportSectionInspector.DA_Reward_SupportSectionInspector"),
+		TEXT("/Game/Data/VerticalSlice/Rewards/DA_Reward_DomainEcho.DA_Reward_DomainEcho"),
+	};
+	int32 DemoRewardsRegistered = 0;
+	for (const TCHAR* DemoRewardPath : DemoRewardPaths)
+	{
+		if (UHSRRewardDefinition* DemoReward = LoadObject<UHSRRewardDefinition>(nullptr, DemoRewardPath))
+		{
+			const EHSRRewardOperationResult DemoResult = RegisterRewardDefinition(*DemoReward);
+			if (DemoResult == EHSRRewardOperationResult::Success || DemoResult == EHSRRewardOperationResult::NoOp)
+			{
+				++DemoRewardsRegistered;
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("P18 DemoRewardBootstrap=FAILED Reason=RegisterRewardDefinition RewardId=%s Result=%d"),
+					*DemoReward->RewardDefinitionId.ToString(), static_cast<int32>(DemoResult));
+			}
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("P18 DemoRewardBootstrap=READY Rewards=%d/%d"), DemoRewardsRegistered, static_cast<int32>(UE_ARRAY_COUNT(DemoRewardPaths)));
 }
 
 #if WITH_DEV_AUTOMATION_TESTS

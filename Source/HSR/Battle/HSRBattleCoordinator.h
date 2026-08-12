@@ -23,6 +23,7 @@ class UHSRSkillDefinition;
 class UHSRDamageRuleDefinition;
 class UGameplayEffect;
 class UHSREnemyDefinition;
+class UHSREnemyCatalog;
 class UHSRStatusDefinition;
 class UHSRStatusComponent;
 struct FOnAttributeChangeData;
@@ -108,6 +109,9 @@ public:
 	/** Convenience accessor for the harnesses, which drive a default basic attack. */
 	const UHSRSkillDefinition* GetBasicAttackDefinition() const { return FindDefaultSkillByCategory(EHSRSkillCategory::BasicAttack); }
 	void SetEnemyDefinition(UHSREnemyDefinition* InDefinition) { EnemyDefinition = InDefinition; }
+	/** Registers the authored enemy catalog so encounters resolve their enemy by EnemyDefinitionId
+	 * instead of depending on a single GameMode-authored reference. */
+	void SetEnemyCatalog(UHSREnemyCatalog* InCatalog) { EnemyCatalog = InCatalog; }
 	void SetParticipantInitializationGameplayEffect(TSubclassOf<UGameplayEffect> InEffect) { ParticipantInitializationGameplayEffect = InEffect; }
 	void SetCharacterProgressionGameplayEffect(TSubclassOf<UGameplayEffect> InEffect) { CharacterProgressionGameplayEffect = InEffect; }
 	void SetCharacterProgressionContext(FName ParticipantId, const FHSRCharacterProgressionContext& Context) { CharacterProgressionContexts.Add(ParticipantId, Context); }
@@ -317,6 +321,7 @@ private:
 	UPROPERTY()
 	TMap<FName, FHSRSkillLoadout> ParticipantSkillLoadouts;
 	UPROPERTY() TObjectPtr<UHSREnemyDefinition> EnemyDefinition;
+	UPROPERTY() TObjectPtr<UHSREnemyCatalog> EnemyCatalog;
 	UPROPERTY() TObjectPtr<UHSRStatusDefinition> StatusDefinition;
 	UPROPERTY() TObjectPtr<UHSRStatusDefinition> DamageOverTimeStatusDefinition;
 	UPROPERTY() TObjectPtr<UHSRStatusDefinition> BreakStatusDefinition;

@@ -15,6 +15,17 @@
 #include "../Progression/HSRCharacterProfileSubsystem.h"
 #include "../Reward/HSRRewardSubsystem.h"
 #include "../Save/HSRSaveSubsystem.h"
+#include "../Save/HSRSaveVersion.h"
+#include "../Map/HSRMapSubsystem.h"
+#include "../Quest/HSRQuestSubsystem.h"
+#include "../Data/Definitions/HSRMapDefinition.h"
+#include "../Data/Definitions/HSRTeleportDefinition.h"
+#include "../Data/Definitions/HSRItemEquipmentMappingCatalog.h"
+#include "../Data/Definitions/HSRRelicSetDefinition.h"
+#include "Kismet/GameplayStatics.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Misc/ScopeExit.h"
 
 namespace HSR::P13::SaveTests
 {
@@ -26,6 +37,8 @@ namespace HSR::P13::SaveTests
 		UHSREquipmentSubsystem* Equipment = nullptr;
 		UHSRInventorySubsystem* Inventory = nullptr;
 		UHSRRewardSubsystem* Reward = nullptr;
+		UHSRQuestSubsystem* Quest = nullptr;
+		UHSRMapSubsystem* Map = nullptr;
 		UHSRSaveSubsystem* Save = nullptr;
 	};
 
@@ -38,6 +51,8 @@ namespace HSR::P13::SaveTests
 		F.Equipment = NewObject<UHSREquipmentSubsystem>(F.GameInstance);
 		F.Inventory = NewObject<UHSRInventorySubsystem>(F.GameInstance);
 		F.Reward = NewObject<UHSRRewardSubsystem>(F.GameInstance);
+		F.Quest = NewObject<UHSRQuestSubsystem>(F.GameInstance);
+		F.Map = NewObject<UHSRMapSubsystem>(F.GameInstance);
 		F.Save = NewObject<UHSRSaveSubsystem>(F.GameInstance);
 
 		UHSRCharacterDefinition* Character = NewObject<UHSRCharacterDefinition>();
@@ -111,6 +126,16 @@ bool FHSRProductionSaveDefinitionsColdBootstrapTest::RunTest(const FString&)
 			Inventory->HasDefinition(TEXT("Item.Unique.ArchiveToken")));
 		TestTrue(TEXT("cold Reward knows Standard reward"),
 			Reward->HasDefinition(TEXT("Reward.P13.Standard")));
+		// Demo reward bundles (chest / encounter VictoryRewardDefinition) are the same
+		// shape as P13: a reward definition plus its fixed relic items. A receipt stored in a
+		// save must survive a cold boot, so these must be registered without any Actor
+		// side effect, exactly like DemoItemBootstrap registers the item definitions.
+		TestTrue(TEXT("cold Reward knows demo chest reward"),
+			Reward->HasDefinition(TEXT("Demo.Reward.WangXiaYiTong")));
+		TestTrue(TEXT("cold Reward knows demo boss reward"),
+			Reward->HasDefinition(TEXT("Demo.Reward.Laigushi")));
+		TestTrue(TEXT("cold Reward knows demo inspector reward"),
+			Reward->HasDefinition(TEXT("Demo.Reward.SupportSectionInspector")));
 	}
 
 	UWorld* World = GameInstance->GetWorld();
@@ -202,6 +227,59 @@ bool FHSRInventoryRewardSaveV3Test::RunTest(const FString&)
 	Target.Inventory->GetSnapshot(Snapshot);
 	TestTrue(TEXT("v2 migrates empty inventory"), Snapshot.Stacks.IsEmpty() && Snapshot.UniqueItems.IsEmpty());
 	TestFalse(TEXT("v2 migrates empty ledger"), Target.Reward->GetReceipt(Claim, RestoredReceipt));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRDemoRewardSaveDiskRoundtripTest,
+	"HSR.Save.DemoReward.DiskRoundtrip",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRDemoRewardSaveDiskRoundtripTest::RunTest(const FString&)
+{
+	// Regression for the "cannot load/save any save" report: a receipt whose reward definition
+	// was only ever registered by a chest/encounter Actor made Validate reject the whole blob on
+	// the next cold boot (the reward registry was empty before any Actor existed). The fix
+	// registers demo reward definitions in HSRRewardSubsystem::Initialize, so a disk roundtrip
+	// that stores a demo receipt must survive decode -> validate -> restore.
+	using namespace HSR::P13::SaveTests;
+	FFixture F = MakeFixture(*this);
+	UHSRRewardDefinition* DemoReward = NewObject<UHSRRewardDefinition>();
+	DemoReward->RewardDefinitionId = TEXT("Demo.Reward.WangXiaYiTong");
+	UHSRItemDefinition* DemoRelic = NewObject<UHSRItemDefinition>();
+	DemoRelic->ItemId = TEXT("Demo.Relic.HeavenLiveRoom.PlanarSphere");
+	DemoRelic->StorageKind = EHSRItemStorageKind::Unique;
+	DemoRelic->MaxStack = 1;
+	TestEqual(TEXT("register demo relic item"), F.Inventory->RegisterDefinition(*DemoRelic), EHSRInventoryOperationResult::Success);
+	DemoReward->FixedItems.Add({DemoRelic->ItemId, 1});
+	F.Reward->InitializeForAutomation(F.Inventory);
+	TestEqual(TEXT("register demo reward"), F.Reward->RegisterRewardDefinition(*DemoReward), EHSRRewardOperationResult::Success);
+	FHSRRewardReceipt Receipt;
+	const FGuid Claim(77, 1, 2, 3);
+	TestEqual(TEXT("claim demo reward"), F.Reward->SubmitReward({Claim, DemoReward->RewardDefinitionId, 1}, Receipt), EHSRRewardOperationResult::Success);
+
+	// Equip a relic so the blob carries an equipment placement. Character identity GUID is
+	// hashed case-insensitively, so the placement authored against the live "Character.A"
+	// profile must still match the profile row after a decode (which reconstructs the name).
+	// MakeFixture already registered Relic.P13.Save.
+	FHSREquipmentInstance Equipped;
+	const FGuid EquipId(13, 4, 9, 9);
+	Equipped.InstanceId = EquipId;
+	Equipped.DefinitionId = TEXT("Relic.P13.Save");
+	Equipped.Kind = EHSREquipmentKind::Relic;
+	Equipped.EnhancementLevel = 0;
+	TestEqual(TEXT("equip relic"), F.Equipment->Equip(HSRCharacterGuidFromProfileName(TEXT("Character.A")), Equipped), EHSREquipmentOperationResult::Success);
+
+	const FString Slot = FString::Printf(TEXT("HSR_DemoReward_%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits));
+	ON_SCOPE_EXIT { UGameplayStatics::DeleteGameInSlot(Slot, 0); };
+	TestEqual(TEXT("disk save"), F.Save->SaveToSlot(Slot, 0), EHSRSaveResult::Success);
+
+	// A fresh fixture is a second cold boot: only startup-registered definitions exist here.
+	FFixture Reload = MakeFixture(*this);
+	TestEqual(TEXT("reload register demo relic item"), Reload.Inventory->RegisterDefinition(*DemoRelic), EHSRInventoryOperationResult::Success);
+	Reload.Reward->InitializeForAutomation(Reload.Inventory);
+	TestEqual(TEXT("reload register demo reward"), Reload.Reward->RegisterRewardDefinition(*DemoReward), EHSRRewardOperationResult::Success);
+	TestEqual(TEXT("disk load"), Reload.Save->LoadFromSlot(Slot, 0), EHSRSaveResult::Success);
+	FHSRRewardReceipt Restored;
+	TestTrue(TEXT("demo receipt restored"), Reload.Reward->GetReceipt(Claim, Restored));
 	return true;
 }
 

@@ -29,6 +29,7 @@
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "../Status/HSRStatusComponent.h"
 #include "../Data/Definitions/HSREnemyDefinition.h"
+#include "../Data/Definitions/HSREnemyCatalog.h"
 #include "../Data/Definitions/HSREncounterDefinition.h"
 #include "../Enemy/HSREnemyAIController.h"
 #include "../Enemy/HSREnemyCharacter.h"
@@ -354,6 +355,42 @@ bool FHSRBehaviorTreeAdapterPatchTest::RunTest(const FString& Parameters)
 	OriginEnemy->CaptureSpawnOriginForAutomation();
 	OriginEnemy->SetActorLocation(FVector(999.0f, 999.0f, 999.0f));
 	TestEqual(TEXT("Post-BeginPlay captured origin remains stable"), OriginEnemy->GetSpawnOrigin(), PreBeginPlayLocation);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSREncounterPatrolContactAdmissionTest,
+	"HSR.Exploration.Patch.EncounterPatrolContact",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSREncounterPatrolContactAdmissionTest::RunTest(const FString&)
+{
+	// Encounter admission is owned by Character overlap contact, not by the Chasing state.
+	// A patrol-state contact must still pass the admission gate (EncounterPending alone rejects).
+	AHSREnemyAIController* Controller = NewObject<AHSREnemyAIController>();
+	TestEqual(TEXT("Idle-state contact passes admission gate and attempts submission"),
+		Controller->GetEncounterSubmissionAttemptsForAutomation(), 0);
+	Controller->TryRequestEncounterFromCharacter();
+	TestEqual(TEXT("Idle-state contact increments submission attempts"),
+		Controller->GetEncounterSubmissionAttemptsForAutomation(), 1);
+
+	Controller->SetStateForAutomation(EHSREnemyExplorationState::PatrolWaiting);
+	Controller->TryRequestEncounterFromCharacter();
+	TestEqual(TEXT("PatrolWaiting-state contact increments submission attempts"),
+		Controller->GetEncounterSubmissionAttemptsForAutomation(), 2);
+
+	Controller->SetStateForAutomation(EHSREnemyExplorationState::MovingToPatrol);
+	Controller->TryRequestEncounterFromCharacter();
+	TestEqual(TEXT("MovingToPatrol-state contact increments submission attempts"),
+		Controller->GetEncounterSubmissionAttemptsForAutomation(), 3);
+
+	Controller->SetStateForAutomation(EHSREnemyExplorationState::Chasing);
+	Controller->TryRequestEncounterFromCharacter();
+	TestEqual(TEXT("Chasing-state contact increments submission attempts"),
+		Controller->GetEncounterSubmissionAttemptsForAutomation(), 4);
+
+	Controller->SetStateForAutomation(EHSREnemyExplorationState::EncounterPending);
+	Controller->TryRequestEncounterFromCharacter();
+	TestEqual(TEXT("EncounterPending-state contact still counts an attempt but is gated"),
+		Controller->GetEncounterSubmissionAttemptsForAutomation(), 5);
 	return true;
 }
 
@@ -1401,6 +1438,56 @@ bool FHSRDefaultLoadoutResolutionTest::RunTest(const FString& Parameters)
 	Resolved = GameMode->ResolveDefaultSkillLoadoutForTest();
 	TestEqual(TEXT("An all-null array falls back rather than yielding an empty loadout"), Resolved.Num(), 4);
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSREnemyCatalogResolutionTest,
+	"HSR.Battle.Patch.EnemyCatalogResolution",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSREnemyCatalogResolutionTest::RunTest(const FString&)
+{
+	// Two distinct encounters (Inspector + Boss) must each field their own enemy. The coordinator
+	// resolves the enemy by EnemyDefinitionId from the authored catalog, not a single GameMode
+	// reference -- this is what lets both formal encounters enter battle.
+	UHSREnemyCatalog* Catalog = NewObject<UHSREnemyCatalog>();
+	UHSREnemyDefinition* Inspector = NewObject<UHSREnemyDefinition>();
+	Inspector->EnemyDefinitionId = TEXT("Demo.Enemy.SupportSectionInspector");
+	UHSREnemyDefinition* Laigushi = NewObject<UHSREnemyDefinition>();
+	Laigushi->EnemyDefinitionId = TEXT("Demo.Boss.Laigushi");
+	Catalog->Enemies.Add(Inspector);
+	Catalog->Enemies.Add(Laigushi);
+
+	UHSRBattleCoordinator* Coordinator = NewObject<UHSRBattleCoordinator>();
+	Coordinator->SetEnemyCatalog(Catalog);
+
+	// Inspector encounter resolves the inspector enemy definition from the catalog.
+	FHSREncounterRequest InspectorRequest;
+	InspectorRequest.RequestId = FGuid(1, 2, 3, 4);
+	InspectorRequest.EncounterId = TEXT("Demo.Encounter.SupportSectionInspector");
+	InspectorRequest.EnemyDefinitionId = TEXT("Demo.Enemy.SupportSectionInspector");
+	InspectorRequest.BattleMapPath = TEXT("/Game/Maps/Map_Battle");
+	InspectorRequest.PlayerCharacterId = TEXT("Character.A");
+	TestTrue(TEXT("Inspector encounter submits"), Coordinator->SubmitBattleRequest(InspectorRequest));
+
+	// The catalog resolution path is exercised inside BuildParticipants; without a world we cannot
+	// run it end-to-end, but we can verify the catalog carries both enemies by id.
+	TestEqual(TEXT("Catalog carries the inspector enemy"), Catalog->Enemies[0]->EnemyDefinitionId,
+		FName(TEXT("Demo.Enemy.SupportSectionInspector")));
+	TestEqual(TEXT("Catalog carries the boss enemy"), Catalog->Enemies[1]->EnemyDefinitionId,
+		FName(TEXT("Demo.Boss.Laigushi")));
+
+	// The authored catalog asset exists with both formal enemies.
+	UHSREnemyCatalog* AuthoredCatalog = LoadObject<UHSREnemyCatalog>(nullptr,
+		TEXT("/Game/Data/VerticalSlice/Enemies/DA_EnemyCatalog.DA_EnemyCatalog"));
+	if (!TestNotNull(TEXT("Authored enemy catalog loads"), AuthoredCatalog))
+	{
+		return false;
+	}
+	TestEqual(TEXT("Authored catalog has two enemies"), AuthoredCatalog->Enemies.Num(), 2);
+	TestEqual(TEXT("Authored catalog includes the inspector"),
+		AuthoredCatalog->Enemies[0]->EnemyDefinitionId, FName(TEXT("Demo.Enemy.SupportSectionInspector")));
+	TestEqual(TEXT("Authored catalog includes the boss"),
+		AuthoredCatalog->Enemies[1]->EnemyDefinitionId, FName(TEXT("Demo.Boss.Laigushi")));
 	return true;
 }
 

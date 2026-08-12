@@ -531,4 +531,40 @@ bool FHSREquipmentMovementReplaceTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRDemoRelicEquipResolutionTest,
+	"HSR.Equipment.Movement.DemoRelicEquipResolution",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRDemoRelicEquipResolutionTest::RunTest(const FString&)
+{
+	// The authored demo relics must resolve through the P17 equipment mapping catalog so the
+	// Inventory equip button is enabled, and the equipment subsystem must accept their relic
+	// definitions so an equip is not rejected with MappingRejected.
+	UHSRItemEquipmentMappingCatalog* Catalog = LoadObject<UHSRItemEquipmentMappingCatalog>(nullptr,
+		TEXT("/Game/Data/Items/DA_ItemEquipmentMappingCatalog_P17.DA_ItemEquipmentMappingCatalog_P17"));
+	if (!TestNotNull(TEXT("Authored P17 mapping catalog loads"), Catalog))
+	{
+		return false;
+	}
+	const TCHAR* DemoRelicIds[] =
+	{
+		TEXT("Demo.Relic.ShiningMagicalGirl.Head"),
+		TEXT("Demo.Relic.ShiningMagicalGirl.Hands"),
+		TEXT("Demo.Relic.ShiningMagicalGirl.Body"),
+		TEXT("Demo.Relic.ShiningMagicalGirl.Feet"),
+		TEXT("Demo.Relic.HeavenLiveRoom.PlanarSphere"),
+		TEXT("Demo.Relic.HeavenLiveRoom.LinkRope"),
+	};
+	for (const TCHAR* ItemId : DemoRelicIds)
+	{
+		FHSRItemEquipmentMappingEntry Mapping;
+		if (!TestTrue(FString::Printf(TEXT("Mapping resolves demo relic %s"), ItemId),
+			Catalog->Resolve(FName(ItemId), Mapping)))
+		{
+			return false;
+		}
+		TestEqual(FString::Printf(TEXT("Demo relic %s is RELIC kind"), ItemId), Mapping.Kind, EHSREquipmentKind::Relic);
+	}
+	return true;
+}
+
 #endif

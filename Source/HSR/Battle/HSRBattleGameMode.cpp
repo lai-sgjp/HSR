@@ -16,6 +16,7 @@
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "../Data/HSRSkillDefinition.h"
 #include "../Data/Definitions/HSREnemyDefinition.h"
+#include "../Data/Definitions/HSREnemyCatalog.h"
 #include "../Data/Definitions/HSRStatusDefinition.h"
 #include "../Status/HSRStatusComponent.h"
 #include "../Data/HSRBreakTypes.h"
@@ -1675,6 +1676,7 @@ void AHSRBattleGameMode::BeginPlay()
 	}
 	Coordinator->SetDefaultSkillLoadout(ResolveDefaultSkillLoadout());
 	Coordinator->SetEnemyDefinition(EnemyDefinition);
+	Coordinator->SetEnemyCatalog(EnemyCatalog);
 	Coordinator->SetStatusDefinition(AttackUpStatusDefinition);
 	Coordinator->SetDamageOverTimeStatusDefinition(DamageOverTimeStatusDefinition);
 	Coordinator->SetBreakStatusDefinition(BreakStatusDefinition);

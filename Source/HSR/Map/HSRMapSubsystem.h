@@ -53,6 +53,14 @@ public:
 	bool HasMapDefinition(FName MapId) const { return Maps.Contains(MapId); }
 	bool HasRegionDefinition(FName RegionId) const;
 	bool HasTeleportDefinition(FName TeleportId) const { return Teleports.Contains(TeleportId); }
+	UFUNCTION(BlueprintPure, Category = "HSR|Map")
+	FText GetMapDisplayName(FName MapId) const;
+	UFUNCTION(BlueprintPure, Category = "HSR|Map")
+	void GetAvailableTeleports(TArray<FHSRTeleportProjection>& OutTeleports) const;
+	UFUNCTION(BlueprintPure, Category = "HSR|Map")
+	int32 GetReachableTeleportCount() const;
+	UFUNCTION(BlueprintPure, Category = "HSR|Map")
+	bool GetReachableTeleport(int32 Index, FHSRTeleportProjection& OutTeleport) const;
 	const FHSRMapRuntimeSnapshot& GetSnapshot() const { return Snapshot; }
 	FHSRMapStateChanged& OnMapStateChanged() { return MapStateChanged; }
 	FHSRMapArrivalCommitted& OnArrivalCommitted() { return ArrivalCommitted; }
@@ -83,6 +91,7 @@ private:
 		TSoftObjectPtr<UWorld> World;
 		FName RegionId = NAME_None;
 		FName DefaultArrivalId = NAME_None;
+		FText DisplayName;
 	};
 
 	struct FRegisteredTeleport

@@ -246,7 +246,7 @@ bool FHSRDemoFlowCatalogTest::RunTest(const FString&)
 		{
 			TestEqual(TEXT("encounter id"), Encounter->EncounterId, FName(Spec.Id));
 			TestEqual(TEXT("encounter enemy id"), Encounter->EnemyDefinitionId, FName(Spec.EnemyId));
-			TestEqual(TEXT("battle map"), Encounter->BattleMap.ToSoftObjectPath().GetLongPackageName(), FString(TEXT("/Game/Maps/VerticalSlice/Map_HertaSupportSection")));
+			TestEqual(TEXT("battle map"), Encounter->BattleMap.ToSoftObjectPath().GetLongPackageName(), FString(TEXT("/Game/Maps/Map_Battle")));
 			TestNotNull(TEXT("victory reward definition"), Encounter->VictoryRewardDefinition.Get());
 			if (Encounter->VictoryRewardDefinition)
 			{

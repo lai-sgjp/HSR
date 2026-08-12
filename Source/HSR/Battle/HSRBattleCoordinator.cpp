@@ -1,6 +1,7 @@
 #include "HSRBattleCoordinator.h"
 #include "../Reward/HSRRewardTypes.h"
 #include "../Data/Definitions/HSREnemyDefinition.h"
+#include "../Data/Definitions/HSREnemyCatalog.h"
 #include "HSRTurnManager.h"
 #include "HSREncounterTypes.h"
 #include "HSRTargetingPolicy.h"
@@ -360,11 +361,32 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		Participants.Empty();
 		TurnManager = nullptr;
 	};
-	if (!EnemyDefinition || EnemyDefinition->EnemyDefinitionId != CurrentEnemyDefinitionId)
+	// Resolve the enemy definition for this encounter. The authored enemy catalog is the
+	// primary source keyed by EnemyDefinitionId, so multiple encounters (Inspector, Boss) each
+	// field their own enemy without a single GameMode-authored reference. Fall back to the
+	// injected definition only when the catalog has no match (legacy single-enemy flow).
+	UHSREnemyDefinition* ResolvedEnemyDefinition = nullptr;
+	if (EnemyCatalog)
+	{
+		for (const TObjectPtr<UHSREnemyDefinition>& CatalogEntry : EnemyCatalog->Enemies)
+		{
+			if (CatalogEntry && CatalogEntry->EnemyDefinitionId == CurrentEnemyDefinitionId)
+			{
+				ResolvedEnemyDefinition = CatalogEntry;
+				break;
+			}
+		}
+	}
+	if (!ResolvedEnemyDefinition && EnemyDefinition && EnemyDefinition->EnemyDefinitionId == CurrentEnemyDefinitionId)
+	{
+		ResolvedEnemyDefinition = EnemyDefinition;
+	}
+	if (!ResolvedEnemyDefinition)
 	{
 		CurrentState = EHSRBattleCoordinatorState::Failed;
 		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::DefinitionNotFound, FText::FromString(TEXT("Configured EnemyDefinition does not match encounter EnemyDefinitionId.")), CurrentEnemyDefinitionId);
 	}
+	EnemyDefinition = ResolvedEnemyDefinition;
 
 	// Spawn each participant from its definition
 	for (const auto& Def : ParticipantDefinitions)

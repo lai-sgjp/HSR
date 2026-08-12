@@ -292,4 +292,45 @@ bool FHSRRewardValidationTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRDemoRewardBundleValidationTest,
+	"HSR.Reward.DemoBundle",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRDemoRewardBundleValidationTest::RunTest(const FString&)
+{
+	using namespace HSR::Reward::Tests;
+	FFixture Fixture = MakeFixture(*this);
+
+	// The VerticalSlice encounter reward bundle must validate: its drop table and fixed items
+	// reference formally-registered demo items (relics + growth material).
+	UHSRDropTableDefinition* DemoDrop = NewObject<UHSRDropTableDefinition>();
+	DemoDrop->DropTableId = TEXT("Demo.Drop.VerticalSlice");
+	DemoDrop->Entries.Add({TEXT("Demo.Relic.HeavenLiveRoom.PlanarSphere"), 1, 1, 1});
+	TestEqual(TEXT("Demo drop table registers"), Fixture.Reward->RegisterDropTable(*DemoDrop), EHSRRewardOperationResult::Success);
+
+	UHSRRewardDefinition* InspectorReward = NewObject<UHSRRewardDefinition>();
+	InspectorReward->RewardDefinitionId = TEXT("Demo.Reward.SupportSectionInspector");
+	InspectorReward->DropTableId = TEXT("Demo.Drop.VerticalSlice");
+	InspectorReward->DropRolls = 1;
+	InspectorReward->FixedItems.Add({TEXT("Demo.Relic.HeavenLiveRoom.LinkRope"), 1});
+	TestEqual(TEXT("Demo reward definition registers"), Fixture.Reward->RegisterRewardDefinition(*InspectorReward),
+		EHSRRewardOperationResult::Success);
+
+	// Register the bundle as RequestEncounter does; it must not hit UnknownDropItem/UnknownFixedItem.
+	TArray<TObjectPtr<UHSRItemDefinition>> BundleItems;
+	UHSRItemDefinition* PlanarSphere = NewObject<UHSRItemDefinition>();
+	PlanarSphere->ItemId = TEXT("Demo.Relic.HeavenLiveRoom.PlanarSphere");
+	PlanarSphere->StorageKind = EHSRItemStorageKind::Unique;
+	PlanarSphere->MaxStack = 1;
+	UHSRItemDefinition* LinkRope = NewObject<UHSRItemDefinition>();
+	LinkRope->ItemId = TEXT("Demo.Relic.HeavenLiveRoom.LinkRope");
+	LinkRope->StorageKind = EHSRItemStorageKind::Unique;
+	LinkRope->MaxStack = 1;
+	BundleItems.Add(PlanarSphere);
+	BundleItems.Add(LinkRope);
+	TestEqual(TEXT("Demo reward bundle registers without unknown-item rejection"),
+		Fixture.Reward->RegisterBundle(BundleItems, *DemoDrop, *InspectorReward),
+		EHSRRewardOperationResult::Success);
+	return true;
+}
+
 #endif

@@ -5,7 +5,14 @@
 
 FORCEINLINE FGuid HSRCharacterGuidFromProfileName(const FName& CharacterId)
 {
-	const FTCHARToUTF8 Utf8(*CharacterId.ToString());
+	// Character identity is hashed case-insensitively so the save layer round-trips it exactly.
+	// The canonical save codec lowercases every FName on disk, and decode reconstructs the name
+	// as the runtime registered it, but a profile may arrive either as the authored "Character.A"
+	// (live runtime) or the canonical lowercased form (decoded from disk). Hashing the lowercased
+	// form makes both spellings yield the same GUID, so an equipment placement authored against the
+	// live profile still matches the profile row after a save/load round-trip.
+	const FString Normalized = CharacterId.ToString().ToLower();
+	const FTCHARToUTF8 Utf8(*Normalized);
 	uint32 StableHash = 2166136261u;
 	for (int32 Index = 0; Index < Utf8.Length(); ++Index)
 	{

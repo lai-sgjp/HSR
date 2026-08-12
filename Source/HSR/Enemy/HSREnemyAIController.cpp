@@ -326,10 +326,11 @@ void AHSREnemyAIController::TryRequestEncounterFromCharacter()
 #if WITH_DEV_AUTOMATION_TESTS
 	++EncounterSubmissionAttemptsForAutomation;
 #endif
-	// Only process Encounter requests while in Chasing state
-	if (CurrentState != EHSREnemyExplorationState::Chasing)
+	// Encounter admission is owned by Character overlap contact. Accept contact in every
+	// exploration state except EncounterPending (which would double-submit the same battle).
+	if (CurrentState == EHSREnemyExplorationState::EncounterPending)
 	{
-		UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::TryRequestEncounter - %s FAILED (state=%d, not Chasing)"),
+		UE_LOG(LogTemp, Log, TEXT("AHSREnemyAIController::TryRequestEncounter - %s FAILED (state=%d, EncounterPending)"),
 			*GetName(), static_cast<int32>(CurrentState));
 		return;
 	}

@@ -61,3 +61,6 @@ Content/ModResources/
 /Content/ThirdPersonBP/
 /Content/__ExternalActors__/
 /Content/__ExternalObjects__/
+
+# Nested Claude worktrees (separate git checkouts, never tracked by the main repo)
+/.claude/worktrees/

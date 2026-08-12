@@ -3,6 +3,10 @@
 #include "../Character/HSRCharacterBase.h"
 #include "../Data/Definitions/HSRCharacterCatalog.h"
 #include "../Data/Definitions/HSRCharacterDefinition.h"
+#include "../Data/Definitions/HSRMapCatalog.h"
+#include "../Data/Definitions/HSRMapDefinition.h"
+#include "../Data/Definitions/HSRTeleportDefinition.h"
+#include "../Map/HSRMapSubsystem.h"
 #include "../Party/HSRPartySubsystem.h"
 #include "../Player/HSRPlayerController.h"
 #include "../Progression/HSRCharacterProfileSubsystem.h"
@@ -28,8 +32,95 @@ void AHSRGameModeBase::RestartPlayer(AController* NewPlayer)
 #if WITH_DEV_AUTOMATION_TESTS
 		AutomationController = NewPlayer;
 #endif
+		BootstrapMapDefinitions();
 		BootstrapCharacterIdentity(CharacterBootstrapMode);
 	}
+}
+
+EHSRMapBootstrapResult AHSRGameModeBase::BootstrapMapDefinitions()
+{
+	if (!MapCatalog)
+	{
+		LastMapBootstrapResult = EHSRMapBootstrapResult::MissingCatalog;
+		return LastMapBootstrapResult;
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	UHSRMapSubsystem* Maps = GameInstance ? GameInstance->GetSubsystem<UHSRMapSubsystem>() : nullptr;
+	if (!Maps)
+	{
+		LastMapBootstrapResult = EHSRMapBootstrapResult::MissingCatalog;
+		return LastMapBootstrapResult;
+	}
+
+	for (const TObjectPtr<UHSRMapDefinition>& MapEntry : MapCatalog->Maps)
+	{
+		if (!MapEntry)
+		{
+			LastMapBootstrapResult = EHSRMapBootstrapResult::MapRegistrationFailed;
+			return LastMapBootstrapResult;
+		}
+		const EHSRMapOperationResult RegisterResult = Maps->RegisterMapAsset(MapEntry);
+		if (RegisterResult != EHSRMapOperationResult::Success && RegisterResult != EHSRMapOperationResult::NoOp)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("P18 MapBootstrap map '%s' register failed result=%d"),
+				*MapEntry->MapId.ToString(), static_cast<int32>(RegisterResult));
+			LastMapBootstrapResult = EHSRMapBootstrapResult::MapRegistrationFailed;
+			return LastMapBootstrapResult;
+		}
+	}
+
+	for (const TObjectPtr<UHSRTeleportDefinition>& TeleportEntry : MapCatalog->Teleports)
+	{
+		if (!TeleportEntry)
+		{
+			LastMapBootstrapResult = EHSRMapBootstrapResult::TeleportRegistrationFailed;
+			return LastMapBootstrapResult;
+		}
+		const EHSRMapOperationResult RegisterResult = Maps->RegisterTeleportAsset(TeleportEntry);
+		if (RegisterResult != EHSRMapOperationResult::Success && RegisterResult != EHSRMapOperationResult::NoOp)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("P18 MapBootstrap teleport '%s' register failed result=%d"),
+				*TeleportEntry->TeleportId.ToString(), static_cast<int32>(RegisterResult));
+			LastMapBootstrapResult = EHSRMapBootstrapResult::TeleportRegistrationFailed;
+			return LastMapBootstrapResult;
+		}
+	}
+
+	// Unlock every catalog region so all authored teleports are reachable from their source maps.
+	for (const TObjectPtr<UHSRMapDefinition>& MapEntry : MapCatalog->Maps)
+	{
+		if (!MapEntry)
+		{
+			LastMapBootstrapResult = EHSRMapBootstrapResult::MapRegistrationFailed;
+			return LastMapBootstrapResult;
+		}
+		const EHSRMapOperationResult UnlockResult = Maps->UnlockRegion(MapEntry->RegionId);
+		if (UnlockResult != EHSRMapOperationResult::Success && UnlockResult != EHSRMapOperationResult::NoOp)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("P18 MapBootstrap region '%s' unlock failed result=%d"),
+				*MapEntry->RegionId.ToString(), static_cast<int32>(UnlockResult));
+			LastMapBootstrapResult = EHSRMapBootstrapResult::MapRegistrationFailed;
+			return LastMapBootstrapResult;
+		}
+	}
+
+	if (!InitialMapId.IsNone())
+	{
+		const EHSRMapOperationResult LocationResult = Maps->SetCurrentLocation(InitialMapId);
+		if (LocationResult != EHSRMapOperationResult::Success && LocationResult != EHSRMapOperationResult::NoOp)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("P18 MapBootstrap initial location '%s' failed result=%d"),
+				*InitialMapId.ToString(), static_cast<int32>(LocationResult));
+			LastMapBootstrapResult = EHSRMapBootstrapResult::InitialLocationFailed;
+			return LastMapBootstrapResult;
+		}
+	}
+
+	LastMapBootstrapResult = EHSRMapBootstrapResult::Success;
+	UE_LOG(LogTemp, Log, TEXT("P18 MapBootstrap registered %d maps %d teleports regions unlocked initial=%s"),
+		MapCatalog->Maps.Num(), MapCatalog->Teleports.Num(), *InitialMapId.ToString());
+	return LastMapBootstrapResult;
 }
 
 EHSRCharacterBootstrapResult AHSRGameModeBase::BootstrapCharacterIdentity(const EHSRCharacterBootstrapMode Mode)
@@ -178,5 +269,11 @@ void AHSRGameModeBase::ConfigureCharacterBootstrapForAutomation(UHSRCharacterCat
 	CharacterCatalog = InCatalog;
 	InitialCharacterId = InInitialCharacterId;
 	AutomationController = InController;
+}
+
+void AHSRGameModeBase::ConfigureMapBootstrapForAutomation(UHSRMapCatalog* InCatalog, const FName InInitialMapId)
+{
+	MapCatalog = InCatalog;
+	InitialMapId = InInitialMapId;
 }
 #endif

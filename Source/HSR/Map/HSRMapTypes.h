@@ -92,6 +92,28 @@ struct FHSRTeleportRequest
 };
 
 USTRUCT(BlueprintType)
+struct FHSRTeleportProjection
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly)
+	FName TeleportId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly)
+	FName SourceMapId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly)
+	FName DestinationMapId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly)
+	FText DestinationDisplayName;
+
+	/** Whether this teleport is unlocked and reachable from the current map right now. */
+	UPROPERTY(BlueprintReadOnly)
+	bool bUsable = false;
+};
+
+USTRUCT(BlueprintType)
 struct FHSRMapRuntimeSnapshot
 {
 	GENERATED_BODY()

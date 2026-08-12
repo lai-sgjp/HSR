@@ -3,7 +3,14 @@
 #include "../GAS/HSRAbilitySystemComponent.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 #include "../UI/HSRAttributeViewModel.h"
+#include "../Data/Definitions/HSRCharacterDefinition.h"
+#include "../Progression/HSRCharacterProfileSubsystem.h"
+#include "../Equipment/HSREquipmentEffectBridge.h"
+#include "../Equipment/HSREquipmentStatAggregator.h"
+#include "../Equipment/HSREquipmentSubsystem.h"
+#include "../Equipment/HSREquipmentTypes.h"
 #include "GameplayEffect.h"
+#include "Engine/GameInstance.h"
 
 AHSRCharacterBase::AHSRCharacterBase()
 {
@@ -43,6 +50,7 @@ void AHSRCharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		AttributeViewModel->Teardown();
 	}
+	UnprojectEquipmentFromAbilitySystem();
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -111,6 +119,10 @@ void AHSRCharacterBase::ApplyInitialAttributes()
 	{
 		bInitialAttributesApplied = true;
 		InitialAttributesApplySuccessCount++;
+		// The authored character definition is the single source of truth for base stats. If the
+		// character id is already known (player spawned after RestartPlayer), re-assert the base
+		// values so the GE's default magnitudes never stack on top of the definition values.
+		ApplyCharacterBaseStatsToAbilitySystem();
 		UE_LOG(LogTemp, Log, TEXT("%s::ApplyInitialAttributes - GE applied successfully via WasSuccessfullyApplied (total=%d)"), *GetName(), InitialAttributesApplySuccessCount);
 	}
 	else
@@ -297,5 +309,121 @@ bool AHSRCharacterBase::SetProjectedCharacterId(const FName CharacterId)
 		return false;
 	}
 	ProjectedCharacterId = CharacterId;
+	ApplyCharacterBaseStatsToAbilitySystem();
+	ProjectEquipmentToAbilitySystem();
 	return true;
+}
+
+void AHSRCharacterBase::ApplyCharacterBaseStatsToAbilitySystem()
+{
+	if (ProjectedCharacterId.IsNone() || !AbilitySystemComponent)
+	{
+		return;
+	}
+	UGameInstance* GameInstance = GetGameInstance();
+	UHSRCharacterProfileSubsystem* Profiles = GameInstance ? GameInstance->GetSubsystem<UHSRCharacterProfileSubsystem>() : nullptr;
+	if (!Profiles)
+	{
+		return;
+	}
+	const UHSRCharacterDefinition* Definition = nullptr;
+	if (!Profiles->GetDefinition(ProjectedCharacterId, Definition) || !Definition)
+	{
+		return;
+	}
+	UHSRCoreAttributeSet* Core = const_cast<UHSRCoreAttributeSet*>(AbilitySystemComponent->GetSet<UHSRCoreAttributeSet>());
+	if (!Core)
+	{
+		return;
+	}
+	const float MaxHealth = Definition->BaseMaxHealth;
+	AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(), MaxHealth);
+	AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), MaxHealth);
+	AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxEnergyAttribute(), Definition->BaseMaxEnergy);
+	AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetEnergyAttribute(), Definition->BaseMaxEnergy);
+	AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetAttackAttribute(), Definition->BaseAttack);
+	AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetDefenseAttribute(), Definition->BaseDefense);
+	AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), Definition->BaseSpeed);
+	UE_LOG(LogTemp, Log, TEXT("AHSRCharacterBase::ApplyCharacterBaseStatsToAbilitySystem - %s base MaxHealth=%.0f Health=%.0f MaxEnergy=%.0f Energy=%.0f Speed=%.0f"),
+		*GetName(), MaxHealth,
+		AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()),
+		Definition->BaseMaxEnergy,
+		AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute()),
+		Definition->BaseSpeed);
+}
+
+void AHSRCharacterBase::ProjectEquipmentToAbilitySystem()
+{
+	if (ProjectedCharacterId.IsNone() || !AbilitySystemComponent)
+	{
+		return;
+	}
+	UGameInstance* GameInstance = GetGameInstance();
+	UHSREquipmentSubsystem* Equipment = GameInstance ? GameInstance->GetSubsystem<UHSREquipmentSubsystem>() : nullptr;
+	if (!Equipment)
+	{
+		return;
+	}
+	UnprojectEquipmentFromAbilitySystem();
+	if (!EquipmentEffectBridge)
+	{
+		EquipmentEffectBridge = NewObject<UHSREquipmentEffectBridge>(this);
+	}
+	TSubclassOf<UGameplayEffect> EquipmentEffect =
+		LoadClass<UGameplayEffect>(nullptr, TEXT("/Game/GameplayEffects/GE_Equipment_P12.GE_Equipment_P12_C"));
+	const FGuid CharacterGuid = HSRCharacterGuidFromProfileName(ProjectedCharacterId);
+	FHSREquipmentLoadout Loadout;
+	int32 Revision = 0;
+	if (EquipmentEffect && Equipment->GetLoadout(CharacterGuid, Loadout, Revision))
+	{
+		for (const auto& Pair : Loadout.Equipment)
+		{
+			FHSREquipmentAggregate Aggregate;
+			if (UHSREquipmentStatAggregator::AddInstance(Pair.Value, Aggregate))
+			{
+				Aggregate.Revision = Revision;
+				EquipmentEffectBridge->Apply(Pair.Value.InstanceId, AbilitySystemComponent, EquipmentEffect, Aggregate);
+			}
+		}
+		for (const auto& Pair : Loadout.Relics)
+		{
+			FHSREquipmentAggregate Aggregate;
+			if (UHSREquipmentStatAggregator::AddInstance(Pair.Value, Aggregate))
+			{
+				Aggregate.Revision = Revision;
+				EquipmentEffectBridge->Apply(Pair.Value.InstanceId, AbilitySystemComponent, EquipmentEffect, Aggregate);
+			}
+		}
+	}
+	EquipmentLoadoutChangedHandle = Equipment->OnLoadoutChanged().AddUObject(this, &AHSRCharacterBase::HandleEquipmentLoadoutChanged);
+	UE_LOG(LogTemp, Log, TEXT("AHSRCharacterBase::ProjectEquipmentToAbilitySystem - %s projected equipment loadout to ASC"), *GetName());
+}
+
+void AHSRCharacterBase::UnprojectEquipmentFromAbilitySystem()
+{
+	if (EquipmentLoadoutChangedHandle.IsValid())
+	{
+		if (UGameInstance* GameInstance = GetGameInstance())
+		{
+			if (UHSREquipmentSubsystem* Equipment = GameInstance->GetSubsystem<UHSREquipmentSubsystem>())
+			{
+				Equipment->OnLoadoutChanged().Remove(EquipmentLoadoutChangedHandle);
+			}
+		}
+		EquipmentLoadoutChangedHandle.Reset();
+	}
+	if (EquipmentEffectBridge)
+	{
+		EquipmentEffectBridge->RemoveAll();
+	}
+}
+
+void AHSRCharacterBase::HandleEquipmentLoadoutChanged(const FGuid& CharacterId, int32 Revision)
+{
+	const FGuid MyGuid = HSRCharacterGuidFromProfileName(ProjectedCharacterId);
+	if (CharacterId != MyGuid)
+	{
+		return;
+	}
+	ProjectEquipmentToAbilitySystem();
 }

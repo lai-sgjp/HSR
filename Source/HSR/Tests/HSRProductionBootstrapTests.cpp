@@ -10,6 +10,8 @@
 #include "../Character/HSRExplorationCharacter.h"
 #include "../Data/Definitions/HSRCharacterCatalog.h"
 #include "../Data/Definitions/HSRCharacterDefinition.h"
+#include "../Data/Definitions/HSRMapCatalog.h"
+#include "../Map/HSRMapSubsystem.h"
 #include "../Framework/HSRGameModeBase.h"
 #include "../Party/HSRPartySubsystem.h"
 #include "../Progression/HSRCharacterProfileSubsystem.h"
@@ -243,6 +245,80 @@ bool FHSRProductionBootstrapCharacterIdentityTest::RunTest(const FString& Parame
 	TestFalse(TEXT("Wrong Pawn creates no profile"), WrongPawnFixture.GameInstance
 		->GetSubsystem<UHSRCharacterProfileSubsystem>()->GetProfileSnapshot(TEXT("Character.A"), WrongPawnProfile));
 	WrongPawnFixture.Shutdown();
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRProductionBootstrapMapCatalogTest,
+	"HSR.ProductionBootstrap.MapCatalog",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSRProductionBootstrapMapCatalogTest::RunTest(const FString& Parameters)
+{
+	FHSRBootstrapFixture Fixture;
+	if (!TestTrue(TEXT("Map-catalog fixture initializes"), Fixture.Initialize()))
+	{
+		Fixture.Shutdown();
+		return false;
+	}
+
+	UHSRMapCatalog* Catalog = LoadObject<UHSRMapCatalog>(nullptr,
+		TEXT("/Game/Data/Maps/DA_MapCatalog.DA_MapCatalog"));
+	if (!TestNotNull(TEXT("Authored map catalog loads"), Catalog))
+	{
+		Fixture.Shutdown();
+		return false;
+	}
+	Fixture.GameMode->ConfigureMapBootstrapForAutomation(Catalog, TEXT("Map.ObservationCar"));
+
+	UHSRMapSubsystem* Maps = Fixture.GameInstance->GetSubsystem<UHSRMapSubsystem>();
+	TestEqual(TEXT("Map bootstrap succeeds"),
+		Fixture.GameMode->BootstrapMapDefinitions(), EHSRMapBootstrapResult::Success);
+	TestEqual(TEXT("All three maps registered"), Maps->HasMapDefinition(TEXT("Map.ObservationCar"))
+		&& Maps->HasMapDefinition(TEXT("Map.NewEriduSixthStreet"))
+		&& Maps->HasMapDefinition(TEXT("Map.HertaSupportSection")), true);
+	TestEqual(TEXT("All six teleports registered"), Maps->HasTeleportDefinition(TEXT("Teleport.ObservationCarToSixthStreet"))
+		&& Maps->HasTeleportDefinition(TEXT("Teleport.SixthStreetToObservationCar"))
+		&& Maps->HasTeleportDefinition(TEXT("Teleport.ObservationCarToHerta"))
+		&& Maps->HasTeleportDefinition(TEXT("Teleport.HertaToObservationCar"))
+		&& Maps->HasTeleportDefinition(TEXT("Teleport.SixthStreetToHerta"))
+		&& Maps->HasTeleportDefinition(TEXT("Teleport.HertaToSixthStreet")), true);
+	TestEqual(TEXT("Initial location set"), Maps->GetSnapshot().CurrentLocation.MapId, FName(TEXT("Map.ObservationCar")));
+	TestEqual(TEXT("Herta display name resolved"), Maps->GetMapDisplayName(TEXT("Map.HertaSupportSection")),
+		FText::FromString(TEXT("黑塔空间站支援舱段")));
+
+	// All catalog regions are unlocked so every authored teleport is usable.
+	TestEqual(TEXT("All catalog regions unlocked"), Maps->IsRegionUnlocked(TEXT("Region.A"))
+		&& Maps->IsRegionUnlocked(TEXT("Region.B"))
+		&& Maps->IsRegionUnlocked(TEXT("Region.C")), true);
+	TArray<FHSRTeleportProjection> Projections;
+	Maps->GetAvailableTeleports(Projections);
+	int32 Reachable = 0;
+	for (const FHSRTeleportProjection& Projection : Projections)
+	{
+		if (Projection.bUsable)
+		{
+			++Reachable;
+		}
+	}
+	TestEqual(TEXT("Two teleports reachable from observation car"), Reachable, 2);
+
+	// Repeated bootstrap is a no-op and does not conflict.
+	TestEqual(TEXT("Repeated map bootstrap no-op"),
+		Fixture.GameMode->BootstrapMapDefinitions(), EHSRMapBootstrapResult::Success);
+
+	Fixture.Shutdown();
+
+	FHSRBootstrapFixture MissingCatalogFixture;
+	if (!TestTrue(TEXT("Missing-catalog fixture initializes"), MissingCatalogFixture.Initialize()))
+	{
+		MissingCatalogFixture.Shutdown();
+		return false;
+	}
+	MissingCatalogFixture.GameMode->ConfigureMapBootstrapForAutomation(nullptr, TEXT("Map.ObservationCar"));
+	TestEqual(TEXT("Missing map catalog is rejected"),
+		MissingCatalogFixture.GameMode->BootstrapMapDefinitions(), EHSRMapBootstrapResult::MissingCatalog);
+	MissingCatalogFixture.Shutdown();
 
 	return true;
 }

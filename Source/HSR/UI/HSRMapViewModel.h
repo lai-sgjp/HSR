@@ -22,6 +22,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "HSR|Map")
 	EHSRMapOperationResult RequestTeleport(FName TeleportId);
 
+	UFUNCTION(BlueprintPure, Category = "HSR|Map")
+	FText GetMapDisplayName(FName MapId) const;
+
+	UFUNCTION(BlueprintPure, Category = "HSR|Map")
+	void GetAvailableTeleports(TArray<FHSRTeleportProjection>& OutTeleports) const;
+
+	UFUNCTION(BlueprintPure, Category = "HSR|Map")
+	int32 GetReachableTeleportCount() const;
+
+	UFUNCTION(BlueprintPure, Category = "HSR|Map")
+	bool GetReachableTeleport(int32 Index, FHSRTeleportProjection& OutTeleport) const;
+
 	FHSRMapStateChanged& OnChanged() { return Changed; }
 
 	UPROPERTY(BlueprintAssignable, Category = "HSR|Map")

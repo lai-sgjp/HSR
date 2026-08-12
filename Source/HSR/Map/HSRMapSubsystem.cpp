@@ -82,12 +82,13 @@ EHSRMapOperationResult UHSRMapSubsystem::RegisterMapDefinition(const UHSRMapDefi
 		return EHSRMapOperationResult::InvalidDefinition;
 	}
 
-	const FRegisteredMap Candidate{Definition.World, Definition.RegionId, Definition.DefaultArrivalId};
+	const FRegisteredMap Candidate{Definition.World, Definition.RegionId, Definition.DefaultArrivalId, Definition.DisplayName};
 	if (const FRegisteredMap* Existing = Maps.Find(Definition.MapId))
 	{
 		const bool bSame = Existing->World == Candidate.World
 			&& Existing->RegionId == Candidate.RegionId
-			&& Existing->DefaultArrivalId == Candidate.DefaultArrivalId;
+			&& Existing->DefaultArrivalId == Candidate.DefaultArrivalId
+			&& Existing->DisplayName.EqualTo(Candidate.DisplayName);
 		return bSame ? EHSRMapOperationResult::NoOp : EHSRMapOperationResult::DuplicateId;
 	}
 
@@ -202,6 +203,75 @@ bool UHSRMapSubsystem::HasRegionDefinition(const FName RegionId) const
 		{
 			return true;
 		}
+	}
+	return false;
+}
+
+FText UHSRMapSubsystem::GetMapDisplayName(const FName MapId) const
+{
+	const FRegisteredMap* Map = Maps.Find(MapId);
+	if (!Map || Map->DisplayName.IsEmpty())
+	{
+		return FText::FromName(MapId);
+	}
+	return Map->DisplayName;
+}
+
+void UHSRMapSubsystem::GetAvailableTeleports(TArray<FHSRTeleportProjection>& OutTeleports) const
+{
+	OutTeleports.Reset();
+	const FName CurrentMapId = Snapshot.CurrentLocation.MapId;
+	for (const TPair<FName, FRegisteredTeleport>& Pair : Teleports)
+	{
+		const FRegisteredTeleport& Teleport = Pair.Value;
+		FHSRTeleportProjection Projection;
+		Projection.TeleportId = Pair.Key;
+		Projection.SourceMapId = Teleport.SourceMapId;
+		Projection.DestinationMapId = Teleport.DestinationMapId;
+		Projection.DestinationDisplayName = GetMapDisplayName(Teleport.DestinationMapId);
+
+		const FRegisteredMap* DestinationMap = Maps.Find(Teleport.DestinationMapId);
+		const bool bFromCurrentMap = (CurrentMapId == Teleport.SourceMapId);
+		const bool bTeleportUnlocked = Snapshot.UnlockedTeleportIds.Contains(Pair.Key);
+		const bool bRegionUnlocked = DestinationMap && Snapshot.UnlockedRegionIds.Contains(DestinationMap->RegionId);
+		Projection.bUsable = bFromCurrentMap && bTeleportUnlocked && bRegionUnlocked;
+
+		OutTeleports.Add(Projection);
+	}
+}
+
+int32 UHSRMapSubsystem::GetReachableTeleportCount() const
+{
+	TArray<FHSRTeleportProjection> All;
+	GetAvailableTeleports(All);
+	int32 Count = 0;
+	for (const FHSRTeleportProjection& Projection : All)
+	{
+		if (Projection.bUsable)
+		{
+			++Count;
+		}
+	}
+	return Count;
+}
+
+bool UHSRMapSubsystem::GetReachableTeleport(const int32 Index, FHSRTeleportProjection& OutTeleport) const
+{
+	TArray<FHSRTeleportProjection> All;
+	GetAvailableTeleports(All);
+	int32 Seen = 0;
+	for (const FHSRTeleportProjection& Projection : All)
+	{
+		if (!Projection.bUsable)
+		{
+			continue;
+		}
+		if (Seen == Index)
+		{
+			OutTeleport = Projection;
+			return true;
+		}
+		++Seen;
 	}
 	return false;
 }

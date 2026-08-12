@@ -47,6 +47,30 @@ EHSRMapOperationResult UHSRMapViewModel::RequestTeleport(const FName TeleportId)
 	return Maps.IsValid() ? Maps->RequestTeleportTravel(TeleportId) : EHSRMapOperationResult::InvalidWorld;
 }
 
+FText UHSRMapViewModel::GetMapDisplayName(const FName MapId) const
+{
+	return Maps.IsValid() ? Maps->GetMapDisplayName(MapId) : FText::FromName(MapId);
+}
+
+void UHSRMapViewModel::GetAvailableTeleports(TArray<FHSRTeleportProjection>& OutTeleports) const
+{
+	OutTeleports.Reset();
+	if (Maps.IsValid())
+	{
+		Maps->GetAvailableTeleports(OutTeleports);
+	}
+}
+
+int32 UHSRMapViewModel::GetReachableTeleportCount() const
+{
+	return Maps.IsValid() ? Maps->GetReachableTeleportCount() : 0;
+}
+
+bool UHSRMapViewModel::GetReachableTeleport(const int32 Index, FHSRTeleportProjection& OutTeleport) const
+{
+	return Maps.IsValid() && Maps->GetReachableTeleport(Index, OutTeleport);
+}
+
 void UHSRMapViewModel::HandleMapStateChanged(const FHSRMapRuntimeSnapshot& InSnapshot)
 {
 	if (bHasSnapshot && Snapshot.Revision == InSnapshot.Revision)

@@ -16,6 +16,7 @@ class UUserWidget;
 class UHSRDamageRuleDefinition;
 class UGameplayEffect;
 class UHSREnemyDefinition;
+class UHSREnemyCatalog;
 class UHSRStatusDefinition;
 class UHSRCharacterCatalog;
 struct FHSRRestoreCommitInfo;
@@ -113,6 +114,8 @@ protected:
 	TObjectPtr<UHSRSkillDefinition> SkillSkillDefinition;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Skills") TObjectPtr<UHSRSkillDefinition> HealSkillDefinition;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Definitions") TObjectPtr<UHSREnemyDefinition> EnemyDefinition;
+	/** Authored catalog of enemy definitions; the coordinator resolves the encounter's enemy from it by ID. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Definitions") TObjectPtr<UHSREnemyCatalog> EnemyCatalog;
 	/** Required initialization GE, applied once to every spawned participant before abilities are granted. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Battle|Initialization") TSubclassOf<UGameplayEffect> ParticipantInitializationGameplayEffect;
 	/** Infinite, handle-owned character progression layer. Bind the user-authored P11 asset here. */
