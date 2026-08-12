@@ -1,5 +1,21 @@
 ﻿# HSR Todo Plan
 
+## 2026-08-11 - TASK-P18-DEMO-CONTENT-001
+
+- [x] 冻结 `Demo.*` 正式 ID、显示名、字段、数值、路径和引用关系。
+- [x] 创建正式目录和跨会话 TDD 证据。
+- [x] 新增只读 `HSR.Demo.ContentCatalog` 四组 Automation 测试源码。
+- [x] 用户本机运行 Development Editor Build；测试 Compile、Link、Metadata 通过，
+  `Result: Succeeded`。
+- [x] 聚焦 Automation 发现 4 项并全部因正式资产缺失按预期失败；退出码 -1，
+  TDD runtime RED 已确认。
+- [ ] 用户创建 `/Game/Data/VerticalSlice` 与三张正式地图，Save All、重开并完成 GREEN。
+- [ ] 用户完成双调查顺序、双向传送、奖励防重和 Save/Load 的两轮 PIE。
+- [ ] 单独处理 Quest 显示标题与维林娜治疗终结技能量权威缺口。
+- [ ] 内容 GREEN 后进入 Phase 19，再进入 Phase 20 最终整合。
+
+---
+
 ## 2026-08-10 - Relic/Inventory Demo checkpoint
 
 - [x] 遗器定义、实例注册、Inventory 候选数据和装备/替换链路接通。
@@ -504,12 +520,12 @@
 - [x] TASK-P17-CHAR-SHELL-001：Character Progression Shell；C++/UHT/Build、Shell 2/2、相邻 20/20 Automation 与用户 Editor/PIE 已收口。失败路径 PIE 与双分辨率按用户决定记录为非阻塞未执行项。
 - [x] 计划 P17-006 Character 养成 Shell：实际 P17-006 仍是 Quest Frontend；本计划语义的 Character Detail/Weapon/Traces/Relics/Eidolon/Information/Outfit Shell 已由无歧义任务 `TASK-P17-CHAR-SHELL-001` 用户验收。
 - [x] 计划 P17-007 Relic/Equipment 多级选择与强化：用户 PIE 已接受；本地实现提交 `65ba365`，正式 closeout 文档/provenance 仍需同步。
-- [x] 计划 P17-008 Inventory 分类、详情与合法操作：003 代码门禁完成；Editor/UMG、B/Back/X、旅行 teardown 与 PIE 收口仍属 004。
-- [ ] 计划 P17-012 Dialogue Presentation：当前实际 P17-012 是动态挂载，不能替代本计划对话展示包。
-- [ ] 计划 P17-013 Battle HUD、只读详情与两阶段指令：未发现对应完成归档。
-- [ ] 计划 P17-014 Battle Pause、Restart/Exit 与 Reward Presentation：未发现对应完成归档。
-- [ ] 计划 P17-015 Gacha UI Contract：未发现对应完成归档。
-- [ ] 计划 P17-016 Phase 17 收尾：尚未开始；需等待上述计划包状态明确后再执行阶段收尾门。
+- [x] 计划 P17-008 Inventory 分类、详情与合法操作：Inventory-001～004 已完成代码、Editor/UMG、输入、旅行与用户 PIE 收口。
+- [x] 计划 P17-012 Dialogue Presentation：Dialogue-001～004 已完成代码、Authority、Overlay、Editor 与用户 PIE 收口；实际归档的旧 `TASK-P17-012` 仍保持动态挂载语义。
+- [x] 计划 P17-013 Battle HUD、只读详情与两阶段指令：现有 Battle Command/Target/Confirm 路径、fresh HSR.UI Automation 与用户确认满足当前 Demo。
+- [ ] 计划 P17-014 Battle Pause、Restart/Exit 与 Reward Presentation：`DEFERRED / NON-BLOCKING`，用户决定优先可玩 Demo，不宣称已实现。
+- [ ] 计划 P17-015 Gacha UI Contract：`DEFERRED / NON-BLOCKING`，无 Gacha Authority，不实现真实抽卡。
+- [x] 计划 P17-016 Phase 17 收尾：Fresh Build、fresh HSR.UI Automation 通过；P17-013 用户接受，P17-014/015 明确延期，阶段为 `READY WITH DEFERRED FOLLOW-UPS / USER ACCEPTED`。
 
 ### Phase 17 Inventory/Dialogue 子任务 backlog（规划，不代表完成）
 
@@ -526,9 +542,9 @@
 > 或最终收口，等待用户手动验证。
 - [x] `TASK-P17-DIALOGUE-002`：事件驱动对话 Presentation、说话者、正文、选项、选择和退出；代码门禁完成。
 - [x] `TASK-P17-DIALOGUE-003`：稳定 Node/Choice ID 与 Quest/Encounter/Reward Authority exactly-once 转发；代码门禁完成。
-- [ ] `TASK-P17-DIALOGUE-004`：代码/Automation 门禁完成；生命周期、焦点、旅行
-  teardown 的用户 Editor/PIE 体验与最终收口待完成。
-- [ ] Phase 18 Gate 0 及 `TASK-P18-PRESENTATION-001`～`004`：在 P17-016 后建立，不提前实施。
+- [x] `TASK-P17-DIALOGUE-004`：代码/Automation、生命周期、焦点、旅行 teardown、用户 Editor/PIE 与最终收口完成。
+- [ ] Phase 18 Gate 0：`TASK-P18-PRESENTATION-001` 已开始规划；Teacher 角色按用户决定排除。首要约束是授权台账/隔离、表现事件回退，以及为 Demo 重新配置地图、技能、角色、遗器名称与数据，不复用当前测试资产。
+- [ ] `TASK-P18-PRESENTATION-001`～`004`：等待 Gate 0 审核与单个表现垂直切片授权；不自动创建 UAsset 或导入第三方资源。
 
 > 串行规则：一次只保留一个活动任务卡；完成前一包的 Build/Automation/PIE/文档
 > 证据后才进入下一包。实际归档的 `TASK-P17-012` 和计划编号 P17-008 均不复用。

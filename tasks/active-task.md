@@ -1,4 +1,90 @@
-# TASK-P17-DIALOGUE-004 — 生命周期、旅行恢复、Editor/PIE 收口
+# CURRENT TASK - TASK-P18-DEMO-CONTENT-001
+
+Status: IN PROGRESS / CONTENT CONTRACT FROZEN / BUILD PASS / TDD RED CONFIRMED / USER EDITOR AUTHORING REQUIRED
+
+## Sole observable outcome
+
+Freeze the formal Demo namespace and prove through read-only Automation that
+new assets under `/Game/Data/VerticalSlice` form a closed content graph. Old
+test and phase-numbered assets cannot satisfy this gate.
+
+## Allowed files
+
+- `Source/HSR/Tests/HSRDemoContentCatalogTests.cpp`
+- `docs/phase-20-demo-content-catalog.md`
+- `docs/testing/TASK-P18-DEMO-CONTENT-001.tdd.md`
+- `tasks/active-task.md`
+- `tasks/execution-result.md`
+- `PROJECT_STATE.md`
+- `todo_plan.md`
+- `worklog.md`
+
+## Explicit boundaries
+
+- No production authority, Config, Build.cs, `.uproject`, GameplayTag, module
+  or Git changes.
+- Codex does not create or edit UAsset, UMG or map binaries; the user authors
+  and verifies the assets in the frozen catalog.
+- Teacher remains excluded. Asset licensing is a user-owned prerequisite, not
+  a task gate.
+- Quest title projection and energy spend for a Heal-category finisher are
+  recorded schema gaps, not silently claimed by this task.
+
+---
+
+# HISTORICAL - TASK-P18-PRESENTATION-001 Gate 0
+
+Status: IN PROGRESS / TDD GREEN / FOCUSED AUTOMATION PASS
+
+Phase 18 Teacher role is intentionally excluded by the user's explicit scope
+decision. The user authorized the first code-only presentation contract slice;
+no presentation asset import or production gameplay authority change is in scope.
+
+The eventual Demo must use newly authored Demo names and configurations for
+maps, skills, characters and relics. Existing `*Test`, `P11`, `P13`, `P14`,
+`P15`, `P17` assets remain regression fixtures or historical content and cannot
+be silently promoted as final Demo definitions.
+
+## Current implementation allowlist
+
+Production files:
+
+- `Source/HSR/Battle/HSRBattlePresentationResolver.h`
+- `Source/HSR/Battle/HSRBattlePresentationResolver.cpp`
+
+Test and evidence files:
+
+- `Source/HSR/Tests/HSRBattlePresentationResolverTests.cpp`
+- `tasks/active-task.md`
+- `tasks/execution-result.md`
+- `docs/testing/TASK-P18-PRESENTATION-001.tdd.md`
+- `worklog.md`
+
+Explicitly out of scope: `HSRBattleCoordinator.*`, Gameplay/Turn/Save/UI
+authority, any UAsset/UMG/Config/Build.cs changes, and all existing test or
+historical Demo data.
+
+## Current evidence
+
+- RED: confirmed by UE5.6 UBT reaching the intended missing resolver header.
+- GREEN: Development Editor Build succeeded.
+- Focused Automation: 3/3 `HSR.Battle.PresentationResolver.*` passed.
+- Editor/PIE and actual presentation assets remain user-owned and unverified.
+
+---
+
+# HISTORICAL — TASK-P17-016 Phase 17 closeout
+
+Status: COMPLETE / READY WITH DEFERRED FOLLOW-UPS / USER ACCEPTED
+
+P17-013 is user accepted. P17-014 and P17-015 are explicitly deferred and
+non-blocking so the project can prioritize a playable demo. Fresh Development
+Editor Build and fresh `HSR.UI` Automation passed. The detailed P17-016 record
+is retained below; all preceding task records are historical.
+
+---
+
+# HISTORICAL — TASK-P17-DIALOGUE-004 — 生命周期、旅行恢复、Editor/PIE 收口
 Status: COMPLETE / GATE 0 PASS / TDD RED CONFIRMED / GREEN PASS / FOCUSED AUTOMATION PASS / EDITOR-PIE PASS / USER ACCEPTED
 
 This is the unambiguous implementation identity for the Phase 17 execution-plan
@@ -778,3 +864,84 @@ Dialogue Overlay, UAsset, Editor, PIE, Dialogue-003 exactly-once branch flow or
 Git checkpoint. The next separately authorized package is Dialogue-003.
 
 ---
+# TASK-P17-016 - Phase 17 closeout audit and regression gate
+Status: COMPLETE / READY WITH DEFERRED FOLLOW-UPS / USER ACCEPTED
+
+## Sole observable outcome
+
+Produce an evidence-backed Phase 17 closeout decision: every planned P17-005
+through P17-015 outcome is classified as complete, covered by an existing
+accepted slice, deferred with an explicit non-goal, or blocked by a concrete
+failure. The closeout must include fresh Development Editor Build and focused
+HSR.UI Automation evidence, the known ScreenLifecycle and CharacterDetail
+fixture boundaries, and a truthful list of Editor/PIE/resolution/controller
+evidence that remains NOT VERIFIED.
+
+## Gate 0 decisions
+
+1. This package audits and verifies Phase 17; it does not begin Phase 18.
+2. Existing Authority, Save, Battle, Inventory, Equipment, Map and Dialogue
+   implementations remain the source of truth. No business-authority rewrite is
+   implied by a missing plan archive.
+3. P17-013, P17-014 and P17-015 must be classified from repository evidence
+   before any new implementation is authorized.
+4. Known `HSR.UI.ScreenLifecycle` and
+   `HSR.UI.CharacterDetail.ViewModel` failures are explicit closeout inputs;
+   they may be fixed only within a separately frozen allowlist after the first
+   fresh failure is reproduced.
+5. UAsset/UMG editing, Editor reopen, PIE, physical controller and visual
+   inspection remain user-owned evidence boundaries.
+6. No Git stage/commit/push, destructive operation, Config/plugin/module change,
+   or Phase 18 asset work is included.
+
+## Initial verification matrix
+
+- Fresh Development Editor Build: pending.
+- Focused `HSR.UI` Automation: pending.
+- ScreenLifecycle regression: pending; historical failures are not presumed
+  fixed or product defects until reproduced.
+- CharacterDetail ViewModel regression: pending.
+- Editor reopen, 1920x1080/1280x720, keyboard/mouse and physical controller:
+  user evidence pending or explicitly NOT VERIFIED.
+
+## Allowed files for the audit phase
+
+- `tasks/active-task.md`
+- `tasks/execution-result.md`
+- `docs/testing/TASK-P17-016.tdd.md`
+- `PROJECT_STATE.md`
+- `todo_plan.md`
+- `worklog.md`
+
+Production source or Content changes require a follow-up task with an exact
+allowlist after the first reproducible closeout failure.
+
+## Initial audit findings (2026-08-10)
+
+- P17-013 is covered by the existing Battle Command ViewModel/Widget, target
+  selection and command sink seams, but still needs phase-level classification
+  and user PIE evidence in the final closeout packet.
+- P17-014 is partially covered by the existing battle result confirmation,
+  settlement/reward summary and frontend restoration paths. Restart/Exit and
+  reward presentation must be classified from the current battle flow rather
+  than assumed complete from filenames.
+- P17-015 has no Gacha Authority or authored Gacha asset in the current scope.
+  It should remain `UI CONTRACT PASS / BUSINESS BLOCKED` unless a separate
+  design and authorization is provided; real draw, pity, currency or economy
+  work is out of scope.
+- The fresh `HSR.UI` commandlet log reports `Result={Success}` for all
+  discovered tests, including the historical ScreenLifecycle and Character
+  Detail ViewModel cases. The prior failure boundary is therefore not currently
+  reproducible on this branch.
+
+## User scope decision and closeout
+
+The user explicitly confirmed that P17-013 has no current problem and chose to
+defer P17-014 and P17-015 so the project can prioritize a playable demo. Those
+two packages are non-blocking follow-ups and are not represented as implemented.
+
+Phase 17 therefore closes as `READY WITH DEFERRED FOLLOW-UPS / USER ACCEPTED`.
+Physical-controller, dual-resolution, Battle Pause/Restart/Exit and Gacha
+Authority remain truthful `NOT VERIFIED` or `DEFERRED` boundaries. Phase 18 is
+not started automatically; the next planning target is the smallest playable
+demo completion slice.

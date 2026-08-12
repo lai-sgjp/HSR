@@ -1,5 +1,9 @@
 # HSR
 
+> 2026-08-11：Phase 17 已按 `READY WITH DEFERRED FOLLOW-UPS / USER ACCEPTED`
+> 收口。P17-013 满足当前 Demo；P17-014 Battle Pause/Restart/Exit 与 P17-015
+> Gacha 明确延期且不阻塞。当前优先级转为完成最小可玩 Demo。
+
 HSR 是一个全新的 Unreal Engine 5.6 C++ 单机 JRPG 学习与作品集项目，目标是逐步完成原创的探索和回合制战斗系统。
 
 > `HSR` 仅为本地学习代号。项目不会复制任何商业游戏受版权保护的角色、剧情、美术、音乐、文本、UI、商标、专有名词或数值表；公开展示前将改用原创名称并完成资产授权审查。

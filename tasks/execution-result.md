@@ -1,3 +1,70 @@
+# TASK-P18-DEMO-CONTENT-001 Execution Result
+
+Status: IN PROGRESS / CONTENT CONTRACT FROZEN / BUILD PASS / TDD RED CONFIRMED / USER EDITOR AUTHORING REQUIRED
+
+- Created `docs/phase-20-demo-content-catalog.md` with exact Demo paths, IDs,
+  stats, skills, travel graph, relic slots, objectives, encounters and rewards.
+- Added four read-only `HSR.Demo.ContentCatalog` Automation tests.
+- No UAsset, map, Config, GameplayTag, production authority or Git operation
+  was performed. Formal assets remain user Editor work.
+- The user explicitly approved an UBT retry. Both escalated requests ended
+  because the approval service disconnected before execution. No Build result
+  or runtime RED is claimed, and no bypass was attempted.
+- Known gaps: Quest has no display-title projection, and a Heal-category skill
+  cannot authoritatively spend Ultimate energy.
+- User UBT reached `HSRDemoContentCatalogTests.cpp` and exposed a test-only
+  `TObjectPtr`/`TestNotNull` mismatch. The test now passes `.Get()`; Build must
+  be rerun and this compiler setup error is not counted as runtime RED.
+- User rerun evidence: the corrected test compiled, Editor module linked,
+  metadata completed and UBT returned `Result: Succeeded` in 4.45 seconds.
+- Focused Automation did not launch because its approval service disconnected;
+  no runtime RED result is claimed yet.
+- The user then ran focused Automation locally. It found exactly four tests;
+  CharactersAndSkills, Flow, MapsAndTravel and Relics all failed on the
+  intended missing `/Game/Data/VerticalSlice` package assertions. The
+  commandlet ended with exit code -1. Runtime RED is confirmed.
+
+---
+
+# TASK-P17-016 Phase 17 Closeout Result
+
+Status: COMPLETE / READY WITH DEFERRED FOLLOW-UPS / USER ACCEPTED
+
+- Fresh `HSREditor Win64 Development` Build passed through Compile, Link and
+  Metadata. MSVC 14.51 produced the known non-preferred-toolchain warning.
+- Fresh `Automation RunTests HSR.UI` completed with exit code 0. All discovered
+  tests reported `Result={Success}`, including the historical ScreenLifecycle
+  and CharacterDetail ViewModel boundaries.
+- P17-013 is user accepted for the playable-demo target.
+- P17-014 and P17-015 are explicitly deferred and non-blocking. Battle
+  Pause/Restart/Exit and Gacha Authority are not claimed as implemented.
+- Physical controller and dual-resolution evidence remain `NOT VERIFIED`.
+- No production Source, Content, Config, stage, commit or push was performed by
+  this closeout task.
+
+---
+
+# TASK-P18-PRESENTATION-001 Execution Result
+
+Status: IN PROGRESS / TDD RED CONFIRMED / GREEN PASS / FOCUSED AUTOMATION PASS
+
+Implemented only the allowlisted pure C++ presentation resolver and its
+Automation tests. It maps existing `FHSRBattlePresentationEvent` values to
+new Demo presentation IDs, supplies stable fallback IDs when a mapping is
+missing, and consumes each valid EventId once. It does not import assets or
+modify gameplay authority. Asset licensing is accepted as a user-guaranteed
+prerequisite and is not a blocker for this package.
+
+- RED: UBT reached the intended missing `HSRBattlePresentationResolver.h`
+  include in `HSRBattlePresentationResolverTests.cpp`.
+- GREEN: `HSREditor Win64 Development` Build returned `Result: Succeeded`.
+- Automation: `HSR.Battle.PresentationResolver` discovered 3 tests and all
+  returned `Result={Success}`; command exit code was 0.
+- Not verified: Editor/PIE, actual animation/audio/VFX assets and final Demo
+  map/skill/character/relic DataAssets.
+
+---
+
 # TASK-P17-DIALOGUE-004 Execution Result
 
 Status: COMPLETE / GATE 0 PASS / TDD RED CONFIRMED / GREEN PASS / FOCUSED AUTOMATION PASS / EDITOR-PIE PASS / USER ACCEPTED

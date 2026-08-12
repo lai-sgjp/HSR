@@ -1,6 +1,58 @@
 ﻿# HSR Project State
 
-> 最后更新：2026-08-10
+> 最后更新：2026-08-11
+
+## 2026-08-11 TASK-P18-DEMO-CONTENT-001 内容冻结
+
+- 当前活动任务为 `TASK-P18-DEMO-CONTENT-001`。正式合同位于
+  `docs/phase-20-demo-content-catalog.md`；旧 Test/P11/P13/P14/P15/P17 资产
+  不能作为正式 Demo 内容通过门禁。
+- 冻结两张探索地图、一张战斗地图、凯瑟琳、任务“界域回响”、王下一桶、
+  支援舱段巡检机、来古士、四名角色与 12 技能，以及 4+2 两套遗器。
+- 已新增只读 `HSR.Demo.ContentCatalog` Automation。用户创建正式资产前预期
+  runtime RED；用户已授权 UBT 重试，但两次审批服务均在命令执行前断开，不能
+  记作 Build 或 RED 结果。
+- 用户随后在本机完成修正后的 UBT：测试 Compile、模块 Link、Metadata 全部通过，
+  `Result: Succeeded`。聚焦 Automation 的工具审批仍在启动前断开，因此 runtime
+  RED 继续保持 `PENDING`。
+- 用户本机随后运行聚焦 Automation：发现 4 项；CharactersAndSkills、Flow、
+  MapsAndTravel、Relics 全部因精确 `/Game/Data/VerticalSlice` 包不存在而按预期
+  `Result={Fail}`，最终退出码 -1。TDD runtime RED 已确认，下一门是用户 Editor
+  正式资产创建与 GREEN。
+- 用户负责 `/Game/Data/VerticalSlice`、地图、Save All/重开和两轮 PIE；Codex
+  不创建二进制资产。Teacher 排除，资产许可由用户保证且不作为当前门禁。
+- 已知缺口：Quest 无显示标题字段；Heal 类别技能不能权威消费 Ultimate 能量。
+- 顺序：内容合同与 Editor 资产 GREEN -> Phase 19 -> Phase 20 最终整合。
+
+---
+
+## 2026-08-11 Phase 18 Gate 0 启动
+
+- 用户授权开始 Phase 18 规划；当前活动任务为
+  `TASK-P18-PRESENTATION-001` Gate 0，Teacher 角色按用户明确决定不参与。
+- Phase 18 首包只冻结授权/provenance、`ModResources` 隔离、纯值表现事件、
+  缺失资源回退和精确 allowlist，不导入资产、不修改 Gameplay/Save/Inventory/
+  Equipment/Battle Authority。
+- 用户要求最终 Demo 的地图、技能、角色、遗器名称与配置全部重新作者化；当前
+  `*Test`、P11/P13/P14/P15/P17 资产仅作为回归或历史配置，不得静默升级为 Demo 内容。
+- 现有 Kachujin 资源仍位于 `Content/Characters/Player/`，许可证记录为用户接受的
+  非官方证据；`Content/ThirdParty` 和 `Content/ModResources` 当前不存在。
+
+---
+
+## 2026-08-11 TASK-P17-016 Phase 17 收尾
+
+- Fresh `HSREditor Win64 Development` Build 通过 Compile、Link、Metadata；仅保留
+  MSVC 14.51 非 Epic 推荐版本的非阻断警告。
+- Fresh `Automation RunTests HSR.UI` 退出码 0；全部发现项为 `Result={Success}`，
+  历史 ScreenLifecycle 和 CharacterDetail ViewModel 失败当前不可复现。
+- 用户确认 P17-013 当前没有问题；P17-014 Battle Pause/Restart/Exit 与 P17-015
+  Gacha 明确延期，不阻塞优先完成可玩 Demo，也不宣称已实现。
+- Phase 17 收口状态为 `READY WITH DEFERRED FOLLOW-UPS / USER ACCEPTED`。
+  物理手柄、双分辨率和延期功能继续保持 `NOT VERIFIED / DEFERRED`。
+- 未自动开始 Phase 18；下一规划目标调整为最小可玩 Demo 完成切片。
+
+---
 
 ## 2026-08-10 TASK-P17-RELIC-EQUIPMENT-001 / Inventory Demo 收口
 

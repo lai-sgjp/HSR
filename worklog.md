@@ -1,5 +1,23 @@
 ﻿# HSR Worklog
 
+## 2026-08-11 - TASK-P18-PRESENTATION-001 Gate 0 启动
+
+- 用户授权开始 Phase 18；Teacher 角色按用户决定排除，当前只做 Gate 0 规划与审计。
+- 冻结表现事件/回退/授权隔离边界；不导入资产、不修改 Gameplay 或 Save Authority。
+- 明确 Demo 必须重新作者化地图、技能、角色和遗器名称/配置，现有测试资产不作为最终 Demo 内容。
+- 现有 Kachujin 许可证仅为用户接受的非官方证据，`ThirdParty`/`ModResources` 尚不存在。
+
+## 2026-08-11 - TASK-P17-016 Phase 17 收尾
+
+- 建立 P17-016 收尾任务和证据矩阵；未扩大到 Phase 18 或业务 Authority。
+- Fresh Development Editor Build 通过；fresh `HSR.UI` Automation 全部成功，
+  ScreenLifecycle 与 CharacterDetail ViewModel 历史失败当前不可复现。
+- 用户确认 P17-013 满足当前需求，并明确延期 P17-014、P17-015，优先完成可玩
+  Demo；延期项为非阻断 follow-up，不记为实现完成。
+- Phase 17 以 `READY WITH DEFERRED FOLLOW-UPS / USER ACCEPTED` 收口；物理手柄、
+  双分辨率、Battle Pause/Restart/Exit 与 Gacha Authority 保留真实边界。
+- 本轮只修改 Markdown，未 stage、commit 或 push，`.claude/**` 保持排除。
+
 ## 2026-08-10 - TASK-P17-RELIC-EQUIPMENT-001 / Inventory Demo 收口
 
 - 用户确认遗器强化问题已解决，并决定当前 Demo 先从 Inventory 装备遗器；
@@ -2633,6 +2651,41 @@ Phase 0 — `Not verified`（8/9 通过，实际 C++ 标准缺证）
 - Dialogue-002 is complete at the code/Automation gate. No Overlay/UAsset,
   Editor/PIE, Git stage/commit/push, or `.claude/**` operation was performed;
   Dialogue-003 requires separate authorization.
+
+# 2026-08-11 | TASK-P18-DEMO-CONTENT-001 content contract
+
+- User approved the formal Demo content plan and requested durable cross-session
+  handoff. `docs/phase-20-demo-content-catalog.md` freezes exact `Demo.*` IDs,
+  paths, values and references for two exploration maps, one battle map, four
+  characters, twelve skills, two relic sets, quest, encounters and rewards.
+- Added read-only `HSR.Demo.ContentCatalog` Automation source. Old Test/P11/
+  P13/P14/P15/P17 assets cannot satisfy the focused gate.
+- Codex did not create UAssets or maps. Teacher remains excluded; licensing is
+  user-owned and not a task gate.
+- Static inspection exposed two follow-ups: Quest UI has no title field, and
+  the Skill category contract cannot combine Heal with authoritative Ultimate
+  energy spend.
+- The user approved retrying UBT, but both approval requests ended before
+  execution because the approval service disconnected. Build and runtime RED
+  remain `NOT RUN`; no bypass was attempted.
+- Resume by running the exact UE5.6 Development Editor Build, fixing only test
+  compile errors, then run `HSR.Demo.ContentCatalog` for missing-asset RED.
+  After Editor authoring, rerun GREEN and complete two-route PIE.
+- User's local UBT reached the new test and reported `TestNotNull` receiving a
+  `TObjectPtr<UHSRRewardDefinition>`. The allowlisted test was corrected to
+  pass `.Get()`; this compile setup failure does not count as content RED.
+- User reran UBT after the correction: `HSRDemoContentCatalogTests.cpp`
+  compiled, the Editor module linked, metadata completed and the build returned
+  `Result: Succeeded` in 4.45 seconds. A focused Automation launch attempt was
+  blocked before execution by the overloaded approval service, so runtime RED
+  remains pending.
+- User then ran `HSR.Demo.ContentCatalog` locally. The commandlet found four
+  tests; CharactersAndSkills, Flow, MapsAndTravel and Relics each failed at the
+  intended missing `/Game/Data/VerticalSlice` asset assertions. Package loading
+  reported that the exact formal packages do not exist and the commandlet
+  exited -1. Runtime RED is confirmed; user Editor authoring is the next gate.
+
+---
 
 # 2026-08-09 | TASK-P17-DIALOGUE-003 code/Automation closeout
 
