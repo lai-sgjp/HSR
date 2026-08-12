@@ -1,6 +1,7 @@
 #include "HSRBattleTestConsumer.h"
 #include "HSRBattleTransitionSubsystem.h"
 
+// 构造函数：关闭 Tick，默认不启用测试返回。
 AHSRBattleTestConsumer::AHSRBattleTestConsumer()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -19,8 +20,8 @@ void AHSRBattleTestConsumer::BeginPlay()
 		return;
 	}
 
-	// --- First consumption: should succeed ---
-	// Use the Consume return value (ConsumedRequest), NOT GetPendingRequest()
+	// --- 第一次消费：应成功 ---
+	// 用 Consume 的返回值（ConsumedRequest），而不是重新读子系统内部。
 	FHSREncounterResult FirstResult = Subsystem->ConsumePendingEncounter();
 	if (FirstResult.ResultType == EHSREncounterResultType::Success)
 	{
@@ -35,7 +36,7 @@ void AHSRBattleTestConsumer::BeginPlay()
 		UE_LOG(LogTemp, Log, TEXT("  ReturnLoc       = %s"), *ConsumedReq.ReturnTransform.GetLocation().ToString());
 		UE_LOG(LogTemp, Log, TEXT("  Subsystem State = %d (should be 3 = Consumed)"), static_cast<int32>(Subsystem->GetCurrentState()));
 
-		// Store consumed request and schedule test return if enabled
+		// 暂存已消费的请求；若启用测试返回则定时触发一次返回。
 		StoredConsumedRequest = ConsumedReq;
 		if (bEnableTestReturn && !ConsumedReq.ExplorationMapPath.IsNone())
 		{
@@ -50,15 +51,14 @@ void AHSRBattleTestConsumer::BeginPlay()
 		UE_LOG(LogTemp, Error, TEXT("  Message: %s"), *FirstResult.Message.ToString());
 	}
 
-	// --- Second consumption: must FAIL with AlreadyConsumed ---
-	// After first consume, the internal payload is cleared; second consume must fail
-	// and must not return any ConsumedRequest data.
+	// --- 第二次消费：必须失败（AlreadyConsumed） ---
+	// 首次消费后内部载荷已清空；第二次消费必须失败且不带任何 ConsumedRequest 数据。
 	FHSREncounterResult SecondResult = Subsystem->ConsumePendingEncounter();
 	if (SecondResult.ResultType == EHSREncounterResultType::AlreadyConsumed)
 	{
 		UE_LOG(LogTemp, Log, TEXT("AHSRBattleTestConsumer::BeginPlay - Second Consume correctly FAILED AlreadyConsumed"));
 
-		// Verify no old payload data through ConsumedRequest on failure
+		// 校验失败返回里没有旧载荷数据。
 		const FHSREncounterRequest& EmptyReq = SecondResult.ConsumedRequest;
 		UE_LOG(LogTemp, Log, TEXT("  ConsumedRequest.EncounterId (should be None): %s"), *EmptyReq.EncounterId.ToString());
 	}
@@ -68,7 +68,7 @@ void AHSRBattleTestConsumer::BeginPlay()
 			static_cast<int32>(SecondResult.ResultType));
 	}
 
-	// --- Clear to restore Empty state ---
+	// --- 清空以恢复 Empty 状态 ---
 	Subsystem->ClearPending();
 	UE_LOG(LogTemp, Log, TEXT("AHSRBattleTestConsumer::BeginPlay - Final State=%d (Empty)"),
 		static_cast<int32>(Subsystem->GetCurrentState()));
@@ -80,14 +80,16 @@ void AHSRBattleTestConsumer::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+// 测试返回：通过子系统请求一次返回（用暂存的已消费请求）。
 void AHSRBattleTestConsumer::RequestTestReturn()
 {
 	UHSRBattleTransitionSubsystem* Subsystem = GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>();
 	if (!Subsystem)
+	{
 		return;
+	}
 
-	// The consumed request was already logged in BeginPlay.
-	// Now trigger a return through the subsystem.
+	// 已消费的请求在 BeginPlay 里记录过；现在通过子系统触发返回。
 	UE_LOG(LogTemp, Log, TEXT("AHSRBattleTestConsumer::RequestTestReturn - TEST: Calling RequestTestReturn..."));
 	FHSRExplorationReturnResult RetResult = Subsystem->RequestTestReturn(StoredConsumedRequest);
 	if (RetResult.ResultType == EHSREncounterReturnResultType::Success)

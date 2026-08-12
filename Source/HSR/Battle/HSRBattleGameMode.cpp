@@ -91,6 +91,12 @@ namespace
 		return Loadout;
 	}
 
+	/**
+	 * 结算结果画面显示时，把输入模式切换到 UIOnly：
+	 * - 优先走 AHSRPlayerController 的 SetControlMode（HSR 的统一输入模式入口）；
+	 * - 没有 HSR 控制器时回退到引擎的 FInputModeUIOnly，并手动隐藏光标/禁用移动与视角输入。
+	 * 这样玩家只能点击结算 UI，无法在结算期间移动角色。
+	 */
 	void ApplyP10004ResultInput(APlayerController* PlayerController, const FGuid& RequestId)
 	{
 		if (!PlayerController || !PlayerController->IsLocalController())
@@ -120,9 +126,17 @@ namespace
 		UE_LOG(LogTemp, Log, TEXT("P10-004 ResultInput Result=SUCCESS Path=GenericPlayerController Mode=UIOnly Controller=%s RequestId=%s"), *PlayerController->GetName(), *RequestId.ToString());
 	}
 
+	/**
+	 * 恢复战斗之外的常规输入：和 ApplyP10004ResultInput 成对使用。
+	 * 有 HSR 控制器时切回 Exploration 模式；否则回退到 FInputModeGameOnly 并恢复光标隐藏。
+	 */
 	void RestoreP10004GameInput(APlayerController* PlayerController, const TCHAR* Reason)
 	{
-		if (!PlayerController || !PlayerController->IsLocalController()) return;
+		if (!PlayerController || !PlayerController->IsLocalController())
+		{
+			// 没有本地控制器就无事可做，直接返回。
+			return;
+		}
 		if (AHSRPlayerController* HSRPlayerController = Cast<AHSRPlayerController>(PlayerController))
 		{
 			HSRPlayerController->SetControlMode(EHSRPlayerControlMode::Exploration);
@@ -140,6 +154,8 @@ namespace
 #if WITH_EDITOR
 namespace HSRBattleDevelopmentTest
 {
+	// P8 契约测试的“状态快照”：记录一场契约调用前后的关键状态，
+	// 用于断言一次纯查询/校验调用不会改动战斗状态（无副作用契约）。
 	struct FP8Snapshot
 	{
 		float Health = 0.0f;
@@ -149,13 +165,21 @@ namespace HSRBattleDevelopmentTest
 		int32 Rng = 0;
 	};
 
+	// 从 Coordinator 抓取一份当前状态快照。
 	static FP8Snapshot CaptureP8Snapshot(const UHSRBattleCoordinator* Coordinator)
 	{
 		FP8Snapshot Snapshot;
-		if (!Coordinator) return Snapshot;
+		if (!Coordinator)
+		{
+			// 拿不到 Coordinator 就返回全零快照。
+			return Snapshot;
+		}
 		Snapshot.SkillPoints = Coordinator->GetTeamResourceState().CurrentSkillPoints;
 		Snapshot.Rng = Coordinator->GetDevelopmentDamageConsumeCount();
-		if (const UHSRTurnManager* TurnManager = Coordinator->GetTurnManager()) Snapshot.Turn = TurnManager->GetCurrentParticipantId();
+		if (const UHSRTurnManager* TurnManager = Coordinator->GetTurnManager())
+		{
+			Snapshot.Turn = TurnManager->GetCurrentParticipantId();
+		}
 		for (const FHSRBattleParticipant& Participant : Coordinator->GetParticipants())
 		{
 			if (Participant.AbilitySystemComponent.IsValid())
@@ -168,13 +192,20 @@ namespace HSRBattleDevelopmentTest
 		return Snapshot;
 	}
 
+	// P8 韧性系统契约测试：验证 FHSRToughnessConfiguration 的校验函数在合法/非法输入下
+	// 返回预期结果，同时保证调用前后战斗状态零变化（纯函数契约）。
 	static void RunP8ContractHarness(const UHSRBattleCoordinator* Coordinator)
 	{
+		// 每个用例：执行“校验调用”，对比调用前后快照是否一致，再判定结果是否等于预期。
 		const auto RunCase = [Coordinator](const TCHAR* Name, EHSRElementToughnessContractResult Actual, EHSRElementToughnessContractResult Expected)
 		{
 			const FP8Snapshot Before = CaptureP8Snapshot(Coordinator);
 			const FP8Snapshot After = CaptureP8Snapshot(Coordinator);
-			const bool bNoMutation = Before.Health == After.Health && Before.Toughness == After.Toughness && Before.Turn == After.Turn && Before.SkillPoints == After.SkillPoints && Before.Rng == After.Rng;
+			const bool bNoMutation = Before.Health == After.Health
+				&& Before.Toughness == After.Toughness
+				&& Before.Turn == After.Turn
+				&& Before.SkillPoints == After.SkillPoints
+				&& Before.Rng == After.Rng;
 			const bool bPass = Actual == Expected && bNoMutation;
 			if (bPass)
 			{
@@ -185,11 +216,22 @@ namespace HSRBattleDevelopmentTest
 				UE_LOG(LogTemp, Error, TEXT("P8-001 Contract Case=%s Result=FAIL Reason=%d HPBefore=%f HPAfter=%f ToughnessBefore=%f ToughnessAfter=%f TurnBefore=%s TurnAfter=%s ResourceBefore=%d ResourceAfter=%d RNGBefore=%d RNGAfter=%d NoMutation=%d"), Name, static_cast<int32>(Actual), Before.Health, After.Health, Before.Toughness, After.Toughness, *Before.Turn.ToString(), *After.Turn.ToString(), Before.SkillPoints, After.SkillPoints, Before.Rng, After.Rng, bNoMutation ? 1 : 0);
 			}
 		};
+		// 元素标签根：合法契约用例要求标签属于 Element.* / Weakness.* 层级。
 		const FGameplayTag ElementRoot = FGameplayTag::RequestGameplayTag(TEXT("Element"), false);
 		const FGameplayTag WeaknessRoot = FGameplayTag::RequestGameplayTag(TEXT("Weakness"), false);
-		FGameplayTagContainer ValidWeaknesses; ValidWeaknesses.AddTag(WeaknessRoot);
-		FGameplayTagContainer InvalidWeaknesses; InvalidWeaknesses.AddTag(ElementRoot);
-		const EHSRElementToughnessContractResult ValidResult = FHSRToughnessConfiguration::ValidateElement(ElementRoot) == EHSRElementToughnessContractResult::Valid && FHSRToughnessConfiguration::ValidateWeaknesses(ValidWeaknesses) == EHSRElementToughnessContractResult::Valid && FHSRToughnessConfiguration::ValidateToughnessDamage(1.0f) == EHSRElementToughnessContractResult::Valid && FHSRToughnessConfiguration::ValidateInitialToughness(1.0f, 1.0f) == EHSRElementToughnessContractResult::Valid ? EHSRElementToughnessContractResult::Valid : EHSRElementToughnessContractResult::InvalidElementTag;
+		// 合法弱点集合（使用 Weakness.* 根），非法弱点集合（误用 Element.* 根）。
+		FGameplayTagContainer ValidWeaknesses;
+		ValidWeaknesses.AddTag(WeaknessRoot);
+		FGameplayTagContainer InvalidWeaknesses;
+		InvalidWeaknesses.AddTag(ElementRoot);
+		// 全链路合法输入应得到 Valid 结果；任一项非法则判为 InvalidElementTag。
+		const EHSRElementToughnessContractResult ValidResult =
+			FHSRToughnessConfiguration::ValidateElement(ElementRoot) == EHSRElementToughnessContractResult::Valid
+			&& FHSRToughnessConfiguration::ValidateWeaknesses(ValidWeaknesses) == EHSRElementToughnessContractResult::Valid
+			&& FHSRToughnessConfiguration::ValidateToughnessDamage(1.0f) == EHSRElementToughnessContractResult::Valid
+			&& FHSRToughnessConfiguration::ValidateInitialToughness(1.0f, 1.0f) == EHSRElementToughnessContractResult::Valid
+			? EHSRElementToughnessContractResult::Valid
+			: EHSRElementToughnessContractResult::InvalidElementTag;
 		RunCase(TEXT("ValidContract"), ValidResult, EHSRElementToughnessContractResult::Valid);
 		RunCase(TEXT("MissingElement"), FHSRToughnessConfiguration::ValidateElement(FGameplayTag()), EHSRElementToughnessContractResult::MissingElement);
 		RunCase(TEXT("EmptyWeakness"), FHSRToughnessConfiguration::ValidateWeaknesses(FGameplayTagContainer()), EHSRElementToughnessContractResult::EmptyWeaknesses);
@@ -199,6 +241,8 @@ namespace HSRBattleDevelopmentTest
 		UE_LOG(LogTemp, Log, TEXT("P8-001 Contract Harness=COMPLETE"));
 	}
 
+	// P9 回合生命周期事件记录器：收集 TurnManager 广播的所有回合事件，
+	// 供后续用例按顺序断言事件类型、参与者、回合纪元与序号。
 	struct FP9TurnEventRecorder
 	{
 		TArray<FHSRTurnLifecycleEvent> Events;
@@ -211,6 +255,7 @@ namespace HSRBattleDevelopmentTest
 		}
 	};
 
+	// 输出单个 P9 用例的通过/失败日志。
 	static void LogP9Case(const TCHAR* CaseName, bool bPassed, const FP9TurnEventRecorder& Recorder)
 	{
 		const TCHAR* Result = bPassed ? TEXT("PASS") : TEXT("FAIL");
@@ -224,17 +269,24 @@ namespace HSRBattleDevelopmentTest
 		}
 	}
 
+	// 把 TurnStarted / TurnEnded 两个事件都绑定到同一个记录器。
 	static void BindP9Recorder(UHSRTurnManager* Manager, FP9TurnEventRecorder& Recorder)
 	{
 		Manager->OnTurnStarted().AddRaw(&Recorder, &FP9TurnEventRecorder::Record);
 		Manager->OnTurnEnded().AddRaw(&Recorder, &FP9TurnEventRecorder::Record);
 	}
 
+	// 判断一条事件是否完全匹配给定的类型、参与者、纪元与序号（便于精确断言）。
 	static bool IsP9Event(const FHSRTurnLifecycleEvent& Event, EHSRTurnLifecycleEventType Type, FName ParticipantId, uint64 Epoch, uint64 Sequence)
 	{
-		return Event.EventType == Type && Event.ParticipantId == ParticipantId && Event.BattleEpoch == Epoch && Event.TurnSequence == Sequence;
+		return Event.EventType == Type
+			&& Event.ParticipantId == ParticipantId
+			&& Event.BattleEpoch == Epoch
+			&& Event.TurnSequence == Sequence;
 	}
 
+	// P9-000 回合生命周期契约测试：验证 TurnManager 的初始化/回合推进/重置/失效/击败/破韧延迟/
+	// 战斗结束等场景下，TurnStarted/TurnEnded 事件是否按精确的顺序、纪元与序号发出。
 	static void RunP9TurnLifecycleHarness(UHSRBattleCoordinator* Coordinator)
 	{
 		if (!Coordinator || Coordinator->GetParticipants().Num() != 2)
@@ -249,6 +301,7 @@ namespace HSRBattleDevelopmentTest
 			UE_LOG(LogTemp, Error, TEXT("P9-000 TurnLifecycle Harness=SKIPPED Reason=InvalidParticipantASC"));
 			return;
 		}
+		// 设速度：玩家 120 先手，敌人 80 后手，保证回合顺序可预测。
 		Participants[0].AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), 120.0f);
 		Participants[1].AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), 80.0f);
 		const FName FirstId = Participants[0].ParticipantId;
@@ -259,22 +312,28 @@ namespace HSRBattleDevelopmentTest
 		BindP9Recorder(Manager, Recorder);
 		const bool bInitialized = Manager->Initialize(Participants);
 		const uint64 EpochOne = Manager->GetBattleEpoch();
+		// 初始化应只触发一次 TurnStarted（先手方），并进入新纪元。
 		LogP9Case(TEXT("Initialize_FirstStartedOnly"), bInitialized && EpochOne != 0 && Recorder.Events.Num() == 1
 			&& IsP9Event(Recorder.Events[0], EHSRTurnLifecycleEventType::TurnStarted, FirstId, EpochOne, 1), Recorder);
 
+		// 非当前回合者的解析应被拒绝，且不产生任何事件。
 		const int32 BeforeNonCurrent = Recorder.Events.Num();
 		LogP9Case(TEXT("NonCurrentResolve_NoEvent"), !Manager->ResolveAction(SecondId) && Recorder.Events.Num() == BeforeNonCurrent, Recorder);
 		const bool bLegalResolve = Manager->ResolveAction(FirstId);
+		// 合法解析应依次发出 TurnEnded(当前者) 和 TurnStarted(下一个)，序号 +1。
 		LogP9Case(TEXT("LegalResolve_EndedThenStarted"), bLegalResolve && Recorder.Events.Num() == BeforeNonCurrent + 2
 			&& IsP9Event(Recorder.Events[BeforeNonCurrent], EHSRTurnLifecycleEventType::TurnEnded, FirstId, EpochOne, 1)
 			&& IsP9Event(Recorder.Events[BeforeNonCurrent + 1], EHSRTurnLifecycleEventType::TurnStarted, SecondId, EpochOne, 2), Recorder);
+		// 同一回合重复解析应被拒绝且不产生事件。
 		const int32 BeforeDuplicate = Recorder.Events.Num();
 		LogP9Case(TEXT("DuplicateResolve_NoEvent"), !Manager->ResolveAction(FirstId) && Recorder.Events.Num() == BeforeDuplicate, Recorder);
 
+		// 重置后纪元归零、序号归零，且不广播事件。
 		const int32 BeforeReset = Recorder.Events.Num();
 		Manager->Reset();
 		LogP9Case(TEXT("Reset_NoEvent"), Recorder.Events.Num() == BeforeReset && Manager->GetBattleEpoch() == 0
 			&& Manager->GetTurnSequence() == 0, Recorder);
+		// 重置后重新初始化应开启一个全新的纪元，序号从 1 重新开始。
 		const int32 BeforeResetInitialize = Recorder.Events.Num();
 		const bool bSecondInitialize = Manager->Initialize(Participants);
 		const uint64 EpochTwo = Manager->GetBattleEpoch();
@@ -282,6 +341,7 @@ namespace HSRBattleDevelopmentTest
 			&& Recorder.Events.Num() == BeforeResetInitialize + 1
 			&& IsP9Event(Recorder.Events.Last(), EHSRTurnLifecycleEventType::TurnStarted, FirstId, EpochTwo, 1), Recorder);
 
+		// 当前参与者被判定失效时，解析应被跳过（不发 TurnEnded），直接轮到下一个参与者。
 		Manager->Reset();
 		const int32 BeforeInvalid = Recorder.Events.Num();
 		Manager->Initialize(Participants);
@@ -294,6 +354,7 @@ namespace HSRBattleDevelopmentTest
 			&& Recorder.Events.Num() == BeforeInvalidResolve + 1
 			&& IsP9Event(Recorder.Events.Last(), EHSRTurnLifecycleEventType::TurnStarted, SecondId, InvalidEpoch, 2), Recorder);
 
+		// 当前参与者已被击败时同样跳过（不发 TurnEnded），直接轮到下一个。
 		const float FirstHealth = Participants[0].AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
 		const float FirstMaxHealth = Participants[0].AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxHealthAttribute());
 		Manager->Reset();
@@ -304,10 +365,12 @@ namespace HSRBattleDevelopmentTest
 		const bool bDefeatedRejected = !Manager->ResolveAction(FirstId);
 		const bool bDefeatedCasePassed = bDefeatedRejected && Recorder.Events.Num() == BeforeDefeatedResolve + 1
 			&& IsP9Event(Recorder.Events.Last(), EHSRTurnLifecycleEventType::TurnStarted, SecondId, DefeatedEpoch, 2);
+		// 恢复被改写的血量，避免污染后续用例。
 		Participants[0].AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(), FirstMaxHealth);
 		Participants[0].AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), FirstHealth);
 		LogP9Case(TEXT("DefeatedCurrent_SkippedWithoutEnded"), bDefeatedCasePassed, Recorder);
 
+		// 破韧延迟：给 SecondId 注册延迟后，当前者解析时应跳过它，当前者自己立即再次行动。
 		Manager->Reset();
 		Manager->Initialize(Participants);
 		const uint64 DelayEpoch = Manager->GetBattleEpoch();
@@ -322,6 +385,7 @@ namespace HSRBattleDevelopmentTest
 			&& IsP9Event(Recorder.Events[BeforeDelayResolve], EHSRTurnLifecycleEventType::TurnEnded, FirstId, DelayEpoch, 1)
 			&& IsP9Event(Recorder.Events[BeforeDelayResolve + 1], EHSRTurnLifecycleEventType::TurnStarted, FirstId, DelayEpoch, 2), Recorder);
 
+		// 战斗结束后：一切解析与延迟注册都应被拒绝且不产生事件。
 		Manager->Reset();
 		Manager->Initialize(Participants);
 		Manager->FinishBattle();
@@ -332,17 +396,20 @@ namespace HSRBattleDevelopmentTest
 		LogP9Case(TEXT("Finished_ResolveDelayNoEvent"), !Manager->ResolveAction(FirstId)
 			&& !Manager->ConsumeBreakDelay(FinishedDelay) && Recorder.Events.Num() == BeforeFinishedCalls, Recorder);
 
+		// 空参与者数组初始化应失败且不产生事件。
 		UHSRTurnManager* EmptyManager = NewObject<UHSRTurnManager>(Coordinator);
 		FP9TurnEventRecorder EmptyRecorder;
 		BindP9Recorder(EmptyManager, EmptyRecorder);
 		const TArray<FHSRBattleParticipant> EmptyParticipants;
 		LogP9Case(TEXT("EmptyInitialize_NoEvent"), !EmptyManager->Initialize(EmptyParticipants) && EmptyRecorder.Events.IsEmpty(), EmptyRecorder);
 
+		// 两轮战斗的纪元必须互不相同（纪元隔离）。
 		const bool bTwoRoundEpochs = EpochOne != 0 && EpochTwo != 0 && EpochOne != EpochTwo;
 		LogP9Case(TEXT("TwoRounds_EpochIsolation"), bTwoRoundEpochs, Recorder);
 		UE_LOG(LogTemp, Log, TEXT("P9-000 TurnLifecycle Harness=COMPLETE"));
 	}
 
+	// 输出单个 P5-002 回合测试用例的结果日志。
 	static void LogCase(const TCHAR* CaseName, bool bPassed)
 	{
 		if (bPassed)
@@ -355,6 +422,7 @@ namespace HSRBattleDevelopmentTest
 		}
 	}
 
+	// 设置参与者的速度属性，返回是否设置成功。
 	static bool SetSpeed(const FHSRBattleParticipant& Participant, float Speed)
 	{
 		if (!Participant.AbilitySystemComponent.IsValid())
@@ -365,6 +433,7 @@ namespace HSRBattleDevelopmentTest
 		return true;
 	}
 
+	// 设置参与者的血量（当前血量和最大血量）。
 	static bool SetHealth(const FHSRBattleParticipant& Participant, float Health, float MaxHealth)
 	{
 		if (!Participant.AbilitySystemComponent.IsValid())
@@ -376,11 +445,15 @@ namespace HSRBattleDevelopmentTest
 		return true;
 	}
 
+	// 读取当前血量；ASC 无效时返回 -1.0f 作为哨兵值。
 	static float GetHealth(const FHSRBattleParticipant& Participant)
 	{
-		return Participant.AbilitySystemComponent.IsValid() ? Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) : -1.0f;
+		return Participant.AbilitySystemComponent.IsValid()
+			? Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute())
+			: -1.0f;
 	}
 
+	// 设置参与者的能量（当前能量和最大能量）。
 	static bool SetEnergy(const FHSRBattleParticipant& Participant, float Energy, float MaxEnergy)
 	{
 		if (!Participant.AbilitySystemComponent.IsValid())
@@ -392,11 +465,15 @@ namespace HSRBattleDevelopmentTest
 		return true;
 	}
 
+	// 读取当前能量；ASC 无效时返回 -1.0f 作为哨兵值。
 	static float GetEnergy(const FHSRBattleParticipant& Participant)
 	{
-		return Participant.AbilitySystemComponent.IsValid() ? Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute()) : -1.0f;
+		return Participant.AbilitySystemComponent.IsValid()
+			? Participant.AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute())
+			: -1.0f;
 	}
 
+	// 输出单个 P6-002 终结技用例的结果日志（含能量/血量/回合的前后对比）。
 	static void LogP6UltimateCase(const TCHAR* CaseName, bool bPassed, const FGuid& ActionId, const FHSRAbilityResolution& Resolution,
 		float EnergyBefore, float EnergyAfter, float HealthBefore, float HealthAfter, FName TurnBefore, FName TurnAfter)
 	{
@@ -412,6 +489,7 @@ namespace HSRBattleDevelopmentTest
 		}
 	}
 
+	// 从参与者的 ASC 中查找基础攻击能力，返回其主实例（PrimaryInstance）。
 	static UHSRBasicAttackAbility* FindBasicAttackAbility(const FHSRBattleParticipant& Participant)
 	{
 		if (!Participant.AbilitySystemComponent.IsValid())
@@ -703,29 +781,129 @@ namespace HSRBattleDevelopmentTest
 	UE_LOG(LogTemp, Log, TEXT("P6-002 Harness=COMPLETE"));
 	}
 
+	// P6-003 战技点（SP）资源契约测试：
+	// 验证技能点发放上限、普攻 +1、技能 -1、重复提交缓存、非法目标回滚等行为。
 	static void RunP6SkillPoints(UHSRBattleCoordinator* Coordinator, const UHSRSkillDefinition* SkillDefinition)
 	{
 		if (!Coordinator || !SkillDefinition || !SkillDefinition->IsValidSkillDefinition() || Coordinator->GetParticipants().Num() != 2)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("P6-003 Harness=SKIPPED reason=missing-valid-skill-definition-or-participants")); UE_LOG(LogTemp, Log, TEXT("P6-003 Harness=COMPLETE")); return;
+			UE_LOG(LogTemp, Warning, TEXT("P6-003 Harness=SKIPPED reason=missing-valid-skill-definition-or-participants"));
+			UE_LOG(LogTemp, Log, TEXT("P6-003 Harness=COMPLETE"));
+			return;
 		}
-		const TArray<FHSRBattleParticipant>& P = Coordinator->GetParticipants(); const FHSRBattleParticipant* Player = P.FindByPredicate([](const FHSRBattleParticipant& X){return X.ParticipantId==FName(TEXT("Player"));}); const FHSRBattleParticipant* Enemy = P.FindByPredicate([](const FHSRBattleParticipant& X){return X.ParticipantId==FName(TEXT("Enemy"));}); UHSRTurnManager* TM=Coordinator->GetTurnManager();
-		if (!Player || !Enemy || !TM) { UE_LOG(LogTemp, Warning, TEXT("P6-003 Harness=SKIPPED reason=missing-runtime")); UE_LOG(LogTemp, Log, TEXT("P6-003 Harness=COMPLETE")); return; }
-		const auto Setup=[&](int32 SP){ SetSpeed(*Player,120);SetSpeed(*Enemy,80);SetHealth(*Player,1000,1000);SetHealth(*Enemy,1000,1000);SetEnergy(*Player,100,100);Coordinator->SetTeamSkillPointsForDevelopmentTest(SP,3);return TM->Initialize(P)&&TM->GetCurrentParticipantId()==Player->ParticipantId;};
-		const auto Cmd=[&](FName Skill,FName Target){FHSRBattleActionCommand C;C.ActionId=FGuid::NewGuid();C.BattleId=Coordinator->GetCurrentRequestId();C.ActorParticipantId=Player->ParticipantId;C.SkillId=Skill;C.TargetParticipantIds.Add(Target);return C;};
-		const auto Log=[&](const TCHAR* N,bool OK,const FHSRBattleActionCommand& C,float EB,float EA,float HB,float HA,FName TB,FName TA,int32 SB,int32 SA){if(OK){UE_LOG(LogTemp,Log,TEXT("P6-003 Case=%s Result=PASS ActionId=%s SPBefore=%d SPAfter=%d EnergyBefore=%.0f EnergyAfter=%.0f HPBefore=%.0f HPAfter=%.0f TurnBefore=%s TurnAfter=%s"),N,*C.ActionId.ToString(),SB,SA,EB,EA,HB,HA,*TB.ToString(),*TA.ToString());}else{UE_LOG(LogTemp,Error,TEXT("P6-003 Case=%s Result=FAIL ActionId=%s SPBefore=%d SPAfter=%d EnergyBefore=%.0f EnergyAfter=%.0f HPBefore=%.0f HPAfter=%.0f TurnBefore=%s TurnAfter=%s"),N,*C.ActionId.ToString(),SB,SA,EB,EA,HB,HA,*TB.ToString(),*TA.ToString());}};
-		// Zero SP Skill reject.
-		Setup(0); auto Z=Cmd(SkillDefinition->SkillId,Enemy->ParticipantId);float ze=GetEnergy(*Player),zh=GetHealth(*Enemy);FName zt=TM->GetCurrentParticipantId();auto zr=Coordinator->RequestAction(Z);Log(TEXT("ZeroSP_SkillReject"),zr.FailureReason==EHSRAbilityFailureReason::InsufficientSkillPoint&&Coordinator->GetTeamResourceState().CurrentSkillPoints==0&&GetEnergy(*Player)==ze&&GetHealth(*Enemy)==zh&&TM->GetCurrentParticipantId()==zt,Z,ze,GetEnergy(*Player),zh,GetHealth(*Enemy),zt,TM->GetCurrentParticipantId(),0,Coordinator->GetTeamResourceState().CurrentSkillPoints);
-		// Cap Basic succeeds but cannot exceed cap.
-		Setup(3);auto C=Cmd(FName(TEXT("BasicAttack")),Enemy->ParticipantId);float ch=GetHealth(*Enemy);auto cr=Coordinator->RequestAction(C);Log(TEXT("CapBasic_NoOverflow"),cr.Succeeded()&&Coordinator->GetTeamResourceState().CurrentSkillPoints==3,C,100,GetEnergy(*Player),ch,GetHealth(*Enemy),Player->ParticipantId,TM->GetCurrentParticipantId(),3,Coordinator->GetTeamResourceState().CurrentSkillPoints);
-		// Basic +1 then Skill -1.
-		Setup(1);auto B=Cmd(FName(TEXT("BasicAttack")),Enemy->ParticipantId);auto br=Coordinator->RequestAction(B);Log(TEXT("BasicCommitPlusOne"),br.Succeeded()&&Coordinator->GetTeamResourceState().CurrentSkillPoints==2,B,100,GetEnergy(*Player),1000,GetHealth(*Enemy),Player->ParticipantId,TM->GetCurrentParticipantId(),1,Coordinator->GetTeamResourceState().CurrentSkillPoints);
-		Setup(2);auto S=Cmd(SkillDefinition->SkillId,Enemy->ParticipantId);float sh=GetHealth(*Enemy);auto sr=Coordinator->RequestAction(S);int32 sa=Coordinator->GetTeamResourceState().CurrentSkillPoints;auto replay=Coordinator->RequestAction(S);Log(TEXT("SkillCommitMinusOne_ReplayCached"),sr.Succeeded()&&replay.Succeeded()&&sa==1&&Coordinator->GetTeamResourceState().CurrentSkillPoints==1,S,100,GetEnergy(*Player),sh,GetHealth(*Enemy),Player->ParticipantId,TM->GetCurrentParticipantId(),2,Coordinator->GetTeamResourceState().CurrentSkillPoints);
-		// Invalid target proves no reserve/commit.
-		Setup(2);auto I=Cmd(SkillDefinition->SkillId,Player->ParticipantId);auto ir=Coordinator->RequestAction(I);Log(TEXT("SkillInvalidTarget_Rollback"),ir.FailureReason==EHSRAbilityFailureReason::InvalidTarget&&Coordinator->GetTeamResourceState().CurrentSkillPoints==2,I,100,GetEnergy(*Player),1000,GetHealth(*Enemy),Player->ParticipantId,TM->GetCurrentParticipantId(),2,Coordinator->GetTeamResourceState().CurrentSkillPoints);
+		// 取出参与者与回合管理器（短别名，仅本函数内使用）。
+		const TArray<FHSRBattleParticipant>& P = Coordinator->GetParticipants();
+		const FHSRBattleParticipant* Player = P.FindByPredicate([](const FHSRBattleParticipant& X)
+		{
+			return X.ParticipantId == FName(TEXT("Player"));
+		});
+		const FHSRBattleParticipant* Enemy = P.FindByPredicate([](const FHSRBattleParticipant& X)
+		{
+			return X.ParticipantId == FName(TEXT("Enemy"));
+		});
+		UHSRTurnManager* TM = Coordinator->GetTurnManager();
+		if (!Player || !Enemy || !TM)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("P6-003 Harness=SKIPPED reason=missing-runtime"));
+			UE_LOG(LogTemp, Log, TEXT("P6-003 Harness=COMPLETE"));
+			return;
+		}
+
+		// 重置一个用例：双方满血满能量、玩家先手、SP 设为指定值，返回回合队列是否就绪。
+		const auto Setup = [&](int32 SP)
+		{
+			SetSpeed(*Player, 120);
+			SetSpeed(*Enemy, 80);
+			SetHealth(*Player, 1000, 1000);
+			SetHealth(*Enemy, 1000, 1000);
+			SetEnergy(*Player, 100, 100);
+			Coordinator->SetTeamSkillPointsForDevelopmentTest(SP, 3);
+			return TM->Initialize(P) && TM->GetCurrentParticipantId() == Player->ParticipantId;
+		};
+
+		// 构造一条基础攻击/技能指令（新 ActionId，指向敌方）。
+		const auto Cmd = [&](FName Skill, FName Target)
+		{
+			FHSRBattleActionCommand C;
+			C.ActionId = FGuid::NewGuid();
+			C.BattleId = Coordinator->GetCurrentRequestId();
+			C.ActorParticipantId = Player->ParticipantId;
+			C.SkillId = Skill;
+			C.TargetParticipantIds.Add(Target);
+			return C;
+		};
+
+		// 输出一个用例的通过/失败日志（含 SP/能量/血量/回合前后对比）。
+		const auto Log = [&](const TCHAR* N, bool OK, const FHSRBattleActionCommand& C,
+			float EB, float EA, float HB, float HA, FName TB, FName TA, int32 SB, int32 SA)
+		{
+			if (OK)
+			{
+				UE_LOG(LogTemp, Log, TEXT("P6-003 Case=%s Result=PASS ActionId=%s SPBefore=%d SPAfter=%d EnergyBefore=%.0f EnergyAfter=%.0f HPBefore=%.0f HPAfter=%.0f TurnBefore=%s TurnAfter=%s"),
+					N, *C.ActionId.ToString(), SB, SA, EB, EA, HB, HA, *TB.ToString(), *TA.ToString());
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("P6-003 Case=%s Result=FAIL ActionId=%s SPBefore=%d SPAfter=%d EnergyBefore=%.0f EnergyAfter=%.0f HPBefore=%.0f HPAfter=%.0f TurnBefore=%s TurnAfter=%s"),
+					N, *C.ActionId.ToString(), SB, SA, EB, EA, HB, HA, *TB.ToString(), *TA.ToString());
+			}
+		};
+
+		// 零 SP 时技能必须被拒绝，且不消耗 SP/能量/血量、回合不前进。
+		Setup(0);
+		auto Z = Cmd(SkillDefinition->SkillId, Enemy->ParticipantId);
+		float ze = GetEnergy(*Player);
+		float zh = GetHealth(*Enemy);
+		FName zt = TM->GetCurrentParticipantId();
+		auto zr = Coordinator->RequestAction(Z);
+		Log(TEXT("ZeroSP_SkillReject"),
+			zr.FailureReason == EHSRAbilityFailureReason::InsufficientSkillPoint
+				&& Coordinator->GetTeamResourceState().CurrentSkillPoints == 0
+				&& GetEnergy(*Player) == ze
+				&& GetHealth(*Enemy) == zh
+				&& TM->GetCurrentParticipantId() == zt,
+			Z, ze, GetEnergy(*Player), zh, GetHealth(*Enemy), zt, TM->GetCurrentParticipantId(), 0, Coordinator->GetTeamResourceState().CurrentSkillPoints);
+
+		// 普攻成功但 SP 已满 3 时不能溢出（仍为 3）。
+		Setup(3);
+		auto C = Cmd(FName(TEXT("BasicAttack")), Enemy->ParticipantId);
+		float ch = GetHealth(*Enemy);
+		auto cr = Coordinator->RequestAction(C);
+		Log(TEXT("CapBasic_NoOverflow"),
+			cr.Succeeded() && Coordinator->GetTeamResourceState().CurrentSkillPoints == 3,
+			C, 100, GetEnergy(*Player), ch, GetHealth(*Enemy), Player->ParticipantId, TM->GetCurrentParticipantId(), 3, Coordinator->GetTeamResourceState().CurrentSkillPoints);
+
+		// SP=1 时普攻成功 → SP +1 变 2。
+		Setup(1);
+		auto B = Cmd(FName(TEXT("BasicAttack")), Enemy->ParticipantId);
+		auto br = Coordinator->RequestAction(B);
+		Log(TEXT("BasicCommitPlusOne"),
+			br.Succeeded() && Coordinator->GetTeamResourceState().CurrentSkillPoints == 2,
+			B, 100, GetEnergy(*Player), 1000, GetHealth(*Enemy), Player->ParticipantId, TM->GetCurrentParticipantId(), 1, Coordinator->GetTeamResourceState().CurrentSkillPoints);
+
+		// SP=2 时技能成功 → SP -1 变 1；重放同一指令应命中缓存，不再扣第二次。
+		Setup(2);
+		auto S = Cmd(SkillDefinition->SkillId, Enemy->ParticipantId);
+		float sh = GetHealth(*Enemy);
+		auto sr = Coordinator->RequestAction(S);
+		int32 sa = Coordinator->GetTeamResourceState().CurrentSkillPoints;
+		auto replay = Coordinator->RequestAction(S);
+		Log(TEXT("SkillCommitMinusOne_ReplayCached"),
+			sr.Succeeded() && replay.Succeeded() && sa == 1 && Coordinator->GetTeamResourceState().CurrentSkillPoints == 1,
+			S, 100, GetEnergy(*Player), sh, GetHealth(*Enemy), Player->ParticipantId, TM->GetCurrentParticipantId(), 2, Coordinator->GetTeamResourceState().CurrentSkillPoints);
+
+		// 目标非法：技能不应扣 SP（证明没有预扣，或预扣已回滚）。
+		Setup(2);
+		auto I = Cmd(SkillDefinition->SkillId, Player->ParticipantId);
+		auto ir = Coordinator->RequestAction(I);
+		Log(TEXT("SkillInvalidTarget_Rollback"),
+			ir.FailureReason == EHSRAbilityFailureReason::InvalidTarget && Coordinator->GetTeamResourceState().CurrentSkillPoints == 2,
+			I, 100, GetEnergy(*Player), 1000, GetHealth(*Enemy), Player->ParticipantId, TM->GetCurrentParticipantId(), 2, Coordinator->GetTeamResourceState().CurrentSkillPoints);
 		UE_LOG(LogTemp, Log, TEXT("P6-003 Harness=COMPLETE"));
 	}
 
+	// P6-004 治疗与 ViewModel 契约测试：
+	// 验证自我治疗技能的治疗成功/满血拒绝/伪造目标拒绝，以及 ViewModel 重建后委托正确解绑。
 	static void RunP6HealAndViewState(UHSRBattleCoordinator* Coordinator, const UHSRSkillDefinition* HealDefinition)
 	{
 		if (!Coordinator || !HealDefinition || !HealDefinition->IsValidHealDefinition() || HealDefinition->TargetType != EHSRTargetType::Self || Coordinator->GetParticipants().Num() != 2)
@@ -735,25 +913,100 @@ namespace HSRBattleDevelopmentTest
 			return;
 		}
 		const TArray<FHSRBattleParticipant>& Participants = Coordinator->GetParticipants();
-		const FHSRBattleParticipant* Player = Participants.FindByPredicate([](const FHSRBattleParticipant& P){ return P.ParticipantId == FName(TEXT("Player")); });
-		const FHSRBattleParticipant* Enemy = Participants.FindByPredicate([](const FHSRBattleParticipant& P){ return P.ParticipantId == FName(TEXT("Enemy")); });
+		const FHSRBattleParticipant* Player = Participants.FindByPredicate([](const FHSRBattleParticipant& P)
+		{
+			return P.ParticipantId == FName(TEXT("Player"));
+		});
+		const FHSRBattleParticipant* Enemy = Participants.FindByPredicate([](const FHSRBattleParticipant& P)
+		{
+			return P.ParticipantId == FName(TEXT("Enemy"));
+		});
 		UHSRTurnManager* Manager = Coordinator->GetTurnManager();
-		if (!Player || !Enemy || !Player->AbilitySystemComponent.IsValid() || !Manager) { UE_LOG(LogTemp, Error, TEXT("P6-004 Case=Setup Result=FAIL")); UE_LOG(LogTemp, Log, TEXT("P6-004 Harness=COMPLETE")); return; }
-		SetSpeed(*Player, 120.f); SetSpeed(*Enemy, 80.f); SetHealth(*Player, 50.f, 100.f); SetHealth(*Enemy, 100.f, 100.f); Manager->Initialize(Participants);
-		auto Make = [Coordinator, HealDefinition](const FGuid& Id, FName Target){ FHSRBattleActionCommand C; C.ActionId=Id; C.BattleId=Coordinator->GetCurrentRequestId(); C.ActorParticipantId=FName(TEXT("Player")); C.SkillId=HealDefinition->SkillId; C.TargetParticipantIds.Add(Target); return C; };
-		const FGuid LegalId=FGuid::NewGuid(); const float HpBefore=GetHealth(*Player); const FName TurnBefore=Manager->GetCurrentParticipantId(); const FHSRAbilityResolution Legal=Coordinator->RequestAction(Make(LegalId, FName(TEXT("Player")))); const float HpAfter=GetHealth(*Player); const FName TurnAfter=Manager->GetCurrentParticipantId();
-		const FHSRAbilityResolution Replay=Coordinator->RequestAction(Make(LegalId, FName(TEXT("Player"))));
-		const bool bLegal=Legal.Succeeded() && HpAfter>HpBefore && HpAfter<=100.f && TurnBefore!=TurnAfter && Replay.Succeeded() && FMath::IsNearlyEqual(HpAfter,GetHealth(*Player));
-		UE_LOG(LogTemp,Log,TEXT("P6-004 Case=HealSuccess_ReplayCached Result=%s HPBefore=%.2f HPAfter=%.2f TurnBefore=%s TurnAfter=%s"),bLegal?TEXT("PASS"):TEXT("FAIL"),HpBefore,HpAfter,*TurnBefore.ToString(),*TurnAfter.ToString());
-		SetHealth(*Player,100.f,100.f); Manager->Initialize(Participants); const float FullHp=GetHealth(*Player); const FName FullTurn=Manager->GetCurrentParticipantId(); const FHSRAbilityResolution Full=Coordinator->RequestAction(Make(FGuid::NewGuid(),FName(TEXT("Player")))); const bool bFull=Full.Status==EHSRAbilityResolutionStatus::Rejected&&Full.FailureReason==EHSRAbilityFailureReason::AlreadyAtFullHealth&&FMath::IsNearlyEqual(FullHp,GetHealth(*Player))&&FullTurn==Manager->GetCurrentParticipantId();
-		UE_LOG(LogTemp,Log,TEXT("P6-004 Case=FullHealth_ZeroMutation Result=%s"),bFull?TEXT("PASS"):TEXT("FAIL"));
-		const FHSRAbilityResolution Forged=Coordinator->RequestAction(Make(FGuid::NewGuid(),FName(TEXT("Enemy")))); const bool bForged=Forged.FailureReason==EHSRAbilityFailureReason::InvalidTarget&&FMath::IsNearlyEqual(FullHp,GetHealth(*Player))&&FullTurn==Manager->GetCurrentParticipantId();
-		UE_LOG(LogTemp,Log,TEXT("P6-004 Case=ForgedTarget_ZeroMutation Result=%s"),bForged?TEXT("PASS"):TEXT("FAIL"));
-		UHSRBattleCommandViewModel* TestVm=NewObject<UHSRBattleCommandViewModel>(Coordinator); int32 First=0,Second=0; const FDelegateHandle FirstHandle=TestVm->OnChanged().AddLambda([&First](const FHSRBattleCommandViewState&){++First;}); TestVm->SetState(Coordinator->GetCommandViewState()); TestVm->OnChanged().Remove(FirstHandle); const FDelegateHandle SecondHandle=TestVm->OnChanged().AddLambda([&Second](const FHSRBattleCommandViewState&){++Second;}); TestVm->SetState(Coordinator->GetCommandViewState()); TestVm->OnChanged().Remove(SecondHandle); const bool bRebuild=First==1&&Second==1;
-		UE_LOG(LogTemp,Log,TEXT("P6-004 Case=ViewModelRebuild_DelegateUnbound Result=%s First=%d Second=%d"),bRebuild?TEXT("PASS"):TEXT("FAIL"),First,Second);
-		UE_LOG(LogTemp,Log,TEXT("P6-004 Harness=COMPLETE"));
+		if (!Player || !Enemy || !Player->AbilitySystemComponent.IsValid() || !Manager)
+		{
+			UE_LOG(LogTemp, Error, TEXT("P6-004 Case=Setup Result=FAIL"));
+			UE_LOG(LogTemp, Log, TEXT("P6-004 Harness=COMPLETE"));
+			return;
+		}
+		// 基线：玩家 50/100 血（需要治疗），玩家先手。
+		SetSpeed(*Player, 120.f);
+		SetSpeed(*Enemy, 80.f);
+		SetHealth(*Player, 50.f, 100.f);
+		SetHealth(*Enemy, 100.f, 100.f);
+		Manager->Initialize(Participants);
+
+		// 构造治疗指令（目标为指定参与者）。
+		auto Make = [Coordinator, HealDefinition](const FGuid& Id, FName Target)
+		{
+			FHSRBattleActionCommand C;
+			C.ActionId = Id;
+			C.BattleId = Coordinator->GetCurrentRequestId();
+			C.ActorParticipantId = FName(TEXT("Player"));
+			C.SkillId = HealDefinition->SkillId;
+			C.TargetParticipantIds.Add(Target);
+			return C;
+		};
+
+		// 合法治疗：血量回升且不超过上限、回合前进；重放同一 ActionId 命中缓存不再治疗。
+		const FGuid LegalId = FGuid::NewGuid();
+		const float HpBefore = GetHealth(*Player);
+		const FName TurnBefore = Manager->GetCurrentParticipantId();
+		const FHSRAbilityResolution Legal = Coordinator->RequestAction(Make(LegalId, FName(TEXT("Player"))));
+		const float HpAfter = GetHealth(*Player);
+		const FName TurnAfter = Manager->GetCurrentParticipantId();
+		const FHSRAbilityResolution Replay = Coordinator->RequestAction(Make(LegalId, FName(TEXT("Player"))));
+		const bool bLegal = Legal.Succeeded()
+			&& HpAfter > HpBefore
+			&& HpAfter <= 100.f
+			&& TurnBefore != TurnAfter
+			&& Replay.Succeeded()
+			&& FMath::IsNearlyEqual(HpAfter, GetHealth(*Player));
+		UE_LOG(LogTemp, Log, TEXT("P6-004 Case=HealSuccess_ReplayCached Result=%s HPBefore=%.2f HPAfter=%.2f TurnBefore=%s TurnAfter=%s"), bLegal ? TEXT("PASS") : TEXT("FAIL"), HpBefore, HpAfter, *TurnBefore.ToString(), *TurnAfter.ToString());
+
+		// 满血时治疗应被拒绝（AlreadyAtFullHealth），零副作用。
+		SetHealth(*Player, 100.f, 100.f);
+		Manager->Initialize(Participants);
+		const float FullHp = GetHealth(*Player);
+		const FName FullTurn = Manager->GetCurrentParticipantId();
+		const FHSRAbilityResolution Full = Coordinator->RequestAction(Make(FGuid::NewGuid(), FName(TEXT("Player"))));
+		const bool bFull = Full.Status == EHSRAbilityResolutionStatus::Rejected
+			&& Full.FailureReason == EHSRAbilityFailureReason::AlreadyAtFullHealth
+			&& FMath::IsNearlyEqual(FullHp, GetHealth(*Player))
+			&& FullTurn == Manager->GetCurrentParticipantId();
+		UE_LOG(LogTemp, Log, TEXT("P6-004 Case=FullHealth_ZeroMutation Result=%s"), bFull ? TEXT("PASS") : TEXT("FAIL"));
+
+		// 伪造目标（治疗敌人）：应被 InvalidTarget 拒绝，零副作用。
+		const FHSRAbilityResolution Forged = Coordinator->RequestAction(Make(FGuid::NewGuid(), FName(TEXT("Enemy"))));
+		const bool bForged = Forged.FailureReason == EHSRAbilityFailureReason::InvalidTarget
+			&& FMath::IsNearlyEqual(FullHp, GetHealth(*Player))
+			&& FullTurn == Manager->GetCurrentParticipantId();
+		UE_LOG(LogTemp, Log, TEXT("P6-004 Case=ForgedTarget_ZeroMutation Result=%s"), bForged ? TEXT("PASS") : TEXT("FAIL"));
+
+		// ViewModel 重建契约：两次 SetState 都应恰好触发一次 OnChanged，且旧句柄移除后不再叠加。
+		UHSRBattleCommandViewModel* TestVm = NewObject<UHSRBattleCommandViewModel>(Coordinator);
+		int32 First = 0;
+		int32 Second = 0;
+		const FDelegateHandle FirstHandle = TestVm->OnChanged().AddLambda([&First](const FHSRBattleCommandViewState&)
+		{
+			++First;
+		});
+		TestVm->SetState(Coordinator->GetCommandViewState());
+		TestVm->OnChanged().Remove(FirstHandle);
+		const FDelegateHandle SecondHandle = TestVm->OnChanged().AddLambda([&Second](const FHSRBattleCommandViewState&)
+		{
+			++Second;
+		});
+		TestVm->SetState(Coordinator->GetCommandViewState());
+		TestVm->OnChanged().Remove(SecondHandle);
+		const bool bRebuild = First == 1 && Second == 1;
+		UE_LOG(LogTemp, Log, TEXT("P6-004 Case=ViewModelRebuild_DelegateUnbound Result=%s First=%d Second=%d"), bRebuild ? TEXT("PASS") : TEXT("FAIL"), First, Second);
+		UE_LOG(LogTemp, Log, TEXT("P6-004 Harness=COMPLETE"));
 	}
 
+	// P9-001 状态系统契约测试：
+	// 覆盖状态添加/刷新/过期、其它参与者回合不消耗、重复回合事件去重、
+	// 非法定义校验、缺失 ASC、目标已败、强制施加失败、EndPlay 清理、
+	// 回合管理器替换解绑、目标死亡清理、重置后第二场战斗、战斗结束清理等完整生命周期。
 	static void RunP9StatusHarness(UHSRBattleCoordinator* Coordinator)
 	{
 		if (!Coordinator || !Coordinator->GetStatusDefinition() || Coordinator->GetParticipants().Num() != 2)
@@ -985,6 +1238,9 @@ namespace HSRBattleDevelopmentTest
 		}
 	}
 
+	// P9-002 状态堆叠契约测试：
+	// 验证 AddStack 刷新策略的 1→2 叠加、达到上限后的 AtMaxRefreshed、
+	// 显式 ReplaceStatus 替换、施加失败/移除失败时的原子回滚、重复 ActionId 幂等去重。
 	static void RunP9StackHarness(UHSRBattleCoordinator* Coordinator, const UHSRStatusDefinition* StackDefinition, const UHSRStatusDefinition* RefreshDefinition)
 	{
 		if (!Coordinator || !StackDefinition || !RefreshDefinition || StackDefinition->RefreshPolicy != EHSRStatusRefreshPolicy::AddStack || Coordinator->GetParticipants().Num() != 2)
@@ -1142,6 +1398,9 @@ namespace HSRBattleDevelopmentTest
 		if(bAll){UE_LOG(LogTemp,Log,TEXT("P9-002 Stack Harness=COMPLETE"));}else{UE_LOG(LogTemp,Error,TEXT("P9-002 Stack Harness=INCOMPLETE"));}
 	}
 
+	// P9-003 DoT 与破韧状态契约测试：
+	// 覆盖 DoT 施放无即时伤害、回合触发伤害并递减、伤害施加失败时重试不重复消耗、
+	// 破韧状态可与 DoT 共存、目标死亡清理、战斗结束无副作用、可重复破韧等场景。
 	static void RunP9DotBreakHarness(UHSRBattleCoordinator* Coordinator, const UHSRStatusDefinition* DotDefinition, const UHSRStatusDefinition* BreakDefinition)
 	{
 		if (!Coordinator || !DotDefinition || !BreakDefinition || DotDefinition->Validate() != EHSRStatusOperationResult::Success
@@ -1364,6 +1623,9 @@ namespace HSRBattleDevelopmentTest
 		}
 	}
 
+	// P9-004 免疫与净化契约测试：
+	// 覆盖免疫标签拒绝 DoT/破韧、净化只移除可净化状态且保留 Buff/哨兵效果、
+	// 源失效清理与重试、多源时保留最新源策略、EndPlay/回合管理器替换解绑、目标死亡清理。
 	static void RunP9ImmunityDispelHarness(UHSRBattleCoordinator* Coordinator, const UHSRStatusDefinition* DotDefinition,
 		const UHSRStatusDefinition* BreakDefinition, const UHSRStatusDefinition* AttackDefinition, TSubclassOf<UGameplayEffect> ImmunityEffect)
 	{
@@ -1440,6 +1702,9 @@ namespace HSRBattleDevelopmentTest
 		void Record(const FHSRBattleCommandViewState& State) { ++UpdateCount; if (ViewModel.IsValid()) ViewModel->SetState(State); }
 	};
 
+	// P9-005 状态视图契约测试：
+	// 验证状态变化通过事件驱动推送到 ViewModel 的纯值快照（添加/刷新/堆叠/破韧/净化/触发/过期），
+	// 以及 Widget 绑定/重建/析构时委托的正确解绑与不重复回调。
 	static void RunP9StatusViewHarness(UHSRBattleCoordinator* Coordinator, const UHSRStatusDefinition* AttackDefinition, const UHSRStatusDefinition* StackDefinition, const UHSRStatusDefinition* DotDefinition, const UHSRStatusDefinition* BreakDefinition, TSubclassOf<UHSRBattleCommandWidget> WidgetClass)
 	{
 		if (!Coordinator || !AttackDefinition || !StackDefinition || !DotDefinition || !BreakDefinition || !WidgetClass || Coordinator->GetParticipants().Num() != 2 || AttackDefinition->Validate() != EHSRStatusOperationResult::Success || StackDefinition->Validate() != EHSRStatusOperationResult::Success || DotDefinition->Validate() != EHSRStatusOperationResult::Success || BreakDefinition->Validate() != EHSRStatusOperationResult::Success)
@@ -1637,7 +1902,15 @@ void AHSRBattleGameMode::BeginPlay()
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("AHSRBattleGameMode::BeginPlay - Coordinator created"));
-	if(UGameInstance* GI=GetGameInstance())if(UHSRSaveSubsystem* Save=GI->GetSubsystem<UHSRSaveSubsystem>())RestoreCommittedHandle=Save->OnRestoreCommitted().AddUObject(this,&AHSRBattleGameMode::HandleRestoreCommitted);
+	// 订阅存档“恢复已提交”事件：当玩家档案被外部（如装备/成长变更）恢复时，
+	// 战斗中已生成的参与者属性需要同步刷新（见 HandleRestoreCommitted）。
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UHSRSaveSubsystem* Save = GI->GetSubsystem<UHSRSaveSubsystem>())
+		{
+			RestoreCommittedHandle = Save->OnRestoreCommitted().AddUObject(this, &AHSRBattleGameMode::HandleRestoreCommitted);
+		}
+	}
 
 	// Access the Transition Subsystem to consume the pending encounter
 	UHSRBattleTransitionSubsystem* Subsystem = GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>();
@@ -1683,22 +1956,52 @@ void AHSRBattleGameMode::BeginPlay()
 	Coordinator->SetParticipantInitializationGameplayEffect(ParticipantInitializationGameplayEffect);
 	Coordinator->SetCharacterProgressionGameplayEffect(CharacterProgressionGameplayEffect);
 	UHSRCharacterProfileSubsystem* Profiles = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRCharacterProfileSubsystem>() : nullptr;
-	if (!Profiles || !CharacterCatalog) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED MissingSubsystemOrCatalog")); return; }
+	if (!Profiles || !CharacterCatalog)
+	{
+		UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED MissingSubsystemOrCatalog"));
+		return;
+	}
 	const EHSRCharacterProfileResult CatalogResult = Profiles->RegisterLoadedCatalog(CharacterCatalog);
-	if (CatalogResult != EHSRCharacterProfileResult::Success && CatalogResult != EHSRCharacterProfileResult::DefinitionAlreadyRegistered) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CatalogResult=%d"), static_cast<int32>(CatalogResult)); return; }
+	if (CatalogResult != EHSRCharacterProfileResult::Success && CatalogResult != EHSRCharacterProfileResult::DefinitionAlreadyRegistered)
+	{
+		UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CatalogResult=%d"), static_cast<int32>(CatalogResult));
+		return;
+	}
 #if WITH_EDITOR
 	if (P11DevelopmentStartingExperience > 0)
 	{
+		// 仅编辑器：开发期直接给主角发经验，方便调试成长数值。
 		const EHSRCharacterProfileResult ExperienceResult = Profiles->GrantExperience(ActivePlayerCharacterId, P11DevelopmentStartingExperience);
-		if (ExperienceResult != EHSRCharacterProfileResult::Success) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED DevelopmentExperience Result=%d CharacterId=%s"), static_cast<int32>(ExperienceResult), *ActivePlayerCharacterId.ToString()); return; }
+		if (ExperienceResult != EHSRCharacterProfileResult::Success)
+		{
+			UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED DevelopmentExperience Result=%d CharacterId=%s"), static_cast<int32>(ExperienceResult), *ActivePlayerCharacterId.ToString());
+			return;
+		}
 	}
 #endif
-	FHSRCharacterProgressionContext PlayerContext; const UHSRCharacterDefinition* PlayerDefinition = nullptr;
-	if (!Profiles->GetProgressionContext(ActivePlayerCharacterId, PlayerContext) || !Profiles->GetDefinition(ActivePlayerCharacterId, PlayerDefinition)) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterNotRegistered Id=%s"), *ActivePlayerCharacterId.ToString()); return; }
-	if (PlayerDefinition->CharacterClass.IsNull()) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassEmpty Id=%s"), *ActivePlayerCharacterId.ToString()); return; }
+	FHSRCharacterProgressionContext PlayerContext;
+	const UHSRCharacterDefinition* PlayerDefinition = nullptr;
+	if (!Profiles->GetProgressionContext(ActivePlayerCharacterId, PlayerContext) || !Profiles->GetDefinition(ActivePlayerCharacterId, PlayerDefinition))
+	{
+		UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterNotRegistered Id=%s"), *ActivePlayerCharacterId.ToString());
+		return;
+	}
+	if (PlayerDefinition->CharacterClass.IsNull())
+	{
+		UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassEmpty Id=%s"), *ActivePlayerCharacterId.ToString());
+		return;
+	}
 	UClass* PlayerClass = PlayerDefinition->CharacterClass.LoadSynchronous();
-	if (!PlayerClass) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassLoad Id=%s"), *ActivePlayerCharacterId.ToString()); return; }
-	if (!PlayerClass->IsChildOf<AHSRCharacterBase>()) { UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassType Id=%s"), *ActivePlayerCharacterId.ToString()); return; }
+	if (!PlayerClass)
+	{
+		UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassLoad Id=%s"), *ActivePlayerCharacterId.ToString());
+		return;
+	}
+	if (!PlayerClass->IsChildOf<AHSRCharacterBase>())
+	{
+		UE_LOG(LogTemp, Error, TEXT("P11-003 ProfileSetup FAILED CharacterClassType Id=%s"), *ActivePlayerCharacterId.ToString());
+		return;
+	}
 	// The leader keeps driving SetPlayerCharacterDefinition so single-member callers and the
 	// existing spawn path behave exactly as before; the roster loop below adds the rest.
 	Coordinator->SetPlayerCharacterDefinition(ActivePlayerCharacterId, PlayerClass);
@@ -2497,7 +2800,20 @@ void AHSRBattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		DisableInput(PlayerController);
 	}
-	if(RestoreCommittedHandle.IsValid())if(UGameInstance* GI=GetGameInstance())if(UHSRSaveSubsystem* Save=GI->GetSubsystem<UHSRSaveSubsystem>()){Save->OnRestoreCommitted().Remove(RestoreCommittedHandle);RestoreCommittedHandle.Reset();}PendingRestoreTransaction=0;PendingRestoreCharacterId=NAME_None;
+	// 解除对存档“恢复已提交”事件的订阅，并清理待处理恢复状态。
+	if (RestoreCommittedHandle.IsValid())
+	{
+		if (UGameInstance* GI = GetGameInstance())
+		{
+			if (UHSRSaveSubsystem* Save = GI->GetSubsystem<UHSRSaveSubsystem>())
+			{
+				Save->OnRestoreCommitted().Remove(RestoreCommittedHandle);
+				RestoreCommittedHandle.Reset();
+			}
+		}
+	}
+	PendingRestoreTransaction = 0;
+	PendingRestoreCharacterId = NAME_None;
 	RestoreP10004GameInput(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr, TEXT("EndPlay"));
 	if (CommandViewModel)
 	{
@@ -2540,6 +2856,7 @@ void AHSRBattleGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AHSRBattleGameMode::HandleCommandStateReady(const FHSRBattleCommandViewState& State)
 {
+	// 战斗命令状态就绪：把纯值快照交给 ViewModel，触发 UI 刷新。
 	if (CommandViewModel)
 	{
 		CommandViewModel->SetState(State);
@@ -2554,20 +2871,22 @@ void AHSRBattleGameMode::HandleBattleResultReady(const FHSRBattleResult& Result)
 		return;
 	}
 
-	// The result view is hosted by the battle command widget. If battle ends
-	// while the detail screen is open, restore that widget before publishing it.
+	// 结果画面由战斗命令面板托管。若战斗结束时角色详情页正开着，
+	// 先切回命令面板再发布结果。
 	ShowBattleCommands();
 	if (!CommandViewModel || !CommandViewModel->ShowBattleResult(Result))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultReady - REJECTED duplicate or stale result RequestId=%s"), *Result.RequestId.ToString());
 		return;
 	}
+	// 结果画面显示后把输入切到 UIOnly，禁止移动。
 	ApplyP10004ResultInput(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr, Result.RequestId);
 	UE_LOG(LogTemp, Log, TEXT("P10-004 ResultView Show RequestId=%s Outcome=%d"), *Result.RequestId.ToString(), static_cast<int32>(Result.Outcome));
 }
 
 void AHSRBattleGameMode::ShowCharacterDetail()
 {
+	// 角色详情页打开条件：面板存在，且当前不在结算结果画面。
 	if (!CharacterDetailWidget || (CommandViewModel && CommandViewModel->GetStateCopy().ResultViewState.bVisible))
 	{
 		return;
@@ -2583,6 +2902,7 @@ void AHSRBattleGameMode::ShowCharacterDetail()
 
 void AHSRBattleGameMode::ShowBattleCommands()
 {
+	// 切回战斗命令面板；只有当前在详情页时才需要切。
 	if (!bCharacterDetailVisible)
 	{
 		return;
@@ -2601,7 +2921,15 @@ void AHSRBattleGameMode::ShowBattleCommands()
 
 void AHSRBattleGameMode::HandleCharacterDetailToggleInput()
 {
-	if (bCharacterDetailVisible) ShowBattleCommands(); else ShowCharacterDetail();
+	// 在角色详情页与战斗命令面板之间来回切换。
+	if (bCharacterDetailVisible)
+	{
+		ShowBattleCommands();
+	}
+	else
+	{
+		ShowCharacterDetail();
+	}
 }
 
 void AHSRBattleGameMode::HandleCharacterDetailBackInput()
@@ -2611,16 +2939,51 @@ void AHSRBattleGameMode::HandleCharacterDetailBackInput()
 
 void AHSRBattleGameMode::HandleRestoreCommitted(const FHSRRestoreCommitInfo& Info)
 {
-	if(Info.TransactionRevision<=LastHandledRestoreTransaction||ActivePlayerCharacterId.IsNone()||!Info.ChangedCharacterIds.Contains(ActivePlayerCharacterId))return;PendingRestoreTransaction=Info.TransactionRevision;PendingRestoreCharacterId=ActivePlayerCharacterId;TryConsumePendingRestore();
+	// 存档恢复提交：只有本次恢复触及当前主角，且交易号比上次处理的新时，才需要刷新战斗内属性。
+	if (Info.TransactionRevision <= LastHandledRestoreTransaction
+		|| ActivePlayerCharacterId.IsNone()
+		|| !Info.ChangedCharacterIds.Contains(ActivePlayerCharacterId))
+	{
+		return;
+	}
+	PendingRestoreTransaction = Info.TransactionRevision;
+	PendingRestoreCharacterId = ActivePlayerCharacterId;
+	TryConsumePendingRestore();
 }
 
 void AHSRBattleGameMode::TryConsumePendingRestore()
 {
-	if(PendingRestoreTransaction<=LastHandledRestoreTransaction||PendingRestoreCharacterId.IsNone())return;UGameInstance* GI=GetGameInstance();UHSRCharacterProfileSubsystem* Profiles=GI?GI->GetSubsystem<UHSRCharacterProfileSubsystem>():nullptr;FHSRCharacterProgressionContext Context;const bool bSuccess=Coordinator&&Profiles&&Profiles->GetProgressionContext(PendingRestoreCharacterId,Context)&&Coordinator->RefreshCharacterProgression(TEXT("Player"),Context);if(bSuccess){UE_LOG(LogTemp,Log,TEXT("P11-005 RestoreRefresh Tx=%lld Character=%s Result=SUCCESS"),PendingRestoreTransaction,*PendingRestoreCharacterId.ToString());}else{UE_LOG(LogTemp,Warning,TEXT("P11-005 RestoreRefresh Tx=%lld Character=%s Result=FAILED"),PendingRestoreTransaction,*PendingRestoreCharacterId.ToString());}if(bSuccess){LastHandledRestoreTransaction=PendingRestoreTransaction;PendingRestoreTransaction=0;PendingRestoreCharacterId=NAME_None;}
+	// 尝试执行挂起的恢复刷新：读取角色最新成长上下文，喂给 Coordinator 刷新“Player”参与者。
+	if (PendingRestoreTransaction <= LastHandledRestoreTransaction || PendingRestoreCharacterId.IsNone())
+	{
+		return;
+	}
+	UGameInstance* GI = GetGameInstance();
+	UHSRCharacterProfileSubsystem* Profiles = GI ? GI->GetSubsystem<UHSRCharacterProfileSubsystem>() : nullptr;
+	FHSRCharacterProgressionContext Context;
+	const bool bSuccess = Coordinator
+		&& Profiles
+		&& Profiles->GetProgressionContext(PendingRestoreCharacterId, Context)
+		&& Coordinator->RefreshCharacterProgression(TEXT("Player"), Context);
+	if (bSuccess)
+	{
+		UE_LOG(LogTemp, Log, TEXT("P11-005 RestoreRefresh Tx=%lld Character=%s Result=SUCCESS"), PendingRestoreTransaction, *PendingRestoreCharacterId.ToString());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("P11-005 RestoreRefresh Tx=%lld Character=%s Result=FAILED"), PendingRestoreTransaction, *PendingRestoreCharacterId.ToString());
+	}
+	if (bSuccess)
+	{
+		LastHandledRestoreTransaction = PendingRestoreTransaction;
+		PendingRestoreTransaction = 0;
+		PendingRestoreCharacterId = NAME_None;
+	}
 }
 
 void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& RequestId)
 {
+	// 玩家点击“确认结算”：先校验这是当前战斗的结果，再做结算预检，最后请求返回探索地图。
 	if (!Coordinator || !CommandViewModel || RequestId != Coordinator->GetCurrentRequestId())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultConfirmRequested - REJECTED stale request RequestId=%s"), *RequestId.ToString());
@@ -2635,6 +2998,7 @@ void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& Request
 		return;
 	}
 
+	// 若本局已提交过结算，直接复用已提交的结果；否则从 Coordinator 取权威结果。
 	FHSRBattleResult PreviewResult;
 	if (SettlementState.bHasCommittedBattleResult)
 	{
@@ -2646,6 +3010,8 @@ void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& Request
 		UE_LOG(LogTemp, Error, TEXT("P10-004 ReturnPreflight Result=FAILED Reason=MissingAuthoritativeResult RequestId=%s"), *RequestId.ToString());
 		return;
 	}
+
+	// 返回前预检：确认战斗结果能合法转换为探索返回。
 	const FHSRExplorationReturnResult Preflight = Subsystem->ValidateBattleReturn(PreviewResult);
 	if (Preflight.ResultType != EHSREncounterReturnResultType::Success)
 	{
@@ -2654,6 +3020,7 @@ void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& Request
 		return;
 	}
 
+	// 执行结算：发奖励、经验、挑战进度；只有 ReadyToReturn 才允许继续。
 	if (ProcessSettlement(GetGameInstance(), ActiveEncounterRequest, PreviewResult, SettlementState)
 		!= EHSRBattleSettlementConfirmResult::ReadyToReturn)
 	{
@@ -2663,12 +3030,12 @@ void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& Request
 	}
 	if (CommandViewModel && SettlementState.bSettlementCommitted)
 	{
-		// The reward authority owns the committed receipt.  Publish that exact
-		// receipt into the already-visible result view before travel, so UMG can
-		// render item ids, quantities and unique instance ids without re-rolling.
+		// 奖励权威已持有提交后的收据。旅行前把这份收据发布到已可见的结果画面，
+		// 让 UMG 能渲染物品 ID/数量/唯一实例 ID，而无需重新摇随机数。
 		CommandViewModel->SetBattleResultReward(SettlementState.Receipt.RewardReceipt);
 	}
 
+	// 首次提交时从 Coordinator 消费战斗结果（恰好一次），后续请求直接复用。
 	if (!SettlementState.bHasCommittedBattleResult)
 	{
 		if (!Coordinator->ConsumeBattleResult(SettlementState.CommittedBattleResult))
@@ -2680,6 +3047,7 @@ void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& Request
 		SettlementState.bHasCommittedBattleResult = true;
 	}
 
+	// 发起返回探索地图的请求。
 	const FHSRExplorationReturnResult ReturnResult = Subsystem->RequestBattleReturn(SettlementState.CommittedBattleResult);
 	if (ReturnResult.ResultType == EHSREncounterReturnResultType::Success)
 	{
@@ -2695,24 +3063,29 @@ void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& Request
 	}
 }
 
+// 结算流程：校验战斗结果与遭遇请求匹配 → 缓存结算请求快照 → 交给奖励/挑战子系统提交 → 标记已提交。
 EHSRBattleSettlementConfirmResult AHSRBattleGameMode::ProcessSettlement(UGameInstance* GameInstance,
 	const FHSREncounterRequest& EncounterRequest, const FHSRBattleResult& BattleResult,
 	FHSRBattleSettlementState& State)
 {
+	// 前置校验：结果必须有效，且 RequestId/EncounterId 与当前遭遇一致，主角 ID 非空。
 	if (!GameInstance || !BattleResult.IsValid() || BattleResult.RequestId != EncounterRequest.RequestId
 		|| BattleResult.EncounterId != EncounterRequest.EncounterId || EncounterRequest.PlayerCharacterId.IsNone())
 	{
 		return EHSRBattleSettlementConfirmResult::Rejected;
 	}
+	// 玩家战败：无奖励可发，直接允许返回。
 	if (BattleResult.Outcome == EHSRBattleOutcome::PlayerDefeat)
 	{
 		return EHSRBattleSettlementConfirmResult::ReadyToReturn;
 	}
+	// 只有玩家胜利且遭遇配置了奖励定义才继续结算。
 	if (BattleResult.Outcome != EHSRBattleOutcome::PlayerVictory || EncounterRequest.RewardDefinitionId.IsNone())
 	{
 		return EHSRBattleSettlementConfirmResult::Rejected;
 	}
 
+	// 已存在请求时，确认它与当前遭遇完全吻合（事务 ID/奖励/角色/种子/经验全匹配）。
 	auto MatchesEncounter = [&EncounterRequest](const FHSRSettlementRequest& Request)
 	{
 		return Request.TransactionId == EncounterRequest.RequestId
@@ -2725,6 +3098,7 @@ EHSRBattleSettlementConfirmResult AHSRBattleGameMode::ProcessSettlement(UGameIns
 	{
 		return EHSRBattleSettlementConfirmResult::Rejected;
 	}
+	// 已提交过结算：幂等，直接允许返回。
 	if (State.bSettlementCommitted)
 	{
 		return EHSRBattleSettlementConfirmResult::ReadyToReturn;
@@ -2735,11 +3109,14 @@ EHSRBattleSettlementConfirmResult AHSRBattleGameMode::ProcessSettlement(UGameIns
 	UHSRRewardSubsystem* Reward = GameInstance->GetSubsystem<UHSRRewardSubsystem>();
 	UHSRSettlementAuthority* Authority = GameInstance->GetSubsystem<UHSRSettlementAuthority>();
 	UHSRChallengeProgressionSubsystem* ChallengeProgression = GameInstance->GetSubsystem<UHSRChallengeProgressionSubsystem>();
+	// 所有依赖子系统必须存在，且遭遇 ID 必须被挑战进度系统认可。
 	if (!Inventory || !Profiles || !Reward || !Authority || !ChallengeProgression
 		|| !ChallengeProgression->IsValidEncounterId(EncounterRequest.EncounterId))
 	{
 		return EHSRBattleSettlementConfirmResult::Rejected;
 	}
+
+	// 首次结算：拍下各子系统当前版本（期望版本号），用于结算权威做乐观并发校验。
 	if (!State.bHasRequest)
 	{
 		FHSRInventorySnapshot InventorySnapshot;
@@ -2762,11 +3139,13 @@ EHSRBattleSettlementConfirmResult AHSRBattleGameMode::ProcessSettlement(UGameIns
 		State.bHasRequest = true;
 	}
 
+	// 提交结算（奖励发放），成功或无需操作都算通过。
 	const EHSRSettlementResult Result = Authority->SubmitSettlement(State.Request, State.Receipt);
 	if (Result != EHSRSettlementResult::Success && Result != EHSRSettlementResult::NoOp)
 	{
 		return EHSRBattleSettlementConfirmResult::Rejected;
 	}
+	// 同步推进挑战进度（通关遭遇）。
 	const EHSRChallengeProgressionResult ProgressionResult =
 		ChallengeProgression->CompleteEncounter(EncounterRequest.EncounterId);
 	if (ProgressionResult != EHSRChallengeProgressionResult::Success
@@ -2790,6 +3169,7 @@ EHSRBattleSettlementConfirmResult AHSRBattleGameMode::ProcessSettlementForAutoma
 void AHSRBattleGameMode::RunTerminalScenarioForDevelopment()
 {
 #if WITH_EDITOR
+	// P5-004 终局场景测试：仅在编辑器里运行。要求配置了场景、Coordinator 存在且恰好两个参与者。
 	if (TerminalTestScenario == EHSRP5TerminalTestScenario::None || !Coordinator || Coordinator->GetParticipants().Num() != 2)
 	{
 		return;
@@ -2804,6 +3184,7 @@ void AHSRBattleGameMode::RunTerminalScenarioForDevelopment()
 		return;
 	}
 
+	// 统一基线：双方各 100 血，玩家 120 速先手，敌人 80 速。
 	Player->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(), 100.0f);
 	Player->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 100.0f);
 	Enemy->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetMaxHealthAttribute(), 100.0f);
@@ -2812,6 +3193,7 @@ void AHSRBattleGameMode::RunTerminalScenarioForDevelopment()
 	Enemy->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetSpeedAttribute(), 80.0f);
 	Coordinator->GetTurnManager()->Initialize(Participants);
 
+	// 玩家胜利场景：敌人剩 10 血，一次普攻应将其击杀并触发胜利。
 	if (TerminalTestScenario == EHSRP5TerminalTestScenario::PlayerVictory)
 	{
 		Enemy->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 10.0f);
@@ -2825,6 +3207,7 @@ void AHSRBattleGameMode::RunTerminalScenarioForDevelopment()
 			UE_LOG(LogTemp, Error, TEXT("P5-004 DeathTest Case=PlayerVictory Result=FAIL"));
 		}
 	}
+	// 玩家战败场景：直接把玩家血置零，应触发 Finished 状态。
 	else
 	{
 		Player->AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), 0.0f);

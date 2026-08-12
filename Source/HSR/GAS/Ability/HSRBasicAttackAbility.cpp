@@ -2,13 +2,15 @@
 
 #include "AbilitySystemComponent.h"
 
+// 构造函数：把默认动作上下文固定为 BasicAttack。
+// 正式伤害由 UHSRBattleCoordinator 准备，这里不再绑定旧的固定伤害 GE；
+// 本能力只消费那份准备好的 Spec。
 UHSRBasicAttackAbility::UHSRBasicAttackAbility()
 {
 	SetActionContext(FGuid(), FName(TEXT("BasicAttack")));
-	// Formal damage is prepared by UHSRBattleCoordinator.  Do not bind the
-	// retired fixed-damage GE here: this ability only consumes that prepared Spec.
 }
 
+// 设置待处理目标：校验目标 ASC 非空后暂存。
 bool UHSRBasicAttackAbility::SetPendingTarget(UAbilitySystemComponent* InTargetAbilitySystem)
 {
 	if (!InTargetAbilitySystem)
@@ -21,11 +23,14 @@ bool UHSRBasicAttackAbility::SetPendingTarget(UAbilitySystemComponent* InTargetA
 	return true;
 }
 
+// 清除待处理目标。
 void UHSRBasicAttackAbility::ClearPendingTarget()
 {
 	PendingTargetAbilitySystem.Reset();
 }
 
+// 激活能力：应用已准备的正式伤害（由 Coordinator 预先装配好 Spec），
+// 结束后按结果标记成功/失败并结束能力。
 void UHSRBasicAttackAbility::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,

@@ -67,6 +67,8 @@ namespace
 	};
 }
 
+// 提交一次遭遇请求：把请求原子地捕获进本协调器，并从 Idle 进入 Consuming 状态。
+// 这是战斗世界加载后的第一步，由 AHSRBattleGameMode::BeginPlay 调用。
 bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRequest)
 {
 	if (CurrentState != EHSRBattleCoordinatorState::Idle)
@@ -108,6 +110,7 @@ bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRe
 		return false;
 	}
 
+	// 若携带了关卡 Buff 选择，先校验这些 BuffId 对当前遭遇合法（由过渡子系统把关）。
 	if (!InRequest.BuffIds.IsEmpty())
 	{
 		UHSRBattleTransitionSubsystem* Transition = GetWorld() && GetWorld()->GetGameInstance()
@@ -121,13 +124,13 @@ bool UHSRBattleCoordinator::SubmitBattleRequest(const FHSREncounterRequest& InRe
 		}
 	}
 
-	// Build pure-value ReturnContext from the consumed request
+	// 从请求构造纯值返回上下文（回探索地图用）。
 	FHSRBattleReturnContext RetCtx;
 	RetCtx.RequestId = InRequest.RequestId;
 	RetCtx.ExplorationMapPath = InRequest.ExplorationMapPath;
 	RetCtx.ReturnTransform = InRequest.ReturnTransform;
 
-	// Capture state atomically
+	// 原子捕获整个请求到当前状态。
 	CurrentRequestId = InRequest.RequestId;
 	CurrentEncounterId = InRequest.EncounterId;
 	CurrentEnemyDefinitionId = InRequest.EnemyDefinitionId;
@@ -162,6 +165,8 @@ const FHSRBattleParticipant* UHSRBattleCoordinator::FindStageBuffPlayerParticipa
 	});
 }
 
+// 把本次遭遇请求携带的关卡 Buff 施加到玩家侧领队身上，并扣除对应资源（如消耗品）。
+// 任一 Buff 失败都会整体失败（由调用方回滚），避免半套 Buff 生效。
 bool UHSRBattleCoordinator::ApplyStageBuffs(UWorld* BattleWorld)
 {
 	if (CurrentStageBuffIds.IsEmpty())
@@ -195,6 +200,7 @@ bool UHSRBattleCoordinator::ApplyStageBuffs(UWorld* BattleWorld)
 
 	for (const FName BuffId : CurrentStageBuffIds)
 	{
+		// 同一 Buff 不允许重复施加。
 		if (AppliedStageBuffHandles.Contains(BuffId))
 		{
 			UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: duplicate runtime BuffId=%s"), *BuffId.ToString());
@@ -202,6 +208,7 @@ bool UHSRBattleCoordinator::ApplyStageBuffs(UWorld* BattleWorld)
 		}
 		const UHSRStageBuffDefinition* Definition =
 			Transition->FindStageBuffDefinition(CurrentEncounterId, BuffId);
+		// 定义必须有效：GE 非空、成本非负、有成本就必须有资源 ID。
 		if (!Definition || !Definition->GameplayEffectClass
 			|| Definition->ResourceCost < 0
 			|| (Definition->ResourceCost > 0 && Definition->ResourceItemId.IsNone()))
@@ -210,6 +217,7 @@ bool UHSRBattleCoordinator::ApplyStageBuffs(UWorld* BattleWorld)
 			return false;
 		}
 
+		// 有资源成本时，二次确认库存仍够（预检与施加之间可能被其他逻辑改动）。
 		if (Definition->ResourceCost > 0)
 		{
 			FHSRInventorySnapshot Snapshot;
@@ -221,6 +229,7 @@ bool UHSRBattleCoordinator::ApplyStageBuffs(UWorld* BattleWorld)
 			}
 		}
 
+		// 生成 GE spec 并施加到玩家 ASC。
 		FGameplayEffectSpecHandle Spec = Player->AbilitySystemComponent->MakeOutgoingSpec(
 			Definition->GameplayEffectClass, 1.0f, Player->AbilitySystemComponent->MakeEffectContext());
 		if (!Spec.IsValid())
@@ -230,6 +239,7 @@ bool UHSRBattleCoordinator::ApplyStageBuffs(UWorld* BattleWorld)
 		}
 		const FActiveGameplayEffectHandle Handle =
 			Player->AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+		// 施加后必须确实处于激活状态，否则视为失败。
 		if (!Handle.WasSuccessfullyApplied() || !Player->AbilitySystemComponent->GetActiveGameplayEffect(Handle))
 		{
 			UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: GE was not active BuffId=%s"), *BuffId.ToString());
@@ -237,11 +247,13 @@ bool UHSRBattleCoordinator::ApplyStageBuffs(UWorld* BattleWorld)
 		}
 		AppliedStageBuffHandles.Add(BuffId, Handle);
 
+		// 记录资源成本，并在施加成功后扣除库存。
 		if (Definition->ResourceCost > 0)
 		{
 			if (Inventory->RemoveStack(Definition->ResourceItemId, Definition->ResourceCost)
 				!= EHSRInventoryOperationResult::Success)
 			{
+				// 扣资源失败：把刚加的 GE 移除，保持无副作用。
 				Player->AbilitySystemComponent->RemoveActiveGameplayEffect(Handle);
 				AppliedStageBuffHandles.Remove(BuffId);
 				UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed: resource debit failed BuffId=%s"), *BuffId.ToString());
@@ -258,8 +270,7 @@ bool UHSRBattleCoordinator::ApplyStageBuffs(UWorld* BattleWorld)
 
 UAbilitySystemComponent* UHSRBattleCoordinator::FindLeaderAbilitySystemComponent(EHSRBattleParticipantTeam Team) const
 {
-	// The leader is the first roster entry for the team, which is also the first
-	// participant spawned for it, so first-match wins.
+	// 领队是队伍名单里第一个成员，也是该队第一个生成出的参与者，所以首个匹配即返回。
 	for (const FHSRBattleParticipant& Participant : Participants)
 	{
 		if (Participant.Team == Team)
@@ -271,11 +282,12 @@ UAbilitySystemComponent* UHSRBattleCoordinator::FindLeaderAbilitySystemComponent
 	return nullptr;
 }
 
+// 回滚所有已施加的关卡 Buff：默认移除 GE，可选地退还已扣资源。
 void UHSRBattleCoordinator::RollbackStageBuffs(bool bRefundResources)
 {
-	// This used to compare ParticipantId against PlayerCharacterId — an id-space mismatch
-	// ("Player" vs the authored character id) that never matched, so rollback silently did
-	// nothing.  Stage buffs land on the leader, so resolve the leader by roster position.
+	// 注意：这里曾用 ParticipantId 与 PlayerCharacterId 比对——两个不同的 ID 空间
+	//（"Player" 对作者角色 ID），从不相等，导致回滚静默无效。关卡 Buff 落在领队身上，
+	// 所以按名单位置解析领队，而不是按角色 ID。
 	UAbilitySystemComponent* PlayerASC = FindLeaderAbilitySystemComponent(EHSRBattleParticipantTeam::Player);
 
 	if (PlayerASC)
@@ -316,6 +328,8 @@ void UHSRBattleCoordinator::RollbackStageBuffs(bool bRefundResources)
 	AppliedStageBuffCosts.Reset();
 }
 
+// 在战斗世界里构建并生成所有参与者，完成初始化后进入 Spawned 状态。
+// 这是请求提交后的第二步，任何失败都会回滚已生成的参与者。
 FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorld)
 {
 	if (CurrentState != EHSRBattleCoordinatorState::Consuming)
@@ -340,10 +354,17 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			FText::FromString(TEXT("Battle World is null."))
 		);
 	}
-	if (!EquipmentGameplayEffect) EquipmentGameplayEffect=LoadClass<UGameplayEffect>(nullptr,TEXT("/Game/GameplayEffects/GE_Equipment_P12.GE_Equipment_P12_C"));
-	if (!RelicSetGameplayEffect) RelicSetGameplayEffect=LoadClass<UGameplayEffect>(nullptr,TEXT("/Game/GameplayEffects/GE_RelicSet_P12_A.GE_RelicSet_P12_A_C"));
+	// 装备与圣遗物套装加成用的 GE 走默认路径加载（若尚未由 GameMode 配置）。
+	if (!EquipmentGameplayEffect)
+	{
+		EquipmentGameplayEffect = LoadClass<UGameplayEffect>(nullptr, TEXT("/Game/GameplayEffects/GE_Equipment_P12.GE_Equipment_P12_C"));
+	}
+	if (!RelicSetGameplayEffect)
+	{
+		RelicSetGameplayEffect = LoadClass<UGameplayEffect>(nullptr, TEXT("/Game/GameplayEffects/GE_RelicSet_P12_A.GE_RelicSet_P12_A_C"));
+	}
 
-	// Build and validate participant definitions from request
+	// 先构建并校验参与者定义。
 	FHSRBattleInitResult DefResult = BuildAndValidateParticipantDefinitions();
 	if (!DefResult.IsSuccess())
 	{
@@ -352,19 +373,24 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 	}
 
 	Participants.Empty();
+	// 构建失败时的统一回滚：撤 Buff、解绑委托、清成长 GE、销毁已生成参与者。
 	const auto RollbackBuild = [this]()
 	{
 		RollbackStageBuffs(true);
 		ClearRuntimeDelegates();
 		ClearProgressionGameplayEffects();
-		for (FHSRBattleParticipant& Existing : Participants) if (Existing.Actor.IsValid()) Existing.Actor->Destroy();
+		for (FHSRBattleParticipant& Existing : Participants)
+		{
+			if (Existing.Actor.IsValid())
+			{
+				Existing.Actor->Destroy();
+			}
+		}
 		Participants.Empty();
 		TurnManager = nullptr;
 	};
-	// Resolve the enemy definition for this encounter. The authored enemy catalog is the
-	// primary source keyed by EnemyDefinitionId, so multiple encounters (Inspector, Boss) each
-	// field their own enemy without a single GameMode-authored reference. Fall back to the
-	// injected definition only when the catalog has no match (legacy single-enemy flow).
+	// 解析本次遭遇的敌人定义：先查作者目录（按 EnemyDefinitionId 主键），
+	// 只有目录没有匹配时才回退到注入的单敌人定义（旧式单敌人流程）。
 	UHSREnemyDefinition* ResolvedEnemyDefinition = nullptr;
 	if (EnemyCatalog)
 	{
@@ -388,7 +414,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 	}
 	EnemyDefinition = ResolvedEnemyDefinition;
 
-	// Spawn each participant from its definition
+	// 逐个定义生成参与者并初始化。
 	for (const auto& Def : ParticipantDefinitions)
 	{
 		AActor* SpawnedActor = SpawnParticipantActor(BattleWorld, Def);
@@ -397,7 +423,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			UE_LOG(LogTemp, Error,
 				TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED spawn ParticipantId=%s DefId=%s RequestId=%s"),
 				*Def.ParticipantId.ToString(), *Def.DefinitionId.ToString(), *CurrentRequestId.ToString());
-			// Cleanup previously spawned
+			// 清理已生成的部分。
 			RollbackBuild();
 			ParticipantDefinitions.Empty();
 			CurrentState = EHSRBattleCoordinatorState::Failed;
@@ -412,7 +438,8 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			UE_LOG(LogTemp, Error,
 				TEXT("UHSRBattleCoordinator::BuildParticipants - FAILED InitASC ParticipantId=%s DefId=%s RequestId=%s"),
 				*Def.ParticipantId.ToString(), *Def.DefinitionId.ToString(), *CurrentRequestId.ToString());
-			SpawnedActor->Destroy(); RollbackBuild();
+			SpawnedActor->Destroy();
+			RollbackBuild();
 			ParticipantDefinitions.Empty();
 			CurrentState = EHSRBattleCoordinatorState::Failed;
 			return FHSRBattleInitResult::MakeFailure(
@@ -421,6 +448,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 				Def.DefinitionId);
 		}
 
+		// 组装参与者 DTO。
 		FHSRBattleParticipant Participant;
 		Participant.ParticipantId = Def.ParticipantId;
 		Participant.DefinitionId = Def.DefinitionId;
@@ -432,14 +460,16 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		if (!ApplyParticipantInitializationGameplayEffect(Participant))
 		{
 			UE_LOG(LogTemp, Error, TEXT("P8-005 InitGE Participant=%s Result=FAILED"), *Participant.ParticipantId.ToString());
-			SpawnedActor->Destroy(); RollbackBuild(); ParticipantDefinitions.Empty(); CurrentState = EHSRBattleCoordinatorState::Failed;
+			SpawnedActor->Destroy();
+			RollbackBuild();
+			ParticipantDefinitions.Empty();
+			CurrentState = EHSRBattleCoordinatorState::Failed;
 			return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Participant initialization GameplayEffect failed.")), Def.DefinitionId);
 		}
 		if (Def.Team == EHSRBattleParticipantTeam::Enemy)
 		{
-			// Enemies reach here with the definition asset already resolved, so fill presentation
-			// from it. Only when the roster left it empty: an authored roster entry is the more
-			// specific source and must win over the shared definition.
+			// 敌人到这里时定义资产已解析：补全展示字段与弱点、韧性。
+			// 只有当 roster 里没写这些字段时才回退到共享敌人定义（更具体的来源优先）。
 			if (Participant.DisplayName.IsEmpty())
 			{
 				Participant.DisplayName = EnemyDefinition->DisplayName;
@@ -466,6 +496,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 				Def.DefinitionId);
 		}
 		Participants.Add(Participant);
+		// 订阅血量变化，用于检测死亡。
 		BindHealthObserver(Participant);
 
 		UE_LOG(LogTemp, Log,
@@ -486,6 +517,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			FText::FromString(TEXT("Stage Buff application or resource transaction failed.")));
 	}
 
+	// 初始化回合管理器与状态组件。
 	TurnManager = NewObject<UHSRTurnManager>(this);
 	if (!TurnManager || !TurnManager->Initialize(Participants))
 	{
@@ -502,9 +534,16 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Failed to initialize StatusComponents.")));
 	}
 
-	// Atomically transition to Spawned
+	// 原子切换到 Spawned，绑定装备移动投影与敌人回合监听。
 	CurrentState = EHSRBattleCoordinatorState::Spawned;
-	if (UGameInstance* GI=BattleWorld->GetGameInstance()) if (UHSREquipmentSubsystem* Equipment=GI->GetSubsystem<UHSREquipmentSubsystem>()) { Equipment->SetRestoreProjection(FHSREquipmentRestoreProjection::CreateUObject(this,&ThisClass::ProjectEquipmentRestore)); BindEquipmentMovementProjection(*Equipment); }
+	if (UGameInstance* GI = BattleWorld->GetGameInstance())
+	{
+		if (UHSREquipmentSubsystem* Equipment = GI->GetSubsystem<UHSREquipmentSubsystem>())
+		{
+			Equipment->SetRestoreProjection(FHSREquipmentRestoreProjection::CreateUObject(this, &ThisClass::ProjectEquipmentRestore));
+			BindEquipmentMovementProjection(*Equipment);
+		}
+	}
 	BindEnemyTurnManager(TurnManager);
 	DevelopmentDamageRandomStream.Initialize(DevelopmentDamageSeed);
 	DevelopmentDamageConsumeCount = 0;
@@ -514,8 +553,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 	LastDevelopmentFormalExecutionResult = FHSRFormalDamageExecutionResult();
 #endif
 	PublishCommandViewState();
-	// Initialize broadcasts before the Coordinator is Spawned and before our bind.
-	// Normalize that boundary into the same queue used for all later turns.
+	// 在 Coordinator 进入 Spawned 前就记录初始广播，统一并入后续回合的同一个队列。
 	RecordCurrentEnemyTurnIfNeeded();
 	DrainPendingEnemyTurns();
 
@@ -526,6 +564,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 	return FHSRBattleInitResult::MakeSuccess();
 }
 
+// 便捷入口：构造一条基础攻击指令并提交（供旧调用方使用）。
 bool UHSRBattleCoordinator::RequestBasicAttack(FName AttackerParticipantId, FName TargetParticipantId)
 {
 	FHSRBattleActionCommand Command;
@@ -537,6 +576,7 @@ bool UHSRBattleCoordinator::RequestBasicAttack(FName AttackerParticipantId, FNam
 	return RequestAction(Command).Succeeded();
 }
 
+// 公开指令入口：维护调度深度计数，交给核心解析，并在最外层解析结束后排空敌人回合队列。
 FHSRAbilityResolution UHSRBattleCoordinator::RequestAction(const FHSRBattleActionCommand& Command)
 {
 	++RequestActionDispatchDepth;
@@ -555,6 +595,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestAction(const FHSRBattleActio
 	#endif
 	check(RequestActionDispatchDepth > 0);
 	--RequestActionDispatchDepth;
+	// 仅当回到最外层调用时才排空敌人回合，避免递归调度互相嵌套。
 	if (RequestActionDispatchDepth == 0)
 	{
 		DrainPendingEnemyTurns();
@@ -562,12 +603,14 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestAction(const FHSRBattleActio
 	return Resolution;
 }
 
+// 指令解析核心：幂等缓存 → 状态/回合/技能/目标校验 → 形式化伤害准备 → 施加 → 韧性/破韧 → 结算。
 FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleActionCommand& Command)
 {
 	FHSRAbilityResolution Resolution;
 	Resolution.ActionId = Command.ActionId;
 	Resolution.ActorParticipantId = Command.ActorParticipantId;
 	Resolution.SkillId = Command.SkillId;
+	// 收尾：把成功动作的伤害/韧性/破韧/治疗转成展示事件，缓存解析结果并广播视图状态。
 	const auto Finalize = [this, &Command](FHSRAbilityResolution InResolution)
 	{
 		if (InResolution.Succeeded() && Command.ActionId.IsValid())
@@ -575,30 +618,54 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 			if (InResolution.bHasDamageResult)
 			{
 				FHSRBattlePresentationEvent& Event = PresentationEvents.AddDefaulted_GetRef();
-				Event.EventId = FGuid::NewGuid(); Event.ActionId = Command.ActionId; Event.SourceParticipantId = Command.ActorParticipantId; Event.TargetParticipantId = Command.TargetParticipantIds.Num() > 0 ? Command.TargetParticipantIds[0] : NAME_None;
-				Event.EventType = EHSRPresentationEventType::Damage; Event.Value = InResolution.DamageResult.Breakdown.AppliedDamage; Event.bCritical = InResolution.DamageResult.Breakdown.bCritical;
+				Event.EventId = FGuid::NewGuid();
+				Event.ActionId = Command.ActionId;
+				Event.SourceParticipantId = Command.ActorParticipantId;
+				Event.TargetParticipantId = Command.TargetParticipantIds.Num() > 0 ? Command.TargetParticipantIds[0] : NAME_None;
+				Event.EventType = EHSRPresentationEventType::Damage;
+				Event.Value = InResolution.DamageResult.Breakdown.AppliedDamage;
+				Event.bCritical = InResolution.DamageResult.Breakdown.bCritical;
 				UE_LOG(LogTemp, Log, TEXT("P10-003 PresentationEvent Type=Damage EventId=%s ActionId=%s Source=%s Target=%s Value=%.2f Critical=%d"), *Event.EventId.ToString(), *Event.ActionId.ToString(), *Event.SourceParticipantId.ToString(), *Event.TargetParticipantId.ToString(), Event.Value, Event.bCritical ? 1 : 0);
 			}
 			if (InResolution.bHasToughnessResult)
 			{
 				FHSRBattlePresentationEvent& Event = PresentationEvents.AddDefaulted_GetRef();
-				Event.EventId = FGuid::NewGuid(); Event.ActionId = Command.ActionId; Event.SourceParticipantId = Command.ActorParticipantId; Event.TargetParticipantId = Command.TargetParticipantIds.Num() > 0 ? Command.TargetParticipantIds[0] : NAME_None;
-				Event.EventType = EHSRPresentationEventType::Toughness; Event.Value = InResolution.ToughnessResult.Damage;
+				Event.EventId = FGuid::NewGuid();
+				Event.ActionId = Command.ActionId;
+				Event.SourceParticipantId = Command.ActorParticipantId;
+				Event.TargetParticipantId = Command.TargetParticipantIds.Num() > 0 ? Command.TargetParticipantIds[0] : NAME_None;
+				Event.EventType = EHSRPresentationEventType::Toughness;
+				Event.Value = InResolution.ToughnessResult.Damage;
 				UE_LOG(LogTemp, Log, TEXT("P10-003 PresentationEvent Type=Toughness EventId=%s ActionId=%s Source=%s Target=%s Value=%.2f"), *Event.EventId.ToString(), *Event.ActionId.ToString(), *Event.SourceParticipantId.ToString(), *Event.TargetParticipantId.ToString(), Event.Value);
 			}
 			if (InResolution.bHasBreakResult && InResolution.BreakResult.bTriggered)
 			{
 				FHSRBattlePresentationEvent& Event = PresentationEvents.AddDefaulted_GetRef();
-				Event.EventId = FGuid::NewGuid(); Event.ActionId = Command.ActionId; Event.SourceParticipantId = Command.ActorParticipantId; Event.TargetParticipantId = InResolution.BreakResult.TargetParticipantId; Event.EventType = EHSRPresentationEventType::Break; Event.Value = InResolution.BreakResult.ToughnessBefore - InResolution.BreakResult.ToughnessAfter; Event.bBreak = true;
+				Event.EventId = FGuid::NewGuid();
+				Event.ActionId = Command.ActionId;
+				Event.SourceParticipantId = Command.ActorParticipantId;
+				Event.TargetParticipantId = InResolution.BreakResult.TargetParticipantId;
+				Event.EventType = EHSRPresentationEventType::Break;
+				Event.Value = InResolution.BreakResult.ToughnessBefore - InResolution.BreakResult.ToughnessAfter;
+				Event.bBreak = true;
 				UE_LOG(LogTemp, Log, TEXT("P10-003 PresentationEvent Type=Break EventId=%s ActionId=%s Source=%s Target=%s Value=%.2f"), *Event.EventId.ToString(), *Event.ActionId.ToString(), *Event.SourceParticipantId.ToString(), *Event.TargetParticipantId.ToString(), Event.Value);
 			}
 			if (InResolution.bHasHealResult)
 			{
 				FHSRBattlePresentationEvent& Event = PresentationEvents.AddDefaulted_GetRef();
-				Event.EventId = FGuid::NewGuid(); Event.ActionId = Command.ActionId; Event.SourceParticipantId = Command.ActorParticipantId; Event.TargetParticipantId = Command.TargetParticipantIds.Num() > 0 ? Command.TargetParticipantIds[0] : NAME_None; Event.EventType = EHSRPresentationEventType::Heal; Event.Value = InResolution.HealAmount;
+				Event.EventId = FGuid::NewGuid();
+				Event.ActionId = Command.ActionId;
+				Event.SourceParticipantId = Command.ActorParticipantId;
+				Event.TargetParticipantId = Command.TargetParticipantIds.Num() > 0 ? Command.TargetParticipantIds[0] : NAME_None;
+				Event.EventType = EHSRPresentationEventType::Heal;
+				Event.Value = InResolution.HealAmount;
 				UE_LOG(LogTemp, Log, TEXT("P10-003 PresentationEvent Type=Heal EventId=%s ActionId=%s Source=%s Target=%s Value=%.2f"), *Event.EventId.ToString(), *Event.ActionId.ToString(), *Event.SourceParticipantId.ToString(), *Event.TargetParticipantId.ToString(), Event.Value);
 			}
-			if (PresentationEvents.Num() > 32) PresentationEvents.RemoveAt(0, PresentationEvents.Num() - 32, EAllowShrinking::No);
+			// 展示事件只保留最近 32 条。
+			if (PresentationEvents.Num() > 32)
+			{
+				PresentationEvents.RemoveAt(0, PresentationEvents.Num() - 32, EAllowShrinking::No);
+			}
 		}
 		if (Command.ActionId.IsValid())
 		{
@@ -673,15 +740,24 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 	{
 		return Reject(EHSRAbilityFailureReason::InvalidTarget);
 	}
+	// 记录目标在“录取”时是否存活（用于破韧延迟 + 延迟死亡判定）。
 	const bool bTargetAliveAtAdmission = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) > 0.0f;
-	if (ResolvedSkillDefinition->RestoresHealth() && Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) >= Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxHealthAttribute())) return Reject(EHSRAbilityFailureReason::AlreadyAtFullHealth);
+	// 治疗技能对已满血目标直接拒绝。
+	if (ResolvedSkillDefinition->RestoresHealth()
+		&& Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) >= Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxHealthAttribute()))
+	{
+		return Reject(EHSRAbilityFailureReason::AlreadyAtFullHealth);
+	}
 
-	// This is the synchronous preflight for the only mutating P6-001 ability.
-	// ResolveAction can reject only if its current participant is absent/invalid or
-	// changes. The current id and the TurnManager's own weak participant copy are
-	// both checked before GE activation; no Tick, delegate, or asynchronous work
-	// runs between this check and the immediate ResolveAction below.
-	const FHSRBattleParticipant* TurnParticipant = TurnManager->GetOrderedParticipants().FindByPredicate([&Command](const FHSRBattleParticipant& Participant) { return Participant.ParticipantId == Command.ActorParticipantId; });
+	// 这是唯一会改变状态的 P6-001 技能的同步预检：
+	// ResolveAction 只会在当前参与者缺失/失效或变化时拒绝。当前 ID 与 TurnManager 自己的
+	// 弱参与者副本都在 GE 激活前被检查；此检查与紧随其后的 ResolveAction 之间
+	// 没有任何 Tick、委托或异步工作。
+	const FHSRBattleParticipant* TurnParticipant = TurnManager->GetOrderedParticipants().FindByPredicate(
+		[&Command](const FHSRBattleParticipant& Participant)
+		{
+			return Participant.ParticipantId == Command.ActorParticipantId;
+		});
 	if (!TurnParticipant || !TurnParticipant->IsValid())
 	{
 		return Reject(EHSRAbilityFailureReason::NotCurrentActor);
@@ -1557,16 +1633,42 @@ void UHSRBattleCoordinator::Reset()
 
 FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticipantId, FName TargetParticipantId, const FGuid& ActionId, const UHSRStatusDefinition* Definition)
 {
-	FHSRDamageResult Failure; Failure.ActionId = ActionId; Failure.DamageType = Definition ? Definition->DamageType : FGameplayTag();
-	if (!Definition || Definition->EffectKind != EHSRStatusEffectKind::DamageOverTime) { Failure.Result = EHSRDamageResultType::MissingDamageRule; return Failure; }
+	FHSRDamageResult Failure;
+	Failure.ActionId = ActionId;
+	Failure.DamageType = Definition ? Definition->DamageType : FGameplayTag();
+	if (!Definition || Definition->EffectKind != EHSRStatusEffectKind::DamageOverTime)
+	{
+		Failure.Result = EHSRDamageResultType::MissingDamageRule;
+		return Failure;
+	}
 	const FHSRBattleParticipant* Source = FindParticipant(SourceParticipantId);
 	const FHSRBattleParticipant* Target = FindParticipant(TargetParticipantId);
 	const UHSRDamageRuleDefinition* Rule = Definition->DamageRule.LoadSynchronous();
-	if (CurrentState != EHSRBattleCoordinatorState::Spawned) { Failure.Result = EHSRDamageResultType::BattleTerminal; return Failure; }
-	if (!ActionId.IsValid()) { Failure.Result = EHSRDamageResultType::DuplicateAction; return Failure; }
-	if (!Source || !Source->AbilitySystemComponent.IsValid()) { Failure.Result = EHSRDamageResultType::InvalidSource; return Failure; }
-	if (!Target || !Target->AbilitySystemComponent.IsValid()) { Failure.Result = EHSRDamageResultType::InvalidTarget; return Failure; }
-	if (!Rule || !Rule->IsValidRuleDefinition()) { Failure.Result = EHSRDamageResultType::MissingDamageRule; return Failure; }
+	if (CurrentState != EHSRBattleCoordinatorState::Spawned)
+	{
+		Failure.Result = EHSRDamageResultType::BattleTerminal;
+		return Failure;
+	}
+	if (!ActionId.IsValid())
+	{
+		Failure.Result = EHSRDamageResultType::DuplicateAction;
+		return Failure;
+	}
+	if (!Source || !Source->AbilitySystemComponent.IsValid())
+	{
+		Failure.Result = EHSRDamageResultType::InvalidSource;
+		return Failure;
+	}
+	if (!Target || !Target->AbilitySystemComponent.IsValid())
+	{
+		Failure.Result = EHSRDamageResultType::InvalidTarget;
+		return Failure;
+	}
+	if (!Rule || !Rule->IsValidRuleDefinition())
+	{
+		Failure.Result = EHSRDamageResultType::MissingDamageRule;
+		return Failure;
+	}
 	const FHSRDamageSetByCallerTags DamageTags;
 	if (!Definition->DamageType.IsValid() || !DamageTags.IsValid())
 	{
@@ -1575,27 +1677,60 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticip
 	}
 	FGameplayEffectContextHandle Context = Source->AbilitySystemComponent->MakeEffectContext();
 	FHSRDamageEffectContext* DamageContext = static_cast<FHSRDamageEffectContext*>(Context.Get());
-	if (!DamageContext || DamageContext->GetScriptStruct() != FHSRDamageEffectContext::StaticStruct()) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return Failure; }
-	DamageContext->DamageContext.ActionId = ActionId; DamageContext->DamageContext.DamageType = Definition->DamageType; DamageContext->DamageContext.AbilityMultiplier = Definition->DamageAbilityMultiplier; DamageContext->DamageContext.CritRoll = 0.0f; DamageContext->DefenseCoefficient = Rule->DefenseCoefficient; DamageContext->MinDamage = Rule->MinDamage;
+	if (!DamageContext || DamageContext->GetScriptStruct() != FHSRDamageEffectContext::StaticStruct())
+	{
+		Failure.Result = EHSRDamageResultType::SpecCreationFailed;
+		return Failure;
+	}
+	DamageContext->DamageContext.ActionId = ActionId;
+	DamageContext->DamageContext.DamageType = Definition->DamageType;
+	DamageContext->DamageContext.AbilityMultiplier = Definition->DamageAbilityMultiplier;
+	DamageContext->DamageContext.CritRoll = 0.0f;
+	DamageContext->DefenseCoefficient = Rule->DefenseCoefficient;
+	DamageContext->MinDamage = Rule->MinDamage;
 	const TSubclassOf<UGameplayEffect> DamageClass = Definition->DamageGameplayEffectClass.LoadSynchronous();
-	if (!DamageClass) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return Failure; }
+	if (!DamageClass)
+	{
+		Failure.Result = EHSRDamageResultType::SpecCreationFailed;
+		return Failure;
+	}
 	FGameplayEffectSpecHandle Spec = Source->AbilitySystemComponent->MakeOutgoingSpec(DamageClass, 1.0f, Context);
-	if (!Spec.IsValid()) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return Failure; }
+	if (!Spec.IsValid())
+	{
+		Failure.Result = EHSRDamageResultType::SpecCreationFailed;
+		return Failure;
+	}
+	// 在 Apply 前记下 RNG 流，任何失败都需要回滚（不消耗暴击骰）。
 	const FRandomStream RandomStreamBeforeApply = DevelopmentDamageRandomStream;
 	DamageContext->DamageContext.CritRoll = DevelopmentDamageRandomStream.GetFraction();
 	DamageTags.ApplyTo(*Spec.Data, Definition->DamageAbilityMultiplier, Rule->DefenseCoefficient,
 		Rule->MinDamage, DamageContext->DamageContext.CritRoll);
 	const float HealthBefore = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
-	bFormalDamageTransactionOpen = true; PendingDefeatedParticipantId = NAME_None;
+	// 状态伤害也是一次正式伤害事务：死亡延迟到事务结束。
+	bFormalDamageTransactionOpen = true;
+	PendingDefeatedParticipantId = NAME_None;
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	if (bForceStatusDamageApplyFailure)
 	{
-		DevelopmentDamageRandomStream = RandomStreamBeforeApply; bFormalDamageTransactionOpen = false; Failure.Result = EHSRDamageResultType::EffectApplicationFailed; return Failure;
+		DevelopmentDamageRandomStream = RandomStreamBeforeApply;
+		bFormalDamageTransactionOpen = false;
+		Failure.Result = EHSRDamageResultType::EffectApplicationFailed;
+		return Failure;
 	}
 #endif
 	const FActiveGameplayEffectHandle Applied = Source->AbilitySystemComponent->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), Target->AbilitySystemComponent.Get());
-	if (!Applied.WasSuccessfullyApplied()) { DevelopmentDamageRandomStream = RandomStreamBeforeApply; bFormalDamageTransactionOpen = false; PendingDefeatedParticipantId = NAME_None; Failure.Result = EHSRDamageResultType::EffectApplicationFailed; return Failure; }
-	FHSRDamageResult Result = DamageContext->DamageResult; Result.ActionId = ActionId; Result.DamageType = Definition->DamageType; Result.Breakdown.AppliedDamage = FMath::Max(0.0f, HealthBefore - Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()));
+	if (!Applied.WasSuccessfullyApplied())
+	{
+		DevelopmentDamageRandomStream = RandomStreamBeforeApply;
+		bFormalDamageTransactionOpen = false;
+		PendingDefeatedParticipantId = NAME_None;
+		Failure.Result = EHSRDamageResultType::EffectApplicationFailed;
+		return Failure;
+	}
+	FHSRDamageResult Result = DamageContext->DamageResult;
+	Result.ActionId = ActionId;
+	Result.DamageType = Definition->DamageType;
+	Result.Breakdown.AppliedDamage = FMath::Max(0.0f, HealthBefore - Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()));
 	if (Result.Result != EHSRDamageResultType::DamageResolved)
 	{
 		DevelopmentDamageRandomStream = RandomStreamBeforeApply;
@@ -1603,15 +1738,28 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticip
 		PendingDefeatedParticipantId = NAME_None;
 	}
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
-	else { ++StatusDamageCommitCount; }
+	else
+	{
+		++StatusDamageCommitCount;
+	}
 #endif
 	return Result;
 }
 
+// 状态伤害事务收尾：若事务期间产生了延迟死亡，则在此结算。
 void UHSRBattleCoordinator::FinalizeStatusDamage()
 {
-	if (!PendingDefeatedParticipantId.IsNone()) { const FName Defeated = PendingDefeatedParticipantId; PendingDefeatedParticipantId = NAME_None; bFormalDamageTransactionOpen = false; ResolveDefeat(Defeated); }
-	else { bFormalDamageTransactionOpen = false; }
+	if (!PendingDefeatedParticipantId.IsNone())
+	{
+		const FName Defeated = PendingDefeatedParticipantId;
+		PendingDefeatedParticipantId = NAME_None;
+		bFormalDamageTransactionOpen = false;
+		ResolveDefeat(Defeated);
+	}
+	else
+	{
+		bFormalDamageTransactionOpen = false;
+	}
 }
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 FHSRBattleInitResult UHSRBattleCoordinator::ResetAndRebuildForDevelopmentTest(UWorld* BattleWorld)
@@ -1637,22 +1785,63 @@ void UHSRBattleCoordinator::InitializeDevelopmentDamageRng(int32 InSeed)
 	DevelopmentDamageResults.Empty();
 }
 
+// 开发测试专用伤害路径：直接调用伤害执行，不经过完整指令管线（P7-002 用）。
 FHSRDamageResult UHSRBattleCoordinator::ResolveDevelopmentExecutionDamage(FName SourceParticipantId, FName TargetParticipantId, const FGuid& ActionId, const FGameplayTag& DamageType, float AbilityMultiplier, const UHSRDamageRuleDefinition* Rule, TSubclassOf<UGameplayEffect> DamageEffectClass)
 {
 	FHSRDamageResult Failure;
 	Failure.ActionId = ActionId;
 	Failure.DamageType = DamageType;
-	if (const FHSRDamageResult* Existing = DevelopmentDamageResults.Find(ActionId)) { return *Existing; }
-	const auto CacheFailure = [this, &ActionId](FHSRDamageResult Result) { if (ActionId.IsValid()) { DevelopmentDamageResults.Add(ActionId, Result); } return Result; };
-	if (CurrentState != EHSRBattleCoordinatorState::Spawned) { Failure.Result = EHSRDamageResultType::BattleTerminal; return CacheFailure(Failure); }
-	if (!ActionId.IsValid()) { Failure.Result = EHSRDamageResultType::DuplicateAction; return Failure; }
+	// 幂等缓存：同一 ActionId 直接返回缓存。
+	if (const FHSRDamageResult* Existing = DevelopmentDamageResults.Find(ActionId))
+	{
+		return *Existing;
+	}
+	// 失败也缓存（仅当 ActionId 有效），保证重放行为一致。
+	const auto CacheFailure = [this, &ActionId](FHSRDamageResult Result)
+	{
+		if (ActionId.IsValid())
+		{
+			DevelopmentDamageResults.Add(ActionId, Result);
+		}
+		return Result;
+	};
+	if (CurrentState != EHSRBattleCoordinatorState::Spawned)
+	{
+		Failure.Result = EHSRDamageResultType::BattleTerminal;
+		return CacheFailure(Failure);
+	}
+	if (!ActionId.IsValid())
+	{
+		Failure.Result = EHSRDamageResultType::DuplicateAction;
+		return Failure;
+	}
 	const FHSRBattleParticipant* Source = FindParticipant(SourceParticipantId);
-	if (!Source || !Source->AbilitySystemComponent.IsValid()) { Failure.Result = EHSRDamageResultType::InvalidSource; return CacheFailure(Failure); }
+	if (!Source || !Source->AbilitySystemComponent.IsValid())
+	{
+		Failure.Result = EHSRDamageResultType::InvalidSource;
+		return CacheFailure(Failure);
+	}
 	const FHSRBattleParticipant* Target = FindParticipant(TargetParticipantId);
-	if (!Target || !Target->AbilitySystemComponent.IsValid()) { Failure.Result = EHSRDamageResultType::InvalidTarget; return CacheFailure(Failure); }
-	if (!Rule || !Rule->IsValidRuleDefinition()) { Failure.Result = EHSRDamageResultType::MissingDamageRule; return CacheFailure(Failure); }
-	if (!DamageType.IsValid() || !FMath::IsFinite(AbilityMultiplier) || AbilityMultiplier <= 0.0f || AbilityMultiplier > 100.0f) { Failure.Result = EHSRDamageResultType::InvalidDamageType; return CacheFailure(Failure); }
-	if (!DamageEffectClass) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return CacheFailure(Failure); }
+	if (!Target || !Target->AbilitySystemComponent.IsValid())
+	{
+		Failure.Result = EHSRDamageResultType::InvalidTarget;
+		return CacheFailure(Failure);
+	}
+	if (!Rule || !Rule->IsValidRuleDefinition())
+	{
+		Failure.Result = EHSRDamageResultType::MissingDamageRule;
+		return CacheFailure(Failure);
+	}
+	if (!DamageType.IsValid() || !FMath::IsFinite(AbilityMultiplier) || AbilityMultiplier <= 0.0f || AbilityMultiplier > 100.0f)
+	{
+		Failure.Result = EHSRDamageResultType::InvalidDamageType;
+		return CacheFailure(Failure);
+	}
+	if (!DamageEffectClass)
+	{
+		Failure.Result = EHSRDamageResultType::SpecCreationFailed;
+		return CacheFailure(Failure);
+	}
 	const FHSRDamageSetByCallerTags DamageTags;
 	if (!DamageTags.IsValid())
 	{
@@ -1661,24 +1850,36 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveDevelopmentExecutionDamage(FName 
 	}
 	FGameplayEffectContextHandle ContextHandle = Source->AbilitySystemComponent->MakeEffectContext();
 	FHSRDamageEffectContext* DamageContext = static_cast<FHSRDamageEffectContext*>(ContextHandle.Get());
-	if (!DamageContext || DamageContext->GetScriptStruct() != FHSRDamageEffectContext::StaticStruct()) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return CacheFailure(Failure); }
+	if (!DamageContext || DamageContext->GetScriptStruct() != FHSRDamageEffectContext::StaticStruct())
+	{
+		Failure.Result = EHSRDamageResultType::SpecCreationFailed;
+		return CacheFailure(Failure);
+	}
 	DamageContext->DamageContext.ActionId = ActionId;
 	DamageContext->DamageContext.DamageType = DamageType;
 	DamageContext->DamageContext.AbilityMultiplier = AbilityMultiplier;
-	// Build the Spec before consuming RNG. All failures above this point are side-effect free.
+	// 在消耗 RNG 之前先构造好 Spec：以上所有失败分支都无副作用。
 	DamageContext->DamageContext.CritRoll = 0.0f;
 	DamageContext->DefenseCoefficient = Rule->DefenseCoefficient;
 	DamageContext->MinDamage = Rule->MinDamage;
 	FGameplayEffectSpecHandle Spec = Source->AbilitySystemComponent->MakeOutgoingSpec(DamageEffectClass, 1.0f, ContextHandle);
-	if (!Spec.IsValid()) { Failure.Result = EHSRDamageResultType::SpecCreationFailed; return CacheFailure(Failure); }
-	// The unique commit point: Spec is valid and Apply is immediately next.
+	if (!Spec.IsValid())
+	{
+		Failure.Result = EHSRDamageResultType::SpecCreationFailed;
+		return CacheFailure(Failure);
+	}
+	// 唯一的 RNG 消耗点：Spec 有效且紧跟着 Apply。
 	DamageContext->DamageContext.CritRoll = DevelopmentDamageRandomStream.GetFraction();
 	++DevelopmentDamageConsumeCount;
 	DamageTags.ApplyTo(*Spec.Data, AbilityMultiplier, Rule->DefenseCoefficient,
 		Rule->MinDamage, DamageContext->DamageContext.CritRoll);
 	const float HealthBefore = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
 	const FActiveGameplayEffectHandle Applied = Source->AbilitySystemComponent->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), Target->AbilitySystemComponent.Get());
-	if (!Applied.WasSuccessfullyApplied()) { Failure.Result = EHSRDamageResultType::EffectApplicationFailed; return CacheFailure(Failure); }
+	if (!Applied.WasSuccessfullyApplied())
+	{
+		Failure.Result = EHSRDamageResultType::EffectApplicationFailed;
+		return CacheFailure(Failure);
+	}
 	FHSRDamageResult Result = DamageContext->DamageResult;
 	const float HealthAfter = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
 	Result.Breakdown.AppliedDamage = FMath::Max(0.0f, HealthBefore - HealthAfter);
@@ -1907,15 +2108,23 @@ bool UHSRBattleCoordinator::InitParticipantASC(AActor* TargetActor)
 	return true;
 }
 
+// 为每个参与者创建 UHSRStatusComponent，绑定回合管理器与协调器，并订阅状态变化。
 bool UHSRBattleCoordinator::InitializeStatusComponents()
 {
 	ClearStatusComponents();
-	if (!TurnManager) return false;
+	if (!TurnManager)
+	{
+		return false;
+	}
 	for (const FHSRBattleParticipant& Participant : Participants)
 	{
-		if (!Participant.Actor.IsValid() || !Participant.AbilitySystemComponent.IsValid()) return false;
+		if (!Participant.Actor.IsValid() || !Participant.AbilitySystemComponent.IsValid())
+		{
+			return false;
+		}
 		UHSRStatusComponent* Component = NewObject<UHSRStatusComponent>(Participant.Actor.Get());
-		if (!Component || !Component->InitializeStatusRuntime(Participant.ParticipantId, Participant.AbilitySystemComponent.Get())
+		if (!Component
+			|| !Component->InitializeStatusRuntime(Participant.ParticipantId, Participant.AbilitySystemComponent.Get())
 			|| !Component->BindTurnManager(TurnManager))
 		{
 			return false;
@@ -1923,18 +2132,23 @@ bool UHSRBattleCoordinator::InitializeStatusComponents()
 		Component->BindBattleCoordinator(this);
 		Component->RegisterComponent();
 		StatusComponents.Add(Participant.ParticipantId, Component);
-		StatusChangedHandles.Add(Participant.ParticipantId, Component->OnStatusChanged().AddUObject(this, &UHSRBattleCoordinator::HandleStatusChanged, Participant.ParticipantId));
+		StatusChangedHandles.Add(Participant.ParticipantId,
+			Component->OnStatusChanged().AddUObject(this, &UHSRBattleCoordinator::HandleStatusChanged, Participant.ParticipantId));
 	}
 	return true;
 }
 
+// 清理所有状态组件：解绑委托、清状态、解绑回合管理器、销毁组件。
 void UHSRBattleCoordinator::ClearStatusComponents()
 {
 	for (TPair<FName, TObjectPtr<UHSRStatusComponent>>& Pair : StatusComponents)
 	{
 		if (Pair.Value)
 		{
-			if (const FDelegateHandle* Handle = StatusChangedHandles.Find(Pair.Key)) Pair.Value->OnStatusChanged().Remove(*Handle);
+			if (const FDelegateHandle* Handle = StatusChangedHandles.Find(Pair.Key))
+			{
+				Pair.Value->OnStatusChanged().Remove(*Handle);
+			}
 			Pair.Value->ClearStatus();
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 			LastClearedStatusSnapshots.Add(Pair.Key, Pair.Value->GetSnapshot());
@@ -1948,9 +2162,13 @@ void UHSRBattleCoordinator::ClearStatusComponents()
 	PublishCommandViewState();
 }
 
+// 状态组件变化时记录最近一次公开操作并广播视图状态。
 void UHSRBattleCoordinator::HandleStatusChanged(FName ParticipantId)
 {
-	if (const UHSRStatusComponent* Component = GetStatusComponent(ParticipantId)) LastStatusOperation = Component->GetLastPublicOperation();
+	if (const UHSRStatusComponent* Component = GetStatusComponent(ParticipantId))
+	{
+		LastStatusOperation = Component->GetLastPublicOperation();
+	}
 	PublishCommandViewState();
 }
 
@@ -2241,79 +2459,192 @@ bool UHSRBattleCoordinator::ApplyCharacterProgressionGameplayEffect(const FHSRBa
 	return true;
 }
 
+// 校验成长 GE 的契约：必须是 Infinite 持续、恰好 4 个修饰符，且每个都是
+// Additive + SetByCaller 并指向对应的成长标签。
 bool UHSRBattleCoordinator::ValidateCharacterProgressionEffectContract(const UGameplayEffect* Effect)
 {
-	if (!Effect || Effect->DurationPolicy != EGameplayEffectDurationType::Infinite || Effect->Modifiers.Num() != 4) return false;
-	const auto Has = [Effect](const FGameplayAttribute& Attribute, FGameplayTag Tag) { int32 N=0; for (const FGameplayModifierInfo& M:Effect->Modifiers) if(M.Attribute==Attribute&&M.ModifierOp==EGameplayModOp::Additive&&M.ModifierMagnitude.GetMagnitudeCalculationType()==EGameplayEffectMagnitudeCalculation::SetByCaller&&M.ModifierMagnitude.GetSetByCallerFloat().DataTag==Tag)++N; return N==1; };
-	return Has(UHSRCoreAttributeSet::GetMaxHealthAttribute(),HSRProgressionTags::BonusMaxHealth)&&Has(UHSRCoreAttributeSet::GetAttackAttribute(),HSRProgressionTags::BonusAttack)&&Has(UHSRCoreAttributeSet::GetDefenseAttribute(),HSRProgressionTags::BonusDefense)&&Has(UHSRCoreAttributeSet::GetSpeedAttribute(),HSRProgressionTags::BonusSpeed);
+	if (!Effect || Effect->DurationPolicy != EGameplayEffectDurationType::Infinite || Effect->Modifiers.Num() != 4)
+	{
+		return false;
+	}
+	// 检查某个属性 + 标签的修饰符是否恰好存在一个且为 Additive + SetByCaller。
+	const auto Has = [Effect](const FGameplayAttribute& Attribute, FGameplayTag Tag)
+	{
+		int32 N = 0;
+		for (const FGameplayModifierInfo& M : Effect->Modifiers)
+		{
+			if (M.Attribute == Attribute
+				&& M.ModifierOp == EGameplayModOp::Additive
+				&& M.ModifierMagnitude.GetMagnitudeCalculationType() == EGameplayEffectMagnitudeCalculation::SetByCaller
+				&& M.ModifierMagnitude.GetSetByCallerFloat().DataTag == Tag)
+			{
+				++N;
+			}
+		}
+		return N == 1;
+	};
+	return Has(UHSRCoreAttributeSet::GetMaxHealthAttribute(), HSRProgressionTags::BonusMaxHealth)
+		&& Has(UHSRCoreAttributeSet::GetAttackAttribute(), HSRProgressionTags::BonusAttack)
+		&& Has(UHSRCoreAttributeSet::GetDefenseAttribute(), HSRProgressionTags::BonusDefense)
+		&& Has(UHSRCoreAttributeSet::GetSpeedAttribute(), HSRProgressionTags::BonusSpeed);
 }
 
-bool UHSRBattleCoordinator::RefreshCharacterProgression(FName ParticipantId,const FHSRCharacterProgressionContext& Context)
+// 刷新角色成长：更新缓存的成长上下文，重放成长 GE；失败时回滚到旧上下文。
+bool UHSRBattleCoordinator::RefreshCharacterProgression(FName ParticipantId, const FHSRCharacterProgressionContext& Context)
 {
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
-	++ProgressionRefreshCountForTest;bLastProgressionRefreshResultForTest=false;
+	++ProgressionRefreshCountForTest;
+	bLastProgressionRefreshResultForTest = false;
 #endif
-	const FHSRBattleParticipant* Participant=FindParticipant(ParticipantId);if(!Participant||Participant->Team==EHSRBattleParticipantTeam::Enemy)return false;
-	const FHSRCharacterProgressionContext* Existing=CharacterProgressionContexts.Find(ParticipantId);const TOptional<FHSRCharacterProgressionContext> Previous=Existing?TOptional<FHSRCharacterProgressionContext>(*Existing):TOptional<FHSRCharacterProgressionContext>();CharacterProgressionContexts.Add(ParticipantId,Context);if(ApplyCharacterProgressionGameplayEffect(*Participant)){
-#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
-	bLastProgressionRefreshResultForTest=true;
-#endif
-	return true;}if(Previous.IsSet())CharacterProgressionContexts.Add(ParticipantId,Previous.GetValue());else CharacterProgressionContexts.Remove(ParticipantId);return false;
+	const FHSRBattleParticipant* Participant = FindParticipant(ParticipantId);
+	if (!Participant || Participant->Team == EHSRBattleParticipantTeam::Enemy)
+	{
+		return false;
+	}
+	const FHSRCharacterProgressionContext* Existing = CharacterProgressionContexts.Find(ParticipantId);
+	const TOptional<FHSRCharacterProgressionContext> Previous = Existing
+		? TOptional<FHSRCharacterProgressionContext>(*Existing)
+		: TOptional<FHSRCharacterProgressionContext>();
+	CharacterProgressionContexts.Add(ParticipantId, Context);
+	if (ApplyCharacterProgressionGameplayEffect(*Participant))
+	{
+	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
+		bLastProgressionRefreshResultForTest = true;
+	#endif
+		return true;
+	}
+	// 施加失败：回滚到旧上下文。
+	if (Previous.IsSet())
+	{
+		CharacterProgressionContexts.Add(ParticipantId, Previous.GetValue());
+	}
+	else
+	{
+		CharacterProgressionContexts.Remove(ParticipantId);
+	}
+	return false;
 }
 
-bool UHSRBattleCoordinator::ApplyEquipmentSource(FName ParticipantId,const FGuid& InstanceId,const FHSREquipmentAggregate& Aggregate,int64 Revision)
+// 把单件装备的聚合加成施加到参与者（通过 EquipmentEffectBridge 管理 GE 生命周期）。
+bool UHSRBattleCoordinator::ApplyEquipmentSource(FName ParticipantId, const FGuid& InstanceId, const FHSREquipmentAggregate& Aggregate, int64 Revision)
 {
-	if (!EquipmentGameplayEffect || !InstanceId.IsValid() || Revision < 0) return false;
-	const FHSRBattleParticipant* P=FindParticipant(ParticipantId);
-	if (!P || !P->AbilitySystemComponent.IsValid()) return false;
-	FHSREquipmentAggregate A=Aggregate; A.Revision=Revision;
-	if (!EquipmentEffectBridge) EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
-	return EquipmentEffectBridge->Apply(InstanceId,P->AbilitySystemComponent.Get(),EquipmentGameplayEffect,A);
+	if (!EquipmentGameplayEffect || !InstanceId.IsValid() || Revision < 0)
+	{
+		return false;
+	}
+	const FHSRBattleParticipant* P = FindParticipant(ParticipantId);
+	if (!P || !P->AbilitySystemComponent.IsValid())
+	{
+		return false;
+	}
+	FHSREquipmentAggregate A = Aggregate;
+	A.Revision = Revision;
+	if (!EquipmentEffectBridge)
+	{
+		EquipmentEffectBridge = NewObject<UHSREquipmentEffectBridge>(this);
+	}
+	return EquipmentEffectBridge->Apply(InstanceId, P->AbilitySystemComponent.Get(), EquipmentGameplayEffect, A);
 }
-bool UHSRBattleCoordinator::RemoveEquipmentSource(FName ParticipantId,const FGuid& InstanceId)
+
+// 移除单件装备的加成。
+bool UHSRBattleCoordinator::RemoveEquipmentSource(FName ParticipantId, const FGuid& InstanceId)
 {
-	if (!EquipmentEffectBridge) return false;
-	const FHSRBattleParticipant* P=FindParticipant(ParticipantId);
+	if (!EquipmentEffectBridge)
+	{
+		return false;
+	}
+	const FHSRBattleParticipant* P = FindParticipant(ParticipantId);
 	return P && EquipmentEffectBridge->Remove(InstanceId);
 }
-bool UHSRBattleCoordinator::ApplyEquipmentSetSource(FName ParticipantId,FName SetSourceId,const FHSREquipmentAggregate& Aggregate,int64 Revision)
+
+// 施加圣遗物套装加成（按套装 ID 聚合）。
+bool UHSRBattleCoordinator::ApplyEquipmentSetSource(FName ParticipantId, FName SetSourceId, const FHSREquipmentAggregate& Aggregate, int64 Revision)
 {
-	if (!RelicSetGameplayEffect || SetSourceId.IsNone() || Revision < 0) return false;
-	const FHSRBattleParticipant* P=FindParticipant(ParticipantId);
-	if (!P || !P->AbilitySystemComponent.IsValid()) return false;
-	if (!EquipmentEffectBridge) EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
-	FHSREquipmentAggregate A=Aggregate; A.Revision=Revision;
-	return EquipmentEffectBridge->ApplySetSource(SetSourceId,P->AbilitySystemComponent.Get(),RelicSetGameplayEffect,A);
+	if (!RelicSetGameplayEffect || SetSourceId.IsNone() || Revision < 0)
+	{
+		return false;
+	}
+	const FHSRBattleParticipant* P = FindParticipant(ParticipantId);
+	if (!P || !P->AbilitySystemComponent.IsValid())
+	{
+		return false;
+	}
+	if (!EquipmentEffectBridge)
+	{
+		EquipmentEffectBridge = NewObject<UHSREquipmentEffectBridge>(this);
+	}
+	FHSREquipmentAggregate A = Aggregate;
+	A.Revision = Revision;
+	return EquipmentEffectBridge->ApplySetSource(SetSourceId, P->AbilitySystemComponent.Get(), RelicSetGameplayEffect, A);
 }
-bool UHSRBattleCoordinator::RemoveEquipmentSetSource(FName ParticipantId,FName SetSourceId)
+
+// 移除圣遗物套装加成。
+bool UHSRBattleCoordinator::RemoveEquipmentSetSource(FName ParticipantId, FName SetSourceId)
 {
-	if (SetSourceId.IsNone() || !EquipmentEffectBridge) return false;
-	const FHSRBattleParticipant* P=FindParticipant(ParticipantId);
+	if (SetSourceId.IsNone() || !EquipmentEffectBridge)
+	{
+		return false;
+	}
+	const FHSRBattleParticipant* P = FindParticipant(ParticipantId);
 	return P && EquipmentEffectBridge->RemoveSetSource(SetSourceId);
 }
+
+// 把本协调器注册为装备移动（穿/脱/替换）的投影目标，让探索侧可以在战斗内预览装备变化。
 void UHSRBattleCoordinator::BindEquipmentMovementProjection(UHSREquipmentSubsystem& Equipment)
 {
-	if(!EquipmentEffectBridge)EquipmentEffectBridge=NewObject<UHSREquipmentEffectBridge>(this);
+	if (!EquipmentEffectBridge)
+	{
+		EquipmentEffectBridge = NewObject<UHSREquipmentEffectBridge>(this);
+	}
 	Equipment.SetMovementProjection(
-		UHSREquipmentSubsystem::FMovementProjectionPreflight::CreateUObject(this,&ThisClass::CanProjectEquipmentMovement),
-		UHSREquipmentSubsystem::FMovementProjectionApply::CreateUObject(this,&ThisClass::ApplyEquipmentMovementProjection),
-		UHSREquipmentSubsystem::FMovementProjectionCommit::CreateUObject(this,&ThisClass::CommitEquipmentMovementProjection));
+		UHSREquipmentSubsystem::FMovementProjectionPreflight::CreateUObject(this, &ThisClass::CanProjectEquipmentMovement),
+		UHSREquipmentSubsystem::FMovementProjectionApply::CreateUObject(this, &ThisClass::ApplyEquipmentMovementProjection),
+		UHSREquipmentSubsystem::FMovementProjectionCommit::CreateUObject(this, &ThisClass::CommitEquipmentMovementProjection));
 }
-bool UHSRBattleCoordinator::CanProjectEquipmentMovement(const FHSREquipmentMovementRequest& Request,const FHSREquipmentLoadout& Candidate) const
+
+// 预检：只有主角领队且装备 GE 可用时，装备移动才可投影。
+bool UHSRBattleCoordinator::CanProjectEquipmentMovement(const FHSREquipmentMovementRequest& Request, const FHSREquipmentLoadout& Candidate) const
 {
-	if(Request.CharacterId!=HSRCharacterGuidFromProfileName(PlayerCharacterId)||!EquipmentGameplayEffect)return false;
+	if (Request.CharacterId != HSRCharacterGuidFromProfileName(PlayerCharacterId) || !EquipmentGameplayEffect)
+	{
+		return false;
+	}
 	const FHSRBattleParticipant* Participant = FindParticipant(GetLeaderParticipantId(EHSRBattleParticipantTeam::Player));
 	if (!Participant || !Participant->AbilitySystemComponent.IsValid())
 	{
 		return false;
 	}
-	UHSREquipmentEffectBridge* Bridge=EquipmentEffectBridge.Get();
-	if(!Bridge)return false;
-	TSet<FGuid> DesiredIds;for(const auto& Pair:Candidate.Equipment)DesiredIds.Add(Pair.Value.InstanceId);for(const auto& Pair:Candidate.Relics)DesiredIds.Add(Pair.Value.InstanceId);
-	for(const auto& Existing:EquipmentProjectionStates)if(!DesiredIds.Contains(Existing.Key)&&!Bridge->CanRemove(Existing.Key))return false;
-	if(Request.Intent==EHSREquipmentMovementIntent::Unequip)return true;
+	UHSREquipmentEffectBridge* Bridge = EquipmentEffectBridge.Get();
+	if (!Bridge)
+	{
+		return false;
+	}
+	// 期望的装备集合（候选装备 + 候选圣遗物）。
+	TSet<FGuid> DesiredIds;
+	for (const auto& Pair : Candidate.Equipment)
+	{
+		DesiredIds.Add(Pair.Value.InstanceId);
+	}
+	for (const auto& Pair : Candidate.Relics)
+	{
+		DesiredIds.Add(Pair.Value.InstanceId);
+	}
+	// 现有投影里不在期望集合中的装备必须可移除。
+	for (const auto& Existing : EquipmentProjectionStates)
+	{
+		if (!DesiredIds.Contains(Existing.Key) && !Bridge->CanRemove(Existing.Key))
+		{
+			return false;
+		}
+	}
+	// 卸下意图直接放行；穿上/替换需要能聚合并施加。
+	if (Request.Intent == EHSREquipmentMovementIntent::Unequip)
+	{
+		return true;
+	}
 	FHSREquipmentAggregate Aggregate;
-	return UHSREquipmentStatAggregator::Aggregate(Candidate,Request.ExpectedEquipmentRevision+1,Aggregate)&&Bridge->CanApply(Participant->AbilitySystemComponent.Get(),EquipmentGameplayEffect,Aggregate);
+	return UHSREquipmentStatAggregator::Aggregate(Candidate, Request.ExpectedEquipmentRevision + 1, Aggregate)
+		&& Bridge->CanApply(Participant->AbilitySystemComponent.Get(), EquipmentGameplayEffect, Aggregate);
 }
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 void UHSRBattleCoordinator::SetEquipmentMovementProjectionFailureForDevelopmentTest(bool bApply,bool bRemove)
@@ -2415,54 +2746,206 @@ bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipme
 		{
 			continue;
 		}
-		const auto AddInstance=[&](const FHSREquipmentInstance& Instance){FHSREquipmentLoadout Single; if(Instance.Kind==EHSREquipmentKind::Equipment)Single.Equipment.Add(EHSREquipmentSlot::Weapon,Instance);else Single.Relics.Add(EHSRRelicSlot::Head,Instance);FHSREquipmentAggregate Aggregate;if(!UHSREquipmentStatAggregator::Aggregate(Single,Pair.Value.Revision,Aggregate))return false;DesiredStates.Add(Instance.InstanceId,Aggregate);DesiredParticipants.Add(Instance.InstanceId,Participant->ParticipantId);return true;};
-		for(const auto& Item:Pair.Value.Loadout.Equipment)if(!AddInstance(Item.Value))return false;
-		for(const auto& Item:Pair.Value.Loadout.Relics)if(!AddInstance(Item.Value))return false;
-		// The restore DTO carries piece counts but not thresholds, so ask the subsystem that owns
-		// the registered set definitions.  Sets it never saw fall back to the two-piece default.
-		for (const auto& Set : Pair.Value.RelicSetCounts)
+	// 把单件实例按“单件负载”聚合并登记到期望集合（装备→武器槽，圣遗物→头部槽）。
+	const auto AddInstance = [&](const FHSREquipmentInstance& Instance)
+	{
+		FHSREquipmentLoadout Single;
+		if (Instance.Kind == EHSREquipmentKind::Equipment)
 		{
-			if (Set.Value < (Equipment ? Equipment->GetSetThreshold(Set.Key) : FHSRRelicSetResolver::DefaultThreshold))
-			{
-				continue;
-			}
-			FHSREquipmentAggregate Aggregate;
-			Aggregate.Revision = Pair.Value.Revision;
-			DesiredSetStates.Add(Set.Key, Aggregate);
-			DesiredSetParticipants.Add(Set.Key, Participant->ParticipantId);
+			Single.Equipment.Add(EHSREquipmentSlot::Weapon, Instance);
+		}
+		else
+		{
+			Single.Relics.Add(EHSRRelicSlot::Head, Instance);
+		}
+		FHSREquipmentAggregate Aggregate;
+		if (!UHSREquipmentStatAggregator::Aggregate(Single, Pair.Value.Revision, Aggregate))
+		{
+			return false;
+		}
+		DesiredStates.Add(Instance.InstanceId, Aggregate);
+		DesiredParticipants.Add(Instance.InstanceId, Participant->ParticipantId);
+		return true;
+	};
+	for (const auto& Item : Pair.Value.Loadout.Equipment)
+	{
+		if (!AddInstance(Item.Value))
+		{
+			return false;
 		}
 	}
-	const auto RestoreOld=[&](){for(const auto& Old:OldStates)ApplyEquipmentSource(OldParticipants.FindRef(Old.Key),Old.Key,Old.Value,Old.Value.Revision);for(const auto& Old:OldSetStates)ApplyEquipmentSetSource(OldSetParticipants.FindRef(Old.Key),Old.Key,Old.Value,Old.Value.Revision);for(const auto& Desired:DesiredStates)if(!OldStates.Contains(Desired.Key))RemoveEquipmentSource(DesiredParticipants.FindRef(Desired.Key),Desired.Key);for(const auto& Desired:DesiredSetStates)if(!OldSetStates.Contains(Desired.Key))RemoveEquipmentSetSource(DesiredSetParticipants.FindRef(Desired.Key),Desired.Key);};
-	int32 CompletedOperations=0;
-	const auto InjectFailure=[&](){
-#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
-		return EquipmentRestoreFailureAfterOperations>=0&&CompletedOperations>=EquipmentRestoreFailureAfterOperations;
-#else
-		return false;
-#endif
+	for (const auto& Item : Pair.Value.Loadout.Relics)
+	{
+		if (!AddInstance(Item.Value))
+		{
+			return false;
+		}
+	}
+	// 存档 DTO 只带件数而不带阈值，所以问持有已注册套装定义的子系统要阈值；
+	// 它从未见过的套装回退到两件套默认阈值。
+	for (const auto& Set : Pair.Value.RelicSetCounts)
+	{
+		if (Set.Value < (Equipment ? Equipment->GetSetThreshold(Set.Key) : FHSRRelicSetResolver::DefaultThreshold))
+		{
+			continue;
+		}
+		FHSREquipmentAggregate Aggregate;
+		Aggregate.Revision = Pair.Value.Revision;
+		DesiredSetStates.Add(Set.Key, Aggregate);
+		DesiredSetParticipants.Add(Set.Key, Participant->ParticipantId);
+	}
+	}
+	// 回滚函数：把旧投影状态全部还原，并移除新登记但旧状态里没有的来源。
+	const auto RestoreOld = [&]()
+	{
+		for (const auto& Old : OldStates)
+		{
+			ApplyEquipmentSource(OldParticipants.FindRef(Old.Key), Old.Key, Old.Value, Old.Value.Revision);
+		}
+		for (const auto& Old : OldSetStates)
+		{
+			ApplyEquipmentSetSource(OldSetParticipants.FindRef(Old.Key), Old.Key, Old.Value, Old.Value.Revision);
+		}
+		for (const auto& Desired : DesiredStates)
+		{
+			if (!OldStates.Contains(Desired.Key))
+			{
+				RemoveEquipmentSource(DesiredParticipants.FindRef(Desired.Key), Desired.Key);
+			}
+		}
+		for (const auto& Desired : DesiredSetStates)
+		{
+			if (!OldSetStates.Contains(Desired.Key))
+			{
+				RemoveEquipmentSetSource(DesiredSetParticipants.FindRef(Desired.Key), Desired.Key);
+			}
+		}
 	};
-	for(const auto& Desired:DesiredStates){if(InjectFailure()||!ApplyEquipmentSource(DesiredParticipants.FindRef(Desired.Key),Desired.Key,Desired.Value,Desired.Value.Revision)){UE_LOG(LogTemp,Error,TEXT("HSR.EquipmentProjection FAIL Apply Instance=%s Revision=%lld"),*Desired.Key.ToString(),Desired.Value.Revision);RestoreOld();return false;}++CompletedOperations;}
-	for(const auto& Desired:DesiredSetStates){if(InjectFailure()||!ApplyEquipmentSetSource(DesiredSetParticipants.FindRef(Desired.Key),Desired.Key,Desired.Value,Desired.Value.Revision)){UE_LOG(LogTemp,Error,TEXT("HSR.EquipmentProjection FAIL ApplySet Set=%s Revision=%lld"),*Desired.Key.ToString(),Desired.Value.Revision);RestoreOld();return false;}++CompletedOperations;}
-	for(const auto& Old:OldStates)if(!DesiredStates.Contains(Old.Key)){if(InjectFailure()||!RemoveEquipmentSource(OldParticipants.FindRef(Old.Key),Old.Key)){UE_LOG(LogTemp,Error,TEXT("HSR.EquipmentProjection FAIL Remove Instance=%s Revision=%lld"),*Old.Key.ToString(),Old.Value.Revision);RestoreOld();return false;}++CompletedOperations;}
-	for(const auto& Old:OldSetStates)if(!DesiredSetStates.Contains(Old.Key)){if(InjectFailure()||!RemoveEquipmentSetSource(OldSetParticipants.FindRef(Old.Key),Old.Key)){UE_LOG(LogTemp,Error,TEXT("HSR.EquipmentProjection FAIL RemoveSet Set=%s Revision=%lld"),*Old.Key.ToString(),Old.Value.Revision);RestoreOld();return false;}++CompletedOperations;}
-	EquipmentProjectionStates=MoveTemp(DesiredStates);EquipmentProjectionParticipants=MoveTemp(DesiredParticipants);
-	EquipmentSetProjectionStates=MoveTemp(DesiredSetStates);EquipmentSetProjectionParticipants=MoveTemp(DesiredSetParticipants);
+	int32 CompletedOperations = 0;
+	// 仅在开发测试注入失败场景时使用：达到指定操作数后强制失败。
+	const auto InjectFailure = [&]()
+	{
+	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
+		return EquipmentRestoreFailureAfterOperations >= 0 && CompletedOperations >= EquipmentRestoreFailureAfterOperations;
+	#else
+		return false;
+	#endif
+	};
+	for (const auto& Desired : DesiredStates)
+	{
+		if (InjectFailure() || !ApplyEquipmentSource(DesiredParticipants.FindRef(Desired.Key), Desired.Key, Desired.Value, Desired.Value.Revision))
+		{
+			UE_LOG(LogTemp, Error, TEXT("HSR.EquipmentProjection FAIL Apply Instance=%s Revision=%lld"), *Desired.Key.ToString(), Desired.Value.Revision);
+			RestoreOld();
+			return false;
+		}
+		++CompletedOperations;
+	}
+	for (const auto& Desired : DesiredSetStates)
+	{
+		if (InjectFailure() || !ApplyEquipmentSetSource(DesiredSetParticipants.FindRef(Desired.Key), Desired.Key, Desired.Value, Desired.Value.Revision))
+		{
+			UE_LOG(LogTemp, Error, TEXT("HSR.EquipmentProjection FAIL ApplySet Set=%s Revision=%lld"), *Desired.Key.ToString(), Desired.Value.Revision);
+			RestoreOld();
+			return false;
+		}
+		++CompletedOperations;
+	}
+	for (const auto& Old : OldStates)
+	{
+		if (!DesiredStates.Contains(Old.Key))
+		{
+			if (InjectFailure() || !RemoveEquipmentSource(OldParticipants.FindRef(Old.Key), Old.Key))
+			{
+				UE_LOG(LogTemp, Error, TEXT("HSR.EquipmentProjection FAIL Remove Instance=%s Revision=%lld"), *Old.Key.ToString(), Old.Value.Revision);
+				RestoreOld();
+				return false;
+			}
+			++CompletedOperations;
+		}
+	}
+	for (const auto& Old : OldSetStates)
+	{
+		if (!DesiredSetStates.Contains(Old.Key))
+		{
+			if (InjectFailure() || !RemoveEquipmentSetSource(OldSetParticipants.FindRef(Old.Key), Old.Key))
+			{
+				UE_LOG(LogTemp, Error, TEXT("HSR.EquipmentProjection FAIL RemoveSet Set=%s Revision=%lld"), *Old.Key.ToString(), Old.Value.Revision);
+				RestoreOld();
+				return false;
+			}
+			++CompletedOperations;
+		}
+	}
+	// 全部成功后，用期望状态替换投影状态。
+	EquipmentProjectionStates = MoveTemp(DesiredStates);
+	EquipmentProjectionParticipants = MoveTemp(DesiredParticipants);
+	EquipmentSetProjectionStates = MoveTemp(DesiredSetStates);
+	EquipmentSetProjectionParticipants = MoveTemp(DesiredSetParticipants);
 	return true;
 }
 
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
-bool UHSRBattleCoordinator::HasProgressionPrimaryHandleForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S&&S->ActiveHandle.IsValid();}
-FString UHSRBattleCoordinator::GetProgressionPrimaryHandleForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S?S->ActiveHandle.ToString():FString();}
-int32 UHSRBattleCoordinator::GetProgressionSecondaryCountForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S?S->SecondaryOwnedHandles.Num():0;}
-int32 UHSRBattleCoordinator::GetProgressionActiveHandleCountForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);UAbilitySystemComponent* A=S?S->AbilitySystemComponent.Get():nullptr;if(!S||!A)return 0;int32 N=A->GetActiveGameplayEffect(S->ActiveHandle)?1:0;for(auto H:S->SecondaryOwnedHandles)if(A->GetActiveGameplayEffect(H))++N;return N;}
-FString UHSRBattleCoordinator::GetProgressionFingerprintForDevelopmentTest(FName Id) const {const auto* S=ProgressionEffects.Find(Id);return S?FString::Printf(TEXT("Character=%s Revision=%lld Bonus=%.3f/%.3f/%.3f/%.3f"),*S->CharacterId.ToString(),S->Revision,S->Bonuses.MaxHealth,S->Bonuses.Attack,S->Bonuses.Defense,S->Bonuses.Speed):TEXT("None");}
+// 开发测试辅助：查询成长效果的主句柄是否有效。
+bool UHSRBattleCoordinator::HasProgressionPrimaryHandleForDevelopmentTest(FName Id) const
+{
+	const auto* S = ProgressionEffects.Find(Id);
+	return S && S->ActiveHandle.IsValid();
+}
+// 开发测试辅助：取成长效果主句柄的字符串形式。
+FString UHSRBattleCoordinator::GetProgressionPrimaryHandleForDevelopmentTest(FName Id) const
+{
+	const auto* S = ProgressionEffects.Find(Id);
+	return S ? S->ActiveHandle.ToString() : FString();
+}
+// 开发测试辅助：取成长效果的次级句柄数量。
+int32 UHSRBattleCoordinator::GetProgressionSecondaryCountForDevelopmentTest(FName Id) const
+{
+	const auto* S = ProgressionEffects.Find(Id);
+	return S ? S->SecondaryOwnedHandles.Num() : 0;
+}
+// 开发测试辅助：统计该参与者当前激活的成长句柄总数（主 + 次级）。
+int32 UHSRBattleCoordinator::GetProgressionActiveHandleCountForDevelopmentTest(FName Id) const
+{
+	const auto* S = ProgressionEffects.Find(Id);
+	UAbilitySystemComponent* A = S ? S->AbilitySystemComponent.Get() : nullptr;
+	if (!S || !A)
+	{
+		return 0;
+	}
+	int32 N = A->GetActiveGameplayEffect(S->ActiveHandle) ? 1 : 0;
+	for (auto H : S->SecondaryOwnedHandles)
+	{
+		if (A->GetActiveGameplayEffect(H))
+		{
+			++N;
+		}
+	}
+	return N;
+}
+// 开发测试辅助：生成成长状态的指纹字符串（用于对比前后是否一致）。
+FString UHSRBattleCoordinator::GetProgressionFingerprintForDevelopmentTest(FName Id) const
+{
+	const auto* S = ProgressionEffects.Find(Id);
+	return S
+		? FString::Printf(TEXT("Character=%s Revision=%lld Bonus=%.3f/%.3f/%.3f/%.3f"),
+			*S->CharacterId.ToString(), S->Revision, S->Bonuses.MaxHealth, S->Bonuses.Attack, S->Bonuses.Defense, S->Bonuses.Speed)
+		: TEXT("None");
+}
 #endif
 
+// 判断两份成长上下文是否等价（字符、版本、四维加成全部相等）。
 bool UHSRBattleCoordinator::HasSameProgressionFingerprint(const FHSRCharacterProgressionContext& A, const FHSRCharacterProgressionContext& B)
 {
-	return A.CharacterId==B.CharacterId&&A.RuntimeRevision==B.RuntimeRevision&&A.ProgressionBonuses.MaxHealth==B.ProgressionBonuses.MaxHealth&&A.ProgressionBonuses.Attack==B.ProgressionBonuses.Attack&&A.ProgressionBonuses.Defense==B.ProgressionBonuses.Defense&&A.ProgressionBonuses.Speed==B.ProgressionBonuses.Speed;
+	return A.CharacterId == B.CharacterId
+		&& A.RuntimeRevision == B.RuntimeRevision
+		&& A.ProgressionBonuses.MaxHealth == B.ProgressionBonuses.MaxHealth
+		&& A.ProgressionBonuses.Attack == B.ProgressionBonuses.Attack
+		&& A.ProgressionBonuses.Defense == B.ProgressionBonuses.Defense
+		&& A.ProgressionBonuses.Speed == B.ProgressionBonuses.Speed;
 }
 
+// 清除所有成长效果的 GE，并更新成长纪元（纪元用于区分新旧成长状态）。
 bool UHSRBattleCoordinator::ClearProgressionGameplayEffects()
 {
 	bool bAllRemoved = true;
@@ -2470,16 +2953,34 @@ bool UHSRBattleCoordinator::ClearProgressionGameplayEffects()
 	for (const TPair<FName, FHSRProgressionEffectState>& Pair : ProgressionEffects)
 	{
 		UAbilitySystemComponent* ASC = Pair.Value.AbilitySystemComponent.Get();
+		// 句柄无效、ASC 已销毁或效果已不激活都视为“已移除”。
 		const auto TryRemove = [ASC](const FActiveGameplayEffectHandle Handle)
 		{
 			return !Handle.IsValid() || ASC == nullptr || !ASC->GetActiveGameplayEffect(Handle) || ASC->RemoveActiveGameplayEffect(Handle);
 		};
 		bool bRemoved = TryRemove(Pair.Value.ActiveHandle);
-		for (const FActiveGameplayEffectHandle Handle : Pair.Value.SecondaryOwnedHandles) bRemoved = TryRemove(Handle) && bRemoved;
-		if (bRemoved) ClearedKeys.Add(Pair.Key); else bAllRemoved = false;
+		for (const FActiveGameplayEffectHandle Handle : Pair.Value.SecondaryOwnedHandles)
+		{
+			bRemoved = TryRemove(Handle) && bRemoved;
+		}
+		if (bRemoved)
+		{
+			ClearedKeys.Add(Pair.Key);
+		}
+		else
+		{
+			bAllRemoved = false;
+		}
 	}
-	for (const FName Key : ClearedKeys) ProgressionEffects.Remove(Key);
-	if (ProgressionEffects.IsEmpty()) ++ProgressionEpoch;
+	for (const FName Key : ClearedKeys)
+	{
+		ProgressionEffects.Remove(Key);
+	}
+	// 全部清空时推进纪元，让后续写入可辨识为“新的一代”。
+	if (ProgressionEffects.IsEmpty())
+	{
+		++ProgressionEpoch;
+	}
 	return bAllRemoved;
 }
 

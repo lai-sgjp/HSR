@@ -14,6 +14,7 @@
 #include "HSRStageBuffAuthority.h"
 #include "../Data/Definitions/HSRStageBuffDefinition.h"
 
+// 子系统初始化：清空状态，创建关卡 Buff 权威，订阅旅行失败事件。
 void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
@@ -24,16 +25,19 @@ void UHSRBattleTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collect
 	TravelRequestId = FGuid();
 	TravelSourceMap = NAME_None;
 	TravelCompletedEncounterId = NAME_None;
+	// 关卡 Buff 定义由独立权威对象托管（按遭遇 ID 校验/查找）。
 	StageBuffAuthority = NewObject<UHSRStageBuffAuthority>(this);
 
 	if (GEngine)
 	{
+		// 旅行失败时能收到回调，用于清理挂起的遭遇/返回事务。
 		GEngine->OnTravelFailure().AddUObject(this, &UHSRBattleTransitionSubsystem::HandleTravelFailure);
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::Initialize - State=Empty"));
 }
 
+// 子系统卸载：清除超时计时器与旅行失败订阅。
 void UHSRBattleTransitionSubsystem::Deinitialize()
 {
 	ClearTravelTimeout();
@@ -46,24 +50,27 @@ void UHSRBattleTransitionSubsystem::Deinitialize()
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::Deinitialize"));
 }
 
+// 请求一次遭遇：由世界内调用（如敌人接触），以当前玩家的 Pawn 为交互者。
 FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative)
-
 {
 	UWorld* World = GetWorld();
 	APlayerController* PlayerController = World ? World->GetFirstPlayerController() : nullptr;
 	return RequestEncounterInternal(Definition, Initiative, PlayerController ? PlayerController->GetPawn() : nullptr);
 }
 
+// UI 提交遭遇请求的入口。
 FHSREncounterResult UHSRBattleTransitionSubsystem::SubmitEncounterRequestFromUI(const FHSREncounterRequest& Request)
 {
 	return SubmitEncounterRequest(Request, GetWorld());
 }
 
+// 校验一组关卡 Buff ID 对给定遭遇是否合法（空集合恒为真）。
 bool UHSRBattleTransitionSubsystem::ValidateStageBuffIds(FName EncounterId, const TArray<FName>& BuffIds) const
 {
 	return BuffIds.IsEmpty() || (StageBuffAuthority && StageBuffAuthority->ValidateBuffIds(EncounterId, BuffIds));
 }
 
+// 校验玩家是否付得起这些关卡 Buff 的资源成本（汇总所需数量与库存比对）。
 bool UHSRBattleTransitionSubsystem::CanAffordStageBuffs(FName EncounterId, const TArray<FName>& BuffIds) const
 {
 	if (BuffIds.IsEmpty())
@@ -77,6 +84,7 @@ bool UHSRBattleTransitionSubsystem::CanAffordStageBuffs(FName EncounterId, const
 		return false;
 	}
 
+	// 先汇总每个资源所需总量（并做加法溢出保护）。
 	TMap<FName, int32> Required;
 	for (const FName BuffId : BuffIds)
 	{
@@ -96,6 +104,7 @@ bool UHSRBattleTransitionSubsystem::CanAffordStageBuffs(FName EncounterId, const
 		}
 	}
 
+	// 对照库存快照逐项核对。
 	FHSRInventorySnapshot Snapshot;
 	Inventory->GetSnapshot(Snapshot);
 	for (const TPair<FName, int32>& Entry : Required)
@@ -108,12 +117,14 @@ bool UHSRBattleTransitionSubsystem::CanAffordStageBuffs(FName EncounterId, const
 	return true;
 }
 
+// 按遭遇 + Buff ID 查定义（转交关卡 Buff 权威）。
 const UHSRStageBuffDefinition* UHSRBattleTransitionSubsystem::FindStageBuffDefinition(
 	FName EncounterId, FName BuffId) const
 {
 	return StageBuffAuthority ? StageBuffAuthority->FindBuff(EncounterId, BuffId) : nullptr;
 }
 
+// 从“战前准入输入”构造遭遇请求：校验模板字段与候选队伍后填入队伍与 Buff。
 EHSREncounterResultType UHSRBattleTransitionSubsystem::BuildEncounterRequest(
 	const FHSRPreBattleAdmissionInput& Input, FHSREncounterRequest& OutRequest)
 {
@@ -123,10 +134,14 @@ EHSREncounterResultType UHSRBattleTransitionSubsystem::BuildEncounterRequest(
 	{
 		return EHSREncounterResultType::InvalidRequest;
 	}
+	// 队伍成员去重：同一角色不能占多个槽位。
 	TSet<FName> Seen;
 	for (const FName CharacterId : Input.CandidateParty)
 	{
-		if (CharacterId.IsNone() || Seen.Contains(CharacterId)) return EHSREncounterResultType::InvalidRequest;
+		if (CharacterId.IsNone() || Seen.Contains(CharacterId))
+		{
+			return EHSREncounterResultType::InvalidRequest;
+		}
 		Seen.Add(CharacterId);
 	}
 	OutRequest = Input.Template;
@@ -201,9 +216,12 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterForInteractor
 	return RequestEncounterInternal(Definition, Initiative, Interactor);
 }
 
+// 遭遇请求核心：从遭遇定义 + 交互者构造完整请求并提交。
+// 校验状态、定义字段、当前会话内是否已解决过、队伍选择、奖励包完整性等。
 FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 	UHSREncounterDefinition* Definition, EHSREncounterInitiative Initiative, AActor* Interactor)
 {
+	// 已有挂起/旅行中的事务时拒绝。
 	if (CurrentState == EHSREncounterState::Pending || CurrentState == EHSREncounterState::Traveling)
 	{
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::AlreadyPending,
@@ -220,6 +238,7 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
 			FText::FromString(TEXT("EncounterId is not set.")));
 	}
+	// 同一会话内已解决过的遭遇不能再次触发。
 	if (ResolvedEncounterIds.Contains(Definition->EncounterId))
 	{
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::AlreadyConsumed,
@@ -231,6 +250,7 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 			FText::FromString(TEXT("EnemyDefinitionId is not set.")));
 	}
 
+	// 从队伍子系统取当前队伍：槽 0 必须已提交玩家选择。
 	UHSRPartySubsystem* Party = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRPartySubsystem>() : nullptr;
 	FHSRPartySnapshot PartySnapshot;
 	if (!Party || !Party->GetSnapshot(PartySnapshot) || PartySnapshot.Slots.IsEmpty()
@@ -240,12 +260,15 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 			FText::FromString(TEXT("Party slot 0 has no committed player selection.")));
 	}
 	const FName PlayerCharacterId = PartySnapshot.Slots[0].CharacterId;
-	// The roster is densified here: empty slots are legal in the party grid but meaningless
-	// as participants, so battle only ever sees committed members, leader first.
+	// 队伍名单在此“致密化”：空槽位在队伍网格中合法，但对战斗无意义，
+	// 战斗只看到已提交的成员，领队在前。
 	TArray<FName> PlayerPartyIds;
 	for (const FHSRPartySlot& Slot : PartySnapshot.Slots)
 	{
-		if (!Slot.IsEmpty()) PlayerPartyIds.Add(Slot.CharacterId);
+		if (!Slot.IsEmpty())
+		{
+			PlayerPartyIds.Add(Slot.CharacterId);
+		}
 	}
 
 	if (Definition->BattleMap.IsNull())
@@ -253,6 +276,7 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidMap,
 			FText::FromString(TEXT("BattleMap is not set.")));
 	}
+	// 战斗地图包必须存在于磁盘。
 	const FString MapPackageName = Definition->BattleMap.GetLongPackageName();
 	if (!FPackageName::DoesPackageExist(MapPackageName))
 	{
@@ -267,8 +291,10 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::NoPlayerSelection,
 			FText::FromString(TEXT("Cannot resolve the committed player Pawn.")));
 	}
+	// 记录返回传送点（玩家遭遇时的位置）。
 	const FTransform ReturnTransform = InteractorPawn->GetActorTransform();
 
+	// 若定义带胜利奖励：校验并注册奖励包（物品/掉率表/奖励定义）。
 	UHSRRewardSubsystem* Reward = nullptr;
 	if (Definition->VictoryRewardDefinition)
 	{
@@ -298,6 +324,7 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 		}
 	}
 
+	// 组装完整请求并提交。
 	FGuid NewRequestId;
 	FPlatformMisc::CreateGuid(NewRequestId);
 	FHSREncounterRequest NewRequest;
@@ -311,6 +338,7 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 	NewRequest.BattleMapPath = FName(*Definition->BattleMap.GetLongPackageName());
 	NewRequest.ReturnTransform = ReturnTransform;
 
+	// 探索地图路径取当前世界（去掉 PIE 前缀）。
 	NewRequest.ExplorationMapPath = FName(*UWorld::RemovePIEPrefix(World->GetOutermost()->GetPathName()));
 	if (Definition->VictoryRewardDefinition)
 	{
@@ -322,19 +350,30 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 	return SubmitEncounterRequest(NewRequest, World);
 }
 
+// 提交遭遇请求：校验后存入挂起状态，标记旅行目标并真正 OpenLevel 到战斗地图。
 FHSREncounterResult UHSRBattleTransitionSubsystem::SubmitEncounterRequest(
 	const FHSREncounterRequest& Request, UWorld* World)
 {
 	if (!World || !Request.RequestId.IsValid() || Request.BattleMapPath.IsNone())
+	{
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest);
+	}
+	// 关卡 Buff 必须先通过合法性 + 可支付性校验。
 	if (!ValidateStageBuffIds(Request.EncounterId, Request.BuffIds))
+	{
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
 			FText::FromString(TEXT("Stage Buff selection is invalid or unavailable.")));
+	}
 	if (!CanAffordStageBuffs(Request.EncounterId, Request.BuffIds))
+	{
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
 			FText::FromString(TEXT("Stage Buff resource is insufficient.")));
+	}
 	if (CurrentState == EHSREncounterState::Pending || CurrentState == EHSREncounterState::Traveling)
+	{
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::AlreadyPending);
+	}
+	// 暂存请求，进入 Pending 再立刻转 Traveling。
 	PendingRequest = Request;
 	CurrentState = EHSREncounterState::Pending;
 #if WITH_DEV_AUTOMATION_TESTS
@@ -353,6 +392,7 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::SubmitEncounterRequest(
 	if (!bSuppressTravelForAutomation)
 #endif
 	{
+		// 真正打开战斗地图。
 		UGameplayStatics::OpenLevel(World, Request.BattleMapPath, true);
 	}
 	return FHSREncounterResult::MakeSuccess(Request.RequestId);
@@ -403,6 +443,8 @@ void UHSRBattleTransitionSubsystem::ResetEncounterAutomationFixture()
 }
 #endif
 
+// 消费挂起的遭遇请求（战斗世界加载后由 BattleGameMode 调用，恰好一次）。
+// 消费不变量：消费后内部载荷立即清空，外部只能从返回值读取完整 DTO。
 FHSREncounterResult UHSRBattleTransitionSubsystem::ConsumePendingEncounter()
 {
 	if (CurrentState == EHSREncounterState::Empty)
@@ -430,11 +472,11 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::ConsumePendingEncounter()
 			FText::FromString(TEXT("Travel has not completed yet.")));
 	}
 
-	// Capture the full DTO before clearing internal payload
+	// 先完整拷贝 DTO，再清空内部载荷。
 	FHSREncounterRequest Consumed = PendingRequest;
 	FGuid ConsumedId = Consumed.RequestId;
 
-	// Immediately clear internal payload (consume invariant: payload is no longer readable)
+	// 立即清空内部载荷（消费不变量：载荷不再可读）。
 	PendingRequest = FHSREncounterRequest();
 	CurrentState = EHSREncounterState::Consumed;
 	TravelKind = EHSRTravelKind::None;
@@ -450,7 +492,7 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::ConsumePendingEncounter()
 		*Consumed.ExplorationMapPath.ToString(),
 		*Consumed.ReturnTransform.GetLocation().ToString());
 
-	// Return the full consumed DTO in the result so Consumer does not re-read from Subsystem
+	// 把完整 DTO 放进返回值，消费方不需要再读子系统内部。
 	FHSREncounterResult Result = FHSREncounterResult::MakeSuccess(ConsumedId);
 	Result.ConsumedRequest = Consumed;
 	return Result;
@@ -495,13 +537,14 @@ void UHSRBattleTransitionSubsystem::ClearReturn()
 	ClearTravelTimeout();
 }
 
+// 旅行失败回调：只有失败属于我们追踪的事务时才清理状态（可重试）。
 void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravelFailure::Type FailureType, const FString& ErrorString)
 {
 	UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - type=%d Error=%s World=%s TargetMap=%s RequestId=%s"),
 		static_cast<int32>(FailureType), *ErrorString, InWorld ? *InWorld->GetName() : TEXT("null"),
 		*TravelTargetMap.ToString(), *TravelRequestId.ToString());
 
-	// 1. Early-exit if no active transaction (nothing to match)
+	// 1. 无活跃事务时直接忽略。
 	if (TravelKind == EHSRTravelKind::None)
 	{
 		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - IGNORED (no active transaction, type=%d)"), static_cast<int32>(FailureType));
@@ -513,7 +556,7 @@ void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravel
 		return;
 	}
 
-	// 2. Attempt to match InWorld's package path against stored TravelTargetMap
+	// 2. 尝试把失败世界包路径与已记录的 TravelTargetMap 关联。
 	FString FailureWorldPath;
 	if (InWorld && InWorld->GetOutermost())
 	{
@@ -525,7 +568,7 @@ void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravel
 	UE_LOG(LogTemp, Warning, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - MatchCheck: WorldPath=%s TargetMap=%s RequestId=%s bMatch=%d"),
 		*FailureWorldPath, *TravelTargetMap.ToString(), *TravelRequestId.ToString(), bMatchesOurTransaction ? 1 : 0);
 
-	// 3. Only clear state if the failure belongs to our tracked transaction
+	// 3. 只有失败属于我们的追踪事务才清状态。
 	if (!bMatchesOurTransaction)
 	{
 		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - IGNORED (world/map mismatch). FailureWorld=%s ExpectedMap=%s"),
@@ -533,7 +576,7 @@ void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravel
 		return;
 	}
 
-	// 4. Clear the matching transaction
+	// 4. 清理匹配的事务。
 	if (TravelKind == EHSRTravelKind::Encounter)
 	{
 		UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::HandleTravelFailure - Clearing Encounter state (RequestId=%s, now clean, retry available)"),
@@ -551,7 +594,7 @@ void UHSRBattleTransitionSubsystem::HandleTravelFailure(UWorld* InWorld, ETravel
 		ClearReturn();
 	}
 
-	// 5. Clear travel tracking (redundant with ClearPending/ClearReturn but explicit for safety)
+	// 5. 清空旅行追踪（与 ClearPending/ClearReturn 冗余，但显式写更安全）。
 	TravelKind = EHSRTravelKind::None;
 	TravelRequestId = FGuid();
 	TravelTargetMap = NAME_None;
@@ -575,6 +618,7 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestTestReturn(con
 	return RequestBattleReturn(TestResult);
 }
 
+// 请求返回探索地图：先做返回预检，再登记返回上下文、标记旅行目标并 OpenLevel。
 FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(const FHSRBattleResult& BattleResult)
 {
 	const FHSRExplorationReturnResult Validation = ValidateBattleReturn(BattleResult);
@@ -587,6 +631,7 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(c
 	FHSRExplorationReturnContext ReturnCtx;
 	ReturnCtx.RequestId = BattleReturnContext.RequestId;
 	ReturnCtx.ExplorationMapPath = BattleReturnContext.ExplorationMapPath;
+	// 通过地图子系统把包路径解析为已注册的地图 ID（返回校验依赖它）。
 	UHSRMapSubsystem* MapSubsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRMapSubsystem>() : nullptr;
 	if (!MapSubsystem || !MapSubsystem->ResolveMapIdByPackage(BattleReturnContext.ExplorationMapPath, ReturnCtx.ExplorationMapId))
 	{
@@ -607,6 +652,7 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(c
 		TravelSourceMap = FName(*UWorld::RemovePIEPrefix(World->GetOutermost()->GetPathName()));
 	}
 	StartTravelTimeout();
+	// 胜利才会把遭遇标记为已解决（失败可重试该遭遇）。
 	TravelCompletedEncounterId = ShouldResolveEncounter(BattleResult.Outcome) ? BattleResult.EncounterId : NAME_None;
 	if (!TravelCompletedEncounterId.IsNone())
 	{
@@ -622,11 +668,13 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(c
 	return FHSRExplorationReturnResult::MakeSuccess();
 }
 
+// 是否把该战斗结果视为“已解决遭遇”（只有玩家胜利才消耗遭遇）。
 bool UHSRBattleTransitionSubsystem::ShouldResolveEncounter(const EHSRBattleOutcome Outcome)
 {
 	return Outcome == EHSRBattleOutcome::PlayerVictory;
 }
 
+// 判断一次旅行失败是否属于我们追踪的源/目标地图之一（去 PIE 前缀后比较）。
 bool UHSRBattleTransitionSubsystem::DoesTravelFailureMatch(const FString& FailureWorldPackage,
 	const FString& SourcePackage, const FString& TargetPackage)
 {
@@ -639,6 +687,7 @@ bool UHSRBattleTransitionSubsystem::DoesTravelFailureMatch(const FString& Failur
 		|| (!TargetPackage.IsEmpty() && NormalizedFailure == UWorld::RemovePIEPrefix(TargetPackage));
 }
 
+// 启动旅行超时计时器（5 秒后触发 HandleTravelTimeout）。
 void UHSRBattleTransitionSubsystem::StartTravelTimeout()
 {
 	ClearTravelTimeout();
@@ -646,6 +695,7 @@ void UHSRBattleTransitionSubsystem::StartTravelTimeout()
 		FTickerDelegate::CreateUObject(this, &UHSRBattleTransitionSubsystem::HandleTravelTimeout), 5.0f);
 }
 
+// 清除旅行超时计时器。
 void UHSRBattleTransitionSubsystem::ClearTravelTimeout()
 {
 	if (TravelTimeoutHandle.IsValid())
@@ -655,6 +705,7 @@ void UHSRBattleTransitionSubsystem::ClearTravelTimeout()
 	}
 }
 
+// 旅行超时：若仍在挂起则清空对应事务，允许重试。
 bool UHSRBattleTransitionSubsystem::HandleTravelTimeout(float)
 {
 	TravelTimeoutHandle.Reset();

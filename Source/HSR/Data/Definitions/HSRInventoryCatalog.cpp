@@ -1,10 +1,15 @@
 #include "HSRInventoryCatalog.h"
 
+// 校验物品目录：每个条目的 ItemId 非空、有显示名、且全局唯一。
 bool UHSRInventoryCatalog::Validate(FString* OutError) const
 {
+	// 局部失败回调：有 OutError 就写入原因，统一返回 false。
 	auto Fail = [OutError](const FString& Error)
 	{
-		if (OutError) *OutError = Error;
+		if (OutError)
+		{
+			*OutError = Error;
+		}
 		return false;
 	};
 
@@ -31,6 +36,7 @@ bool UHSRInventoryCatalog::Validate(FString* OutError) const
 	return true;
 }
 
+// 按物品 ID 查找目录条目；找不到返回 false。
 bool UHSRInventoryCatalog::FindEntry(const FName ItemId, FHSRInventoryCatalogEntry& OutEntry) const
 {
 	for (const FHSRInventoryCatalogEntry& Entry : Entries)

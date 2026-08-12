@@ -1,12 +1,14 @@
-﻿#include "HSRInteractionComponent.h"
+#include "HSRInteractionComponent.h"
 #include "HSRInteractableInterface.h"
 
+// 构造函数：关闭 Tick，初始化候选标记。
 UHSRInteractionComponent::UHSRInteractionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	bCandidateEverRegistered = false;
 }
 
+// 登记一个交互候选：同一时刻只接受一个候选；候选必须实现交互接口。
 void UHSRInteractionComponent::RegisterCandidate(AActor* Candidate)
 {
 	if (!Candidate)
@@ -14,11 +16,13 @@ void UHSRInteractionComponent::RegisterCandidate(AActor* Candidate)
 		return;
 	}
 
+	// 已是同一候选，忽略重复登记。
 	if (CurrentCandidate.IsValid() && CurrentCandidate.Get() == Candidate)
 	{
 		return;
 	}
 
+	// 已有其他候选时拒绝新候选（单候选模型）。
 	if (CurrentCandidate.IsValid() && CurrentCandidate.Get() != Candidate)
 	{
 		UE_LOG(LogTemp, Log, TEXT("UHSRInteractionComponent::RegisterCandidate - Already has candidate %s, rejecting %s"),
@@ -26,6 +30,7 @@ void UHSRInteractionComponent::RegisterCandidate(AActor* Candidate)
 		return;
 	}
 
+	// 候选必须实现交互接口。
 	if (!Candidate->Implements<UHSRInteractableInterface>())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("UHSRInteractionComponent::RegisterCandidate - %s does not implement IHSRInteractableInterface"), *Candidate->GetName());
@@ -39,6 +44,7 @@ void UHSRInteractionComponent::RegisterCandidate(AActor* Candidate)
 		*GetOwner()->GetName(), *Candidate->GetName());
 }
 
+// 注销候选：仅当与当前候选匹配时清空。
 void UHSRInteractionComponent::UnregisterCandidate(AActor* Candidate)
 {
 	if (!Candidate || !CurrentCandidate.IsValid())
@@ -57,12 +63,13 @@ void UHSRInteractionComponent::UnregisterCandidate(AActor* Candidate)
 	}
 }
 
+// 当前是否有一个可用的交互候选。
 bool UHSRInteractionComponent::HasValidCandidate() const
 {
 	return IsCandidateValid();
 }
 
-
+// 当前候选的交互提示文本。
 FText UHSRInteractionComponent::GetCurrentPrompt() const
 {
 	AActor* Candidate = CurrentCandidate.Get();
@@ -73,6 +80,7 @@ FText UHSRInteractionComponent::GetCurrentPrompt() const
 	return IHSRInteractableInterface::Execute_GetInteractionPrompt(Candidate);
 }
 
+// 校验候选是否仍有效：存在、实现接口、且交互可用。
 bool UHSRInteractionComponent::IsCandidateValid() const
 {
 	AActor* Candidate = CurrentCandidate.Get();
@@ -94,12 +102,14 @@ bool UHSRInteractionComponent::IsCandidateValid() const
 	return true;
 }
 
+// 尝试与当前候选交互：一路处理“候选已销毁/从未登记/不再实现接口/当前不可用”的失败，
+// 最后真正执行交互并广播结果。
 FHSRInteractionResult UHSRInteractionComponent::TryInteract()
 {
 	AActor* Candidate = CurrentCandidate.Get();
 	AActor* OwnerActor = GetOwner();
 
-	// Candidate existed but the weak pointer expired (target destroyed)
+	// 候选曾经登记过，但弱引用已失效（目标被销毁）。
 	if (!Candidate && bCandidateEverRegistered)
 	{
 		CurrentCandidate.Reset();
@@ -114,7 +124,7 @@ FHSRInteractionResult UHSRInteractionComponent::TryInteract()
 		return Result;
 	}
 
-	// Never had a candidate, or candidate was properly unregistered
+	// 从来没有候选（或候选被正常注销）。
 	if (!Candidate)
 	{
 		FHSRInteractionResult Result = FHSRInteractionResult::MakeFailure(
@@ -126,6 +136,7 @@ FHSRInteractionResult UHSRInteractionComponent::TryInteract()
 		return Result;
 	}
 
+	// 候选已不再实现交互接口。
 	if (!Candidate->Implements<UHSRInteractableInterface>())
 	{
 		CurrentCandidate.Reset();
@@ -140,6 +151,7 @@ FHSRInteractionResult UHSRInteractionComponent::TryInteract()
 		return Result;
 	}
 
+	// 候选当前不可用。
 	if (!IHSRInteractableInterface::Execute_IsInteractionAvailable(Candidate))
 	{
 		FHSRInteractionResult Result = FHSRInteractionResult::MakeFailure(
@@ -151,6 +163,7 @@ FHSRInteractionResult UHSRInteractionComponent::TryInteract()
 		return Result;
 	}
 
+	// 执行交互（上下文携带交互者与其位置）。
 	FHSRInteractionContext Context(OwnerActor, OwnerActor->GetActorLocation());
 	FHSRInteractionResult Result = IHSRInteractableInterface::Execute_ExecuteInteraction(Candidate, Context);
 
@@ -169,6 +182,7 @@ FHSRInteractionResult UHSRInteractionComponent::TryInteract()
 	return Result;
 }
 
+// 组件销毁前：清理候选与委托。
 void UHSRInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	CurrentCandidate.Reset();
@@ -177,5 +191,3 @@ void UHSRInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	OnInteractionCompleted.Clear();
 	Super::EndPlay(EndPlayReason);
 }
-
-

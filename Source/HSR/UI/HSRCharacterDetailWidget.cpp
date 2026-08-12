@@ -7,6 +7,8 @@
 #include "../Save/HSRSaveSubsystem.h"
 #include "Engine/GameInstance.h"
 
+// NativeConstruct：控件入树时自建 ViewModel，注入四个子系统，订阅快照变化，
+// 并默认选中队伍 0 号槽位。初始化失败（缺子系统或队伍空）时通知蓝图走"不可用"分支。
 void UHSRCharacterDetailWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -33,11 +35,13 @@ void UHSRCharacterDetailWidget::NativeConstruct()
 	}
 	else
 	{
+		// 首次默认选中失败（例如队伍为空）：通知蓝图进入"详情不可用"状态。
 		UE_LOG(LogTemp, Warning, TEXT("P11-005 DetailWidgetInit Result=FAIL SelectionResult=%d"), static_cast<int32>(Result));
 		OnDetailUnavailable(Result);
 	}
 }
 
+// NativeDestruct：控件出树时解绑订阅并反初始化 ViewModel。
 void UHSRCharacterDetailWidget::NativeDestruct()
 {
 	if (ViewModel)
@@ -54,13 +58,19 @@ void UHSRCharacterDetailWidget::NativeDestruct()
 	Super::NativeDestruct();
 }
 
+// GetCurrentSnapshot：输出控件缓存的最近一次详情快照；尚无快照时返回 false。
 bool UHSRCharacterDetailWidget::GetCurrentSnapshot(FHSRCharacterDetailSnapshot& OutSnapshot) const
 {
-	if (!bHasCurrentSnapshot) return false;
+	if (!bHasCurrentSnapshot)
+	{
+		return false;
+	}
 	OutSnapshot = CurrentSnapshot;
 	return true;
 }
 
+// HandleDetailChanged：ViewModel 广播新快照时的回调——缓存快照、统计刷新次数并推送蓝图。
+// RefreshCount 是开发期计数，用于日志确认快照确实在推进（而非停留在初始状态）。
 void UHSRCharacterDetailWidget::HandleDetailChanged(const FHSRCharacterDetailSnapshot& Snapshot)
 {
 	CurrentSnapshot = Snapshot;
