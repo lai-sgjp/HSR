@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 HSR 作品集演示 PPT 生成器
-面向面试/作品集的 17 页演示，全中文，画面与图示为主，不放代码/IDE。
+面向面试/作品集的 24 页演示，全中文，画面与图示为主，不放代码/IDE。
 深色 HSR 风格：近黑背景 #14171d，青色强调 #6fd7ff，金色点缀 #ffd479。
 """
 import os
@@ -113,7 +113,7 @@ def add_header(slide, kicker, title, page_no):
     add_text(slide, Inches(0.55), Inches(0.55), Inches(9), Inches(0.7),
              title, size=28, color=WHITE, bold=True)
     add_text(slide, SLIDE_W - Inches(1.2), Inches(0.4), Inches(0.7), Inches(0.4),
-             f"{page_no:02d} / 17", size=11, color=DIM, align=PP_ALIGN.RIGHT)
+             f"{page_no:02d} / 24", size=11, color=DIM, align=PP_ALIGN.RIGHT)
 
 def add_image_fit(slide, img_path, x, y, w, h, border=True):
     """按比例放入图片，保持纵横比居中"""
@@ -139,6 +139,23 @@ def add_image_fit(slide, img_path, x, y, w, h, border=True):
 def add_footer_note(slide, note):
     add_text(slide, Inches(0.55), SLIDE_H - Inches(0.45), SLIDE_W - Inches(1.1), Inches(0.3),
              note, size=10, color=DIM, align=PP_ALIGN.CENTER)
+
+def add_diagram_slide(kicker, title, page_no, png_name, note, diagram_dir=None):
+    """整页示意图：页眉 + 高清图（保持纵横比居中）+ 底部说明。"""
+    s = new_slide()
+    add_header(s, kicker, title, page_no)
+    base = diagram_dir if diagram_dir else os.path.join(ASSET_DIR, "diagrams")
+    img_path = os.path.join(base, png_name)
+    box_x, box_y = Inches(0.7), Inches(1.2)
+    box_w, box_h = Inches(11.93), Inches(5.5)
+    if os.path.exists(img_path):
+        add_image_fit(s, img_path, box_x, box_y, box_w, box_h)
+    else:
+        add_rect(s, box_x, box_y, box_w, box_h, fill=PANEL2, line=PANEL2, radius=True)
+        add_text(s, box_x, box_y, box_w, box_h, "图待补充\n(SVG 转 PNG 后放入 ppt_assets/diagrams/)",
+                 size=13, color=DIM, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+    add_footer_note(s, note)
+    return s
 
 # ── 幻灯片构建 ───────────────────────────────────────────────────────
 def new_slide():
@@ -293,10 +310,22 @@ add_image_fit(s, os.path.join(ASSET_DIR, "exploration_graybox_b.png"), Inches(6.
 add_footer_note(s, "录屏建议：展示移动 + 走进 NPC 出现“交互”提示 + 敌人发现玩家开始追击的一段。")
 
 # ═══════════════════════════════════════════════════════════════════
-# P6 回合制战斗（核心页）
+# P6 探索交互进入战斗（示意图）
+# ═══════════════════════════════════════════════════════════════════
+add_diagram_slide("INTERACTION → BATTLE", "探索交互进入战斗", 6, "探索交互进入战斗.png",
+    "从 F 键交互到 EncounterIntent，授权切换战斗地图后构建参与者，最终返回 BattleResult 与 ReturnContext 的完整链路。")
+
+# ═══════════════════════════════════════════════════════════════════
+# P7 地图旅行与 UI 重建（示意图）
+# ═══════════════════════════════════════════════════════════════════
+add_diagram_slide("MAP TRAVEL & UI", "地图旅行与 UI 重建", 7, "地图旅行与 UI 重建.png",
+    "跨世界传送时先 teardown 旧 HUD/路由/焦点，旅行到位后用 committed snapshot 重建新探索主机。")
+
+# ═══════════════════════════════════════════════════════════════════
+# P8 回合制战斗（核心页）
 # ═══════════════════════════════════════════════════════════════════
 s = new_slide()
-add_header(s, "TURN-BASED BATTLE", "回合制战斗 · 速度驱动的指令系统", 6)
+add_header(s, "TURN-BASED BATTLE", "回合制战斗 · 速度驱动的指令系统", 8)
 # 上半：流程
 flow_bar(s, Inches(1.5), ["行动条排序", "玩家指令", "目标选择", "伤害结算", "回合推进"], 1,
          [GREEN, CYAN, GREEN, GREEN, GREEN])
@@ -321,7 +350,7 @@ add_footer_note(s, "录屏建议：完整展示一次战斗——选技 → 目�
 # P7 养成系统
 # ═══════════════════════════════════════════════════════════════════
 s = new_slide()
-add_header(s, "PROGRESSION", "养成系统 · 角色成长 × 遗器装备", 7)
+add_header(s, "PROGRESSION", "养成系统 · 角色成长 × 遗器装备", 9)
 # 三列卡片
 cards = [
     ("角色成长", "等级 / 经验曲线\n属性随等级成长\n技能等级解锁\n（角色详情面板）", CYAN),
@@ -338,10 +367,16 @@ add_image_fit(s, "", Inches(6.9), Inches(4.9), Inches(5.9), Inches(2.1))
 add_footer_note(s, "录屏建议：展示角色详情属性、遗器装备前后属性变化、背包分类筛选。")
 
 # ═══════════════════════════════════════════════════════════════════
-# P8 任务与对话
+# P9 装备变更到 ASC 投影（示意图）
+# ═══════════════════════════════════════════════════════════════════
+add_diagram_slide("EQUIPMENT → ASC", "装备变更到 ASC 投影", 10, "装备变更到 ASC 投影.png",
+    "装备/替换经 Equip Intent → Inventory ownership + Equipment slot 校验 → 权威提交后重建 ASC 装备 source，ViewModel 只读快照。")
+
+# ═══════════════════════════════════════════════════════════════════
+# P10 任务与对话
 # ═══════════════════════════════════════════════════════════════════
 s = new_slide()
-add_header(s, "QUEST & DIALOGUE", "任务与对话 · 「界域回响」", 8)
+add_header(s, "QUEST & DIALOGUE", "任务与对话 · 「界域回响」", 11)
 # 左：任务系统
 add_card(s, Inches(0.55), Inches(1.5), Inches(6.0), Inches(5.3), "任务系统（Quest Subsystem）",
          "· 正式任务「界域回响」已作者化：\n"
@@ -362,7 +397,7 @@ add_footer_note(s, "诚实说明：任务数据不暴露标题字段，「界域
 # P9 存档系统
 # ═══════════════════════════════════════════════════════════════════
 s = new_slide()
-add_header(s, "SAVE SYSTEM", "存档系统 · 全量权威数据持久化", 9)
+add_header(s, "SAVE SYSTEM", "存档系统 · 全量权威数据持久化", 12)
 # 中间示意：系统 → 存档
 sys_labels = ["角色 / 队伍", "背包 / 遗器", "任务进度", "地图 / 位置", "奖励账本"]
 add_text(s, Inches(0.55), Inches(1.5), Inches(6), Inches(0.35), "存档覆盖的权威数据", size=15, color=CYAN, bold=True)
@@ -383,10 +418,16 @@ add_card(s, Inches(8.3), Inches(1.5), Inches(4.5), Inches(5.3), "可靠性设计
 add_footer_note(s, "录屏建议：进入游戏 → 做几件事 → 保存 → 退出 → 重新打开 → 状态完整恢复。")
 
 # ═══════════════════════════════════════════════════════════════════
-# P10 UI 总整合
+# P12 SaveLoad 全局恢复（示意图）
+# ═══════════════════════════════════════════════════════════════════
+add_diagram_slide("SAVE / LOAD", "SaveLoad 全局恢复", 13, "SaveLoad 全局恢复.png",
+    "Save 经 canonical encode + checksum + staging readback + backup/primary 落盘；Load 经 decode + migration + 各域 PrepareRestore + 一次 CommitRestore 重建。")
+
+# ═══════════════════════════════════════════════════════════════════
+# P13 UI 总整合
 # ═══════════════════════════════════════════════════════════════════
 s = new_slide()
-add_header(s, "UI INTEGRATION", "UI 总整合 · 深色 HSR 风格前端", 10)
+add_header(s, "UI INTEGRATION", "UI 总整合 · 深色 HSR 风格前端", 14)
 # 顶部：暂停中枢
 add_card(s, Inches(0.55), Inches(1.45), Inches(12.2), Inches(1.15), "暂停中枢（Pause Hub）",
          "Tab / 数字键打开，统一深色风格。所有模块通过同一套 输入策略 + 焦点导航 + 返回逻辑 接入。",
@@ -414,7 +455,7 @@ add_footer_note(s, "每个面板一张截图（待补充）：角色 / 队伍 / 
 # P11 正式 Demo 内容
 # ═══════════════════════════════════════════════════════════════════
 s = new_slide()
-add_header(s, "DEMO CONTENT", "正在制作 · 正式 Demo 内容", 11)
+add_header(s, "DEMO CONTENT", "正在制作 · 正式 Demo 内容", 15)
 add_text(s, Inches(0.55), Inches(1.45), Inches(12.2), Inches(0.5),
          "已冻结正式内容目录，Asset 校验门禁已 GREEN。全部为原创作者化内容，不复用测试资产。",
          size=15, color=GRAY)
@@ -444,7 +485,7 @@ add_footer_note(s, "角色 / 场景美术为占位，正式角色立绘与场景
 # P12 架构亮点（图不用代码）
 # ═══════════════════════════════════════════════════════════════════
 s = new_slide()
-add_header(s, "ARCHITECTURE", "架构亮点 · 用图不用代码", 12)
+add_header(s, "ARCHITECTURE", "架构亮点 · 用图不用代码", 16)
 # 分层示意
 layers = [
     ("表现层 UI", "UMG 只订阅纯值快照", CYAN),
@@ -469,7 +510,7 @@ add_footer_note(s, "这是面试重点：能讲清“为什么用纯值 DTO”�
 # P13 项目数据流动图
 # ═══════════════════════════════════════════════════════════════════
 s = new_slide()
-add_header(s, "DATA FLOW", "数据怎么流动 · 一次完整游戏循环", 13)
+add_header(s, "DATA FLOW", "数据怎么流动 · 一次完整游戏循环", 17)
 flow_nodes = [
     ("探索地图", "移动 / 交互 / 敌人感知\n追击触发遭遇", CYAN),
     ("遭遇", "FHSREncounterRequest\n纯值请求 · 世界切换", BLUE),
@@ -504,10 +545,22 @@ for t, d, c in detail:
 add_footer_note(s, "核心：权威结果永远是一份可回放、可存档、可测试的纯值数据，UI 只是它的投影。")
 
 # ═══════════════════════════════════════════════════════════════════
-# P14 各子系统关系图
+# P17 统一数据流动模型（示意图）
+# ═══════════════════════════════════════════════════════════════════
+add_diagram_slide("DATA FLOW MODEL", "统一数据流动模型", 18, "统一数据流动模型.png",
+    "全项目数据流动总图：输入/Widget → 纯值 Intent → Authority Preflight → 一次权威 Commit → Typed Result → 只读 Snapshot → ViewModel 展示，失败零污染。")
+
+# ═══════════════════════════════════════════════════════════════════
+# P18 战斗结算到奖励、背包和成长（示意图）
+# ═══════════════════════════════════════════════════════════════════
+add_diagram_slide("SETTLEMENT", "战斗结算到奖励、背包和成长", 19, "战斗结算到奖励、背包和成长.png",
+    "BattleResult → SettlementAuthority 冻结并一次提交 Reward/Inventory/Profile 各域 revision，ViewModel 只读投影。")
+
+# ═══════════════════════════════════════════════════════════════════
+# P19 各子系统关系图
 # ═══════════════════════════════════════════════════════════════════
 s = new_slide()
-add_header(s, "SUBSYSTEMS", "各子系统关系 · 单一权威 + 纯值汇聚", 14)
+add_header(s, "SUBSYSTEMS", "各子系统关系 · 单一权威 + 纯值汇聚", 20)
 add_text(s, Inches(0.55), Inches(1.4), Inches(5.5), Inches(0.35), "GameInstance 常驻 · 数据中心", size=15, color=CYAN, bold=True)
 subsystems = [
     ("UHSRCharacterProfileSubsystem", "角色定义 / 成长 / 属性"),
@@ -549,10 +602,16 @@ add_text(s, Inches(0.85), Inches(6.45), Inches(11.6), Inches(0.55),
 add_footer_note(s, "面试要点：能画清「谁拥有权威、数据在哪汇聚、边界传什么」比背类名更重要。")
 
 # ═══════════════════════════════════════════════════════════════════
-# P13 质量保障
+# P20 子系统关系图（示意图）
+# ═══════════════════════════════════════════════════════════════════
+add_diagram_slide("SUBSYSTEMS", "子系统关系图", 21, "子系统关系图.png",
+    "LocalPlayer UI 读模型域 / World Battle 临时运行域 / GameInstance 持久运行域 / 静态定义层，各子系统与依赖一目了然。")
+
+# ═══════════════════════════════════════════════════════════════════
+# P21 质量保障
 # ═══════════════════════════════════════════════════════════════════
 s = new_slide()
-add_header(s, "QUALITY", "质量保障 · 每个阶段都可验证", 15)
+add_header(s, "QUALITY", "质量保障 · 每个阶段都可验证", 22)
 # 流程
 add_text(s, Inches(0.55), Inches(1.5), Inches(6), Inches(0.35), "TDD 流程（每个功能包）", size=15, color=CYAN, bold=True)
 tdd = ["写失败测试\n(Red)", "实现\n(Green)", "构建 + 回归", "用户 PIE 验收"]
@@ -577,7 +636,7 @@ add_footer_note(s, "数字为示意口径，具体测试/构建计数按当前�
 # P14 当前进度
 # ═══════════════════════════════════════════════════════════════════
 s = new_slide()
-add_header(s, "CURRENT STATUS", "当前进度", 16)
+add_header(s, "CURRENT STATUS", "当前进度", 23)
 # 三栏
 add_card(s, Inches(0.55), Inches(1.6), Inches(4.0), Inches(4.2), "已完成（可玩）",
          "探索 → 遭遇 → 回合战斗\n→ 结算 → 养成 → 存档\n\n完整闭环可玩\n全 UI 族（角色/队伍/背包/\n遗器/任务/地图/挑战/存档）\n18 阶段工程推进完成",
