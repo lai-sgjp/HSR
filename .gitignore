@@ -26,3 +26,38 @@ Content/ModResources/
 
 # Local AssetViewer / Editor preview state
 /Config/DefaultEditor.ini
+
+# Large imported art/sample packs kept local and excluded from source commits
+/Content/Assets/
+/Content/Audio/
+/Content/Blueprints/ABP_SandboxCharacter.uasset
+/Content/Blueprints/CBP_SandboxCharacter.uasset
+/Content/Blueprints/AnimModifiers/
+/Content/Blueprints/AnimNotifies/
+/Content/Blueprints/Cameras/
+/Content/Blueprints/Data/
+/Content/Blueprints/PreCMCTick.uasset
+/Content/Blueprints/RetargetedCharacters/
+/Content/Characters/Mannequins/
+/Content/Characters/UEFN_Mannequin/
+/Content/DragonCave/
+/Content/Geometry/
+/Content/Input/IA_Aim.uasset
+/Content/Input/IA_Crouch.uasset
+/Content/Input/IA_Look_Gamepad.uasset
+/Content/Input/IA_Move_WorldSpace.uasset
+/Content/Input/IA_NextCharacter.uasset
+/Content/Input/IA_Sprint.uasset
+/Content/Input/IA_Strafe.uasset
+/Content/Input/IA_Traverse.uasset
+/Content/Input/IA_Walk.uasset
+/Content/Input/IMC_Sandbox.uasset
+/Content/LevelPrototyping/
+/Content/Mannequin/
+/Content/Misc/
+/Content/Polytope_Studio/
+/Content/Scrapopolis/
+/Content/ThirdPerson/
+/Content/ThirdPersonBP/
+/Content/__ExternalActors__/
+/Content/__ExternalObjects__/
