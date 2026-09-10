@@ -64,3 +64,13 @@ Content/ModResources/
 
 # Nested Claude worktrees (separate git checkouts, never tracked by the main repo)
 /.claude/worktrees/
+
+# Local-only agent state and interview transcription artifacts
+/.claude/settings.local.json
+/.codex-resume-review/
+/20260821_天美一面.m4a
+/20260821_天美一面.txt
+/20260903_天美二面.m4a
+/20260903_天美二面.txt
+/_mihoyo_decoded.wav
+/transcribe.py
