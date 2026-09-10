@@ -524,6 +524,7 @@ Sequence（巡逻）
   │     BlackboardKey = TargetLocation（结果写入）
   └── BTTask_MoveTo
         BlackboardKey = TargetLocation（读这个 Key 走过去）
+```
 
 逃跑、追击共用同一个 TargetLocation Key + 同一个 BTTask_MoveTo。
 区别只在于谁往 TargetLocation 里写数据。

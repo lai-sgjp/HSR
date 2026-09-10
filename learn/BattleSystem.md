@@ -69,7 +69,7 @@ Idle → Consuming → Spawned → [循环战斗] → Finished
 | **幂等** | `ProcessedActionResolutions` 按 ActionId 缓存结果 |
 | **事务** | `bFormalDamageTransactionOpen` 事务边界，失败时 Rollback |
 | **先验证再执行** | 所有检查在第 419 行前完成（零副作用），之后的才是写操作 |
-| **多路缓存去重** | `ProcessedStatusOperations` / `ProcessedInvalidSources` / `ProcessedAddOperations` 三路拦截 |
+| **多路缓存去重** | `ProcessedOperationIds`（状态操作 GUID）/ `ProcessedInvalidSources`（纪元\|来源）两路拦截 |
 
 ### 已知问题
 
@@ -81,56 +81,82 @@ Idle → Consuming → Spawned → [循环战斗] → Finished
 
 ### 核心职责
 
-事件驱动的回合调度器，永不 Tick。
+`UHSRTurnManager`（UObject，战役本地）是事件驱动的**行动距离调度器**：不给角色排固定顺序，而是给每个参与者一条"行动距离"（Action Distance），谁的距离先耗尽谁行动。永不 Tick。
 
-### 初始化——按速度排序
-
-```cpp
-OrderedParticipants.Sort([](...)
-{
-    return Left.InitiativeSpeed > Right.InitiativeSpeed;
-});
-```
-
-只排一次序，整个战斗以固定 Round-Robin 循环。
-
-### AdvanceToNextValidTurn 扫描逻辑
+### 行动距离模型
 
 ```
-从 CurrentTurnIndex+1 开始，绕一圈
-对每个候选：
-  ① IsParticipantTurnEligible？
-     → Actor 有效且 HP > 0
-     → 无效 → 跳过；如果有 BreakDelay 记录 → 消耗掉
-  ② PendingBreakDelayActionIds 中有此角色？
-     → 有 → 跳过（消耗，目标"丢一回合"）
-  ③ 找到 → 设为 CurrentTurn，广播 TurnStarted
+基础行动距离 = MaximumBaseActionDistance / Speed   （速度越快，基准距离越短）
+剩余行动距离 = 距下次行动的进度（行动一次后充值回基础距离）
+行动顺序     = 剩余距离最小者先行动；全体减去该最小值 = 时间推进
 ```
 
-### Break 延后机制
+- 速度由 ASC 的 `Speed` 属性实时读取（`MakeBaseActionDistance`），非法值直接初始化失败
+- 初始化按 ParticipantId 字典序稳定排序 + 去重（同速时顺序可预测）；`InitiativeSpeed` 已降级为诊断快照
+- **速度变化实时生效**：`BindSpeedDelegates` 为每个参与者绑定 Speed 属性变化委托，`HandleSpeedChanged` 按新旧基准等比例换算剩余距离，不打断当前进度
 
-```cpp
-ConsumeBreakDelay(Request)
-  → PendingBreakDelayActionIds[TargetId] = ActionId
+### 回合推进（AdvanceToNextValidTurn）
 
-AdvanceToNextValidTurn 扫描到 TargetId 时：
-  → 检查 PendingBreakDelayActionIds
-  → 有 → 跳过（消耗）→ 下次再轮到就正常
 ```
+① 收集所有 IsParticipantTurnEligible 的参与者（唯一资格判定入口 = 存活 IsAlive）
+② 找出剩余距离最小的 → 全体减去该最小值（时间推进到下一行动时刻）
+③ 同速者按 ID 字典序打破平局
+④ 设为当前回合 → State 置 PlayerTurn/EnemyTurn → TurnSequence++ → 广播 TurnStarted
+```
+
+剩余距离出现非有限值 → 数值错误，直接 Finished。
+
+### 行动结算（ResolveAction）
+
+```
+ResolveAction(当前行动者)
+  → 广播 TurnEnded
+  → ApplyCurrentPendingAfterRecharge：剩余距离充值回基础距离 + 应用挂起的调整
+  → AdvanceToNextValidTurn 推进下一回合
+  → 广播 ActionResolved
+```
+
+### 行动距离调整（拉条 / 延后）
+
+`RequestActionDistanceAdjustment(Request)` 是拉条/延后的通用入口，纯值 DTO（`FHSRActionDistanceRequest`）：
+
+- `Advance`（推进/拉条）：剩余距离减去 `BaseActionDistance × Ratio`
+- `Delay`（延后）：剩余距离加上 `BaseActionDistance × Ratio`
+- **正在行动者**的调整不立即生效——挂进 `PendingPostActionOperations`，行动结束后随充值一并应用（先做有限性预演防数值爆炸）
+- 带幂等（`ConsumedOperationIds` 按 OperationId 去重）与纪元校验，拒绝结果以 `FHSRActionDistanceResult` 返回（可验证/可重放）
+
+### Break 延后
+
+`ConsumeBreakDelay` 现在是 P8 兼容桥：把 `FHSRTurnDelayRequest` 转成 `Kind=Delay, Ratio=1.0` 的距离调整——破韧把目标**延后一整段基础行动距离**，不再有独立的"跳一回合"状态。另有 `ConsumeAdmittedBreakDelay` 处理"伤害即死亡 + 破韧同帧"的例外。
+
+### 回合条预测（BuildTurnForecast）
+
+`BuildTurnForecast(SlotCount)` 在**副本上模拟**未来行动顺序（只读，不改真实状态），产出 `FHSRTurnForecastEntry[]`（SlotIndex / DistanceUntilAction / bRepeatAction），供回合条 UI 消费。第 0 格固定为当前行动者；速度变化、拉条/延后会立刻反映在预测上。
 
 ### 事件
 
 ```
-TurnStarted → StatusComponent 扣回合数
-TurnEnded   → 广播给 Coordinator 推进下一回合
-BattleEpoch → 每次新战斗递增（标记这场战斗的数据）
-TurnSequence → 每步递增（防同一回合重复消耗）
+TurnStarted（携带 BattleEpoch + TurnSequence + ParticipantId）→ 状态系统消费
+TurnEnded   → 行动结算后广播
+ActionResolved → 每次行动成功结算后广播
+BattleEpoch → 每次新战斗递增（纪元隔离：重置后旧事件不污染新战斗）
+TurnSequence → 每次推进回合递增（防同一回合重复消耗）
 ```
 
-### 待实现
+### 状态机
 
-- 速度变更效果（加速/减速不重新排序，目前只读一次）
-- 拉条（立即行动）——当前没有"插入到队列头部"的机制
+```
+Waiting → PlayerTurn / EnemyTurn（循环交替） → Finished
+```
+
+- `EHSRTurnManagerState`：Waiting / PlayerTurn / EnemyTurn / Finished
+- `FinishBattle()`：清空挂起操作、解绑速度委托、置 Finished
+
+### 已实现
+
+- ✅ 速度变更实时生效（速度委托绑定，加速/减速即时调整行动距离）
+- ✅ 拉条 / 立即行动（`RequestActionDistanceAdjustment` Advance）
+- ✅ 回合条预测（`BuildTurnForecast`，纯值 DTO）
 
 ---
 
@@ -176,8 +202,8 @@ ToughnessResult.bReachedZero == true    // 韧性打到 0
 ```
 发布 BreakResult
   ├── 挂 Break 状态（RequestBreakStatus → Status.Debuff.Break）
-  └── 注册行动延迟（TurnManager->ConsumeBreakDelay）
-       → 目标下次轮到时不行动（跳过一次）
+  └── 行动延后（TurnManager->ConsumeBreakDelay）
+       → 转成 Delay, Ratio=1.0 的距离调整：目标延后一整段基础行动距离
 ```
 
 ### 元素匹配过程

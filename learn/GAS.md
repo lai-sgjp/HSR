@@ -163,7 +163,7 @@ AnimInstance         → UAnimInstance*                 // 动画实例
 
 **关键回调时序**：
 
-1. **`PreAttributeChange()`** — 你的 `HSRCoreAttributeSet` 中所有属性的 clamp 都在这里。属性**即将**改变，用于钳位预测。
+1. **`PreAttributeBaseChange()` / `PreAttributeChange()`** — 你的 `HSRCoreAttributeSet` 中所有属性的 clamp 都在这里。前者钳**基础值**（Instant GE 通过 `ApplyModToAttribute` 改的就是 Base 值），后者钳**当前值**（Aggregator 重算后的最终值）。属性**即将**改变，用于钳位预测。
 2. **`PostGameplayEffectExecute()`** — 你的 `HSRCoreAttributeSet` 中 `IncomingDamage → Health` 的处理。只在 `Instant` GE 执行。
 3. **`FOnGameplayAttributeValueChange`** — 你的 ViewModel 绑定的是这个。属性**已经**改变后的通知，用于 UI 更新。
 
@@ -722,16 +722,63 @@ void UGameplayAbility::CommitExecute(const FGameplayAbilitySpecHandle Handle,
 
 ## 2.6 实例化策略（Instancing Policy）
 
+### 这个策略到底在回答什么问题
+
+实例化策略**不是**"激活策略"，它回答的是：**「跑代码的那个 UGameplayAbility 对象是谁、有几个、什么时候被 new 出来」**。这是一个对象生命周期问题，不是行为问题。
+
 在 `GameplayAbility.h` 中的枚举：
 
 ```cpp
 UENUM()
 enum class EGameplayAbilityInstancingPolicy : uint8
 {
-    NonInstanced,        // 使用 CDO 本身，不能有状态（性能最优）
-    InstancedPerActor,   // 每个 ASC 一个实例（你的项目使用的）
-    InstancedPerExecution // 每次激活创建一个新实例
+    NonInstanced,        // 永远用全局唯一的 CDO，零分配，不能有成员状态（性能最优）
+    InstancedPerActor,   // GiveAbility 时为每个 ASC new 一个实例并复用（你的项目使用的）
+    InstancedPerExecution // 每次激活都 new 一个全新实例，用完 GC 回收
 };
+```
+
+### 前提概念：CDO vs 实例
+
+理解这个策略前，必须分清两个对象：
+
+```
+GetDefault<UHSRBasicAttackAbility>()          // → CDO（类默认对象）
+                                              //   全局只有 1 个，所有角色共享，存编辑器配置的默认值
+NewObject<UHSRBasicAttackAbility>(Owner)      // → 实例
+                                              //   每次 new 一个，运行时从 CDO 克隆初始值
+```
+
+`GiveAbility(Class)` 时，ASC 把能力存成 `FGameplayAbilitySpec`，`Spec.Ability` 一开始**指向 CDO**。策略决定的就是：激活时 `CanActivateAbility` / `ActivateAbility` 里的代码，跑在 CDO 上还是跑在某个实例上。
+
+### ① NonInstanced —— 永远跑 CDO，零分配，零状态
+
+全程不 new 任何对象，激活逻辑直接跑在 CDO 上（`AbilitySystemComponent_Abilities.cpp` 第 1776-1777 行）：
+
+```cpp
+UGameplayAbility* InstancedAbility = Spec->GetPrimaryInstance();   // 永远是 nullptr
+UGameplayAbility* AbilitySource = InstancedAbility ? InstancedAbility : Ability;  // ← 取 CDO
+```
+
+**代价**：CDO 是全局共享的一个对象。任何 `UPROPERTY()` 成员变量都会被所有拥有该能力的角色共享——A 角色写了值，B 角色读到的是同一个。所以 NonInstanced **不允许有任何成员状态**，只能靠函数参数 / Spec / ActorInfo 传数据。这就是注释里"不能有状态，性能最优"的真实含义。
+
+### ② InstancedPerActor —— GiveAbility 时就 new，一个 ASC 一份（你的项目）
+
+**创建时机是 GiveAbility，不是第一次激活**（`AbilitySystemComponent_Abilities.cpp` 第 299-303 行）：
+
+```cpp
+if (OwnedSpec.Ability->GetInstancingPolicy() == EGameplayAbilityInstancingPolicy::InstancedPerActor)
+{
+    // Create the instance at creation time
+    CreateNewInstanceOfAbility(OwnedSpec, Spec.Ability);
+}
+```
+
+`CreateNewInstanceOfAbility`（第 1176 行）把实例塞进 `Spec.ReplicatedInstances` / `NonReplicatedInstances` 防止被 GC，实例从此归属**某个 ASC（某个角色）**。之后每次激活都复用同一个对象（第 1776 行 + 第 1901 行）：
+
+```cpp
+UGameplayAbility* InstancedAbility = Spec->GetPrimaryInstance();   // ← 拿到那个固定的实例
+AbilitySource->CallActivateAbility(...);                           // ← 激活跑在实例上
 ```
 
 你的 `UHSRGameplayAbilityBase` 构造函数（在 `HSRGameplayAbilityBase.cpp` 中）使用的是 `InstancedPerActor`：
@@ -744,11 +791,41 @@ UHSRGameplayAbilityBase::UHSRGameplayAbilityBase()
 }
 ```
 
-这意味着：
+**这意味着**：
 - 每个 ASC（每个角色）对每种能力只创建一个实例
 - 每次激活时都使用同一个实例对象
-- 实例中的状态变量（你项目中的 `PreparedFormalDamage`、`ActionId`、`SkillId` 等）**在一次激活后必须清干净**
+- 实例中的状态变量（你项目中的 `PreparedFormalDamage`、`ActionId`、`SkillId` 等）**在一次激活后必须清干净**——因为同一个对象下次还会被复用，上次的值会残留
 - 你的 `ClearPreparedTarget()` 和 `ClearPreparedFormalDamage()` 就是这个作用
+- 引擎还自带防御：同实例**激活期间**再激活会被拒绝（第 1810-1831 行 `Spec->IsActive()` 检查），除非配 `bRetriggerInstancedAbility`
+
+### ③ InstancedPerExecution —— 每次激活 new 一个全新的
+
+**创建时机是每次激活**，在 `InternalTryActivateAbility` 里（第 1894-1898 行）：
+
+```cpp
+if (Ability->GetInstancingPolicy() == EGameplayAbilityInstancingPolicy::InstancedPerExecution)
+{
+    InstancedAbility = CreateNewInstanceOfAbility(*Spec, Ability);   // ← 每次 new
+    InstancedAbility->CallActivateAbility(...);                       // ← 跑完即弃，GC 回收
+}
+```
+
+每次状态都是全新的，**不需要清理**。代价是每次激活都分配一个 UObject。5.6 有硬性限制：InstancedPerExecution **不能配 Replicated**（第 1941-1953 行直接 Log Error），预测支持也受限。
+
+### 对比表
+
+| | NonInstanced | InstancedPerActor | InstancedPerExecution |
+|---|---|---|---|
+| **代码跑在** | CDO（全局共享 1 个） | 专属实例（GiveAbility 时 new） | 全新实例（每次激活 new） |
+| **实例数量** | 0 | 每个 ASC 1 个 | 每次激活 1 个，用完回收 |
+| **能存成员状态** | ❌ 共享串扰 | ✅ 但必须清 | ✅ 天然干净 |
+| **分配开销** | 0（最好） | 1 次 | 每次（最重） |
+| **5.6 网络限制** | 激活信息存在 Spec 上（废弃路径） | 无 | 不能 Replicated |
+| **适用场景** | 纯无状态（跳跃、纯检查类） | **绝大多数情况** | 状态复杂且无法清理 |
+
+### 一个常见误区
+
+**「实例化」≠「激活」**。`InstancedPerActor` 的实例在 **GiveAbility 那一刻**就创建了，不是第一次激活才建；`InstancedPerExecution` 才是每次激活建一个。你 HSR 用 InstancedPerActor + 同步能力（激活一帧内 Apply 完就 EndAbility），同一个实例连续干活，所以 `PreparedFormalDamage` 这类成员必须用完即清——**这是这个策略下唯一需要你负责的事**。
 
 ---
 
@@ -992,9 +1069,9 @@ ApplyGameplayEffectSpecToSelf(Spec)
 │       ├── 计算所有 Modifier Magnitudes                             │
 │       ├── 遍历 Modifiers[]                                         │
 │       │   └── InternalExecuteMod(Spec, EvalData)                  │
-│       │       ├── PreGameplayEffectExecute(ExecuteData)            │
-│       │       ├── ApplyModToAttribute() ← 直接改 Base 值           │
-│       │       └── PostGameplayEffectExecute(ExecuteData)           │
+│       │       ├── PreGameplayEffectExecute() ← 否决闸门（未重写）  │
+│       │       ├── ApplyModToAttribute() ← 改 Base 值（内部含钳制） │
+│       │       └── PostGameplayEffectExecute() ← 善后（扣血等）     │
 │       ├── 遍历 Executions[]                                        │
 │       │   └── ExecCDO->Execute(Params, Output)                    │
 │       │       └── 你的 HSRDamageExecutionCalculation 就在这里      │
@@ -1150,9 +1227,10 @@ Ability 激活
               → 计算 FinalDamage
               → 输出 IncomingDamage = FinalDamage (Additive)
               → InternalExecuteMod(IncomingDamage)
-                → PreGameplayEffectExecute
+                → PreGameplayEffectExecute        ← 否决闸门（项目未重写）
                 → ApplyModToAttribute(IncomingDamage)   ← 设置 IncomingDamage 值
-                → PostGameplayEffectExecute
+                →   （内部 SetAttributeBaseValue 触发 PreAttributeBaseChange/PreAttributeChange 钳制）
+                → PostGameplayEffectExecute       ← 后置善后
                   → Health -= IncomingDamage
                   → Clamp Health
                   → 广播 HealthChange 委托
@@ -1304,20 +1382,40 @@ FActiveGameplayEffectsContainer::ExecuteActiveEffectsFrom(Spec)
           InternalExecuteMod(IncomingDamage)
               │
               ▼
-          PreGameplayEffectExecute(ExecuteData)  ← 用于前置规则
+          PreGameplayEffectExecute(ExecuteData)  ← 否决闸门（项目未重写，默认放行）
               │
               ▼
           ApplyModToAttribute(IncomingDamage, Add, FinalDamage) ← 设置值
               │
+              └── SetAttributeBaseValue 内部的前置钳制（真正的前置规则在这）：
+                  │   PreAttributeBaseChange（钳 Base 值：MaxHealth≥0、CritRate∈[0,1]…）
+                  │   PreAttributeChange    （钳 Current 值：Health∈[0,MaxHealth]…）
+              │
               ▼
-          PostGameplayEffectExecute(ExecuteData)
+          PostGameplayEffectExecute(ExecuteData)  ← 后置善后（真正扣血在这）
               │
               ├── Health = Clamp(Health - IncomingDamage, 0, MaxHealth)
+              │   写回 DamageResult.Breakdown.AppliedDamage（被钳制后的实际伤害）
               │
               └── (同样处理 IncomingToughnessDamage)
                   │
                   ▼
           广播 OnHealthChanged 委托 → ViewModel → Widget
+```
+
+### 三个钩子，用崩铁实例对照
+
+| 钩子 | 崩铁里对应什么 |
+|---|---|
+| `PreGameplayEffectExecute`（**否决闸门**，return false 整个丢弃） | 角色的"本场免疫一次致命伤害"被动：伤害 GE 要把血打到 0 时，先检查该被动 Tag，命中就 `return false`——这次伤害整个被吞掉，HP 一字不动。项目未重写，默认放行 |
+| `PreAttributeBaseChange` / `PreAttributeChange`（**前置钳制**） | 治疗溢出 / 回能溢出：娜塔莎大招治疗量 400，但目标只差 50 就满血——钳到 `MaxHealth` 后实际只生效 50；角色回能加到 `MaxEnergy` 就被钳住，多出的作废；暴击率永远进不了 (0,1) 之外 |
+| `PostGameplayEffectExecute`（**后置善后**） | 击破结算：ExecCalc 把韧性伤害塞进 `IncomingToughnessDamage`，这里真正扣韧性，扣到 0 就触发"弱点击破"（敌人延后行动 + 挂 DeBuff）；同时把被钳制后的**实际伤害**写回 Context，飘字显示的是这个真实数而不是原始公式数 |
+
+一句话记忆：
+```
+PreGameplayEffectExecute = "这次伤害让不让发生"（免疫/免死）
+PreAttribute(Change/BaseChange) = "数值不能越过上限/下限"（治疗溢出、回能溢出）
+PostGameplayEffectExecute = "伤害最终落到哪、触发什么"（真正扣血、击破、飘字）
 ```
 
 ## 3.10 在源码中追踪
@@ -1778,22 +1876,23 @@ struct FHSRStatusInstance
 };
 ```
 
-## 三路缓存防重复
+## 两路缓存防重复
 
 ```cpp
-TSet<FString> ProcessedStatusOperations;     // 复杂操作（按 OperationId 去重）
-TSet<FString> ProcessedInvalidSources;       // 来源失效（按 Epoch+Source 去重）
-TSet<FGuid> ProcessedAddOperations;          // 简化添加（AttackUp 专用）
+TSet<FGuid>   ProcessedOperationIds;   // 状态添加/刷新幂等（按操作 GUID，全局唯一不用清）
+TSet<FString> ProcessedInvalidSources; // 来源失效幂等（按 "纪元|来源"，纪元递增自然失效）
 ```
 
-## ActiveStatus vs AdditionalStatuses
+## 状态存储（Statuses 表）
 
-| 存储位置 | 用途 | 限制 |
-|---|---|---|
-| `ActiveStatus`（TOptional） | Status.Buff.AttackUp（唯一的主状态位） | 硬编码了 AttackUp，非通用 |
-| `AdditionalStatuses`（TMap） | 其他所有状态，按 StatusId 索引 | 允许多个共存 |
+当前状态存储是单个 `TMap<FName, FHSRStatusInstance> Statuses`，**按 StatusId 索引**（`HSRStatusComponent.h` 第 65 行）：
 
-**已知问题**：`ActiveStatus` 硬编码了 `Status.Buff.AttackUp`（`AddOrRefreshStatus` 第 92 行）。将来加 DefenseUp 等独占 Buff 时需要重构。
+- 每种状态在参与者身上最多一个实例：同 StatusId 重复施加 = 刷新剩余回合或叠层（`AddOrRefreshStatus`）
+- 不再有 `ActiveStatus` / `AdditionalStatuses` 的拆分——已合并成一张通用表，AttackUp 硬编码已移除
+- 来源信息存在实例内（`SourceParticipantId`），同 StatusId 被不同来源重挂时会刷新/覆盖来源
+- `ReplaceStatus` 要求当前恰好一个状态实例（原子替换，失败回滚）
+
+**已知限制**：Map 的 key 是 `StatusId` 不是 `StatusId + Source`，所以两个角色给同一目标挂同名状态时，在 GAS 层会合并成一个实例（叠层或刷新取决于 GE 的堆叠类型）。如果将来需要"同名状态按来源独立存在"，得改成复合 key，或配合 `EGameplayEffectStackingType::AggregateBySource`。
 
 ---
 
@@ -1895,13 +1994,19 @@ GAS 中「等待」的机制——等待动画播完、等待玩家选择目标�
 
 ## Stacking（堆叠）
 
+### 堆叠的本质
+
+堆叠 = 应用一个 Duration/Infinite GE 时，先到**目标的 ActiveGE 池**里找"能否叠到已有的某条上"（`FindStackableActiveGameplayEffect`）。找到 → `StackCount++`；找不到 → 新建一条。
+
+### 匹配条件（by target vs by source 的唯一差异）
+
 GAS 的堆叠配置（`GameplayEffect.h`）：
 
 ```cpp
 EGameplayEffectStackingType StackingType;
-// AggregateBySource — 同来源堆叠（同一角色多次 Apply）
-// AggregateByTarget — 同目标堆叠（所有来源对一个目标累加）
-// None — 不堆叠
+// AggregateBySource — 按施法者分组：每个施法者各有一叠，互不合并
+// AggregateByTarget — 按目标分组：不管谁施加，同一目标合并成一叠
+// None — 不堆叠，每次 Apply 都新建独立条目
 
 int32 StackLimitCount;                    // 上限
 EGameplayEffectStackingDurationPolicy;     // 堆叠时刷新/保持时长
@@ -1909,13 +2014,57 @@ EGameplayEffectStackingPeriodPolicy;       // 堆叠时重置/保持周期
 EGameplayEffectStackingExpirationPolicy;   // 到期逐层消失/整体消失
 ```
 
-你项目的 Status 系统利用 GAS 的 Stacking 机制：
+两种方式的差别全在 `FindStackableActiveGameplayEffect`（`GameplayEffect.cpp` 第 3522 行）的匹配条件：
+
+```cpp
+if (ActiveEffect.Spec.Def == Spec.Def && ((StackingType == EGameplayEffectStackingType::AggregateByTarget)
+    || (SourceASC && SourceASC == ActiveEffect.Spec.GetContext().GetInstigatorAbilitySystemComponent())))
+```
+
+| 堆叠方式 | 匹配条件 | 效果 |
+|---|---|---|
+| `AggregateByTarget` | 只要求 GE 定义相同 | 所有来源落到同一目标上合并成一叠 |
+| `AggregateBySource` | GE 相同 + 施法者 ASC 相同 | 每个施法者各有一叠，互不合并 |
+
+### 举例：A、B 两个角色都对敌人 E 施加同一张 GE
+
+**AggregateBySource —— "虚弱"（减攻 10%/层，Infinite，上限 3 层）：**
+
+```
+A 施加 ×2  →  E 身上 A 的"虚弱"：StackCount=2，攻 -20%
+B 施加 ×1  →  源 ASC 不同，不合并 → 新建 B 的"虚弱"：StackCount=1，攻 -10%
+```
+
+E 身上有**两条**独立"虚弱"，经 Aggregator 各自贡献，总计 -30%。B 的到期被移除 → 只消失 B 那层，A 的 2 层完好。
+
+**AggregateByTarget —— "灼烧"（Duration + Periodic，每层每回合 5 伤害，上限 3 层）：**
+
+```
+A 施加    →  StackCount=1，每回合 5
+B 施加    →  Def 相同即合并 → StackCount=2，每回合 10
+C 施加    →  StackCount=3（到 StackLimitCount），每回合 15
+D 再施加  →  到顶，走 StackDurationRefreshPolicy / OverflowEffects，层数不再涨
+```
+
+E 身上**只有一条**"灼烧"，层数叠加（伤害按层数线性放大）。移除时整条一起消失。
+
+**直觉记忆：**
+```
+BySource = "每个人给我挂的，各算各的"（独立存在、独立消失）
+ByTarget = "我身上这种 debuff 只有一叠，叠强度"（合并、放大）
+```
+
+### 你项目的现状与注意点
+
+你的 Status 系统利用 GAS 的 Stacking 机制（但 `FHSRStatusInstance` 自己按 StatusId 记账）：
 
 ```
 AddOrRefreshStatus 中：
   已有 + 未达 MaxStacks → Apply GE → GAS 自动 StackCount++
   已有 + 已达 MaxStacks → 只刷新 RemainingTurns，不 Apply GE
 ```
+
+**注意**：你的实例按 `StatusId + SourceParticipantId` 区分，GAS 的 StackCount 只是并行校验（`HSRCombatPatchTests.cpp` 测试里临时把状态 GE 设成 AggregateByTarget）。如果两个角色给同一目标挂同名状态时你希望是独立两条，GE 用 `None`（每次 Apply 独立一条）和你自己的记账最一致；选 ByTarget 反而会被 GAS 强制合并成一条。
 
 ## Immunity（免疫）
 

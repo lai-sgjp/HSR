@@ -116,10 +116,17 @@ struct FHSREquipmentLoadout
 
 ```cpp
 // UHSREquipmentSubsystem 内部状态
-TMap<FName, FDefinitionRule> Definitions;  // 所有已注册的装备定义
-TMap<FGuid, FLoadoutState>   Loadouts;     // 每个角色的装备
-TMap<FGuid, FGuid>           InstanceOwners; // 实例 ID → 角色 ID
+TMap<FName, FDefinitionRule>     Definitions;        // 所有已注册的装备定义
+TMap<FName, int32>               SetThresholds;      // 套装 ID → 激活门槛（作者可配，见 §6）
+TMap<FGuid, FHSREquipmentInstance> InstanceRegistry;  // 实例 ID → 实例本体（定义/强化/词条）
+TMap<FGuid, FLoadoutState>       Loadouts;           // 每个角色的装备（槽位 → InstanceId）
+TMap<FGuid, FGuid>               InstanceOwners;     // 实例 ID → 角色 ID
+TMap<FGuid, FMovementLedgerEntry>    MovementLedger;     // 换装账本（按 OperationId 幂等）
+TMap<FGuid, FEnhancementLedgerEntry> EnhancementLedger;  // 强化账本（按 OperationId 幂等）
 ```
+
+**关键：`FLoadoutState` 的槽位存的是 InstanceId（GUID）**，实例详情集中在 `InstanceRegistry`；
+`FHSREquipmentLoadout`（槽位 → 实例对象）只是投影/候选形态（PrepareRestore、StatAggregator 消费它）。
 
 ### 操作接口
 
@@ -132,6 +139,19 @@ TMap<FGuid, FGuid>           InstanceOwners; // 实例 ID → 角色 ID
 | `Unequip(CharacterId, Kind, Slot, ExpectedInstanceId)` | 卸下装备（需确认实例 ID） | `InstanceMismatch` / `Success` |
 | `SetEnhancementLevel(CharacterId, InstanceId, NewLevel)` | 强化装备 | `NoOp` / `InvalidEnhancementLevel` / `Success` |
 | `GetLoadout(CharacterId, &OutLoadout, &OutRevision)` | 读取角色装备 | `true` / `false` |
+| `RegisterInstance(Instance)` | 注册实例进 InstanceRegistry | `NoOp` / `InstancePayloadConflict` / `Success` |
+| `EnsureRegisteredFromItem(ItemId, InstanceId, MappingCatalog)` | 背包唯一物品 → 铸出装备实例（掉落/奖励链） | `UnknownDefinition` / `NoOp` / `Success` |
+| `EquipById(CharacterId, InstanceId)` / `ReplaceById` | 按 GUID 直接装备/替换 | 同 Equip/Replace |
+| `ExecuteMovement(Request, Inventory, MappingCatalog)` | 换装入口：带 Inventory + 映射目录，账本幂等 | `FHSREquipmentMovementResult` |
+| `ExecuteEnhancement(Request, Inventory, EnhancementCatalog)` | 强化入口：消耗强化材料，账本幂等 | `FHSREquipmentEnhancementResult` |
+| `RegisterSetDefinition(RelicSetDef)` | 注册套装激活门槛 | `Success` / ... |
+| `GetSetThreshold(SetId)` | 读套装门槛（未注册回退 2） | `int32` |
+| `FindInstanceOwner(InstanceId, &OutCharacterId)` | 查实例穿在谁身上 | `true` / `false` |
+
+`ExecuteMovement` / `ExecuteEnhancement` 的 Request 都带 `OperationId`（幂等重放）和
+`ExpectedInventoryRevision` / `ExpectedEquipmentRevision`（并发校验），结果按 OperationId 记入账本。
+另有两组投影 delegates（`SetMovementProjection` / `SetEnhancementProjection`，Preflight/Apply/Commit
+三段），由战斗侧绑定来做 stat 投影。
 
 ### Equip 的完整验证链
 
@@ -170,7 +190,9 @@ void UHSREquipmentSubsystem::CommitLoadout(const FGuid& CharacterId, const FHSRE
 }
 ```
 
-`CommitLoadout` 是原子的——同一角色一次完成所有变更。
+`CommitLoadout` 是原子的——同一角色一次完成所有变更。它仍是底层写入点（移除旧槽位 → 写入新槽位 →
+重建 InstanceOwners → `Revision + 1` → 广播），但现在操作级入口（`ExecuteMovement` / `ExecuteEnhancement`）
+会在它之上套一层：先跑投影 delegates、再按 OperationId 记账。
 
 ---
 
@@ -323,7 +345,7 @@ Bridge 持有 GE 的 Handle，因为：
   ↓
 统计每个 SetId 的出现次数
   ↓
-SetId 出现 ≥ 2 次 → 激活套装效果
+SetId 出现 ≥ Threshold 次 → 激活套装效果（Threshold 作者可配，默认 2）
 ```
 
 ### FHSRRelicSetResolver
@@ -336,7 +358,7 @@ struct FHSRRelicSetResolution
 {
     FName SetSourceId;  // 激活时 = SetId，不激活时 = NAME_None
     int32 Count;        // 已装备的同套装 Relic 数量
-    bool bActive;       // Count >= Threshold（当前 hardcode = 2）
+    bool bActive;       // Count >= Threshold（从子系统 GetSetThreshold 读作者配置，默认 2）
 };
 ```
 
@@ -355,6 +377,31 @@ RelicSetCounts 中 Count >= 2 的 SetId
 ---
 
 ## 7. 存档集成
+
+> **⚠️ schema ≥ 7 起改用 Registry + Placement 双格式（当前 `CurrentSchema = 9`）。**
+> 本节 7.1–7.6 描述的是**旧扁平数组格式**（`FHSREquipmentSaveDto`），当前代码仍兼容它（读旧档），
+> 但新档由 Registry（实例本体）+ Placement（摆位）组成，子系统对两套格式各有一组
+> `ExportSaveData` / `PrepareRestore` / `CommitRestore` 重载，`LoadSnapshot` 按
+> `HSRSaveSchemaGates::UsesEquipmentRegistry(schema)` 选路径。
+
+### 7.0 双格式（schema ≥ 7，当前 9）
+
+```cpp
+// 实例本体 —— 描述"这件装备是什么"，与谁装备无关
+struct FHSREquipmentRegistryDto {
+    FName DefinitionId; FGuid InstanceId;
+    int32 Kind; int32 EnhancementLevel;
+    TArray<FHSREquipmentModifier> Modifiers; FName SetId;
+};
+// 摆位 —— 描述"谁把它装在哪"，按 AuthorityRevision 记录版本
+struct FHSREquipmentPlacementDto {
+    FGuid InstanceId; FGuid CharacterId;
+    int32 Kind; int32 Slot; int32 AuthorityRevision;
+};
+```
+
+设计意图：**本体与摆位分离**——同一件实例换人/换槽不重写 Registry，存档校验只比摆位变化。
+`FHSRSaveData` 同时带 `Equipment`（旧）、`EquipmentRegistry`、`EquipmentPlacements` 三个数组。
 
 ### 7.1 ExportSaveData
 
@@ -747,14 +794,16 @@ UCLASS(BlueprintType)
 class UHSRRelicSetDefinition : public UDataAsset
 {
     UPROPERTY(EditAnywhere) FName SetId;                              // 套装 ID
-    UPROPERTY(EditAnywhere, meta = (ClampMin = "2", ClampMax = "2")) int32 Threshold = 2;  // 触发阈值（当前固定 2）
+    UPROPERTY(EditAnywhere, meta = (ClampMin = "1", ClampMax = "6")) int32 Threshold = 2;  // 触发阈值（可配 1~6，默认 2）
     UPROPERTY(EditAnywhere) TSubclassOf<UGameplayEffect> SetGameplayEffectClass;           // 套装效果的 GE
 };
 ```
 
 关键设计：
 
-- **Threshold 固定为 2**：HSR 原版的"2 件套"设计。编辑器 meta 限制了 ClampMin=2, ClampMax=2，实际不可更改
+- **Threshold 可按套装配置（1~6，默认 2）**：meta `ClampMin=1, ClampMax=6`。运行时经
+  `RegisterSetDefinition` 注册进 `SetThresholds`，消费方统一走 `GetSetThreshold`（未注册回退默认 2）。
+  历史坑：旧代码在给 `Row.Threshold` 赋值前就拿来比较，导致永远按默认 2 判定、忽略作者配置，现已修复
 - **套装效果是 GE**：`SetGameplayEffectClass` 是一个 GameplayEffect 资产，在被 ApplySetSource 时由 Bridge Apply 到角色身上
 - **套装 GE 的 Modifier**：套装效果本身（如"攻击力+12%"）在这个 GE 资产中通过 Modifier 定义，不是通过 Bridge 的 Aggregate 数值传递——Bridge 只负责 Apply/Remove 生命周期
 
@@ -766,6 +815,7 @@ class UHSRRelicSetDefinition : public UDataAsset
 // 在游戏加载时调用
 EquipmentSubsystem->RegisterDefinition(WeaponDef);     // UHSREquipmentDefinition
 EquipmentSubsystem->RegisterDefinition(RelicDef);      // UHSRRelicDefinition
+EquipmentSubsystem->RegisterSetDefinition(RelicSetDef); // UHSRRelicSetDefinition（套装门槛）
 ```
 
 内部转换：
@@ -773,6 +823,7 @@ EquipmentSubsystem->RegisterDefinition(RelicDef);      // UHSRRelicDefinition
 ```
 UHSREquipmentDefinition → FDefinitionRule { Kind=Equipment, Slot, EnhancementCap, SetId=NAME_None }
 UHSRRelicDefinition     → FDefinitionRule { Kind=Relic, Slot, EnhancementCap, SetId=... }
+UHSRRelicSetDefinition  → SetThresholds[SetId] = Threshold（套装门槛单独建表）
 ```
 
 注册后的 DefinitionId 被后续所有操作引用：Equip 检查、PrepareRestore 验证、存档校验。
