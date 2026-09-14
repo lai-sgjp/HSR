@@ -73,7 +73,9 @@ with (out/'files.csv').open('w',encoding='utf-8-sig',newline='') as f:
 groups=defaultdict(lambda:Counter())
 for row in rows:
     c=groups[(row['verdict'],row['group'])];c['count']+=1;c['bytes']+=row['bytes'];c[row['git']]+=1
-summary=['# 资产删除候选清单（尚未授权删除）','','此表是保守依赖审计，不表示已经删除或完成外部备份。逐文件路径、引用者、大小、Git 状态和备份要求见 [files.csv](files.csv)。',
+backup_commit=git('rev-parse','HEAD')[0]
+summary=['# 资产删除候选清单（尚未授权删除）','',f'生成清单时本地提交：`{backup_commit}`。Git 状态按本次生成时重新读取；推送是否一致以交付中的远端核验为准。',
+    '', '此表是保守依赖审计，不表示已经删除或完成外部备份。逐文件路径、引用者、大小、Git 状态和备份要求见 [files.csv](files.csv)。',
     '', '依赖包含硬引用、软引用和 Asset Manager 管理引用；源码和配置动态目录保守保留。测试/制作脚本独立列为待核实。未登记文件不自动判删。',
     '', '只有明确确认的 files.csv 具体行才能进入 Editor 引用感知删除；候选中存在互相引用时应按依赖组处理，删除前再次核对当前引用。',
     '', '|结论|目录|文件数|MiB|tracked / ignored / untracked|','|---|---|---:|---:|---|']
@@ -83,5 +85,5 @@ summary+=['','项目外备份尚未执行；待确认后对非 Git 文件建立�
     '', '四人模型、FINAL 移动动画、LIVE 战斗动画、FULL 倒地和 CAST 施法动画、骨架、重定向器及其依赖保留。旧地图或资源包只因名字陈旧不会被判删。',
     '', '候选行附 SHA-256，确认只适用于该内容版本；后续发生变化的文件需重新核对。']
 (out/'README.md').write_text('\n'.join(summary)+'\n',encoding='utf-8')
-(out/'summary.json').write_text(json.dumps({'files':len(rows),'verdicts':dict(Counter(r['verdict'] for r in rows)),'registry_packages':len(graph)},ensure_ascii=False,indent=2),encoding='utf-8')
+(out/'summary.json').write_text(json.dumps({'inventory_commit':backup_commit,'files':len(rows),'verdicts':dict(Counter(r['verdict'] for r in rows)),'registry_packages':len(graph),'deletion_authorized':False,'external_backup_completed':False},ensure_ascii=False,indent=2),encoding='utf-8')
 print((out/'README.md').as_posix());print(Counter(r['verdict'] for r in rows))

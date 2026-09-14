@@ -1,5 +1,7 @@
 # 资产删除候选清单（尚未授权删除）
 
+生成清单时本地提交：`560137514f726f002772a03256288b33b550e8af`。Git 状态按本次生成时重新读取；推送是否一致以交付中的远端核验为准。
+
 此表是保守依赖审计，不表示已经删除或完成外部备份。逐文件路径、引用者、大小、Git 状态和备份要求见 [files.csv](files.csv)。
 
 依赖包含硬引用、软引用和 Asset Manager 管理引用；源码和配置动态目录保守保留。测试/制作脚本独立列为待核实。未登记文件不自动判删。
@@ -23,7 +25,7 @@
 |仍被使用|Content/Data/Rewards|1|0.00|1 / 0 / 0|
 |仍被使用|Content/Data/Skills|4|0.01|4 / 0 / 0|
 |仍被使用|Content/Data/Status|4|0.01|4 / 0 / 0|
-|仍被使用|Content/Data/VerticalSlice|58|0.16|48 / 0 / 10|
+|仍被使用|Content/Data/VerticalSlice|58|0.16|58 / 0 / 0|
 |仍被使用|Content/GameplayEffects/BP_GE_InitializeCoreAttributes.uasset|1|0.06|1 / 0 / 0|
 |仍被使用|Content/GameplayEffects/BP_GE_P6_Heal.uasset|1|0.01|1 / 0 / 0|
 |仍被使用|Content/GameplayEffects/BP_GE_P6_UltimateDamage.uasset|1|0.01|1 / 0 / 0|
@@ -58,10 +60,10 @@
 |仍被使用|Content/Input/IMC_FrontendNavigation.uasset|1|0.00|1 / 0 / 0|
 |仍被使用|Content/Maps/VerticalSlice|3|0.58|3 / 0 / 0|
 |仍被使用|Content/Presentation/Animation|103|95.11|0 / 0 / 103|
-|仍被使用|Content/Presentation/Blueprints|3|0.07|0 / 0 / 3|
-|仍被使用|Content/Presentation/Materials|13|0.12|0 / 0 / 13|
-|仍被使用|Content/Presentation/Meshes|15|0.62|0 / 0 / 15|
-|仍被使用|Content/Presentation/UI|12|0.71|0 / 0 / 12|
+|仍被使用|Content/Presentation/Blueprints|3|0.07|3 / 0 / 0|
+|仍被使用|Content/Presentation/Materials|13|0.12|13 / 0 / 0|
+|仍被使用|Content/Presentation/Meshes|15|0.62|15 / 0 / 0|
+|仍被使用|Content/Presentation/UI|12|0.71|8 / 0 / 4|
 |仍被使用|Content/UI/P17|21|3.94|21 / 0 / 0|
 |仍被使用|Content/UI/WBP_AttributeDebug.uasset|1|0.27|1 / 0 / 0|
 |仍被使用|Content/UI/WBP_BattleCommandPanel.uasset|1|0.19|1 / 0 / 0|
@@ -158,7 +160,7 @@
 |待核实|Content/Maps/Map_Exploration_P15_A.umap|1|0.16|1 / 0 / 0|
 |待核实|Content/Maps/Map_Exploration_P15_B.umap|1|0.16|1 / 0 / 0|
 |待核实|Content/Polytope_Studio/Nature_Free|2|0.00|0 / 2 / 0|
-|待核实|Content/Presentation/Animation|283|197.65|0 / 0 / 283|
+|待核实|Content/Presentation/Animation|283|197.65|7 / 0 / 276|
 |待核实|Content/Scrapopolis/Effects|1|1.59|0 / 1 / 0|
 |待核实|Content/Scrapopolis/Levels|2|142.13|0 / 2 / 0|
 |待核实|Content/Scrapopolis/Materials|38|0.45|0 / 38 / 0|

@@ -1,9 +1,12 @@
 {
+  "inventory_commit": "560137514f726f002772a03256288b33b550e8af",
   "files": 3357,
   "verdicts": {
     "建议删除": 2093,
     "待核实": 556,
     "仍被使用": 708
   },
-  "registry_packages": 3275
+  "registry_packages": 3275,
+  "deletion_authorized": false,
+  "external_backup_completed": false
 }
