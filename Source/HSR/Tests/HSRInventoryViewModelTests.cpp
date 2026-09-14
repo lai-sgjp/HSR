@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "InputCoreTypes.h"
 #include "Engine/GameInstance.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/Engine.h"
@@ -411,7 +412,7 @@ bool FHSRInventoryViewModelEnhancementFailurePreservesSnapshotTest::RunTest(cons
 	TestEqual(TEXT("Enhancement registry instance registers"), Equipment->RegisterInstance(Instance),
 		EHSREquipmentOperationResult::Success);
 	TestTrue(TEXT("Enhancement rule registers"), EnhancementCatalog->AddRule({
-		EquipmentDefinitionId, EHSREquipmentKind::Equipment, 1, MaterialId, 2,
+		EquipmentDefinitionId, EHSREquipmentKind::Equipment, 1, MaterialId, 6,
 		{{EHSREquipmentStat::Attack, 8.0f}}}));
 	TestEqual(TEXT("Enhancement item enters bag"), Inventory->AddUnique({InstanceId, ItemId}),
 		EHSRInventoryOperationResult::Success);
@@ -429,7 +430,7 @@ bool FHSRInventoryViewModelEnhancementFailurePreservesSnapshotTest::RunTest(cons
 	TestEqual(TEXT("Enhancement entry selection succeeds"), ViewModel->SelectEntry(Before.Entries[0].Key),
 		EHSRInventoryViewModelResult::Success);
 	TestTrue(TEXT("Selected enhancement snapshot is available"), ViewModel->GetSnapshot(Before));
-	TestEqual(TEXT("Unowned enhancement is rejected by Authority"),
+	TestEqual(TEXT("Insufficient materials are rejected by Authority"),
 		ViewModel->SubmitAction(EHSRInventoryAction::Enhance, 1),
 		EHSRInventoryViewModelResult::AuthorityRejected);
 	FHSRInventoryModuleSnapshot After;
@@ -501,18 +502,30 @@ bool FHSRInventoryFrontendDynamicRouteTest::RunTest(const FString&)
 	Manager->ConfigureAutomationBackend(true, true, true, true, true);
 	Manager->ConfigureAutomationInventoryModuleBackend(true, true, true);
 	Manager->RegisterHostForAutomation();
+	TestEqual(TEXT("Pause hub opens"), Manager->OpenPauseScreen(), EHSRUIScreenResult::Success);
+	TestTrue(TEXT("Pause hub is visible before a module commits"), Manager->IsFrontendShellVisibleForAutomation());
+	Manager->FailNextAutomationRouteSubmit();
+	TestEqual(TEXT("Failed module transaction reports route failure"), Manager->OpenFrontendModule(EHSRFrontendModule::Inventory), EHSRUIScreenResult::StackRejected);
+	TestTrue(TEXT("Failed open retains visible hub"), Manager->IsFrontendShellVisibleForAutomation());
 
 	TestEqual(TEXT("P17 Inventory opens through the shared frontend route"),
 		Manager->OpenFrontendModule(EHSRFrontendModule::Inventory), EHSRUIScreenResult::Success);
 	TestTrue(TEXT("P17 Inventory reports an owned open module"), Manager->HasOpenInventoryScreen());
+	TestFalse(TEXT("Committed module hides the hub beneath it"), Manager->IsFrontendShellVisibleForAutomation());
 	TestEqual(TEXT("P17 Inventory owns one dynamic module content widget"),
 		Manager->GetFrontendModuleContentCountForAutomation(), 1);
 	TestEqual(TEXT("P17 Inventory dynamic content reports the Inventory route"),
 		Manager->GetFrontendModuleContentModuleForAutomation(), EHSRFrontendModule::Inventory);
 
+	Manager->ConfigureAutomationInventoryCloseFocus(false);
+	TestEqual(TEXT("Failed back reports focus failure"), Manager->RequestBack(), EHSRUIScreenResult::FocusApplyFailed);
+	TestFalse(TEXT("Failed back restores hub hidden state"), Manager->IsFrontendShellVisibleForAutomation());
+	TestTrue(TEXT("Failed back preserves module"), Manager->HasOpenInventoryScreen());
+	Manager->ConfigureAutomationInventoryCloseFocus(true);
 	TestEqual(TEXT("Back returns from P17 Inventory to the Pause Hub"),
 		Manager->RequestBack(), EHSRUIScreenResult::Success);
 	TestFalse(TEXT("Back releases P17 Inventory ownership"), Manager->HasOpenInventoryScreen());
+	TestTrue(TEXT("Successful back restores visible hub"), Manager->IsFrontendShellVisibleForAutomation());
 	TestEqual(TEXT("Back clears dynamic Inventory content"),
 		Manager->GetFrontendModuleContentCountForAutomation(), 0);
 	TestEqual(TEXT("X closes the shared frontend shell"),
@@ -553,6 +566,91 @@ bool FHSRInventoryFrontendDynamicTravelRestoreTest::RunTest(const FString&)
 		Manager->GetFrontendModuleContentCountForAutomation(), 1);
 
 	Manager->DeinitializeForAutomation();
+	return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRInventoryPreviewCommitFlowTest,
+	"HSR.UI.Inventory.Presentation.PreviewCommitFlow",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRInventoryPreviewCommitFlowTest::RunTest(const FString&)
+{
+	using namespace HSR::P17::InventoryTests;
+	auto* GI = NewObject<UGameInstance>();
+	auto* Inventory = MakeInventory(GI);
+	auto* Equipment = NewObject<UHSREquipmentSubsystem>(GI);
+	auto* Catalog = NewObject<UHSRInventoryCatalog>(GI);
+	auto* Mapping = NewObject<UHSRItemEquipmentMappingCatalog>(GI);
+	auto* Enhancements = NewObject<UHSREquipmentEnhancementCatalog>(GI);
+	const FName ItemId(TEXT("Item.Preview.Weapon")), MaterialId(TEXT("Item.Preview.Material")), DefinitionId(TEXT("Equipment.Preview.Weapon"));
+	const FGuid InstanceId(91,92,93,94), CharacterId(81,82,83,84);
+	RegisterItem(Inventory, GI, ItemId, EHSRItemStorageKind::Unique, 1);
+	RegisterItem(Inventory, GI, MaterialId, EHSRItemStorageKind::Stackable, 99);
+	Inventory->AddUnique({InstanceId, ItemId}); Inventory->AddStack(MaterialId, 5);
+	AddCatalogEntry(Catalog, ItemId, EHSRInventoryCategory::Weapon, TEXT("Preview Weapon"), 0);
+	Catalog->Entries[0].Description = FText::FromString(TEXT("An authored equipment description"));
+	Catalog->Entries[0].Rarity = 4;
+	AddCatalogEntry(Catalog, MaterialId, EHSRInventoryCategory::Material, TEXT("Upgrade Material"), 1);
+	auto* Definition = NewObject<UHSREquipmentDefinition>(GI);
+	Definition->DefinitionId = DefinitionId; Definition->Slot = EHSREquipmentSlot::Weapon; Definition->EnhancementCap = 3;
+	Equipment->RegisterDefinition(*Definition);
+	AddEquipmentMapping(Mapping, ItemId, DefinitionId, EHSREquipmentKind::Equipment, static_cast<int32>(EHSREquipmentSlot::Weapon));
+	Enhancements->AddRule({DefinitionId, EHSREquipmentKind::Equipment, 1, MaterialId, 2, {{EHSREquipmentStat::Attack, 8.f}}});
+	auto* VM = NewObject<UHSRInventoryViewModel>(GI);
+	VM->Initialize(Inventory, Catalog); VM->SetCommandContext(Equipment, Mapping, Enhancements, CharacterId);
+	FHSRInventoryModuleSnapshot Snapshot; VM->GetSnapshot(Snapshot);
+	TestEqual(TEXT("First open displays all item categories"), Snapshot.Entries.Num(), 2);
+	TestEqual(TEXT("Command target is explicit snapshot identity"), Snapshot.TargetCharacterId, CharacterId);
+	FHSRInventoryEntryKey Key; Key.ItemId = ItemId; Key.InstanceId = InstanceId;
+	VM->SelectEntry(Key); VM->GetSnapshot(Snapshot);
+	TestEqual(TEXT("Description projects authored text"), Snapshot.Detail.Entry.Description.ToString(), FString(TEXT("An authored equipment description")));
+	TestEqual(TEXT("Rarity projects authored value"), Snapshot.Detail.Entry.Rarity, 4);
+	TestEqual(TEXT("Never-equipped reward has enhancement option"), Snapshot.EnhancementOptions.Num(), 1);
+	auto* Widget = NewObject<UHSRInventoryModuleWidget>(GI); Widget->SetViewModel(VM); Widget->AttachForAutomation();
+	Widget->SetFilterText(TEXT("  Preview Weapon  "));
+	Widget->GetCurrentSnapshot(Snapshot);
+	TestEqual(TEXT("Search normalizes surrounding whitespace"), Snapshot.FilterText, FString(TEXT("Preview Weapon")));
+	TestEqual(TEXT("Search filters the list"), Snapshot.Entries.Num(), 1);
+	Widget->SetFilterText(TEXT(""));
+	Widget->GetCurrentSnapshot(Snapshot);
+	TestEqual(TEXT("Clearing search restores both categories"), Snapshot.Entries.Num(), 2);
+	Widget->CycleSortMode(); Widget->GetCurrentSnapshot(Snapshot);
+	TestEqual(TEXT("Sort button cycles to name"), Snapshot.SortMode, EHSRInventorySortMode::DisplayNameAscending);
+	Widget->CycleSortMode(); Widget->GetCurrentSnapshot(Snapshot);
+	TestEqual(TEXT("Sort button cycles to quantity"), Snapshot.SortMode, EHSRInventorySortMode::QuantityDescending);
+	Widget->CycleSortMode(); Widget->GetCurrentSnapshot(Snapshot);
+	TestEqual(TEXT("Sort button wraps to catalog"), Snapshot.SortMode, EHSRInventorySortMode::CatalogOrder);
+	TestTrue(TEXT("Sorting preserves the selected stable instance"), Snapshot.SelectedKey == Key);
+	TestEqual(TEXT("No implicit target before opening preview"), Widget->GetSelectedEnhancementTargetLevel(), -1);
+	TestTrue(TEXT("Enhance click opens preview"), Widget->PreviewAction(EHSRInventoryAction::Enhance));
+	TestFalse(TEXT("Another action cannot replace an outstanding preview"), Widget->PreviewAction(EHSRInventoryAction::Equip));
+	FHSRInventorySnapshot Bag; Inventory->GetSnapshot(Bag);
+	TestEqual(TEXT("Preview does not spend material"), Bag.Stacks[0].Quantity, 5);
+	FHSREquipmentInstance Registered;
+	TestFalse(TEXT("Preview does not mint registry instance"), Equipment->FindRegisteredInstance(InstanceId, Registered));
+	TestTrue(TEXT("Escape cancels the preview before screen navigation"), Widget->RoutePreviewBackForAutomation(EKeys::Escape));
+	Widget->PreviewAction(EHSRInventoryAction::Enhance);
+	TestTrue(TEXT("Tab also cancels before screen navigation"), Widget->RoutePreviewBackForAutomation(EKeys::Tab));
+	Widget->PreviewAction(EHSRInventoryAction::Enhance);
+	TestTrue(TEXT("Controller back also cancels before screen navigation"), Widget->RoutePreviewBackForAutomation(EKeys::Gamepad_Special_Right));
+	TestFalse(TEXT("Cancel closes preview"), Widget->HasPendingAction());
+	TestFalse(TEXT("Without a preview the key proceeds to normal navigation"), Widget->RoutePreviewBackForAutomation(EKeys::Escape));
+	TestEqual(TEXT("Cancel cannot commit"), Widget->ConfirmAction(), EHSRInventoryViewModelResult::EntryUnavailable);
+	Widget->PreviewAction(EHSRInventoryAction::Enhance);
+	TestEqual(TEXT("Explicit confirm enhances unregistered bag item"), Widget->ConfirmAction(), EHSRInventoryViewModelResult::Success);
+	Inventory->GetSnapshot(Bag); TestEqual(TEXT("Confirm spends exactly quoted cost"), Bag.Stacks[0].Quantity, 3);
+	TestEqual(TEXT("Double confirm cannot execute again"), Widget->ConfirmAction(), EHSRInventoryViewModelResult::EntryUnavailable);
+	Equipment->FindRegisteredInstance(InstanceId, Registered); TestEqual(TEXT("Enhancement committed"), Registered.EnhancementLevel, 1);
+	Widget->PreviewAction(EHSRInventoryAction::Equip);
+	Inventory->AddStack(MaterialId, 1);
+	TestFalse(TEXT("Inventory revision change invalidates outstanding preview"), Widget->HasPendingAction());
+	TestEqual(TEXT("Invalidated preview cannot commit"), Widget->ConfirmAction(), EHSRInventoryViewModelResult::EntryUnavailable);
+	TestTrue(TEXT("Equip opens another preview"), Widget->PreviewAction(EHSRInventoryAction::Equip));
+	TestEqual(TEXT("Equip confirms"), Widget->ConfirmAction(), EHSRInventoryViewModelResult::Success);
+	VM->GetSnapshot(Snapshot);
+	TestTrue(TEXT("Equipped selection remains visible and stable"), Snapshot.SelectedKey == Key && Snapshot.Detail.bHasSelection);
+	TestEqual(TEXT("Equipped row exposes its real owner"), Snapshot.Detail.Entry.EquippedCharacterId, CharacterId);
+	Widget->SetViewModel(nullptr); VM->Shutdown();
 	return true;
 }
 

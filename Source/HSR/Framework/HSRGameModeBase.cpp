@@ -168,9 +168,12 @@ EHSRCharacterBootstrapResult AHSRGameModeBase::BootstrapCharacterIdentity(const 
 	TSet<FName> CatalogIds;
 	bool bContainsInitialCharacter = false;
 	int32 RegisteredDefinitionCount = 0;
-	for (const TSubclassOf<UHSRCharacterDefinition>& Entry : CharacterCatalog->Characters)
+	TArray<const UHSRCharacterDefinition*> CatalogDefinitions;
+	for (const auto& Entry : CharacterCatalog->Characters)
+		CatalogDefinitions.Add(Entry ? Entry->GetDefaultObject<UHSRCharacterDefinition>() : nullptr);
+	for (const auto& Entry : CharacterCatalog->CharacterAssets) CatalogDefinitions.Add(Entry);
+	for (const UHSRCharacterDefinition* Definition : CatalogDefinitions)
 	{
-		const UHSRCharacterDefinition* Definition = Entry ? Entry->GetDefaultObject<UHSRCharacterDefinition>() : nullptr;
 		if (!Definition || Definition->CharacterId.IsNone() || CatalogIds.Contains(Definition->CharacterId)
 			|| Definition->CumulativeExperienceCurve.IsNull()
 			|| !Definition->CumulativeExperienceCurve.LoadSynchronous())
@@ -230,7 +233,16 @@ EHSRCharacterBootstrapResult AHSRGameModeBase::BootstrapCharacterIdentity(const 
 		{
 			return FinishBootstrap(EHSRCharacterBootstrapResult::NoCommittedSelection);
 		}
-		if (Party->AddCharacter(InitialCharacterId, 0) != EHSRPartyResult::Success)
+		EHSRPartyResult SeedResult;
+		if (InitialPartyIds.IsEmpty()) SeedResult = Party->AddCharacter(InitialCharacterId, 0);
+		else
+		{
+			if (InitialPartyIds.Num() > UHSRPartySubsystem::Capacity || InitialPartyIds[0] != InitialCharacterId)
+				return FinishBootstrap(EHSRCharacterBootstrapResult::InvalidInitialCharacter);
+			for (int32 I=0; I<InitialPartyIds.Num(); ++I) PartySnapshot.Slots[I].CharacterId=InitialPartyIds[I];
+			SeedResult=Party->CommitCandidate(PartySnapshot);
+		}
+		if (SeedResult != EHSRPartyResult::Success)
 		{
 			return FinishBootstrap(EHSRCharacterBootstrapResult::PartyUnavailable);
 		}

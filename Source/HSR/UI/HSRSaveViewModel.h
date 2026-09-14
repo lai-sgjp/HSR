@@ -7,7 +7,7 @@
 class UHSRSaveSubsystem;
 
 UENUM(BlueprintType)
-enum class EHSRSaveFrontendActionResult : uint8 { Success, ConfirmationRequired, InvalidArgument };
+enum class EHSRSaveFrontendActionResult : uint8 { Success, ConfirmationRequired, InvalidArgument, OperationFailed };
 
 USTRUCT(BlueprintType)
 struct HSR_API FHSRSaveFrontendResult
@@ -19,6 +19,7 @@ struct HSR_API FHSRSaveFrontendResult
 	UPROPERTY(BlueprintReadOnly) bool bRecoveredFromBackup = false;
 	UPROPERTY(BlueprintReadOnly) bool bRuntimeChanged = false;
 	UPROPERTY(BlueprintReadOnly) bool bPending = false;
+	UPROPERTY(BlueprintReadOnly) bool bAwaitingOverwrite = false;
 };
 
 DECLARE_MULTICAST_DELEGATE(FHSRSaveViewModelChanged);

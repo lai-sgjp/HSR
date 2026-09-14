@@ -4,7 +4,7 @@ This reference is an optional checklist for `$phase-next-steps`. The detailed pr
 
 ## Universal phase loop
 
-1. Read `agents.md`, `todo_plan.md`, `worklog.md`, `README.md`, the roadmap, and the current phase document.
+1. Read `PROJECT_STATE.md` and the relevant current phase document. Consult `.agents/agents.md` for applicable rules; read todo, worklog, README or roadmap only when needed to resolve a specific prerequisite or evidence gap.
 2. Define one independently verifiable, coherent vertical outcome; list exact allowed files and explicit non-goals.
 3. Describe ownership, data flow, Editor manual work, risks, and evidence before editing.
 4. Check UE reflection, GC, Tick, GAS, UI, DataAsset/Runtime/SaveGame, copyright, and future-networking boundaries as applicable.

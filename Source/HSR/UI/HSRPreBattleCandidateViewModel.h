@@ -25,6 +25,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "HSR|PreBattle")
 	EHSRPreBattleCandidateResult SetBuff(FName BuffId);
+	EHSRPreBattleCandidateResult RemoveBuff(FName BuffId);
 
 	UFUNCTION(BlueprintCallable, Category = "HSR|PreBattle")
 	EHSRPreBattleCandidateResult ConfirmCandidate(UPARAM(ref) FHSREncounterRequest& OutRequest);

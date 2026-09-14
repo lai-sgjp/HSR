@@ -137,6 +137,7 @@ EHSRCharacterDetailResult UHSRCharacterDetailViewModel::BuildSnapshot(FName Id, 
 		int32 EquipmentRevision = 0;
 		if (Equipment->GetLoadout(HSRCharacterGuidFromProfileName(Id), Loadout, EquipmentRevision))
 		{
+			N.EquipmentRevision = EquipmentRevision;
 			FHSREquipmentAggregate Aggregate;
 			if (UHSREquipmentStatAggregator::Aggregate(Loadout, EquipmentRevision, Aggregate))
 			{
@@ -219,7 +220,7 @@ void UHSRCharacterDetailViewModel::RefreshSelected()
 	{
 		return;
 	}
-	if (bHasSnapshot && N.RuntimeRevision == Snapshot.RuntimeRevision)
+	if (bHasSnapshot && N.RuntimeRevision == Snapshot.RuntimeRevision && N.EquipmentRevision == Snapshot.EquipmentRevision)
 	{
 		return;
 	}

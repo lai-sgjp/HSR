@@ -6,6 +6,7 @@
 #include "HSRInventoryRewardWidget.generated.h"
 
 class UHSRInventoryRewardViewModel;
+class UHSRInventoryCatalog;
 
 UCLASS(Blueprintable)
 class HSR_API UHSRInventoryWidget : public UHSRScreenWidget
@@ -57,16 +58,38 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category = "HSR|Reward")
 	void OnRewardSnapshotChanged(const TArray<FHSRRewardReceipt>& Receipts);
 
+	UFUNCTION(BlueprintPure, Category = "HSR|Reward")
+	FText GetRewardNotificationText() const { return NotificationText; }
+
+#if WITH_DEV_AUTOMATION_TESTS
+	void AttachForAutomation() { BindAndRefresh(); }
+	void ExpireForAutomation() { AdvanceNotification(); }
+#endif
+
 protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
 private:
 	void HandleSnapshot(const FHSRInventoryRewardSnapshot& InSnapshot);
 	void BindAndRefresh();
+	void HideNotification();
+	void AdvanceNotification();
+	void ShowNotification(const TArray<FHSRRewardReceipt>& NewReceipts);
+	FText ResolveItemName(FName ItemId) const;
+	UPROPERTY(EditDefaultsOnly, Category = "HSR|Reward")
+	TObjectPtr<UHSRInventoryCatalog> Catalog;
+	UPROPERTY(EditDefaultsOnly, Category = "HSR|Reward", meta = (ClampMin = "1.0", ClampMax = "15.0"))
+	float NotificationSeconds = 5.f;
+	TSet<FGuid> ObservedClaims;
+	TMap<FName, int64> VisibleQuantities;
+	FTimerHandle NotificationTimer;
+	FText NotificationText;
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRInventoryRewardViewModel> ViewModel;
 	FDelegateHandle Subscription;
 	TArray<FHSRRewardReceipt> Current;
+	TArray<FHSRRewardReceipt> PendingReceipts;
 	bool bHasSnapshot = false;
 };

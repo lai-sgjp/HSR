@@ -25,6 +25,7 @@ public class HSR : ModuleRules
 		{
 			"Slate",
 			"SlateCore",
+			"Json",
 		});
 	}
 }

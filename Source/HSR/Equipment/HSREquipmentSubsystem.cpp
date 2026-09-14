@@ -10,6 +10,7 @@
 #include "../Save/HSRSaveTypes.h"
 
 #include <cmath>
+#include "Misc/ScopeExit.h"
 
 // Initialize：启动时注册生产环境的遗器/套装定义。这样通过掉落或奖励进入背包的遗器
 // 在穿戴时能解析到已知定义（ExecuteMovement 会用 Definitions.Find(DefinitionId) 校验）。
@@ -432,6 +433,8 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UH
 	Rule.Kind = EHSREquipmentKind::Equipment;
 	Rule.Slot = static_cast<int32>(Definition.Slot);
 	Rule.EnhancementCap = Definition.EnhancementCap;
+	Rule.DefaultModifiers = Definition.DefaultModifiers;
+	if (!IsValidModifiers(Rule.DefaultModifiers)) return EHSREquipmentOperationResult::InvalidModifier;
 	Definitions.Add(Definition.DefinitionId, Rule);
 	return EHSREquipmentOperationResult::Success;
 }
@@ -484,6 +487,8 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::RegisterDefinition(const UH
 	Rule.Kind = EHSREquipmentKind::Relic;
 	Rule.Slot = static_cast<int32>(Definition.Slot);
 	Rule.EnhancementCap = Definition.EnhancementCap;
+	Rule.DefaultModifiers = Definition.DefaultModifiers;
+	if (!IsValidModifiers(Rule.DefaultModifiers)) return EHSREquipmentOperationResult::InvalidModifier;
 	Rule.SetId = Definition.SetId;
 	Definitions.Add(Definition.DefinitionId, Rule);
 	return EHSREquipmentOperationResult::Success;
@@ -574,43 +579,32 @@ EHSREquipmentOperationResult UHSREquipmentSubsystem::EnsureRegisteredFromItem(
 		return EHSREquipmentOperationResult::NoOp;
 	}
 
-	FHSRItemEquipmentMappingEntry Mapping;
-	if (!MappingCatalog.Resolve(ItemId, Mapping))
+	FHSREquipmentInstance Instance;
+	if (!PreviewMappedInstance(ItemId, InstanceId, MappingCatalog, Instance))
 	{
 		return EHSREquipmentOperationResult::UnknownDefinition;
 	}
-
-	FHSREquipmentInstance Instance;
-	Instance.InstanceId = InstanceId;
-	Instance.DefinitionId = Mapping.EquipmentDefinitionId;
-	Instance.Kind = Mapping.Kind;
-
-	// 带上作者配置的属性行，使掉落的遗器/武器穿戴后产生真实的派生属性提升。
-	// 否则铸出的实例词条为空，加成恒为 0。定义资源按 DA_Relic_<槽位后缀> /
-	// DA_Equipment_<后缀> 命名；后缀从 ID 末段派生（Relic.P12.Head -> Head）。
-	const FString DefId = Mapping.EquipmentDefinitionId.ToString();
-	FString Suffix = DefId;
-	{
-		int32 Dot = INDEX_NONE;
-		if (DefId.FindLastChar(TEXT('.'), Dot))
-		{
-			Suffix = DefId.Mid(Dot + 1);
-		}
-	}
-	if (Instance.Kind == EHSREquipmentKind::Relic)
-	{
-		if (UHSRRelicDefinition* Relic = LoadObject<UHSRRelicDefinition>(nullptr,
-			*FString::Printf(TEXT("/Game/Data/Relics/DA_Relic_%s.DA_Relic_%s"), *Suffix, *Suffix)))
-		{
-			Instance.Modifiers = Relic->DefaultModifiers;
-		}
-	}
-	else if (UHSREquipmentDefinition* Weapon = LoadObject<UHSREquipmentDefinition>(nullptr,
-		*FString::Printf(TEXT("/Game/Data/Equipment/DA_Equipment_%s.DA_Equipment_%s"), *Suffix, *Suffix)))
-	{
-		Instance.Modifiers = Weapon->DefaultModifiers;
-	}
 	return RegisterInstance(Instance);
+}
+
+bool UHSREquipmentSubsystem::PreviewMappedInstance(FName ItemId, const FGuid& InstanceId,
+	const UHSRItemEquipmentMappingCatalog& MappingCatalog, FHSREquipmentInstance& OutInstance) const
+{
+	FHSRItemEquipmentMappingEntry Mapping;
+	if (!InstanceId.IsValid() || !MappingCatalog.Resolve(ItemId, Mapping)
+		|| !IsDefinitionCompatible(Mapping.EquipmentDefinitionId, Mapping.Kind, Mapping.Slot)) return false;
+	if (FindRegisteredInstance(InstanceId, OutInstance))
+	{
+		return OutInstance.DefinitionId == Mapping.EquipmentDefinitionId && OutInstance.Kind == Mapping.Kind;
+	}
+	const FDefinitionRule* Rule = Definitions.Find(Mapping.EquipmentDefinitionId);
+	if (!Rule) return false;
+	OutInstance = FHSREquipmentInstance();
+	OutInstance.InstanceId = InstanceId;
+	OutInstance.DefinitionId = Mapping.EquipmentDefinitionId;
+	OutInstance.Kind = Mapping.Kind;
+	OutInstance.Modifiers = Rule->DefaultModifiers;
+	return IsValidInstance(OutInstance);
 }
 
 // FindRegisteredInstance：按实例 ID 查注册表（返回拷贝）。
@@ -799,6 +793,11 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 		return Result;
 	}
 
+	bool bMintedForMovement = false;
+	ON_SCOPE_EXIT
+	{
+		if (bMintedForMovement && !Result.bCommitted) InstanceRegistry.Remove(Request.InstanceId);
+	};
 	// 确保实例已注册。掉落/奖励进入背包的装备在背包里是唯一物品但还没有装备实例，
 	// 这里按映射目录铸一个；Unequip 未知实例则保持拒绝。
 	FHSREquipmentInstance RegistryInstance;
@@ -824,6 +823,7 @@ FHSREquipmentMovementResult UHSREquipmentSubsystem::ExecuteMovement(const FHSREq
 			Result.Code = EHSREquipmentMovementResultCode::EquipmentRejected;
 			return Result;
 		}
+		bMintedForMovement = AutoRegistration == EHSREquipmentOperationResult::Success;
 		if (!FindRegisteredInstance(Request.InstanceId, RegistryInstance))
 		{
 			Result.Code = EHSREquipmentMovementResultCode::EquipmentRejected;
@@ -1098,7 +1098,11 @@ FHSREquipmentEnhancementResult UHSREquipmentSubsystem::ExecuteEnhancement(
 	Result.OldEnhancementLevel = CurrentInstance->EnhancementLevel;
 	Result.NewEnhancementLevel = CurrentInstance->EnhancementLevel;
 	const FGuid* Owner = InstanceOwners.Find(Request.InstanceId);
-	if (Owner == nullptr || *Owner != Request.CharacterId || CurrentInstance->Kind != Request.Kind)
+	const bool bEquipped = Owner != nullptr;
+	const bool bInBag = InventorySnapshot.UniqueItems.ContainsByPredicate(
+		[&Request](const FHSRItemInstance& Item) { return Item.InstanceId == Request.InstanceId; });
+	if ((bEquipped && *Owner != Request.CharacterId) || (!bEquipped && !bInBag)
+		|| CurrentInstance->Kind != Request.Kind)
 	{
 		Result.Code = EHSREquipmentEnhancementResultCode::EquipmentRejected;
 		return Result;
@@ -1152,7 +1156,7 @@ FHSREquipmentEnhancementResult UHSREquipmentSubsystem::ExecuteEnhancement(
 	FHSREquipmentInstance CandidateInstance = *CurrentInstance;
 	CandidateInstance.EnhancementLevel = Rule.TargetLevel;
 	CandidateInstance.Modifiers = Rule.TargetModifiers;
-	if (EnhancementProjectionPreflight.IsBound()
+	if (bEquipped && EnhancementProjectionPreflight.IsBound()
 		&& !EnhancementProjectionPreflight.Execute(Request, CandidateInstance))
 	{
 		Result.Code = EHSREquipmentEnhancementResultCode::ProjectionRejected;
@@ -1164,11 +1168,13 @@ FHSREquipmentEnhancementResult UHSREquipmentSubsystem::ExecuteEnhancement(
 	CurrentInstance = InstanceRegistry.Find(Request.InstanceId);
 	check(CurrentInstance != nullptr);
 	*CurrentInstance = CandidateInstance;
-	FLoadoutState& InstalledLoadout = Loadouts.FindOrAdd(Request.CharacterId);
-	InstalledLoadout.Revision = Result.OldEquipmentRevision + 1;
+	if (bEquipped)
+	{
+		Loadouts.FindChecked(Request.CharacterId).Revision = Result.OldEquipmentRevision + 1;
+	}
 	Inventory.FinalizeEquipmentEnhancementRevisionNoFail(InventorySnapshot.Revision + 1);
 	Result.NewInventoryRevision = InventorySnapshot.Revision + 1;
-	Result.NewEquipmentRevision = InstalledLoadout.Revision;
+	Result.NewEquipmentRevision = Result.OldEquipmentRevision + (bEquipped ? 1 : 0);
 	Result.NewEnhancementLevel = CandidateInstance.EnhancementLevel;
 	Result.Code = EHSREquipmentEnhancementResultCode::Success;
 	Result.bCommitted = true;
@@ -1177,11 +1183,37 @@ FHSREquipmentEnhancementResult UHSREquipmentSubsystem::ExecuteEnhancement(
 	RecordLedgerEntry(EnhancementLedger, EnhancementLedgerOrder, Request.OperationId,
 		FEnhancementLedgerEntry{Request, Result});
 	Inventory.PublishEquipmentEnhancementCommit(Result.NewInventoryRevision);
-	LoadoutChanged.Broadcast(Request.CharacterId, InstalledLoadout.Revision);
-	if (EnhancementProjectionCommit.IsBound())
+	if (bEquipped) LoadoutChanged.Broadcast(Request.CharacterId, Result.NewEquipmentRevision);
+	if (bEquipped && EnhancementProjectionCommit.IsBound())
 	{
 		EnhancementProjectionCommit.Execute(Request, CandidateInstance);
 	}
+	return Result;
+}
+
+FHSREquipmentEnhancementResult UHSREquipmentSubsystem::ExecuteInventoryEnhancement(
+	const FHSREquipmentEnhancementRequest& Request, UHSRInventorySubsystem& Inventory,
+	const UHSREquipmentEnhancementCatalog& Catalog, const UHSRItemEquipmentMappingCatalog& MappingCatalog)
+{
+	// Replay is independent of current placement, exactly as for the existing transaction entrypoint.
+	if (EnhancementLedger.Contains(Request.OperationId)) return ExecuteEnhancement(Request, Inventory, Catalog);
+	FHSRInventorySnapshot Bag;
+	Inventory.GetSnapshot(Bag);
+	const FHSRItemInstance* Item = Bag.UniqueItems.FindByPredicate(
+		[&Request](const FHSRItemInstance& Row) { return Row.InstanceId == Request.InstanceId; });
+	FHSREquipmentInstance Preview;
+	if (!Item || !PreviewMappedInstance(Item->DefinitionId, Request.InstanceId, MappingCatalog, Preview)
+		|| Preview.Kind != Request.Kind)
+	{
+		FHSREquipmentEnhancementResult Rejected;
+		Rejected.OperationId = Request.OperationId;
+		Rejected.Code = EHSREquipmentEnhancementResultCode::EquipmentRejected;
+		return Rejected;
+	}
+	const bool bMinted = !InstanceRegistry.Contains(Request.InstanceId);
+	if (bMinted) InstanceRegistry.Add(Request.InstanceId, Preview);
+	FHSREquipmentEnhancementResult Result = ExecuteEnhancement(Request, Inventory, Catalog);
+	if (bMinted && !Result.bCommitted) InstanceRegistry.Remove(Request.InstanceId);
 	return Result;
 }
 

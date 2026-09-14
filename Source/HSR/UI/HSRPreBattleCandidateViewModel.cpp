@@ -59,7 +59,8 @@ EHSRPreBattleCandidateResult UHSRPreBattleCandidateViewModel::SetCandidateSlot(i
 	{
 		return EHSRPreBattleCandidateResult::InvalidSlot;
 	}
-	if (!IsKnownProfile(CharacterId))
+	if (CharacterId.IsNone() && SlotIndex == 0) return EHSRPreBattleCandidateResult::EmptyLeader;
+	if (!CharacterId.IsNone() && !IsKnownProfile(CharacterId))
 	{
 		return EHSRPreBattleCandidateResult::ProfileNotFound;
 	}
@@ -84,6 +85,14 @@ EHSRPreBattleCandidateResult UHSRPreBattleCandidateViewModel::SetBuff(FName Buff
 	{
 		BuffIds.Add(BuffId);
 	}
+	RebuildSnapshot();
+	return EHSRPreBattleCandidateResult::Success;
+}
+
+EHSRPreBattleCandidateResult UHSRPreBattleCandidateViewModel::RemoveBuff(FName BuffId)
+{
+	if (BuffId.IsNone()) return EHSRPreBattleCandidateResult::InvalidCandidate;
+	BuffIds.Remove(BuffId);
 	RebuildSnapshot();
 	return EHSRPreBattleCandidateResult::Success;
 }

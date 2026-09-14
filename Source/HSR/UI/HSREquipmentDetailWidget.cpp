@@ -8,6 +8,8 @@ void UHSREquipmentDetailWidget::NativeConstruct()
 	if (ViewModel)
 	{
 		HandleId = ViewModel->OnChanged().AddUObject(this, &ThisClass::Handle);
+		FHSREquipmentDetailSnapshot Initial;
+		if (ViewModel->GetSnapshot(Initial)) Handle(Initial);
 	}
 }
 
@@ -29,9 +31,13 @@ void UHSREquipmentDetailWidget::SetViewModel(UHSREquipmentDetailViewModel* In)
 		ViewModel->OnChanged().Remove(HandleId);
 	}
 	ViewModel = In;
+	bHas = false;
+	Current = FHSREquipmentDetailSnapshot();
 	if (ViewModel && IsConstructed())
 	{
 		HandleId = ViewModel->OnChanged().AddUObject(this, &ThisClass::Handle);
+		FHSREquipmentDetailSnapshot Initial;
+		if (ViewModel->GetSnapshot(Initial)) Handle(Initial);
 	}
 }
 

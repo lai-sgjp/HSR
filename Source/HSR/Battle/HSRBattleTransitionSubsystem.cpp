@@ -11,6 +11,7 @@
 #include "../Reward/HSRRewardSubsystem.h"
 #include "../Map/HSRMapSubsystem.h"
 #include "../Party/HSRPartySubsystem.h"
+#include "../Challenge/HSRChallengeProgressionSubsystem.h"
 #include "HSRStageBuffAuthority.h"
 #include "../Data/Definitions/HSRStageBuffDefinition.h"
 
@@ -62,6 +63,21 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounter(UHSREncounte
 FHSREncounterResult UHSRBattleTransitionSubsystem::SubmitEncounterRequestFromUI(const FHSREncounterRequest& Request)
 {
 	return SubmitEncounterRequest(Request, GetWorld());
+}
+
+bool UHSRBattleTransitionSubsystem::IsEncounterResolved(FName EncounterId) const
+{
+	if (ResolvedEncounterIds.Contains(EncounterId)) return true;
+	const UHSRChallengeProgressionSubsystem* Progression = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UHSRChallengeProgressionSubsystem>() : nullptr;
+	return Progression && Progression->IsCompleted(EncounterId);
+}
+
+void UHSRBattleTransitionSubsystem::ResetResolvedEncountersAfterRestore()
+{
+	// The restored progression is now authoritative. Do not touch active travel
+	// bookkeeping or replay IDs; failed and pending restores never call this hook.
+	ResolvedEncounterIds.Reset();
 }
 
 // 校验一组关卡 Buff ID 对给定遭遇是否合法（空集合恒为真）。
@@ -166,6 +182,11 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::BuildPreBattleEncounterTempla
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
 			FText::FromString(TEXT("EncounterId or EnemyDefinitionId is not set.")));
 	}
+	if (IsEncounterResolved(Definition->EncounterId))
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::AlreadyConsumed,
+			NSLOCTEXT("HSRBattle", "EncounterAlreadyCompleted", "此遭遇已完成，奖励不会重复发放。"));
+	}
 	if (Definition->BattleMap.IsNull())
 	{
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidMap,
@@ -238,11 +259,11 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest,
 			FText::FromString(TEXT("EncounterId is not set.")));
 	}
-	// 同一会话内已解决过的遭遇不能再次触发。
-	if (ResolvedEncounterIds.Contains(Definition->EncounterId))
+	// Completed encounters remain resolved after restoring into a fresh GameInstance.
+	if (IsEncounterResolved(Definition->EncounterId))
 	{
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::AlreadyConsumed,
-			FText::FromString(TEXT("This encounter was already resolved in the current game session.")));
+			NSLOCTEXT("HSRBattle", "EncounterAlreadyCompleted", "此遭遇已完成，奖励不会重复发放。"));
 	}
 	if (Definition->EnemyDefinitionId.IsNone())
 	{
@@ -354,6 +375,13 @@ FHSREncounterResult UHSRBattleTransitionSubsystem::RequestEncounterInternal(
 FHSREncounterResult UHSRBattleTransitionSubsystem::SubmitEncounterRequest(
 	const FHSREncounterRequest& Request, UWorld* World)
 {
+	// Recheck at the admission boundary: a UI template can predate a save restore
+	// or another completion. Reject before mutating pending state or starting travel.
+	if (IsEncounterResolved(Request.EncounterId))
+	{
+		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::AlreadyConsumed,
+			NSLOCTEXT("HSRBattle", "EncounterAlreadyCompleted", "此遭遇已完成，奖励不会重复发放。"));
+	}
 	if (!World || !Request.RequestId.IsValid() || Request.BattleMapPath.IsNone())
 	{
 		return FHSREncounterResult::MakeFailure(EHSREncounterResultType::InvalidRequest);
@@ -662,7 +690,12 @@ FHSRExplorationReturnResult UHSRBattleTransitionSubsystem::RequestBattleReturn(c
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - SUCCESS RequestId=%s ExplorationMap=%s (kind=Return)"),
 		*ReturnCtx.RequestId.ToString(), *ReturnCtx.ExplorationMapPath.ToString());
 
-	UGameplayStatics::OpenLevel(GetWorld(), ReturnCtx.ExplorationMapPath, true);
+#if WITH_DEV_AUTOMATION_TESTS
+	if (!bSuppressTravelForAutomation)
+#endif
+	{
+		UGameplayStatics::OpenLevel(GetWorld(), ReturnCtx.ExplorationMapPath, true);
+	}
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleTransitionSubsystem::RequestTestReturn - Traveling back to %s"), *ReturnCtx.ExplorationMapPath.ToString());
 
 	return FHSRExplorationReturnResult::MakeSuccess();

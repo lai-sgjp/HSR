@@ -1,3 +1,12 @@
+# CURRENT TASK — HSR PRESENTATION AND PLAYABILITY REBUILD
+
+Status: PLAYABLE BUILD DELIVERED, with explicit visual-fidelity and human-pacing limits. User approved 2026-09-12, including subsequent inventory/equipment/relic workflow repairs.
+
+The current user authorization supersedes the historical binary-asset ownership and source allowlist below. Scope: three formal VerticalSlice maps, Blender modular sources/FBX exports, existing UMG pages, supporting C++/Config/editor automation, and integrated validation. Preserve existing stable IDs and historical test maps. Keep pre-existing VRM4U DLL changes separate; no commit or push.
+
+Execution contract and evidence: `docs/presentation-rebuild-execution.md`. Latest editor build and Windows Development package passed. All 74 related Automation tests passed on the final native version (10:17:31 UTC). Inventory/relic/party/pre-battle, both quest orders, single/multiple/boss battles, real save reload and restart reward replay have passed their recorded checks. 720p/1080p/1440p routes are captured. Standalone hidden-window 1080p fixed route measured 327.6 FPS / P95 3.89 ms; whole-adapter memory peak 2124 MiB. Final artifact collation is underway. First-play human pacing and visible-window presentation latency remain unmeasured.
+
+---
 # CURRENT TASK - TASK-P18-DEMO-CONTENT-001
 
 Status: IN PROGRESS / CONTENT CONTRACT FROZEN / BUILD PASS / TDD RED CONFIRMED / USER EDITOR AUTHORING REQUIRED

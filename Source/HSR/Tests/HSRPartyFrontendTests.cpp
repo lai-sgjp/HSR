@@ -23,6 +23,7 @@ bool FHSRPartyFrontendProjectionTest::RunTest(const FString&)
 	UHSRPartySubsystem* Party = NewObject<UHSRPartySubsystem>(GameInstance);
 	UHSRCharacterDefinition* Definition = NewObject<UHSRCharacterDefinition>();
 	Definition->CharacterId = TEXT("Character.Party.A");
+	Definition->DisplayName = FText::FromString(TEXT("维里奈"));
 	Definition->MaxLevel = 2;
 	UCurveFloat* Curve = NewObject<UCurveFloat>(Definition);
 	Curve->FloatCurve.AddKey(2, 100);
@@ -32,7 +33,7 @@ bool FHSRPartyFrontendProjectionTest::RunTest(const FString&)
 	TestEqual(TEXT("character enters party"), Party->AddCharacter(Definition->CharacterId, 1), EHSRPartyResult::Success);
 
 	UHSRPartyViewModel* ViewModel = NewObject<UHSRPartyViewModel>();
-	ViewModel->Initialize(Party);
+	ViewModel->Initialize(Party, Profiles);
 	FHSRPartyFrontendSnapshot Snapshot;
 	TestTrue(TEXT("snapshot available"), ViewModel->GetSnapshot(Snapshot));
 	TestEqual(TEXT("ready state"), Snapshot.Status, EHSRPartyFrontendStatus::Ready);
@@ -41,6 +42,8 @@ bool FHSRPartyFrontendProjectionTest::RunTest(const FString&)
 	TestEqual(TEXT("slot one index"), Snapshot.Slots[1].SlotIndex, 1);
 	TestTrue(TEXT("slot one occupied"), Snapshot.Slots[1].bOccupied);
 	TestEqual(TEXT("character projected"), Snapshot.Slots[1].CharacterId, Definition->CharacterId);
+	TestEqual(TEXT("party slot shows localized name"), Snapshot.Slots[1].DisplayName.ToString(), FString(TEXT("维里奈")));
+	TestTrue(TEXT("selector preserves stable ID to label mapping"), Snapshot.CharacterDisplayNames.Contains(Definition->CharacterId));
 	UHSRPartyWidget* Widget = NewObject<UHSRPartyWidget>();
 	Widget->SetViewModel(ViewModel);
 	Widget->AttachForAutomation();

@@ -96,6 +96,12 @@ public:
 		UHSRInventorySubsystem& Inventory, const UHSRItemEquipmentMappingCatalog& MappingCatalog);
 	FHSREquipmentEnhancementResult ExecuteEnhancement(const FHSREquipmentEnhancementRequest& Request,
 		UHSRInventorySubsystem& Inventory, const UHSREquipmentEnhancementCatalog& Catalog);
+	/** Enhances a real bag item, rolling back a newly minted registry entry if the transaction fails. */
+	FHSREquipmentEnhancementResult ExecuteInventoryEnhancement(const FHSREquipmentEnhancementRequest& Request,
+		UHSRInventorySubsystem& Inventory, const UHSREquipmentEnhancementCatalog& Catalog,
+		const UHSRItemEquipmentMappingCatalog& MappingCatalog);
+	bool PreviewMappedInstance(FName ItemId, const FGuid& InstanceId,
+		const UHSRItemEquipmentMappingCatalog& MappingCatalog, FHSREquipmentInstance& OutInstance) const;
 	void SetMovementProjection(FMovementProjectionPreflight InPreflight, FMovementProjectionCommit InCommit)
 	{
 		MovementProjectionPreflight = MoveTemp(InPreflight);
@@ -131,6 +137,7 @@ private:
 		int32 Slot = 0;
 		int32 EnhancementCap = 0;
 		FName SetId;
+		TArray<FHSREquipmentModifier> DefaultModifiers;
 	};
 
 	struct FLoadoutState

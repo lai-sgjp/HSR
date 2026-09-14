@@ -105,6 +105,11 @@ public:
 	static bool DoesTravelFailureMatch(const FString& FailureWorldPackage, const FString& SourcePackage, const FString& TargetPackage);
 
 private:
+	friend class UHSRSaveSubsystem;
+	/** A committed save replaces completion history, including transient victories after that save. */
+	void ResetResolvedEncountersAfterRestore();
+	/** Includes completion restored from disk; never caches persistent state in the session set. */
+	bool IsEncounterResolved(FName EncounterId) const;
 	FHSREncounterResult SubmitEncounterRequest(const FHSREncounterRequest& Request, UWorld* World);
 	FHSREncounterResult RequestEncounterInternal(UHSREncounterDefinition* Definition,
 		EHSREncounterInitiative Initiative, AActor* Interactor);

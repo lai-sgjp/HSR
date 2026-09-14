@@ -1,709 +1,554 @@
 #include "HSRInventoryModuleWidget.h"
-
 #include "HSRInventoryViewModel.h"
+#include "../../Data/Definitions/HSRCharacterDefinition.h"
 #include "../../Data/Definitions/HSREquipmentEnhancementCatalog.h"
 #include "../../Data/Definitions/HSRInventoryCatalog.h"
 #include "../../Data/Definitions/HSRItemEquipmentMappingCatalog.h"
 #include "../../Equipment/HSREquipmentSubsystem.h"
 #include "../../Inventory/HSRInventorySubsystem.h"
-#include "../../Party/HSRPartySubsystem.h"
-#include "../../Party/HSRPartyTypes.h"
+#include "../../Progression/HSRCharacterProfileSubsystem.h"
 #include "../HSRUIManagerSubsystem.h"
-#include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
 #include "Components/Button.h"
+#include "Components/ButtonSlot.h"
+#include "Components/EditableTextBox.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
-#include "Components/ScrollBox.h"
+#include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Engine/GameInstance.h"
+#include "Engine/Texture2D.h"
+#include "InputCoreTypes.h"
 
-// UHSRInventoryRowClickBridge 的职责：
-// UMG 的 Button::OnClicked 只能绑定到 UObject 的动态委托，且不会携带参数；
-// 列表里每一行按钮都要把“点击事件”翻译成“选中第几行”。
-// 因此每个行按钮都配一个本桥接对象，保存宿主 Widget 与行号，点击时转调
-// 宿主 Widget 的 SelectEntryByIndex 完成选中。
-void UHSRInventoryRowClickBridge::Initialize(UHSRInventoryModuleWidget* const InOwner,
-	const int32 InRowIndex)
+namespace
 {
-	// 记录宿主 Widget（弱引用持有，避免阻止其销毁）与当前行索引。
-	Owner = InOwner;
-	RowIndex = InRowIndex;
+FText CharacterName(UGameInstance* GameInstance, const FGuid& Id)
+{
+	if (GameInstance)
+	{
+		if (auto* Profiles = GameInstance->GetSubsystem<UHSRCharacterProfileSubsystem>())
+		{
+			TArray<FHSRCharacterProfileSnapshot> Rows; Profiles->GetAllProfileSnapshots(Rows);
+			for (const auto& Row : Rows)
+			{
+				if (HSRCharacterGuidFromProfileName(Row.RuntimeState.CharacterId) == Id)
+				{
+					const UHSRCharacterDefinition* Definition = nullptr;
+					if (Profiles->GetDefinition(Row.RuntimeState.CharacterId, Definition) && Definition)
+						return Definition->DisplayName;
+				}
+			}
+		}
+	}
+	return NSLOCTEXT("HSRInventory", "NoTarget", "未选择角色");
+}
+FString StatsText(const TArray<FHSREquipmentModifier>& Modifiers)
+{
+	FString Result;
+	for (const auto& Modifier : Modifiers)
+	{
+		const TCHAR* Name = TEXT("攻击");
+		switch (Modifier.Stat) {
+		case EHSREquipmentStat::MaxHealth: Name = TEXT("生命上限"); break;
+		case EHSREquipmentStat::Defense: Name = TEXT("防御"); break;
+		case EHSREquipmentStat::Speed: Name = TEXT("速度"); break;
+		default: break;
+		}
+		Result += FString::Printf(TEXT("\n%s  %+.1f"), Name, Modifier.Value);
+	}
+	return Result;
+}
 }
 
-// 行按钮点击回调：仅当宿主 Widget 仍存活时才转发选中请求，否则静默丢弃。
+void UHSRInventoryRowClickBridge::Initialize(UHSRInventoryModuleWidget* InOwner, const FHSRInventoryEntryKey& InKey)
+{
+	Owner = InOwner; Key = InKey;
+}
 void UHSRInventoryRowClickBridge::HandleClicked()
 {
-	if (UHSRInventoryModuleWidget* Widget = Owner.Get())
-	{
-		Widget->SelectEntryByIndex(RowIndex);
-	}
+	if (auto* Widget = Owner.Get()) Widget->SelectEntry(Key);
 }
-
-// NativeConstruct：UMG 控件被创建并进入可视树后调用。
-// 这里完成三件事：
-//   1. 确保 ViewModel 存在（延迟创建，便于手动初始化场景复用同一个 ViewModel）；
-//   2. 绑定 ViewModel 的 OnChanged 并立即拉取一次快照；
-//   3. 把 ViewModel 与运行时子系统（Inventory/Equipment 等）接好。
-// 最后单独绑定“返回/关闭”两个常驻按钮——它们在还没有有效快照之前也必须可用。
 void UHSRInventoryModuleWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
-	if (!ViewModel)
-	{
-		ViewModel = NewObject<UHSRInventoryViewModel>(this);
-	}
+	if (!ViewModel) ViewModel = NewObject<UHSRInventoryViewModel>(this);
 	BindAndRefresh();
-	InitializeRuntimeContext();
-
-	// Back and Close must always be reachable, even before a valid snapshot exists.
-	// 返回/关闭按钮始终可达：即便 Inventory 快照尚未就绪，也必须允许玩家退出面板。
-	if (UButton* BackButton = FindButtonByName(TEXT("BTN_Back")))
+	if (!bHasSnapshot || !CurrentSnapshot.bIsValid) InitializeRuntimeContext();
+#define BIND_BUTTON(Name, Handler) if (auto* Button = FindButtonByName(TEXT(Name))) { Button->OnClicked.Clear(); Button->OnClicked.AddDynamic(this, &ThisClass::Handler); }
+	BIND_BUTTON("BTN_Back", HandleBackClicked)
+	BIND_BUTTON("BTN_Close", HandleCloseClicked)
+	BIND_BUTTON("BTN_ConfirmAction", HandleConfirmClicked)
+	BIND_BUTTON("BTN_CancelAction", HandleCancelClicked)
+	BIND_BUTTON("BTN_NextEnhancement", HandleNextEnhancementClicked)
+	BIND_BUTTON("BTN_NextCharacter", CycleTargetCharacter)
+	BIND_BUTTON("BTN_CatAll", HandleCategoryAll)
+	BIND_BUTTON("BTN_CatWeapon", HandleCategoryWeapon)
+	BIND_BUTTON("BTN_CatRelic", HandleCategoryRelic)
+	BIND_BUTTON("BTN_CatConsumable", HandleCategoryConsumable)
+	BIND_BUTTON("BTN_CatMaterial", HandleCategoryMaterial)
+	BIND_BUTTON("BTN_CatOther", HandleCategoryOther)
+	BIND_BUTTON("BTN_CycleSort", CycleSortMode)
+#undef BIND_BUTTON
+	if (auto* Search = WidgetTree ? WidgetTree->FindWidget<UEditableTextBox>(TEXT("SearchBox")) : nullptr)
 	{
-		BackButton->OnClicked.Clear();
-		BackButton->OnClicked.AddDynamic(this, &UHSRInventoryModuleWidget::HandleBackClicked);
+		Search->OnTextChanged.Clear();
+		Search->OnTextCommitted.Clear();
+		Search->SetText(FText::FromString(CurrentSnapshot.FilterText));
+		Search->SetHintText(NSLOCTEXT("HSRInventory", "SearchHint", "搜索物品名称"));
+		Search->OnTextChanged.AddDynamic(this, &ThisClass::HandleSearchChanged);
 	}
-	if (UButton* CloseButton = FindButtonByName(TEXT("BTN_Close")))
-	{
-		CloseButton->OnClicked.Clear();
-		CloseButton->OnClicked.AddDynamic(this, &UHSRInventoryModuleWidget::HandleCloseClicked);
-	}
+	RefreshBrowseControls();
+	RefreshActionPreview();
 }
-
-// NativeDestruct：控件从可视树移除/销毁时调用。
-// 需要释放 ViewModel（Shutdown 清空其内部状态并解绑子系统委托）、解绑快照订阅，
-// 并把本地缓存快照复位，避免析构后还有回调引用已销毁的控件。
 void UHSRInventoryModuleWidget::NativeDestruct()
 {
-	// 通知 ViewModel 停机：清空快照、复位 LastResult 等权威状态。
-	if (ViewModel)
-	{
-		ViewModel->Shutdown();
-	}
-	// 解绑 OnChanged 订阅并置空，防止残留回调。
+	if (auto* Search = WidgetTree ? WidgetTree->FindWidget<UEditableTextBox>(TEXT("SearchBox")) : nullptr)
+		Search->OnTextChanged.RemoveDynamic(this, &ThisClass::HandleSearchChanged);
+	if (ViewModel) ViewModel->Shutdown();
 	SetViewModel(nullptr);
-	// 本地缓存快照作废，后续 GetSnapshot 类访问都会返回失败。
-	bHasSnapshot = false;
-	CurrentSnapshot = FHSRInventoryModuleSnapshot();
+	bHasSnapshot = false; CurrentSnapshot = FHSRInventoryModuleSnapshot();
+	bHasPendingAction = false; RowBridges.Reset();
 	Super::NativeDestruct();
 }
-
-// InitializeForInventory：由外部（通常是 UIManager）在打开背包面板前注入物品目录。
-// 目录用于把物品 ID 展开成显示名/数量/唯一性等展示信息；
-// 若控件已经构造，则立即重新初始化运行时上下文以让新目录生效。
 void UHSRInventoryModuleWidget::InitializeForInventory(UHSRInventoryCatalog* InCatalog)
 {
-	// 仅当外部确实传入非空目录时才覆盖，避免误清空已有配置。
-	if (InCatalog)
-	{
-		Catalog = InCatalog;
-	}
-	// 已经进入可视树时同步刷新 ViewModel 的上下文。
-	if (IsConstructed())
-	{
-		InitializeRuntimeContext();
-	}
+	if (InCatalog) Catalog = InCatalog;
+	if (IsConstructed()) InitializeRuntimeContext();
 }
-
-// InitializeCommandContext：注入“命令上下文”——当前背包所属角色、物品→装备映射目录、
-// 强化目录。ViewModel 后续做 Equip/Enhance 等操作时靠这些数据定位到具体装备与强化选项。
 void UHSRInventoryModuleWidget::InitializeCommandContext(const FGuid& InCharacterId,
-	UHSRItemEquipmentMappingCatalog* InMappingCatalog,
-	UHSREquipmentEnhancementCatalog* InEnhancementCatalog)
+	UHSRItemEquipmentMappingCatalog* InMappingCatalog, UHSREquipmentEnhancementCatalog* InEnhancementCatalog)
 {
 	CharacterId = InCharacterId;
-	if (InMappingCatalog)
-	{
-		MappingCatalog = InMappingCatalog;
-	}
-	if (InEnhancementCatalog)
-	{
-		EnhancementCatalog = InEnhancementCatalog;
-	}
-	if (IsConstructed())
-	{
-		InitializeRuntimeContext();
-	}
-
-	// The UIManager validates the snapshot immediately after InitializeCommandContext,
-	// which can run before this widget is constructed (CreateWidget does not call
-	// NativeConstruct). Ensure the ViewModel exists, is initialized, and has bound the
-	// snapshot so GetCurrentSnapshot reflects the committed state right away. NativeConstruct
-	// reuses the same ViewModel and re-binding is idempotent.
-	// 关键时序问题：UIManager 在 InitializeCommandContext 返回后立刻校验快照，
-	// 而这一步可能发生在控件尚未构造时（CreateWidget 不会触发 NativeConstruct）。
-	// 因此这里必须主动确保 ViewModel 存在、完成初始化并绑定快照，保证调用方立即读到
-	// 已提交的状态。NativeConstruct 之后会复用同一个 ViewModel，重复绑定是幂等的。
-	if (!ViewModel)
-	{
-		ViewModel = NewObject<UHSRInventoryViewModel>(this);
-	}
-	InitializeRuntimeContext();
-	BindAndRefresh();
+	if (InMappingCatalog) MappingCatalog = InMappingCatalog;
+	if (InEnhancementCatalog) EnhancementCatalog = InEnhancementCatalog;
+	if (!ViewModel) ViewModel = NewObject<UHSRInventoryViewModel>(this);
+	InitializeRuntimeContext(); BindAndRefresh();
 }
-
-// RequestCloseToRoot：请求 UI 管理器把整个前端界面一路关闭到根界面。
-// 返回是否成功；失败时由调用方决定是否给出提示。
 bool UHSRInventoryModuleWidget::RequestCloseToRoot()
 {
-	return GetOwningUIManager()
-		&& GetOwningUIManager()->CloseFrontendToRoot() == EHSRUIScreenResult::Success;
+	return GetOwningUIManager() && GetOwningUIManager()->CloseFrontendToRoot() == EHSRUIScreenResult::Success;
 }
-
-// SetViewModel：替换当前 ViewModel。
-// 换绑时先移除旧 ViewModel 上的快照订阅（保证旧数据源不再驱动本控件），
-// 再保存新指针；若控件已构造则立即重新绑定并拉取一次快照。
 void UHSRInventoryModuleWidget::SetViewModel(UHSRInventoryViewModel* InViewModel)
 {
-	if (ViewModel && SnapshotHandle.IsValid())
-	{
-		// 移除旧 ViewModel 的订阅，防止旧数据流继续刷新本控件。
-		ViewModel->OnChanged().Remove(SnapshotHandle);
-		SnapshotHandle.Reset();
+	if (ViewModel && SnapshotHandle.IsValid()) {
+		ViewModel->OnChanged().Remove(SnapshotHandle); SnapshotHandle.Reset();
 #if WITH_DEV_AUTOMATION_TESTS
 		++UnbindCount;
 #endif
 	}
 	ViewModel = InViewModel;
-	// 已进入可视树才需要立刻重绑；否则等待 NativeConstruct 统一处理。
-	if (IsConstructed())
-	{
-		BindAndRefresh();
-	}
+	if (IsConstructed()) BindAndRefresh();
 }
-
-// SelectCategory：把用户选择物品分类的动作转发给 ViewModel。
-// 返回执行结果；ViewModel 缺失时返回 NotInitialized 提示调用方尚未就绪。
-EHSRInventoryViewModelResult UHSRInventoryModuleWidget::SelectCategory(
-	const EHSRInventoryCategory InCategory)
+EHSRInventoryViewModelResult UHSRInventoryModuleWidget::SelectCategory(EHSRInventoryCategory InCategory)
 {
-	return ViewModel ? ViewModel->SelectCategory(InCategory)
-		: EHSRInventoryViewModelResult::NotInitialized;
+	CancelAction();
+	return ViewModel ? ViewModel->SelectCategory(InCategory) : EHSRInventoryViewModelResult::NotInitialized;
 }
-
-// SetFilterText：把搜索框文本转发给 ViewModel 进行过滤。
-// 过滤逻辑完全由 ViewModel 完成，控件只负责转达与展示结果。
 EHSRInventoryViewModelResult UHSRInventoryModuleWidget::SetFilterText(const FString& InFilterText)
 {
-	return ViewModel ? ViewModel->SetFilterText(InFilterText)
-		: EHSRInventoryViewModelResult::NotInitialized;
+	CancelAction();
+	return ViewModel ? ViewModel->SetFilterText(InFilterText) : EHSRInventoryViewModelResult::NotInitialized;
 }
-
-// SetSortMode：把排序方式（按数量/名称等）转发给 ViewModel 重排列表。
-EHSRInventoryViewModelResult UHSRInventoryModuleWidget::SetSortMode(
-	const EHSRInventorySortMode InSortMode)
+EHSRInventoryViewModelResult UHSRInventoryModuleWidget::SetSortMode(EHSRInventorySortMode InSortMode)
 {
-	return ViewModel ? ViewModel->SetSortMode(InSortMode)
-		: EHSRInventoryViewModelResult::NotInitialized;
+	return ViewModel ? ViewModel->SetSortMode(InSortMode) : EHSRInventoryViewModelResult::NotInitialized;
 }
-
-// SelectEntry：按物品键请求选中某条目（高亮并刷新详情区）。
-EHSRInventoryViewModelResult UHSRInventoryModuleWidget::SelectEntry(
-	const FHSRInventoryEntryKey& InKey)
+EHSRInventoryViewModelResult UHSRInventoryModuleWidget::SelectEntry(const FHSRInventoryEntryKey& InKey)
 {
-	return ViewModel ? ViewModel->SelectEntry(InKey)
-		: EHSRInventoryViewModelResult::NotInitialized;
+	CancelAction();
+	return ViewModel ? ViewModel->SelectEntry(InKey) : EHSRInventoryViewModelResult::NotInitialized;
 }
-
-// SubmitAction：把“使用/装备/强化/分解”等操作命令转发给 ViewModel 执行。
-// TargetLevel 供强化操作指定目标等级，其余操作通常传 -1 表示不适用。
-EHSRInventoryViewModelResult UHSRInventoryModuleWidget::SubmitAction(
-	const EHSRInventoryAction Action, const int32 TargetLevel)
+EHSRInventoryViewModelResult UHSRInventoryModuleWidget::SubmitAction(EHSRInventoryAction Action, int32 TargetLevel)
 {
-	return ViewModel ? ViewModel->SubmitAction(Action, TargetLevel)
-		: EHSRInventoryViewModelResult::NotInitialized;
+	if (bSubmitting) return EHSRInventoryViewModelResult::AuthorityRejected;
+	TGuardValue<bool> Guard(bSubmitting, true);
+	const auto Result = ViewModel ? ViewModel->SubmitAction(Action, TargetLevel) : EHSRInventoryViewModelResult::NotInitialized;
+	ShowActionResult(Result);
+	return Result;
 }
-
-// GetCurrentSnapshot：向调用方导出当前缓存的模块快照（纯值 DTO）。
-// 快照尚未就绪（bHasSnapshot 为假）时返回 false，避免用空数据做展示决策。
-bool UHSRInventoryModuleWidget::GetCurrentSnapshot(
-	FHSRInventoryModuleSnapshot& OutSnapshot) const
+bool UHSRInventoryModuleWidget::GetCurrentSnapshot(FHSRInventoryModuleSnapshot& OutSnapshot) const
 {
-	// 无有效快照直接返回失败，保持调用方行为可预期。
-	if (!bHasSnapshot)
-	{
-		return false;
-	}
-	OutSnapshot = CurrentSnapshot;
-	return true;
+	if (!bHasSnapshot) return false;
+	OutSnapshot = CurrentSnapshot; return true;
 }
-
-// GetEntry：按行索引取出该条目（名称/数量/唯一性等）给列表行使用。
-// 越界或快照未就绪时返回 false。
-bool UHSRInventoryModuleWidget::GetEntry(const int32 Index,
-	FHSRInventoryEntryRow& OutEntry) const
+bool UHSRInventoryModuleWidget::GetEntry(int32 Index, FHSRInventoryEntryRow& OutEntry) const
 {
-	if (!bHasSnapshot || !CurrentSnapshot.Entries.IsValidIndex(Index))
-	{
-		return false;
-	}
-	OutEntry = CurrentSnapshot.Entries[Index];
-	return true;
+	if (!bHasSnapshot || !CurrentSnapshot.Entries.IsValidIndex(Index)) return false;
+	OutEntry = CurrentSnapshot.Entries[Index]; return true;
 }
-
-// GetActionState：按行索引取出该条目的操作可用状态（使用/装备/强化/分解是否可点）。
-bool UHSRInventoryModuleWidget::GetActionState(const int32 Index,
-	FHSRInventoryActionState& OutAction) const
+bool UHSRInventoryModuleWidget::GetActionState(int32 Index, FHSRInventoryActionState& OutAction) const
 {
-	if (!bHasSnapshot || !CurrentSnapshot.Actions.IsValidIndex(Index))
-	{
-		return false;
-	}
-	OutAction = CurrentSnapshot.Actions[Index];
-	return true;
+	if (!bHasSnapshot || !CurrentSnapshot.Actions.IsValidIndex(Index)) return false;
+	OutAction = CurrentSnapshot.Actions[Index]; return true;
 }
-
-// GetEntryCount：返回当前列表条目数；快照未就绪时按 0 处理（空列表）。
-int32 UHSRInventoryModuleWidget::GetEntryCount() const
+int32 UHSRInventoryModuleWidget::GetEntryCount() const { return bHasSnapshot ? CurrentSnapshot.Entries.Num() : 0; }
+bool UHSRInventoryModuleWidget::GetEntryDisplay(int32 Index, FString& OutName, int32& OutQuantity, bool& bOutUnique) const
 {
-	return bHasSnapshot ? CurrentSnapshot.Entries.Num() : 0;
+	FHSRInventoryEntryRow Row;
+	if (!GetEntry(Index, Row)) return false;
+	OutName = Row.DisplayName.ToString(); OutQuantity = Row.Quantity; bOutUnique = Row.bIsUnique; return true;
 }
-
-// GetEntryDisplay：取出某条目在列表行上需要展示的三个字段——
-// 显示名（转成 FString 便于 Slate 直接使用）、数量、是否唯一物品。
-bool UHSRInventoryModuleWidget::GetEntryDisplay(const int32 Index, FString& OutDisplayName,
-	int32& OutQuantity, bool& bOutIsUnique) const
+bool UHSRInventoryModuleWidget::GetSelectedDetail(FString& OutName, int32& OutQuantity, bool& bOutSelection) const
 {
-	if (!bHasSnapshot || !CurrentSnapshot.Entries.IsValidIndex(Index))
-	{
-		return false;
-	}
-	const FHSRInventoryEntryRow& Row = CurrentSnapshot.Entries[Index];
-	OutDisplayName = Row.DisplayName.ToString();
-	OutQuantity = Row.Quantity;
-	bOutIsUnique = Row.bIsUnique;
-	return true;
+	OutName.Reset(); OutQuantity = 0; bOutSelection = bHasSnapshot && CurrentSnapshot.Detail.bHasSelection;
+	if (bOutSelection) { OutName = CurrentSnapshot.Detail.Entry.DisplayName.ToString(); OutQuantity = CurrentSnapshot.Detail.Entry.Quantity; }
+	return bHasSnapshot;
 }
-
-// GetSelectedDetail：导出详情区数据（选中物品名/数量/是否有选中项）。
-// 这里先以“无选中”为默认值再依据快照覆盖，保证返回 false 时输出参数也是确定值。
-bool UHSRInventoryModuleWidget::GetSelectedDetail(FString& OutName, int32& OutQuantity,
-	bool& bOutHasSelection) const
+EHSRInventoryViewModelResult UHSRInventoryModuleWidget::SelectEntryByIndex(int32 Index)
 {
-	OutName = TEXT("");
-	OutQuantity = 0;
-	bOutHasSelection = false;
-	// 快照未就绪时返回 false，并保持输出参数为已初始化的默认值。
-	if (!bHasSnapshot)
-	{
-		return false;
-	}
-	bOutHasSelection = CurrentSnapshot.Detail.bHasSelection;
-	if (bOutHasSelection)
-	{
-		OutName = CurrentSnapshot.Detail.Entry.DisplayName.ToString();
-		OutQuantity = CurrentSnapshot.Detail.Entry.Quantity;
-	}
-	return true;
+	FHSRInventoryEntryRow Row;
+	return GetEntry(Index, Row) ? SelectEntry(Row.Key) : EHSRInventoryViewModelResult::EntryUnavailable;
 }
-
-// SelectEntryByIndex：行点击桥接对象转调到的入口——把“第几行”翻译成
-// “快照里该行对应的物品键”，再交给 ViewModel 真正执行选中。
-// 使用快照行而不是直接取 ViewModel 内部数据，是为了让控件只消费纯值快照。
-EHSRInventoryViewModelResult UHSRInventoryModuleWidget::SelectEntryByIndex(const int32 Index)
+bool UHSRInventoryModuleWidget::GetActionAvailable(EHSRInventoryAction Action) const
 {
-	// 前置校验：ViewModel 就绪、快照有效、且行索引未越界。
-	if (!ViewModel || !bHasSnapshot || !CurrentSnapshot.Entries.IsValidIndex(Index))
-	{
-		return EHSRInventoryViewModelResult::EntryUnavailable;
-	}
-	return ViewModel->SelectEntry(CurrentSnapshot.Entries[Index].Key);
-}
-
-// GetActionAvailable：遍历快照中的操作状态，查询某个操作当前是否可用（用于按钮置灰）。
-bool UHSRInventoryModuleWidget::GetActionAvailable(const EHSRInventoryAction Action) const
-{
-	for (const FHSRInventoryActionState& ActionState : CurrentSnapshot.Actions)
-	{
-		if (ActionState.Action == Action)
-		{
-			return ActionState.bIsAvailable;
-		}
-	}
-	// 快照里没有该操作记录时按不可用处理。
+	if (!bHasSnapshot || !CurrentSnapshot.bIsValid) return false;
+	for (const auto& State : CurrentSnapshot.Actions) if (State.Action == Action) return State.bIsAvailable;
 	return false;
 }
-
-// GetSelectedEnhancementTargetLevel：查询当前选中的强化目标等级。
-// 强化按钮需要知道“升到多少级”才能构造命令；快照中第一个可用选项即为目标等级。
 int32 UHSRInventoryModuleWidget::GetSelectedEnhancementTargetLevel() const
 {
-	// 无有效快照或没有选中项时返回 -1（无效等级）。
-	if (!bHasSnapshot || !CurrentSnapshot.Detail.bHasSelection)
-	{
-		return -1;
-	}
-	for (const FHSRInventoryEnhancementOption& Option : CurrentSnapshot.EnhancementOptions)
-	{
-		if (Option.bAvailable)
-		{
-			return Option.TargetLevel;
-		}
-	}
-	return -1;
+	return bHasPendingAction && PendingAction == EHSRInventoryAction::Enhance ? PendingTargetLevel : -1;
 }
-
-// RefreshListAndDetail：强制用当前缓存快照重刷一遍列表与详情区。
-// 用于外部数据（如角色切换后）已变化但快照尚未更新的场景，保持展示与最新状态一致。
 void UHSRInventoryModuleWidget::RefreshListAndDetail()
 {
-	if (!bHasSnapshot)
-	{
-		return;
-	}
-	OnInventorySnapshotChanged(CurrentSnapshot);
+	if (bHasSnapshot) { OnInventorySnapshotChanged(CurrentSnapshot); PopulateListAndDetail(); }
 }
-
-// InitializeRuntimeContext：把 ViewModel 与运行时子系统接好。
-// 从 GameInstance 取 Inventory/Equipment 子系统，连同此前注入的目录、角色 ID
-// 一起交给 ViewModel，之后 ViewModel 才能从这些数据源构建快照。
 void UHSRInventoryModuleWidget::InitializeRuntimeContext()
 {
-	if (!ViewModel)
-	{
-		return;
-	}
-	UGameInstance* GameInstance = GetGameInstance();
-	UHSRInventorySubsystem* Inventory = GameInstance
-		? GameInstance->GetSubsystem<UHSRInventorySubsystem>() : nullptr;
-	UHSREquipmentSubsystem* Equipment = GameInstance
-		? GameInstance->GetSubsystem<UHSREquipmentSubsystem>() : nullptr;
-	ViewModel->Initialize(Inventory, Catalog);
-	ViewModel->SetCommandContext(Equipment, MappingCatalog, EnhancementCatalog, CharacterId);
+	if (!ViewModel) return;
+	auto* GI = GetGameInstance();
+	ViewModel->Initialize(GI ? GI->GetSubsystem<UHSRInventorySubsystem>() : nullptr, Catalog);
+	ViewModel->SetCommandContext(GI ? GI->GetSubsystem<UHSREquipmentSubsystem>() : nullptr, MappingCatalog, EnhancementCatalog, CharacterId);
 }
-
-// BindAndRefresh：核心订阅逻辑。
-// 先解绑旧订阅（防重复），再订阅 ViewModel 的 OnChanged 广播，
-// 最后立刻主动拉取一次初始快照，让控件在打开瞬间就呈现当前数据。
 void UHSRInventoryModuleWidget::BindAndRefresh()
 {
-	if (!ViewModel)
-	{
-		return;
-	}
-	if (SnapshotHandle.IsValid())
-	{
-		// 已有订阅则先解绑再重绑，保证不会重复收到广播。
-		ViewModel->OnChanged().Remove(SnapshotHandle);
-		SnapshotHandle.Reset();
+	if (!ViewModel) return;
+	if (SnapshotHandle.IsValid()) {
+		ViewModel->OnChanged().Remove(SnapshotHandle); SnapshotHandle.Reset();
 #if WITH_DEV_AUTOMATION_TESTS
 		++UnbindCount;
 #endif
 	}
-	// 绑定快照更新回调：ViewModel 每次广播新快照都从这里进入本控件。
 	SnapshotHandle = ViewModel->OnChanged().AddUObject(this, &ThisClass::HandleSnapshot);
 #if WITH_DEV_AUTOMATION_TESTS
 	++BindCount;
 #endif
-	// 立即拉取一次初始快照，使控件创建后无需等待下一次数据变化即可显示。
-	FHSRInventoryModuleSnapshot InitialSnapshot;
-	if (ViewModel->GetSnapshot(InitialSnapshot))
-	{
-		HandleSnapshot(InitialSnapshot);
-	}
+	FHSRInventoryModuleSnapshot Initial;
+	if (ViewModel->GetSnapshot(Initial)) HandleSnapshot(Initial);
 }
-
-// HandleSnapshot：ViewModel 每次广播新快照时触发的统一入口。
-// 职责是把快照缓存到本地，再据此刷新界面：
-//   有效快照 -> 重建列表与详情；无效快照 -> 通知上层（如 UIManager）原因。
-void UHSRInventoryModuleWidget::HandleSnapshot(
-	const FHSRInventoryModuleSnapshot& InSnapshot)
+void UHSRInventoryModuleWidget::HandleSnapshot(const FHSRInventoryModuleSnapshot& InSnapshot)
 {
-	// 缓存最新快照，供后续各类 GetXxx 查询使用。
-	CurrentSnapshot = InSnapshot;
-	bHasSnapshot = true;
-	// 目标角色文本来自 Party 数据而非快照，因此每次快照到达都要独立刷新一次。
-	UpdateTargetCharacterText();
-	// 先广播事件，让订阅者（如 UIManager/自动化测试）拿到快照数据。
-	OnInventorySnapshotChanged(InSnapshot);
-	if (InSnapshot.bIsValid)
+	if (bHasPendingAction && (InSnapshot.SelectedKey != PendingKey || InSnapshot.InventoryRevision != PendingInventoryRevision
+		|| InSnapshot.EquipmentRevision != PendingEquipmentRevision || InSnapshot.TargetCharacterId != PendingCharacterId))
 	{
-		PopulateListAndDetail();
+		bHasPendingAction = false;
+		ActionMessage = NSLOCTEXT("HSRInventory", "PreviewChanged", "物品状态已更新，请重新预览操作。");
 	}
-	if (!InSnapshot.bIsValid)
-	{
-		// 快照无效（例如背包尚未加载成功）时，把失败原因转达给上层处理。
-		OnInventoryUnavailable(InSnapshot.FailureReason);
-	}
+	CurrentSnapshot = InSnapshot; bHasSnapshot = true;
+	UpdateTargetCharacterText(); OnInventorySnapshotChanged(InSnapshot);
+	PopulateListAndDetail();
+	if (!InSnapshot.bIsValid) OnInventoryUnavailable(InSnapshot.FailureReason);
 }
-
-// UpdateTargetCharacterText：刷新标题栏上的“Target: X”文本。
-// 该数据不来自 Inventory 快照，而是来自 Party 子系统（当前操控成员），
-// 因此这里单独查询 Party 快照并解析出目标角色 GUID。
 void UHSRInventoryModuleWidget::UpdateTargetCharacterText()
 {
-	if (!WidgetTree)
-	{
-		return;
-	}
-	UTextBlock* TextBlock = FindTextByName(TEXT("TXT_TargetCharacter"));
-	if (!TextBlock)
-	{
-		return;
-	}
-	FName CharacterIdName = NAME_None;
-	if (UGameInstance* GameInstance = GetGameInstance())
-	{
-		if (UHSRPartySubsystem* Party = GameInstance->GetSubsystem<UHSRPartySubsystem>())
-		{
-			FHSRPartySnapshot PartySnapshot;
-			if (Party->GetSnapshot(PartySnapshot) && !PartySnapshot.Slots.IsEmpty())
-			{
-				// Mirror ResolveInventoryCharacterGuid: the actively-controlled member, falling
-				// back to the leader when the active slot is unset or empty.
-				// 与 ResolveInventoryCharacterGuid 保持一致：优先取当前操控槽位，
-				// 槽位未设置或为空时回退到队长（0 号位）。
-				int32 TargetSlot = PartySnapshot.ActiveSlot;
-				if (TargetSlot < 0 || TargetSlot >= PartySnapshot.Slots.Num()
-					|| PartySnapshot.Slots[TargetSlot].IsEmpty())
-				{
-					TargetSlot = 0;
-				}
-				// 兜底校验：槽位合法且非空才真正取出角色 ID。
-				if (TargetSlot >= 0 && TargetSlot < PartySnapshot.Slots.Num()
-					&& !PartySnapshot.Slots[TargetSlot].IsEmpty())
-				{
-					CharacterIdName = PartySnapshot.Slots[TargetSlot].CharacterId;
-				}
-			}
-		}
-	}
-	// 无目标角色时显示“Target: -”，否则显示角色名。
-	TextBlock->SetText(CharacterIdName.IsNone()
-		? NSLOCTEXT("HSRInventory", "NoTarget", "Target: -")
-		: FText::Format(NSLOCTEXT("HSRInventory", "TargetChar", "Target: {0}"), FText::FromName(CharacterIdName)));
+	if (auto* Text = FindTextByName(TEXT("TXT_TargetCharacter")))
+		Text->SetText(FText::Format(NSLOCTEXT("HSRInventory", "Target", "装备给：{0}"), CharacterName(GetGameInstance(), CurrentSnapshot.TargetCharacterId)));
 }
-
-// PopulateListAndDetail：依据当前快照一次性刷新整个面板——
-// 重建列表行，并刷新详情区三个文本与四个操作按钮。
 void UHSRInventoryModuleWidget::PopulateListAndDetail()
 {
-	UWidgetTree* Tree = WidgetTree;
-	if (!Tree)
-	{
-		return;
-	}
-
-	// 列表行可能增删（过滤/排序后条目数变化），所以总是重建而不是增量更新。
+	if (!WidgetTree) return;
+	RefreshPresentationLabels();
 	PopulateListRows();
-
-	// 详情区：逐个刷新名称/数量/描述三个文本，选中与未选中状态展示不同文案。
-	for (UTextBlock* Text : {FindTextByName(TEXT("TXT_DetailName")),
-		FindTextByName(TEXT("TXT_DetailQuantity")),
-		FindTextByName(TEXT("TXT_DetailDescription"))})
-	{
-		if (!Text)
-		{
-			continue;
-		}
-		if (CurrentSnapshot.Detail.bHasSelection)
-		{
-			// 有选中物品：名称显示物品名，数量显示 xN，描述临时显示物品名。
-			const FHSRInventoryEntryRow& Row = CurrentSnapshot.Detail.Entry;
-			if (Text == FindTextByName(TEXT("TXT_DetailName")))
-			{
-				Text->SetText(Row.DisplayName);
-			}
-			else if (Text == FindTextByName(TEXT("TXT_DetailQuantity")))
-			{
-				Text->SetText(FText::Format(NSLOCTEXT("HSRInventory", "Quantity", "x{0}"),
-					FText::AsNumber(Row.Quantity)));
-			}
-			else
-			{
-				Text->SetText(FText::Format(
-					NSLOCTEXT("HSRInventory", "DetailDesc", "{0} (分类已就绪)"),
-					Row.DisplayName));
-			}
-		}
-		else
-		{
-			// 未选中任何物品：显示引导玩家选择的占位文案。
-			if (Text == FindTextByName(TEXT("TXT_DetailName")))
-			{
-				Text->SetText(NSLOCTEXT("HSRInventory", "NoSelection", "选择物品"));
-			}
-			else if (Text == FindTextByName(TEXT("TXT_DetailQuantity")))
-			{
-				Text->SetText(FText::GetEmpty());
-			}
-			else
-			{
-				Text->SetText(NSLOCTEXT("HSRInventory", "NoSelectionDesc", "选择左侧物品以查看详情"));
-			}
-		}
+	RefreshBrowseControls();
+	const auto& Row = CurrentSnapshot.Detail.Entry;
+	const bool bSelected = CurrentSnapshot.Detail.bHasSelection;
+	if (auto* Text = FindTextByName(TEXT("TXT_DetailName"))) Text->SetText(bSelected ? Row.DisplayName : NSLOCTEXT("HSRInventory", "Select", "选择物品"));
+	if (auto* Text = FindTextByName(TEXT("TXT_DetailQuantity"))) Text->SetText(bSelected ? FText::Format(NSLOCTEXT("HSRInventory", "Quantity", "数量：{0}"), FText::AsNumber(Row.Quantity)) : FText::GetEmpty());
+	FString Detail = Row.Description.ToString();
+	if (bSelected && Row.bIsUnique) {
+		Detail += FString::Printf(TEXT("\n稀有度 %d  ·  强化 +%d"), Row.Rarity, Row.EnhancementLevel);
+		Detail += Row.EquippedCharacterId.IsValid() ? TEXT("\n已装备：") + CharacterName(GetGameInstance(), Row.EquippedCharacterId).ToString() : TEXT("\n未装备");
+		Detail += StatsText(Row.Modifiers);
 	}
-
-	// 四个操作按钮的可用状态与点击行为都取决于当前选中项，统一在此重建。
+	if (auto* Text = FindTextByName(TEXT("TXT_DetailDescription"))) {
+		Text->SetAutoWrapText(true);
+		Text->SetText(bSelected ? FText::FromString(Detail) : NSLOCTEXT("HSRInventory", "SelectHint", "选择物品查看详情。装备和强化会先展示操作预览。"));
+	}
+	if (auto* Icon = WidgetTree->FindWidget<UImage>(TEXT("IMG_DetailIcon"))) {
+		Icon->SetBrushFromTexture(bSelected ? Row.Icon.LoadSynchronous() : nullptr);
+		Icon->SetVisibility(bSelected && !Row.Icon.IsNull() ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+	if (auto* Text = FindTextByName(TEXT("TXT_EmptyState"))) {
+		Text->SetText(CurrentSnapshot.FilterText.IsEmpty() ? NSLOCTEXT("HSRInventory", "Empty", "此分类暂无物品") : NSLOCTEXT("HSRInventory", "NoMatches", "没有符合搜索条件的物品"));
+		Text->SetVisibility(CurrentSnapshot.Entries.IsEmpty() ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
 	SetActionButton(TEXT("BTN_ActionUse"), EHSRInventoryAction::Use);
 	SetActionButton(TEXT("BTN_ActionEquip"), EHSRInventoryAction::Equip);
 	SetActionButton(TEXT("BTN_ActionEnhance"), EHSRInventoryAction::Enhance);
 	SetActionButton(TEXT("BTN_ActionDisassemble"), EHSRInventoryAction::Disassemble);
+	RefreshActionPreview();
 }
-
-// SetActionButton：配置单个操作按钮的外观与行为。
-// 先清空旧点击事件（防止重复绑定），再按操作是否可用置灰按钮；
-// 仅当可用时才绑定对应点击处理，避免不可用时仍响应输入。
-void UHSRInventoryModuleWidget::SetActionButton(const FName ButtonName,
-	const EHSRInventoryAction Action)
+void UHSRInventoryModuleWidget::SetActionButton(FName Name, EHSRInventoryAction Action)
 {
-	UButton* Button = FindButtonByName(ButtonName);
-	if (!Button)
-	{
-		return;
-	}
-	// 清空旧绑定，确保重复调用不会叠加多个回调。
+	auto* Button = FindButtonByName(Name); if (!Button) return;
 	Button->OnClicked.Clear();
-	const bool bAvailable = GetActionAvailable(Action);
-	Button->SetIsEnabled(bAvailable);
-	if (!bAvailable)
-	{
-		return;
+	if (Action == EHSRInventoryAction::Use || Action == EHSRInventoryAction::Disassemble) { Button->SetVisibility(ESlateVisibility::Collapsed); return; }
+	Button->SetVisibility(ESlateVisibility::Visible);
+	Button->SetIsEnabled(GetActionAvailable(Action) && !bHasPendingAction && !bSubmitting);
+	Button->SetToolTipText(Action == EHSRInventoryAction::Equip ? NSLOCTEXT("HSRInventory", "EquipTip", "预览当前角色的装备替换") : NSLOCTEXT("HSRInventory", "EnhanceTip", "预览等级、属性和材料消耗"));
+	if (Action == EHSRInventoryAction::Equip) Button->OnClicked.AddDynamic(this, &ThisClass::HandleEquipClicked);
+	if (Action == EHSRInventoryAction::Enhance) Button->OnClicked.AddDynamic(this, &ThisClass::HandleEnhanceClicked);
+}
+UButton* UHSRInventoryModuleWidget::FindButtonByName(FName Name) const { return WidgetTree ? WidgetTree->FindWidget<UButton>(Name) : nullptr; }
+UTextBlock* UHSRInventoryModuleWidget::FindTextByName(FName Name) const { return WidgetTree ? WidgetTree->FindWidget<UTextBlock>(Name) : nullptr; }
+void UHSRInventoryModuleWidget::HandleBackClicked() { if (bHasPendingAction) CancelAction(); else RequestBack(); }
+void UHSRInventoryModuleWidget::HandleCloseClicked() { RequestCloseToRoot(); }
+void UHSRInventoryModuleWidget::HandleUseClicked() { SubmitAction(EHSRInventoryAction::Use); }
+void UHSRInventoryModuleWidget::HandleEquipClicked() { PreviewAction(EHSRInventoryAction::Equip); }
+void UHSRInventoryModuleWidget::HandleEnhanceClicked() { PreviewAction(EHSRInventoryAction::Enhance); }
+void UHSRInventoryModuleWidget::HandleDisassembleClicked() { SubmitAction(EHSRInventoryAction::Disassemble); }
+void UHSRInventoryModuleWidget::HandleConfirmClicked() { ConfirmAction(); }
+void UHSRInventoryModuleWidget::HandleCancelClicked() { CancelAction(); }
+void UHSRInventoryModuleWidget::HandleNextEnhancementClicked()
+{
+	if (!bHasPendingAction || PendingAction != EHSRInventoryAction::Enhance || CurrentSnapshot.EnhancementOptions.IsEmpty()) return;
+	int32 Index = CurrentSnapshot.EnhancementOptions.IndexOfByPredicate([&](const auto& Option) { return Option.TargetLevel == PendingTargetLevel; });
+	PendingTargetLevel = CurrentSnapshot.EnhancementOptions[(Index + 1) % CurrentSnapshot.EnhancementOptions.Num()].TargetLevel;
+	RefreshActionPreview();
+}
+bool UHSRInventoryModuleWidget::PreviewAction(EHSRInventoryAction Action, int32 TargetLevel)
+{
+	if (bSubmitting || bHasPendingAction || !GetActionAvailable(Action) || (Action != EHSRInventoryAction::Equip && Action != EHSRInventoryAction::Enhance)) return false;
+	if (Action == EHSRInventoryAction::Enhance) {
+		if (CurrentSnapshot.EnhancementOptions.IsEmpty()) return false;
+		if (TargetLevel < 0) TargetLevel = CurrentSnapshot.EnhancementOptions[0].TargetLevel;
+		if (!CurrentSnapshot.EnhancementOptions.ContainsByPredicate([&](const auto& Option) { return Option.TargetLevel == TargetLevel; })) return false;
 	}
-	switch (Action)
-	{
-	case EHSRInventoryAction::Equip:
-		Button->OnClicked.AddDynamic(this, &UHSRInventoryModuleWidget::HandleEquipClicked);
-		break;
-	case EHSRInventoryAction::Enhance:
-		Button->OnClicked.AddDynamic(this, &UHSRInventoryModuleWidget::HandleEnhanceClicked);
-		break;
-	case EHSRInventoryAction::Use:
-		Button->OnClicked.AddDynamic(this, &UHSRInventoryModuleWidget::HandleUseClicked);
-		break;
-	case EHSRInventoryAction::Disassemble:
-		Button->OnClicked.AddDynamic(this, &UHSRInventoryModuleWidget::HandleDisassembleClicked);
-		break;
-	default:
-		break;
+	PendingAction = Action; PendingTargetLevel = TargetLevel; PendingKey = CurrentSnapshot.SelectedKey;
+	PendingInventoryRevision = CurrentSnapshot.InventoryRevision; PendingEquipmentRevision = CurrentSnapshot.EquipmentRevision;
+	PendingCharacterId = CurrentSnapshot.TargetCharacterId; bHasPendingAction = true; ActionMessage = FText::GetEmpty();
+	PopulateListAndDetail(); return true;
+}
+EHSRInventoryViewModelResult UHSRInventoryModuleWidget::ConfirmAction()
+{
+	if (!bHasPendingAction || bSubmitting) return EHSRInventoryViewModelResult::EntryUnavailable;
+	const auto Action = PendingAction; const int32 Level = PendingTargetLevel;
+	if (PendingKey != CurrentSnapshot.SelectedKey || PendingInventoryRevision != CurrentSnapshot.InventoryRevision
+		|| PendingEquipmentRevision != CurrentSnapshot.EquipmentRevision || PendingCharacterId != CurrentSnapshot.TargetCharacterId) {
+		CancelAction(); ShowActionResult(EHSRInventoryViewModelResult::StaleSnapshot); return EHSRInventoryViewModelResult::StaleSnapshot;
+	}
+	if (Action == EHSRInventoryAction::Enhance && !CurrentSnapshot.EnhancementOptions.ContainsByPredicate([&](const auto& Option) { return Option.TargetLevel == Level && Option.bAvailable; })) {
+		ActionMessage = NSLOCTEXT("HSRInventory", "Insufficient", "强化材料不足"); RefreshActionPreview(); return EHSRInventoryViewModelResult::AuthorityRejected;
+	}
+	bHasPendingAction = false;
+	const auto Result = SubmitAction(Action, Level);
+	PopulateListAndDetail(); return Result;
+}
+void UHSRInventoryModuleWidget::CancelAction() { bHasPendingAction = false; PendingTargetLevel = -1; ActionMessage = FText::GetEmpty(); PopulateListAndDetail(); }
+void UHSRInventoryModuleWidget::ShowActionResult(EHSRInventoryViewModelResult Result)
+{
+	if (Result == EHSRInventoryViewModelResult::Success) ActionMessage = NSLOCTEXT("HSRInventory", "Committed", "操作成功，物品状态已更新。");
+	else if (Result == EHSRInventoryViewModelResult::StaleSnapshot) ActionMessage = NSLOCTEXT("HSRInventory", "Stale", "物品状态发生变化，请重新选择并预览。");
+	else if (Result == EHSRInventoryViewModelResult::NoEnhancementOption) ActionMessage = NSLOCTEXT("HSRInventory", "AtCap", "没有更高等级的强化方案。");
+	else ActionMessage = NSLOCTEXT("HSRInventory", "Rejected", "操作未成功。请检查物品归属、强化材料和装备配置。");
+	RefreshActionPreview();
+}
+void UHSRInventoryModuleWidget::RefreshActionPreview()
+{
+	FString Preview; bool bCanConfirm = bHasPendingAction;
+	if (bHasPendingAction) {
+		const auto& Row = CurrentSnapshot.Detail.Entry;
+		if (PendingAction == EHSRInventoryAction::Equip) {
+			Preview = FString::Printf(TEXT("将「%s」装备给 %s。\n候选装备属性%s"), *Row.DisplayName.ToString(), *CharacterName(GetGameInstance(), PendingCharacterId).ToString(), *StatsText(Row.Modifiers));
+			if (CurrentSnapshot.Detail.bReplacesEquipment) Preview += FString::Printf(TEXT("\n当前装备：%s%s\n确认后原装备返回背包。"), *CurrentSnapshot.Detail.ReplacedEquipmentName.ToString(), *StatsText(CurrentSnapshot.Detail.ReplacedModifiers));
+			else Preview += TEXT("\n该部位当前为空。");
+		} else {
+			const auto* Option = CurrentSnapshot.EnhancementOptions.FindByPredicate([&](const auto& Value) { return Value.TargetLevel == PendingTargetLevel; });
+			if (Option) {
+				Preview = FString::Printf(TEXT("%s  +%d → +%d\n消耗 %s ×%d（持有 %d）\n强化后属性%s%s"), *Row.DisplayName.ToString(), Row.EnhancementLevel, PendingTargetLevel, *Option->MaterialName.ToString(), Option->MaterialCost, Option->OwnedMaterial, *StatsText(Option->TargetModifiers), Option->bAffordable ? TEXT("") : TEXT("\n材料不足"));
+				bCanConfirm = Option->bAvailable;
+			} else bCanConfirm = false;
+		}
+	}
+	if (auto* Text = FindTextByName(TEXT("TXT_ActionPreview"))) { Text->SetAutoWrapText(true); Text->SetText(FText::FromString(Preview)); }
+	if (auto* Text = FindTextByName(TEXT("TXT_ActionResult"))) Text->SetText(ActionMessage);
+	for (const FName Name : {FName(TEXT("BTN_ConfirmAction")), FName(TEXT("BTN_CancelAction"))})
+		if (auto* Button = FindButtonByName(Name)) Button->SetVisibility(bHasPendingAction ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	if (auto* Button = FindButtonByName(TEXT("BTN_ConfirmAction"))) Button->SetIsEnabled(bCanConfirm && !bSubmitting);
+	if (auto* Button = FindButtonByName(TEXT("BTN_CancelAction"))) Button->SetIsEnabled(!bSubmitting);
+	if (auto* Button = FindButtonByName(TEXT("BTN_NextEnhancement"))) {
+		Button->SetVisibility(bHasPendingAction && PendingAction == EHSRInventoryAction::Enhance && CurrentSnapshot.EnhancementOptions.Num() > 1 ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+		Button->SetIsEnabled(!bSubmitting);
 	}
 }
-
-// FindButtonByName：按名字在控件树中查找按钮。
-UButton* UHSRInventoryModuleWidget::FindButtonByName(const FName Name) const
+void UHSRInventoryModuleWidget::CycleTargetCharacter()
 {
-	if (!WidgetTree)
-	{
-		return nullptr;
-	}
-	return WidgetTree->FindWidget<UButton>(Name);
+	auto* GI = GetGameInstance(); if (!GI || !ViewModel) return;
+	auto* Profiles = GI->GetSubsystem<UHSRCharacterProfileSubsystem>(); if (!Profiles) return;
+	TArray<FHSRCharacterProfileSnapshot> Rows; Profiles->GetAllProfileSnapshots(Rows);
+	Rows.Sort([](const auto& A, const auto& B) { return A.RuntimeState.CharacterId.LexicalLess(B.RuntimeState.CharacterId); });
+	if (Rows.IsEmpty()) return;
+	int32 Index = Rows.IndexOfByPredicate([&](const auto& Row) { return HSRCharacterGuidFromProfileName(Row.RuntimeState.CharacterId) == CharacterId; });
+	CharacterId = HSRCharacterGuidFromProfileName(Rows[(Index + 1) % Rows.Num()].RuntimeState.CharacterId);
+	CancelAction();
+	ViewModel->SetCommandContext(GI->GetSubsystem<UHSREquipmentSubsystem>(), MappingCatalog, EnhancementCatalog, CharacterId);
 }
-
-// FindTextByName：按名字在控件树中查找文本块。
-UTextBlock* UHSRInventoryModuleWidget::FindTextByName(const FName Name) const
-{
-	if (!WidgetTree)
-	{
-		return nullptr;
-	}
-	return WidgetTree->FindWidget<UTextBlock>(Name);
-}
-
-// HandleBackClicked：返回按钮的点击回调——请求后退一层界面。
-void UHSRInventoryModuleWidget::HandleBackClicked()
-{
-	RequestBack();
-}
-
-// HandleCloseClicked：关闭按钮的点击回调——请求一路关闭到根界面。
-void UHSRInventoryModuleWidget::HandleCloseClicked()
-{
-	RequestCloseToRoot();
-}
-
-// HandleUseClicked：使用按钮回调。TargetLevel 传 -1 表示该操作不需要等级参数。
-void UHSRInventoryModuleWidget::HandleUseClicked()
-{
-	SubmitAction(EHSRInventoryAction::Use, -1);
-}
-
-// HandleEquipClicked：装备按钮回调。
-void UHSRInventoryModuleWidget::HandleEquipClicked()
-{
-	SubmitAction(EHSRInventoryAction::Equip, -1);
-}
-
-// HandleEnhanceClicked：强化按钮回调。强化需要目标等级，先查出当前可选的强化目标等级。
-void UHSRInventoryModuleWidget::HandleEnhanceClicked()
-{
-	SubmitAction(EHSRInventoryAction::Enhance, GetSelectedEnhancementTargetLevel());
-}
-
-// HandleDisassembleClicked：分解按钮回调。
-void UHSRInventoryModuleWidget::HandleDisassembleClicked()
-{
-	SubmitAction(EHSRInventoryAction::Disassemble, -1);
-}
-
-// PopulateListRows：重建列表区。
-// 每次都会清空列表容器与行桥接对象，然后按当前快照逐行创建
-// “整行按钮 + 名称文本 + 数量文本”，并为每行绑定独立的点击桥接。
-// 选中行使用金色底 + 亮色文字，未选中行使用深色底 + 灰文字。
 void UHSRInventoryModuleWidget::PopulateListRows()
 {
-	UScrollBox* ScrollBox = WidgetTree ? WidgetTree->FindWidget<UScrollBox>(TEXT("ListScrollBox")) : nullptr;
-	UVerticalBox* Host = WidgetTree ? WidgetTree->FindWidget<UVerticalBox>(TEXT("ListHost")) : nullptr;
-	if (!ScrollBox || !Host)
-	{
-		return;
-	}
-	// 清空旧行与旧桥接对象，避免行数与引用残留。
-	Host->ClearChildren();
-	RowBridges.Reset();
-	for (int32 Index = 0; Index < CurrentSnapshot.Entries.Num(); ++Index)
-	{
-		const FHSRInventoryEntryRow& Row = CurrentSnapshot.Entries[Index];
-		UButton* RowButton = NewObject<UButton>(this);
-		if (!RowButton)
-		{
-			continue;
-		}
-		RowButton->SetVisibility(ESlateVisibility::Visible);
+	auto* Host = WidgetTree ? WidgetTree->FindWidget<UVerticalBox>(TEXT("ListHost")) : nullptr;
+	if (!Host) return;
+	Host->ClearChildren(); RowBridges.Reset();
+	for (const auto& Row : CurrentSnapshot.Entries) {
+		auto* Button = NewObject<UButton>(this);
 		const bool bSelected = Row.Key == CurrentSnapshot.SelectedKey;
-		// Selected row: gold-tinted fill + bright text; otherwise subtle dark fill + muted text.
-		// 选中行用金色半透明底强调，未选中行用极淡的白色底，保证列表有清晰的当前项。
-		RowButton->SetBackgroundColor(bSelected
-			? FLinearColor(0.78f, 0.61f, 0.24f, 0.35f)
-			: FLinearColor(1.0f, 1.0f, 1.0f, 0.05f));
-		// 把整行按钮铺满容器宽度并留出上下内边距，形成行间距。
-		if (UVerticalBoxSlot* RowSlot = Cast<UVerticalBoxSlot>(Host->AddChild(RowButton)))
-		{
-			RowSlot->SetHorizontalAlignment(HAlign_Fill);
-			RowSlot->SetPadding(FMargin(4.0f, 3.0f, 4.0f, 3.0f));
-		}
-		// 行按钮内部再用横向盒放“名称 + 数量”。
-		UHorizontalBox* RowBox = NewObject<UHorizontalBox>(RowButton);
-		if (!RowBox)
-		{
-			continue;
-		}
-		RowButton->SetContent(RowBox);
-		UTextBlock* NameText = NewObject<UTextBlock>(RowButton);
-		NameText->SetText(Row.DisplayName);
-		NameText->SetColorAndOpacity(bSelected
-			? FSlateColor(FLinearColor(1.0f, 1.0f, 1.0f, 1.0f))
-			: FSlateColor(FLinearColor(0.60f, 0.64f, 0.71f, 1.0f)));
-		FSlateFontInfo NameFont = NameText->GetFont();
-		NameFont.Size = 16;
-		NameText->SetFont(NameFont);
-		RowBox->AddChild(NameText);
-		UTextBlock* QtyText = NewObject<UTextBlock>(RowButton);
-		QtyText->SetText(FText::Format(NSLOCTEXT("HSRInventory", "RowQty", "x{0}"),
-			FText::AsNumber(Row.Quantity)));
-		QtyText->SetColorAndOpacity(bSelected
-			? FSlateColor(FLinearColor(1.0f, 1.0f, 1.0f, 1.0f))
-			: FSlateColor(FLinearColor(0.60f, 0.64f, 0.71f, 1.0f)));
-		FSlateFontInfo QtyFont = QtyText->GetFont();
-		QtyFont.Size = 14;
-		QtyText->SetFont(QtyFont);
-		RowBox->AddChild(QtyText);
-		// 每行一个桥接对象：把“点击”翻译成“选中第 Index 行”，并随本行一起管理生命周期。
-		UHSRInventoryRowClickBridge* Bridge = NewObject<UHSRInventoryRowClickBridge>(this);
-		Bridge->Initialize(this, Index);
-		RowButton->OnClicked.AddDynamic(Bridge, &UHSRInventoryRowClickBridge::HandleClicked);
-		RowBridges.Add(Bridge);
+		Button->SetColorAndOpacity(FLinearColor::White);
+		Button->SetBackgroundColor(bSelected ? FLinearColor(.78f,.61f,.24f,.6f) : FLinearColor(.08f,.12f,.19f,.9f));
+		if (auto* RowSlot = Host->AddChildToVerticalBox(Button)) { RowSlot->SetPadding(FMargin(4,4)); RowSlot->SetHorizontalAlignment(HAlign_Fill); }
+		auto* Box = NewObject<UHorizontalBox>(Button); Button->SetContent(Box);
+		if (auto* ContentSlot = Cast<UButtonSlot>(Box->Slot)) { ContentSlot->SetHorizontalAlignment(HAlign_Fill); ContentSlot->SetVerticalAlignment(VAlign_Center); }
+		if (!Row.Icon.IsNull()) { auto* Icon = NewObject<UImage>(Button); Icon->SetBrushFromTexture(Row.Icon.LoadSynchronous()); Icon->SetDesiredSizeOverride(FVector2D(44,44)); Box->AddChildToHorizontalBox(Icon)->SetPadding(FMargin(8)); }
+		auto* Name = NewObject<UTextBlock>(Button);
+		Name->SetText(Row.DisplayName); Name->SetAutoWrapText(true);
+		Name->SetColorAndOpacity(FSlateColor(FLinearColor(.95f, .97f, 1.f, 1.f)));
+		Name->SetJustification(ETextJustify::Left);
+		FSlateFontInfo Font = Name->GetFont(); Font.Size = 18; Name->SetFont(Font);
+		auto* NameSlot = Box->AddChildToHorizontalBox(Name); NameSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill)); NameSlot->SetPadding(FMargin(12)); NameSlot->SetVerticalAlignment(VAlign_Center);
+		auto* Info = NewObject<UTextBlock>(Button);
+		Info->SetText(FText::FromString(Row.bIsUnique ? FString::Printf(TEXT("+%d  %s"), Row.EnhancementLevel, Row.EquippedCharacterId.IsValid() ? TEXT("已装备") : TEXT("未装备")) : FString::Printf(TEXT("×%d"), Row.Quantity)));
+		Info->SetColorAndOpacity(FSlateColor(bSelected ? FLinearColor(.95f, .91f, .73f, 1.f) : FLinearColor(.73f, .79f, .87f, 1.f)));
+		FSlateFontInfo InfoFont = Info->GetFont(); InfoFont.Size = 16; Info->SetFont(InfoFont);
+		Info->SetJustification(ETextJustify::Right);
+		auto* InfoSlot = Box->AddChildToHorizontalBox(Info); InfoSlot->SetPadding(FMargin(12)); InfoSlot->SetVerticalAlignment(VAlign_Center);
+		auto* Bridge = NewObject<UHSRInventoryRowClickBridge>(this); Bridge->Initialize(this, Row.Key);
+		Button->OnClicked.AddDynamic(Bridge, &UHSRInventoryRowClickBridge::HandleClicked); RowBridges.Add(Bridge);
 	}
+}
+
+
+void UHSRInventoryModuleWidget::HandleCategoryAll() { SelectCategory(EHSRInventoryCategory::All); }
+void UHSRInventoryModuleWidget::HandleCategoryWeapon() { SelectCategory(EHSRInventoryCategory::Weapon); }
+void UHSRInventoryModuleWidget::HandleCategoryRelic() { SelectCategory(EHSRInventoryCategory::Relic); }
+void UHSRInventoryModuleWidget::HandleCategoryConsumable() { SelectCategory(EHSRInventoryCategory::Consumable); }
+void UHSRInventoryModuleWidget::HandleCategoryMaterial() { SelectCategory(EHSRInventoryCategory::Material); }
+void UHSRInventoryModuleWidget::HandleCategoryOther() { SelectCategory(EHSRInventoryCategory::Other); }
+void UHSRInventoryModuleWidget::HandleSearchChanged(const FText& Text)
+{
+	if (bUpdatingSearch) return;
+	TGuardValue<bool> Guard(bUpdatingSearch, true);
+	SetFilterText(Text.ToString());
+}
+void UHSRInventoryModuleWidget::CycleSortMode()
+{
+	const auto Next = CurrentSnapshot.SortMode == EHSRInventorySortMode::CatalogOrder
+		? EHSRInventorySortMode::DisplayNameAscending
+		: CurrentSnapshot.SortMode == EHSRInventorySortMode::DisplayNameAscending
+			? EHSRInventorySortMode::QuantityDescending : EHSRInventorySortMode::CatalogOrder;
+	SetSortMode(Next);
+}
+void UHSRInventoryModuleWidget::RefreshBrowseControls()
+{
+	if (!WidgetTree) return;
+	const TPair<FName, EHSRInventoryCategory> Categories[] = {
+		{TEXT("BTN_CatAll"), EHSRInventoryCategory::All},
+		{TEXT("BTN_CatWeapon"), EHSRInventoryCategory::Weapon},
+		{TEXT("BTN_CatRelic"), EHSRInventoryCategory::Relic},
+		{TEXT("BTN_CatConsumable"), EHSRInventoryCategory::Consumable},
+		{TEXT("BTN_CatMaterial"), EHSRInventoryCategory::Material},
+		{TEXT("BTN_CatOther"), EHSRInventoryCategory::Other}};
+	for (const auto& CategoryButton : Categories)
+	{
+		if (auto* Button = FindButtonByName(CategoryButton.Key))
+			Button->SetBackgroundColor(CurrentSnapshot.Category == CategoryButton.Value
+				? FLinearColor(.78f, .61f, .24f, .9f) : FLinearColor(.08f, .12f, .19f, .9f));
+	}
+	if (auto* Text = FindTextByName(TEXT("TXT_SortLabel")))
+	{
+		Text->SetText(CurrentSnapshot.SortMode == EHSRInventorySortMode::CatalogOrder
+			? NSLOCTEXT("HSRInventory", "SortCatalog", "排序：默认")
+			: CurrentSnapshot.SortMode == EHSRInventorySortMode::DisplayNameAscending
+				? NSLOCTEXT("HSRInventory", "SortName", "排序：名称")
+				: NSLOCTEXT("HSRInventory", "SortQuantity", "排序：数量"));
+	}
+	if (auto* Search = WidgetTree->FindWidget<UEditableTextBox>(TEXT("SearchBox")))
+	{
+		// Do not rewrite whitespace while typing: this preserves caret position and IME composition.
+		FString VisibleFilter = Search->GetText().ToString(); VisibleFilter.TrimStartAndEndInline();
+		if (!bUpdatingSearch && VisibleFilter != CurrentSnapshot.FilterText)
+		{
+			TGuardValue<bool> Guard(bUpdatingSearch, true);
+			Search->SetText(FText::FromString(CurrentSnapshot.FilterText));
+		}
+	}
+}
+
+
+void UHSRInventoryModuleWidget::RefreshPresentationLabels()
+{
+	// Run after the legacy Blueprint snapshot event so authored English placeholders cannot win.
+	const TPair<FName, FText> Labels[] = {
+		{TEXT("TXT_Title"), NSLOCTEXT("HSRInventory", "Title", "背包")},
+		{TEXT("TXT_Back"), NSLOCTEXT("HSRInventory", "Back", "返回")},
+		{TEXT("TXT_Close"), NSLOCTEXT("HSRInventory", "Close", "关闭")},
+		{TEXT("TXT_CatWeapon"), NSLOCTEXT("HSRInventory", "Weapon", "武器")},
+		{TEXT("TXT_CatRelic"), NSLOCTEXT("HSRInventory", "Relic", "遗器")},
+		{TEXT("TXT_CatConsumable"), NSLOCTEXT("HSRInventory", "Consumable", "消耗品")},
+		{TEXT("TXT_CatMaterial"), NSLOCTEXT("HSRInventory", "Material", "材料")},
+		{TEXT("TXT_CatOther"), NSLOCTEXT("HSRInventory", "Other", "其他")},
+		{TEXT("TXT_ActionEquip"), NSLOCTEXT("HSRInventory", "EquipPreview", "装备预览")},
+		{TEXT("TXT_ActionEnhance"), NSLOCTEXT("HSRInventory", "EnhancePreview", "强化预览")}};
+	for (const auto& Label : Labels)
+		if (auto* Text = FindTextByName(Label.Key)) Text->SetText(Label.Value);
+
+	const TPair<FName, FText> ButtonLabels[] = {
+		{TEXT("BTN_CatAll"), NSLOCTEXT("HSRInventory", "All", "全部")},
+		{TEXT("BTN_CycleSort"), NSLOCTEXT("HSRInventory", "CycleSort", "切换排序")},
+		{TEXT("BTN_NextCharacter"), NSLOCTEXT("HSRInventory", "NextCharacter", "切换装备角色")},
+		{TEXT("BTN_ConfirmAction"), NSLOCTEXT("HSRInventory", "Confirm", "确认")},
+		{TEXT("BTN_CancelAction"), NSLOCTEXT("HSRInventory", "Cancel", "取消")},
+		{TEXT("BTN_NextEnhancement"), NSLOCTEXT("HSRInventory", "NextLevel", "选择目标等级")}};
+	for (const auto& Label : ButtonLabels)
+	{
+		if (auto* Button = FindButtonByName(Label.Key))
+		{
+			if (auto* Text = Cast<UTextBlock>(Button->GetContent())) Text->SetText(Label.Value);
+		}
+	}
+
+	TArray<UWidget*> Widgets;
+	WidgetTree->GetAllWidgets(Widgets);
+	for (auto* Widget : Widgets)
+	{
+		if (auto* Button = Cast<UButton>(Widget)) Button->SetColorAndOpacity(FLinearColor::White);
+		if (auto* Border = Cast<UBorder>(Widget)) Border->SetContentColorAndOpacity(FLinearColor::White);
+		if (auto* Text = Cast<UTextBlock>(Widget))
+		{
+			const bool bHeading = Text->GetFName() == TEXT("TXT_Title") || Text->GetFName() == TEXT("TXT_DetailName");
+			const bool bSecondary = Text->GetFName() == TEXT("TXT_DetailDescription") || Text->GetFName() == TEXT("TXT_SortLabel");
+			Text->SetColorAndOpacity(FSlateColor(bSecondary ? FLinearColor(.76f, .82f, .90f, 1.f) : FLinearColor(.95f, .97f, 1.f, 1.f)));
+			FSlateFontInfo Font = Text->GetFont(); Font.Size = bHeading ? 26 : 18; Text->SetFont(Font);
+		}
+	}
+	if (auto* Search = WidgetTree->FindWidget<UEditableTextBox>(TEXT("SearchBox")))
+	{
+		Search->SetForegroundColor(FLinearColor(.95f, .97f, 1.f, 1.f));
+	}
+	UpdateTargetCharacterText();
+}
+
+
+bool UHSRInventoryModuleWidget::CancelPreviewForBackKey(const FKey& Key)
+{
+	if (!bHasPendingAction || (Key != EKeys::Escape && Key != EKeys::Tab && Key != EKeys::Gamepad_Special_Right)) return false;
+	CancelAction();
+	return true;
+}
+
+FReply UHSRInventoryModuleWidget::NativeOnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent)
+{
+	// Preview routing catches Escape before a focused search box or child button consumes it.
+	if (CancelPreviewForBackKey(KeyEvent.GetKey())) return FReply::Handled();
+	return Super::NativeOnPreviewKeyDown(Geometry, KeyEvent);
 }

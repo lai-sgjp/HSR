@@ -5,11 +5,23 @@
 #include "../Character/HSRExplorationCharacter.h"
 #include "Components/SphereComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "../Challenge/HSRChallengeProgressionSubsystem.h"
+#include "../Data/Definitions/HSREncounterDefinition.h"
+#include "Engine/GameInstance.h"
 
 // 构造函数：创建“遭遇触发”碰撞球体（玩家踏入即触发战斗请求）。
 AHSREnemyCharacter::AHSREnemyCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	AIControllerClass = AHSREnemyAIController::StaticClass();
+	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+	PatrolMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PatrolMesh"));
+	PatrolMesh->SetupAttachment(GetRootComponent());
+	PatrolMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	PatrolMesh->SetRelativeLocation(FVector(0,0,-88));
+	GetCharacterMovement()->MaxWalkSpeed = 220.f;
 
 	// 遭遇碰撞球：只做查询、生成重叠事件，不参与物理阻挡。
 	EncounterCollision = CreateDefaultSubobject<USphereComponent>(TEXT("EncounterCollision"));
@@ -25,6 +37,18 @@ AHSREnemyCharacter::AHSREnemyCharacter()
 void AHSREnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	if (EnemyDefinition)
+	{
+		PatrolMesh->SetStaticMesh(EnemyDefinition->BattleMesh.LoadSynchronous());
+		PatrolMesh->SetRelativeScale3D(FVector(EnemyDefinition->BattleMeshScale));
+		if (GetGameInstance() && EnemyDefinition->EncounterDefinition)
+			if (auto* Progress = GetGameInstance()->GetSubsystem<UHSRChallengeProgressionSubsystem>())
+				if (Progress->IsCompleted(EnemyDefinition->EncounterDefinition->EncounterId))
+				{
+					Destroy();
+					return;
+				}
+	}
 	// 记录生成点（用于 AI 巡逻回位）。
 	CaptureSpawnOrigin();
 	// 用定义里的遭遇半径覆盖默认碰撞球半径。

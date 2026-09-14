@@ -167,6 +167,7 @@ FString UMCPythonHelper::UmgAddWidget(UBlueprint* WidgetBP, const FString& Widge
 
     // Mark as variable so Blueprint graph can reference it directly
     NewWidget->bIsVariable = true;
+    if (!WB->WidgetVariableNameToGuidMap.Contains(NewWidget->GetFName())) WB->OnVariableAdded(NewWidget->GetFName());
 
     FString ActualParent;
     bool bIsRoot = false;
@@ -270,6 +271,12 @@ FString UMCPythonHelper::UmgSetWidgetIsVariable(UBlueprint* WidgetBP, const FStr
 
     Widget->Modify();
     Widget->bIsVariable = bIsVariable;
+    WB->Modify();
+    // UE5.6 requires stable variable GUIDs even for programmatically authored widgets.
+    if (bIsVariable && !WB->WidgetVariableNameToGuidMap.Contains(Widget->GetFName()))
+        WB->OnVariableAdded(Widget->GetFName());
+    else if (!bIsVariable && WB->WidgetVariableNameToGuidMap.Contains(Widget->GetFName()))
+        WB->OnVariableRemoved(Widget->GetFName());
 
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WB);
 

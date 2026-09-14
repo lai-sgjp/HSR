@@ -1,6 +1,19 @@
 #include "HSRUserWidget.h"
 #include "HSRAttributeViewModel.h"
 #include "HSRInteractionViewModel.h"
+#include "HSRQuestViewModel.h"
+#include "HSRMinimapWidget.h"
+#include "HSRWorldGuidanceWidget.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/PanelWidget.h"
+#include "Components/TextBlock.h"
+#include "../Quest/HSRQuestSubsystem.h"
+#include "../Party/HSRPartySubsystem.h"
+#include "../Progression/HSRCharacterProfileSubsystem.h"
+#include "../Data/Definitions/HSRCharacterDefinition.h"
+#include "Engine/GameInstance.h"
 
 // 静态实例计数器：每次创建 UHSRUserWidget 都自增分配一个全局唯一实例号，
 // 用于日志中区分同一类 Widget 的不同实例（配合类名形成可读的身份标识）。
@@ -20,10 +33,72 @@ void UHSRUserWidget::NativeConstruct()
 	// 构造完成回调：目前仅透传给父类，绑定逻辑由外部（如 HUD）通过
 	// SetInteractionViewModel / SetAttributeViewModel 注入 ViewModel 触发。
 	Super::NativeConstruct();
+	if (auto* Canvas = WidgetTree ? Cast<UCanvasPanel>(WidgetTree->RootWidget) : nullptr)
+	{
+		if (!WidgetTree->FindWidget(TEXT("WorldGuidance")))
+		{
+			auto* Guide = WidgetTree->ConstructWidget<UHSRWorldGuidanceWidget>(UHSRWorldGuidanceWidget::StaticClass(), TEXT("WorldGuidance"));
+			Guide->SetVisibility(ESlateVisibility::HitTestInvisible);
+			auto* GuideSlot = Canvas->AddChildToCanvas(Guide);
+			GuideSlot->SetAnchors(FAnchors(0,0,1,1));
+			GuideSlot->SetOffsets(FMargin(0));
+			GuideSlot->SetZOrder(-1);
+		}
+	}
+	if (PR_MinimapHost && WidgetTree && PR_MinimapHost->GetChildrenCount()==0)
+		PR_MinimapHost->AddChild(CreateWidget<UHSRMinimapWidget>(GetOwningPlayer(),UHSRMinimapWidget::StaticClass()));
+	if (GetGameInstance() && PR_QuestTracker)
+	{
+		QuestPresentation=NewObject<UHSRQuestViewModel>(this);
+		QuestPresentation->Initialize(GetGameInstance()->GetSubsystem<UHSRQuestSubsystem>());
+		QuestPresentationHandle=QuestPresentation->OnChanged().AddUObject(this,&ThisClass::RefreshQuestPresentation);
+		FHSRQuestFrontendSnapshot Snapshot; QuestPresentation->GetSnapshot(Snapshot); RefreshQuestPresentation(Snapshot);
+	}
+	if (GetGameInstance() && PR_PartyText)
+		if (auto* Party=GetGameInstance()->GetSubsystem<UHSRPartySubsystem>())
+		{
+			PartyPresentationHandle=Party->OnPartyChanged().AddUObject(this,&ThisClass::RefreshPartyPresentation);
+			RefreshPartyPresentation(0);
+		}
+}
+
+void UHSRUserWidget::RefreshQuestPresentation(const FHSRQuestFrontendSnapshot& Snapshot)
+{
+	if (!PR_QuestTracker) return;
+	TArray<FText> Lines;
+	for (const auto& Quest : Snapshot.Quests)
+	{
+		Lines.Add(Quest.DisplayName);
+		for (const auto& O : Quest.Objectives) if (!O.bCompleted)
+		{
+			Lines.Add(FText::Format(NSLOCTEXT("HSRHUD","Objective","◇ {0}   {1}/{2}"),O.Description,FText::AsNumber(O.CurrentCount),FText::AsNumber(O.RequiredCount)));
+			break;
+		}
+		break;
+	}
+	PR_QuestTracker->SetText(FText::Join(FText::FromString(TEXT("\n")),Lines));
+}
+void UHSRUserWidget::RefreshPartyPresentation(int64)
+{
+	if (!GetGameInstance() || !PR_PartyText) return;
+	auto* Party=GetGameInstance()->GetSubsystem<UHSRPartySubsystem>();
+	auto* Profiles=GetGameInstance()->GetSubsystem<UHSRCharacterProfileSubsystem>();
+	FHSRPartySnapshot Snapshot;
+	if (!Party || !Profiles || !Party->GetSnapshot(Snapshot)) return;
+	TArray<FText> Lines;
+	for (int32 I=0; I<Snapshot.Slots.Num(); ++I)
+	{
+		const UHSRCharacterDefinition* Definition=nullptr;
+		if (Profiles->GetDefinition(Snapshot.Slots[I].CharacterId,Definition) && Definition)
+			Lines.Add(FText::Format(NSLOCTEXT("HSRHUD","Party","{0}   {1}"),Definition->DisplayName,FText::AsNumber(I+1)));
+	}
+	PR_PartyText->SetText(FText::Join(FText::FromString(TEXT("\n\n")),Lines));
 }
 
 void UHSRUserWidget::NativeDestruct()
 {
+	if (QuestPresentation) { QuestPresentation->OnChanged().Remove(QuestPresentationHandle); QuestPresentation->Shutdown(); QuestPresentation=nullptr; }
+	if (GetGameInstance()) if (auto* Party=GetGameInstance()->GetSubsystem<UHSRPartySubsystem>()) Party->OnPartyChanged().Remove(PartyPresentationHandle);
 	// 销毁回调：必须先摘掉对 InteractionViewModel 的订阅并 Teardown VM，
 	// 再清空属性 VM 引用，最后才调用父类。顺序很重要——父类析构阶段
 	// 不能再触发任何依赖本 Widget 的回调。

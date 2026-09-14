@@ -4,17 +4,12 @@ This guide supplements `.agents/agents.md`. It routes Codex to the smallest auth
 
 ## Start here
 
-High-level planning and coordination:
+Use the current user request as the task scope. For a focused fix or document edit, read the target files and relevant rules directly.
 
-1. `PROJECT_STATE.md`
-2. `.agents/agents.md`
-3. `tasks/active-task.md`
-4. `todo_plan.md`
-5. latest relevant `worklog.md` entry
-6. current Phase/patch execution plan
-7. only the design documents and Source named by that plan
-
-Implementation models read only `tasks/active-task.md` first and follow its exact read/write allowlist. Review models read the active task、execution result、review template、actual diff and named evidence.
+- For phase planning or resuming project work, read `PROJECT_STATE.md` and the relevant phase plan; consult `todo_plan.md` or recent `worklog.md` entries only to resolve missing or conflicting state.
+- Use relevant sections of `.agents/agents.md` for project constraints.
+- When the user explicitly adopts the task-card workflow, read `tasks/active-task.md` and honor its allowlist. For a formal review, add the actual diff and named evidence; load review templates only if that workflow requires them.
+- Read domain design documents when the affected behavior crosses those boundaries. These are routes, not a mandatory reading stack.
 
 ## Domain ownership map
 
@@ -33,7 +28,7 @@ Canonical cross-domain flow is documented in `docs/system-operation-flow.md` onc
 
 ## Asset ownership
 
-- C++ and Markdown may be edited only when the active task authorizes exact paths.
+- C++ and Markdown edits must stay within the current user-authorized task. In an explicitly adopted task-card workflow, honor its exact path allowlist.
 - User owns Blueprint、UMG、DataAsset、GameplayEffect、InputAction/IMC、map and visual inspection work.
 - Binary assets cannot be meaningfully line-diffed. Require path allowlist、author/provenance、Editor compile/save/reopen and PIE evidence.
 - `Binaries/`、`Intermediate/`、`Saved/`、`DerivedDataCache/`、`.vs/` and local `.claude/` state are not source deliverables unless an explicit task says otherwise.

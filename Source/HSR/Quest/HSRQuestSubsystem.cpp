@@ -1,5 +1,19 @@
 #include "HSRQuestSubsystem.h"
 
+FText UHSRQuestSubsystem::GetQuestDisplayName(FName QuestId) const
+{
+	const FQuestRule* Rule = QuestDefinitions.Find(QuestId);
+	return Rule && !Rule->DisplayName.IsEmpty() ? Rule->DisplayName : NSLOCTEXT("HSRQuest", "Untitled", "待调查任务");
+}
+
+FText UHSRQuestSubsystem::GetObjectiveDescription(FName QuestId, FName ObjectiveId) const
+{
+	if (const FQuestRule* Rule = QuestDefinitions.Find(QuestId))
+		for (const FHSRQuestObjectiveDefinition& Objective : Rule->Objectives)
+			if (Objective.ObjectiveId == ObjectiveId && !Objective.Description.IsEmpty()) return Objective.Description;
+	return NSLOCTEXT("HSRQuest", "Objective", "调查目标");
+}
+
 #include "../Data/Definitions/HSRQuestDefinition.h"
 #include "../Reward/HSRRewardSubsystem.h"
 #include "Misc/Crc.h"
@@ -39,6 +53,7 @@ EHSRQuestOperationResult UHSRQuestSubsystem::RegisterQuestDefinition(const UHSRQ
 	// 只拷贝运行时需要的字段，避免长期持有 DataAsset 引用。
 	FQuestRule Rule;
 	Rule.QuestId = Definition.QuestId;
+	Rule.DisplayName = Definition.DisplayName;
 	Rule.Objectives = Definition.Objectives;
 	Rule.RewardDefinitionId = Definition.RewardDefinitionId;
 	Rule.RewardSeed = Definition.RewardSeed;
@@ -303,17 +318,30 @@ bool UHSRQuestSubsystem::PrepareRestore(const FHSRQuestSaveData& Data, FHSRQuest
 		{
 			return false;
 		}
-		// 逐目标核对：ID 与规则一致、计数合法且与完成标记一致。
-		bool bAllComplete = true;
-		for (int32 Index = 0; Index < Rule->Objectives.Num(); ++Index)
+		// The canonical save codec sorts objectives by ID. Match by identity, then
+		// rebuild authored order because SubmitEvent indexes the rule and state together.
+		FHSRQuestRuntimeState RestoredState = State;
+		RestoredState.QuestId = Rule->QuestId;
+		RestoredState.Objectives.Reset();
+		TMap<FName, const FHSRQuestRuntimeObjective*> SavedObjectives;
+		for (const FHSRQuestRuntimeObjective& SavedObjective : State.Objectives)
 		{
-			const FHSRQuestObjectiveDefinition& RuleObjective = Rule->Objectives[Index];
-			const FHSRQuestRuntimeObjective& SavedObjective = State.Objectives[Index];
-			if (SavedObjective.ObjectiveId != RuleObjective.ObjectiveId || SavedObjective.RequiredCount != RuleObjective.RequiredCount || SavedObjective.CurrentCount < 0 || SavedObjective.CurrentCount > SavedObjective.RequiredCount || SavedObjective.bCompleted != (SavedObjective.CurrentCount >= SavedObjective.RequiredCount))
+			if (SavedObjectives.Contains(SavedObjective.ObjectiveId)) return false;
+			SavedObjectives.Add(SavedObjective.ObjectiveId, &SavedObjective);
+		}
+		bool bAllComplete = true;
+		for (const FHSRQuestObjectiveDefinition& RuleObjective : Rule->Objectives)
+		{
+			const FHSRQuestRuntimeObjective* const* Found = SavedObjectives.Find(RuleObjective.ObjectiveId);
+			if (!Found) return false;
+			const FHSRQuestRuntimeObjective& SavedObjective = **Found;
+			if (SavedObjective.RequiredCount != RuleObjective.RequiredCount || SavedObjective.CurrentCount < 0 || SavedObjective.CurrentCount > SavedObjective.RequiredCount || SavedObjective.bCompleted != (SavedObjective.CurrentCount >= SavedObjective.RequiredCount))
 			{
 				return false;
 			}
 			bAllComplete &= SavedObjective.bCompleted;
+			FHSRQuestRuntimeObjective& RestoredObjective = RestoredState.Objectives.Add_GetRef(SavedObjective);
+			RestoredObjective.ObjectiveId = RuleObjective.ObjectiveId;
 		}
 		// 任务整体状态必须与“目标是否全完成”一致，防止存档把半完成状态标成 Completed。
 		if ((State.State == EHSRQuestState::Completed) != bAllComplete)
@@ -325,13 +353,15 @@ bool UHSRQuestSubsystem::PrepareRestore(const FHSRQuestSaveData& Data, FHSRQuest
 		{
 			return false;
 		}
-		// 领取 ID 必须是有效的且符合派生规则（防止手改存档）。
-		if (!State.RewardClaimId.IsValid() || State.RewardClaimId != MakeQuestRewardClaimId(State.QuestId))
+		// The codec lowercases FNames but preserves GUIDs. Initial state derives its
+		// claim from the authored rule spelling; validate against that same identity
+		// without rewriting the existing claim or its reward-ledger receipt.
+		if (!State.RewardClaimId.IsValid() || State.RewardClaimId != MakeQuestRewardClaimId(Rule->QuestId))
 		{
 			return false;
 		}
 		MaxStateRevision = FMath::Max(MaxStateRevision, State.Revision);
-		Candidate.States.Add(State.QuestId, State);
+		Candidate.States.Add(Rule->QuestId, MoveTemp(RestoredState));
 	}
 	// 修订号一致性兜底：空存档必须修订号为 0；非空存档里任何任务修订号都不能超过存档修订号。
 	if ((Data.States.IsEmpty() && Data.Revision != 0) || (!Data.States.IsEmpty() && MaxStateRevision > Data.Revision))

@@ -1,6 +1,6 @@
 ---
 name: phase-next-steps
-description: Optional HSR phase-gate guidance for deciding what to do next in the UE5.6 C++ and GAS roadmap. Use when the user asks for the next project step, phase transition advice, readiness checks, or a best-practice checklist; this skill only advises and never starts implementation unless the user separately authorizes it.
+description: "Recommend the next HSR phase or work package when asked about project progression or phase readiness."
 ---
 
 # HSR Phase Next Steps
@@ -17,8 +17,8 @@ Use these project-specific safety rules:
 - Prefer a coherent work package that can include tightly coupled C++, Editor configuration, PIE, and evidence. Do not split mechanically by class, file, or asset.
 - Split only for different authors or permissions, dangerous Git/Config, third-party assets, new modules, external dependencies, independent failure/rollback boundaries, or scope beyond a low-level model's safe capacity.
 - Separate Codex changes, user Editor actions, and user-provided evidence.
-- Never create code, assets, Config, or Git changes merely because this skill was invoked.
-- Stop and request authorization for deletion, broad refactoring, third-party assets, Git, or a new module.
+- Invocation alone does not authorize implementation; use the user’s actual requested scope and existing authorization.
+- Recommendations and read-only checks need no extra approval. Before an actual destructive or external action, check whether existing authorization covers it; ask only if it does not.
 
 ## Workflow
 
@@ -29,9 +29,9 @@ Use these project-specific safety rules:
 5. List exact files, assets, manual steps, and evidence required.
 6. State what is explicitly out of scope.
 7. Offer a validation checklist and documentation entries to make after execution.
-8. End with one suggested next task; do not execute it automatically.
+8. For advice-only requests, end with one suggested next task. If the user also authorized implementation, continue within that scope without asking for the same authorization again.
 
-## Required response format
+## Response guide (include only relevant items)
 
 1. Current phase and evidence.
 2. Gate status: ready, blocked, or not yet verified.

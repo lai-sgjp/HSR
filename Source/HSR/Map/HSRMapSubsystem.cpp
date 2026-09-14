@@ -1,4 +1,5 @@
 #include "HSRMapSubsystem.h"
+#include "HSRSafePlacement.h"
 
 #include "../Data/Definitions/HSRMapDefinition.h"
 #include "../Data/Definitions/HSRTeleportDefinition.h"
@@ -516,7 +517,7 @@ EHSRMapOperationResult UHSRMapSubsystem::RequestRestoreTravel(const FHSRMapRunti
 
 // 把“恢复位置”落实到当前关卡的 Pawn 上（无需切换关卡时使用）。
 // 与 CommitPendingArrival 不同，它不消费挂起请求，只负责把玩家 Actor 摆到存档坐标。
-EHSRMapOperationResult UHSRMapSubsystem::ApplyRestoreLocation(const FHSRMapRuntimeSnapshot& RestoreTarget)
+EHSRMapOperationResult UHSRMapSubsystem::ApplyRestoreLocation(FHSRMapRuntimeSnapshot& RestoreTarget)
 {
 	if (RestoreTarget.CurrentLocation.MapId.IsNone())
 	{
@@ -541,11 +542,17 @@ EHSRMapOperationResult UHSRMapSubsystem::ApplyRestoreLocation(const FHSRMapRunti
 		return EHSRMapOperationResult::PawnUnavailable;
 	}
 	// 存档坐标含 NaN，或落点摆放失败，都视为放置失败。
-	if (RestoreTarget.CurrentLocation.WorldTransform.ContainsNaN()
-		|| !Pawn->SetActorTransform(RestoreTarget.CurrentLocation.WorldTransform, false, nullptr, ETeleportType::TeleportPhysics))
+	FTransform SafeTransform;
+	FName FallbackArrival;
+	const FRegisteredMap* Map = Maps.Find(LoadedMapId);
+	if (!HSRSafePlacement::Resolve(Pawn, RestoreTarget.CurrentLocation.WorldTransform, SafeTransform,
+		Map ? Map->DefaultArrivalId : NAME_None, &FallbackArrival)
+		|| !Pawn->SetActorTransform(SafeTransform, false, nullptr, ETeleportType::TeleportPhysics))
 	{
 		return EHSRMapOperationResult::PlacementFailed;
 	}
+	RestoreTarget.CurrentLocation.WorldTransform = Pawn->GetActorTransform();
+	if (!FallbackArrival.IsNone()) RestoreTarget.CurrentLocation.ArrivalId = FallbackArrival;
 	return EHSRMapOperationResult::Success;
 }
 
@@ -588,7 +595,14 @@ EHSRMapOperationResult UHSRMapSubsystem::CommitPendingRestoreArrival(const FName
 	{
 		return EHSRMapOperationResult::InvalidWorld;
 	}
-	return CommitPendingArrivalValidated(DestinationMapId, PendingRequest.Destination.ArrivalId, Pawn, SavedTransform);
+	if (!Pawn) return EHSRMapOperationResult::PawnUnavailable;
+	if (Pawn->GetWorld() != World) return EHSRMapOperationResult::InvalidWorld;
+	FTransform SafeTransform;
+	FName FallbackArrival;
+	if (!HSRSafePlacement::Resolve(Pawn, SavedTransform, SafeTransform, DestinationMap->DefaultArrivalId, &FallbackArrival))
+		return EHSRMapOperationResult::PlacementFailed;
+	const FName ResolvedArrival = FallbackArrival.IsNone() ? PendingRequest.Destination.ArrivalId : FallbackArrival;
+	return CommitPendingArrivalValidated(DestinationMapId, ResolvedArrival, Pawn, SafeTransform);
 }
 
 // 提交到达的公共收尾路径：校验通过后摆放 Pawn、落盘快照、广播事件。
@@ -600,6 +614,7 @@ EHSRMapOperationResult UHSRMapSubsystem::CommitPendingArrivalValidated(const FNa
 	{
 		return EHSRMapOperationResult::PawnUnavailable;
 	}
+	if (Pawn->GetWorld() != GetWorld()) return EHSRMapOperationResult::InvalidWorld;
 	if (ArrivalTransform.ContainsNaN())
 	{
 		return EHSRMapOperationResult::PlacementFailed;
@@ -611,7 +626,8 @@ EHSRMapOperationResult UHSRMapSubsystem::CommitPendingArrivalValidated(const FNa
 
 	// 摆放成功后，把挂起请求固化进运行时快照：当前所在地就是目的地，坐标用实际落点。
 	Snapshot.CurrentLocation = PendingRequest.Destination;
-	Snapshot.CurrentLocation.WorldTransform = ArrivalTransform;
+	Snapshot.CurrentLocation.ArrivalId = ArrivalId;
+	Snapshot.CurrentLocation.WorldTransform = Pawn->GetActorTransform();
 	// 记录已提交的请求 ID，供外部确认“这次旅行确实完成了”。
 	const FGuid CompletedRequestId = PendingRequest.RequestId;
 	LastCommittedRequestId = CompletedRequestId;
@@ -637,6 +653,7 @@ EHSRMapOperationResult UHSRMapSubsystem::CommitPendingArrivalValidated(const FNa
 // 与普通传送不同，这里不消费“传送挂起请求”——战斗返回走的是战斗子系统的通道。
 EHSRMapOperationResult UHSRMapSubsystem::CommitBattleReturnLocation(const FName MapId, APawn* Pawn, const FTransform& ReturnTransform)
 {
+	if (bTravelPending) return EHSRMapOperationResult::AlreadyPending;
 	const FRegisteredMap* Map = Maps.Find(MapId);
 	if (!Map)
 	{
@@ -654,19 +671,23 @@ EHSRMapOperationResult UHSRMapSubsystem::CommitBattleReturnLocation(const FName 
 	{
 		return EHSRMapOperationResult::PawnUnavailable;
 	}
-	if (ReturnTransform.ContainsNaN() || !Pawn->SetActorTransform(ReturnTransform, false, nullptr, ETeleportType::TeleportPhysics))
+	if (Pawn->GetWorld() != World) return EHSRMapOperationResult::InvalidWorld;
+	FTransform SafeTransform;
+	FName FallbackArrival;
+	if (!HSRSafePlacement::Resolve(Pawn, ReturnTransform, SafeTransform, Map->DefaultArrivalId, &FallbackArrival)
+		|| !Pawn->SetActorTransform(SafeTransform, false, nullptr, ETeleportType::TeleportPhysics))
 	{
 		return EHSRMapOperationResult::PlacementFailed;
 	}
 	// 战斗返回不设具体到达点，ArrivalId 记为 None，坐标直接用战斗前位置。
 	Snapshot.CurrentLocation.MapId = MapId;
-	Snapshot.CurrentLocation.ArrivalId = NAME_None;
-	Snapshot.CurrentLocation.WorldTransform = ReturnTransform;
+	Snapshot.CurrentLocation.ArrivalId = FallbackArrival;
+	Snapshot.CurrentLocation.WorldTransform = Pawn->GetActorTransform();
 	CommitStateChange();
-	PublishArrivalCommitted(MapId, NAME_None, EHSRMapArrivalCommitKind::BattleReturn);
+	PublishArrivalCommitted(MapId, FallbackArrival, EHSRMapArrivalCommitKind::BattleReturn);
 	UE_LOG(LogTemp, Log, TEXT("HSR Battle map location committed Map=%s Location=%s"),
 		*MapId.ToString(),
-		*ReturnTransform.GetLocation().ToString());
+		*SafeTransform.GetLocation().ToString());
 	return EHSRMapOperationResult::Success;
 }
 

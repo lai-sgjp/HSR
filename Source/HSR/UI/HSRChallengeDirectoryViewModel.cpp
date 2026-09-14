@@ -58,6 +58,8 @@ EHSRChallengeDirectoryResult UHSRChallengeDirectoryViewModel::Refresh()
 		// 用遭遇定义填充条目：遭遇 ID、敌人定义 ID、战斗地图路径。
 		FHSRChallengeDirectoryEntry& Entry = Snapshot.Entries.AddDefaulted_GetRef();
 		Entry.EncounterId = Definition->EncounterId;
+		Entry.DisplayName = Definition->DisplayName.IsEmpty() ? NSLOCTEXT("HSRChallenge","Unnamed","区域遭遇") : Definition->DisplayName;
+		Entry.Description = Definition->Description;
 		Entry.EnemyDefinitionId = Definition->EnemyDefinitionId;
 		Entry.BattleMapPath = Definition->BattleMap.IsNull()
 			? NAME_None : FName(*Definition->BattleMap.GetLongPackageName());
@@ -87,17 +89,17 @@ EHSRChallengeDirectoryResult UHSRChallengeDirectoryViewModel::Refresh()
 		if (!bDefinitionValid || !bPrerequisitesValid)
 		{
 			Entry.Status = EHSRChallengeDirectoryStatus::Unavailable;
-			Entry.Diagnostic = FText::FromString(TEXT("Challenge is unavailable."));
+			Entry.Diagnostic = NSLOCTEXT("HSRChallenge","Unavailable","挑战暂不可用");
 		}
 		else if (Progression.IsValid() && Progression->IsCompleted(Entry.EncounterId))
 		{
 			Entry.Status = EHSRChallengeDirectoryStatus::Completed;
-			Entry.Diagnostic = FText::FromString(TEXT("Challenge is completed."));
+			Entry.Diagnostic = NSLOCTEXT("HSRChallenge","Completed","已完成 · 奖励已领取");
 		}
 		else if (!bPrerequisitesComplete)
 		{
 			Entry.Status = EHSRChallengeDirectoryStatus::Locked;
-			Entry.Diagnostic = FText::FromString(TEXT("Challenge prerequisites are incomplete."));
+			Entry.Diagnostic = NSLOCTEXT("HSRChallenge","Locked","先完成前置遭遇");
 		}
 		else
 		{

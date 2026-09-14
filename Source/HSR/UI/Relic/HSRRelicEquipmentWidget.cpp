@@ -2,13 +2,16 @@
 
 #include "HSRRelicEquipmentViewModel.h"
 #include "../../Data/Definitions/HSREquipmentEnhancementCatalog.h"
+#include "../../Data/Definitions/HSRInventoryCatalog.h"
 #include "../../Data/Definitions/HSRItemEquipmentMappingCatalog.h"
 #include "../../Equipment/HSREquipmentSubsystem.h"
 #include "../../Equipment/HSREquipmentTypes.h"
 #include "../../Inventory/HSRInventorySubsystem.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
+#include "Components/ButtonSlot.h"
 #include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Components/PanelWidget.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
@@ -17,11 +20,67 @@
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 
+namespace
+{
+FText RelicSlotLabel(EHSRRelicSlot RelicSlot)
+{
+	switch (RelicSlot)
+	{
+	case EHSRRelicSlot::Head: return NSLOCTEXT("HSRRelic", "Head", "头部");
+	case EHSRRelicSlot::Hands: return NSLOCTEXT("HSRRelic", "Hands", "手部");
+	case EHSRRelicSlot::Body: return NSLOCTEXT("HSRRelic", "Body", "躯干");
+	case EHSRRelicSlot::Feet: return NSLOCTEXT("HSRRelic", "Feet", "脚部");
+	case EHSRRelicSlot::PlanarSphere: return NSLOCTEXT("HSRRelic", "Sphere", "位面球");
+	case EHSRRelicSlot::LinkRope: return NSLOCTEXT("HSRRelic", "Rope", "连结绳");
+	default: return NSLOCTEXT("HSRRelic", "UnknownSlot", "遗器槽位");
+	}
+}
+FText RelicStatLabel(EHSREquipmentStat Stat)
+{
+	switch (Stat)
+	{
+	case EHSREquipmentStat::MaxHealth: return NSLOCTEXT("HSRRelic", "Health", "最大生命");
+	case EHSREquipmentStat::Attack: return NSLOCTEXT("HSRRelic", "Attack", "攻击力");
+	case EHSREquipmentStat::Defense: return NSLOCTEXT("HSRRelic", "Defense", "防御力");
+	case EHSREquipmentStat::Speed: return NSLOCTEXT("HSRRelic", "Speed", "速度");
+	default: return NSLOCTEXT("HSRRelic", "Attribute", "属性");
+	}
+}
+FText RelicModifierLabel(const TArray<FHSREquipmentModifier>& Modifiers)
+{
+	TArray<FString> Lines;
+	for (const FHSREquipmentModifier& Modifier : Modifiers)
+		Lines.Add(FText::Format(NSLOCTEXT("HSRRelic", "Modifier", "{0} {1}{2}"), RelicStatLabel(Modifier.Stat),
+			Modifier.Value >= 0.f ? FText::FromString(TEXT("+")) : FText::GetEmpty(), FText::AsNumber(Modifier.Value)).ToString());
+	return Lines.IsEmpty() ? NSLOCTEXT("HSRRelic", "NoModifiers", "无属性加成") : FText::FromString(FString::Join(Lines, TEXT("  ·  ")));
+}
+}
+
 // NativeConstruct：控件入树时自建遗器装备 ViewModel 并订阅其快照事件。
 // 若已指定角色 GUID 则立即初始化运行时上下文，否则进入"未初始化"不可用态。
 void UHSRRelicEquipmentWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	if (UButton* Confirm = WidgetTree ? WidgetTree->FindWidget<UButton>(TEXT("BTN_ConfirmEnhance")) : nullptr)
+	{
+		Confirm->OnClicked.Clear();
+		Confirm->OnClicked.AddDynamic(this, &ThisClass::HandleConfirmEnhancement);
+	}
+	if (UButton* Unequip = WidgetTree ? WidgetTree->FindWidget<UButton>(TEXT("BTN_Unequip")) : nullptr)
+	{
+		Unequip->OnClicked.Clear();
+		Unequip->OnClicked.AddDynamic(this, &ThisClass::HandleUnequip);
+	}
+	if (UButton* Equip = WidgetTree ? WidgetTree->FindWidget<UButton>(TEXT("BTN_Equip")) : nullptr)
+	{
+		Equip->OnClicked.Clear();
+		Equip->OnClicked.AddDynamic(this, &ThisClass::HandleEquip);
+	}
+	if (UButton* Enhance = WidgetTree ? WidgetTree->FindWidget<UButton>(TEXT("BTN_Enhance")) : nullptr)
+	{
+		Enhance->OnClicked.Clear();
+		Enhance->OnClicked.AddDynamic(this, &ThisClass::HandleOpenEnhancement);
+	}
 	ViewModel = NewObject<UHSRRelicEquipmentViewModel>(this);
 	UE_LOG(LogTemp, Log, TEXT("HSRRelic[%p] Construct VM=%d CharacterId=%s valid=%d"),
 		this, ViewModel != nullptr, *CharacterId.ToString(), CharacterId.IsValid());
@@ -41,6 +100,7 @@ void UHSRRelicEquipmentWidget::NativeConstruct()
 	{
 		OnRelicUnavailable(EHSRRelicEquipmentResult::NotInitialized);
 	}
+	RefreshPresentation();
 }
 
 // NativeDestruct：控件出树时解绑订阅、关闭 ViewModel 并清空快照缓存。
@@ -162,6 +222,28 @@ EHSRRelicEquipmentResult UHSRRelicEquipmentWidget::CommitEnhancement(const int32
 	return Result;
 }
 
+EHSRRelicEquipmentResult UHSRRelicEquipmentWidget::UnequipSelectedSlot()
+{
+	const auto Result = ViewModel ? ViewModel->UnequipSelectedSlot() : EHSRRelicEquipmentResult::NotInitialized;
+	ShowOperationResult(Result);
+	return Result;
+}
+
+void UHSRRelicEquipmentWidget::HandleUnequip() { UnequipSelectedSlot(); }
+void UHSRRelicEquipmentWidget::HandleEquip() { CommitSelectedMovement(); }
+void UHSRRelicEquipmentWidget::HandleOpenEnhancement() { OpenEnhancement(); }
+
+void UHSRRelicEquipmentWidget::SelectEnhancementLevel(int32 TargetLevel)
+{
+	SelectedEnhancementLevel = TargetLevel;
+	HandleSnapshot(CurrentSnapshot);
+}
+
+void UHSRRelicEquipmentWidget::HandleConfirmEnhancement()
+{
+	if (SelectedEnhancementLevel != INDEX_NONE) CommitEnhancement(SelectedEnhancementLevel);
+}
+
 // Back：返回上一级界面（转发给 ViewModel）。
 EHSRRelicEquipmentResult UHSRRelicEquipmentWidget::Back()
 {
@@ -207,6 +289,10 @@ bool UHSRRelicEquipmentWidget::HasEnhancementOptions() const
 // 各阶段面板可见性、候选/强化列表，并推送蓝图事件。这是整个遗器装备界面的刷新核心。
 void UHSRRelicEquipmentWidget::HandleSnapshot(const FHSRRelicEquipmentSnapshot& InSnapshot)
 {
+	if (CurrentSnapshot.EnhancementInstanceId != InSnapshot.EnhancementInstanceId
+		|| !InSnapshot.EnhancementOptions.ContainsByPredicate([this](const FHSRRelicEnhancementOption& Option)
+			{ return Option.TargetLevel == SelectedEnhancementLevel; })) SelectedEnhancementLevel = INDEX_NONE;
+	OperationMessage = FText::GetEmpty();
 	CurrentSnapshot = InSnapshot;
 	bHasSnapshot = true;
 	UE_LOG(LogTemp, Log, TEXT("HSRRelic[%p] Snapshot stage=%d valid=%d reason=%d options=%d slots=%d cand=%d curInst=%d"),
@@ -217,14 +303,14 @@ void UHSRRelicEquipmentWidget::HandleSnapshot(const FHSRRelicEquipmentSnapshot& 
 	// "强化"按钮只在存在已选遗器时可用。
 	if (UButton* EnhanceButton = WidgetTree ? WidgetTree->FindWidget<UButton>(TEXT("BTN_Enhance")) : nullptr)
 	{
-		EnhanceButton->SetIsEnabled(InSnapshot.CurrentInstanceId.IsValid());
+		EnhanceButton->SetIsEnabled(InSnapshot.CurrentInstanceId.IsValid() || InSnapshot.SelectedCandidateId.IsValid());
 	}
 	// "确认强化"按钮只在强化阶段存在"可用且负担得起"的选项时可用。
 	if (UButton* ConfirmButton = WidgetTree ? WidgetTree->FindWidget<UButton>(TEXT("BTN_ConfirmEnhance")) : nullptr)
 	{
 		const bool bHasAffordableOption = InSnapshot.Stage == EHSRRelicEquipmentStage::Enhancement
 			&& InSnapshot.EnhancementOptions.ContainsByPredicate(
-				[](const FHSRRelicEnhancementOption& Option) { return Option.bAvailable && Option.bAffordable; });
+				[this](const FHSRRelicEnhancementOption& Option) { return Option.TargetLevel == SelectedEnhancementLevel && Option.bAvailable && Option.bAffordable; });
 		ConfirmButton->SetIsEnabled(bHasAffordableOption);
 	}
 	OnRelicSnapshotChanged(InSnapshot);
@@ -238,24 +324,28 @@ void UHSRRelicEquipmentWidget::HandleSnapshot(const FHSRRelicEquipmentSnapshot& 
 	// 蓝图回调之后立即应用一次，确保用户不会看到旧阶段的面板/列表残留一帧；
 	// 下面的延迟一帧再跑一次，是为了兜住蓝图端在自己回调返回后才调度更新的图。
 	ApplyStageVisibility();
+	PopulateSlots();
 	PopulateCandidates();
 	PopulateEnhancementOptions();
+	RefreshPresentation();
 	// The Blueprint event also drives visibility + repopulates the lists through graph loops.
 	// Run the same C++ pass on the next tick so it remains the final word after any deferred BP work.
 	// 蓝图事件也会通过图里的循环驱动可见性与列表重填；下一帧再执行一次同样的 C++ 处理，
 	// 保证在蓝图的延迟更新之后 C++ 仍是最终裁决。
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().SetTimerForNextTick([this]()
+		World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
 		{
 			if (!IsValid(this) || !bHasSnapshot)
 			{
 				return;
 			}
 			ApplyStageVisibility();
+			PopulateSlots();
 			PopulateCandidates();
 			PopulateEnhancementOptions();
-		});
+			RefreshPresentation();
+		}));
 	}
 }
 
@@ -310,6 +400,10 @@ void UHSRRelicEquipmentWidget::ApplyStageVisibility()
 	{
 		RevealWidgetChain(EnhancementOptionsHost);
 	}
+	if (UWidget* Column = WidgetTree->FindWidget(TEXT("RightColumn")))
+		Column->SetVisibility(bShowSlots ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+	if (UWidget* ListFrame = WidgetTree->FindWidget(TEXT("ListRowSizeBox")))
+		ListFrame->SetVisibility(bShowSlots ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	UE_LOG(LogTemp, Log, TEXT("HSRRelic[%p] ApplyStageVisibility Stage=%d Slot=%s Candidate=%s Comparison=%s Enhance=%s"),
 		this, static_cast<int32>(Stage),
 		SlotBox ? *UEnum::GetValueAsString(SlotBox->GetVisibility()) : TEXT("Missing"),
@@ -340,38 +434,27 @@ void UHSRRelicEquipmentWidget::UpdateStatusText(const FHSRRelicEquipmentSnapshot
 	if (InSnapshot.Stage == EHSRRelicEquipmentStage::Comparison && Selected)
 	{
 		Status->SetText(FText::Format(
-			NSLOCTEXT("HSRRelic", "SelectedRelic", "Selected: {0} ({1})"),
-			FText::FromName(Selected->DefinitionId), FText::FromName(Selected->ItemId)));
+			NSLOCTEXT("HSRRelic", "SelectedRelic", "已选择：{0} +{1}，确认前可对比属性"),
+			ItemLabel(Selected->ItemId), FText::AsNumber(Selected->Instance.EnhancementLevel)));
 	}
 	else if (InSnapshot.Stage == EHSRRelicEquipmentStage::Enhancement)
 	{
-		// 强化阶段：显示当前强化目标（已装备遗器），并提示用户选择目标等级。
-		const FHSRRelicSlotRow* Current = InSnapshot.Slots.FindByPredicate(
-			[&InSnapshot](const FHSRRelicSlotRow& Row) { return Row.Slot == InSnapshot.SelectedSlot; });
-		if (Current && Current->bHasEquipped)
-		{
-			// 只取实例 GUID 前 8 位作为简短展示，避免界面被长串 ID 撑爆。
-			const FString InstanceText = Current->EquippedInstanceId.ToString(EGuidFormats::Digits).Left(8);
-			Status->SetText(FText::Format(
-				NSLOCTEXT("HSRRelic", "EnhanceTarget", "Enhancing {0} ({1}) Lv{2} - choose target level"),
-				FText::FromName(Current->EquippedInstance.DefinitionId),
-				FText::FromString(InstanceText),
-				FText::AsNumber(Current->EquippedInstance.EnhancementLevel)));
-		}
-		else
-		{
-			Status->SetText(NSLOCTEXT("HSRRelic", "EnhanceNoTarget", "No equipped relic selected"));
-		}
+		Status->SetText(FText::Format(
+			NSLOCTEXT("HSRRelic", "EnhancementTargetExplicit", "强化目标：当前选中的遗器 +{0}　{1}"),
+			FText::AsNumber(InSnapshot.EnhancementInstance.EnhancementLevel),
+			InSnapshot.EnhancementOptions.IsEmpty()
+				? NSLOCTEXT("HSRRelic", "NoFurtherLevels", "已无可用强化等级")
+				: NSLOCTEXT("HSRRelic", "ChooseThenConfirm", "选择目标等级并确认消耗")));
 	}
 	else if (InSnapshot.Stage == EHSRRelicEquipmentStage::CandidateSelection)
 	{
 		Status->SetText(InSnapshot.Candidates.IsEmpty()
-			? NSLOCTEXT("HSRRelic", "NoCandidates", "No relics available for this slot")
-			: NSLOCTEXT("HSRRelic", "PickCandidate", "Select a relic from the list to equip"));
+			? NSLOCTEXT("HSRRelic", "NoCandidates", "背包中没有适用于此槽位的遗器")
+			: NSLOCTEXT("HSRRelic", "PickCandidate", "选择遗器后对比属性，再确认装备"));
 	}
 	else
 	{
-		Status->SetText(NSLOCTEXT("HSRRelic", "PickSlot", "Select a slot to equip"));
+		Status->SetText(NSLOCTEXT("HSRRelic", "PickSlot", "选择遗器槽位"));
 	}
 }
 
@@ -390,20 +473,27 @@ void UHSRRelicEquipmentWidget::ShowOperationResult(EHSRRelicEquipmentResult Resu
 	}
 	switch (Result)
 	{
-	case EHSRRelicEquipmentResult::Success:
-		Status->SetText(NSLOCTEXT("HSRRelic", "EquipOk", "Equipped successfully"));
-		break;
-	case EHSRRelicEquipmentResult::InsufficientMaterial:
-		Status->SetText(NSLOCTEXT("HSRRelic", "NoMaterial", "Not enough material"));
-		break;
-	case EHSRRelicEquipmentResult::ComparisonUnavailable:
-		Status->SetText(NSLOCTEXT("HSRRelic", "NoSelection", "Select a relic first"));
-		break;
-	default:
-		Status->SetText(FText::Format(NSLOCTEXT("HSRRelic", "Failed", "Failed ({0})"),
-			StaticEnum<EHSRRelicEquipmentResult>()->GetDisplayNameTextByValue(static_cast<int64>(Result))));
-		break;
+	case EHSRRelicEquipmentResult::Success: OperationMessage = NSLOCTEXT("HSRRelic", "OperationOk", "操作已完成"); break;
+	case EHSRRelicEquipmentResult::InsufficientMaterial: OperationMessage = NSLOCTEXT("HSRRelic", "NoMaterial", "强化材料不足，请选择其他等级或收集材料"); break;
+	case EHSRRelicEquipmentResult::StaleSnapshot: OperationMessage = NSLOCTEXT("HSRRelic", "Stale", "遗器或材料已发生变化，请重新选择后确认"); break;
+	case EHSRRelicEquipmentResult::CatalogUnavailable: OperationMessage = NSLOCTEXT("HSRRelic", "NoCatalog", "遗器配置暂不可用，请返回后重试"); break;
+	case EHSRRelicEquipmentResult::NoEnhancementOption: OperationMessage = NSLOCTEXT("HSRRelic", "NoOption", "此遗器没有可用的强化等级"); break;
+	case EHSRRelicEquipmentResult::CandidateUnavailable:
+	case EHSRRelicEquipmentResult::ComparisonUnavailable: OperationMessage = NSLOCTEXT("HSRRelic", "ChooseAgain", "请重新选择要操作的遗器"); break;
+	case EHSRRelicEquipmentResult::NotInitialized:
+	case EHSRRelicEquipmentResult::InvalidCharacterId: OperationMessage = NSLOCTEXT("HSRRelic", "NotReady", "角色装备数据尚未就绪，请返回后重试"); break;
+	default: OperationMessage = NSLOCTEXT("HSRRelic", "OperationFailed", "操作未完成，请检查遗器和材料后重试"); break;
 	}
+	Status->SetText(OperationMessage);
+	RefreshPresentation();
+}
+
+FText UHSRRelicEquipmentWidget::ItemLabel(FName ItemId) const
+{
+	FHSRInventoryCatalogEntry Entry;
+	if (PresentationCatalog && PresentationCatalog->FindEntry(ItemId, Entry) && !Entry.DisplayName.IsEmpty())
+		return Entry.DisplayName;
+	return NSLOCTEXT("HSRRelic", "UnnamedItem", "物品");
 }
 
 // MakeListButton：动态构造一个列表行按钮（标签 + 背景色）。
@@ -422,10 +512,16 @@ UButton* UHSRRelicEquipmentWidget::MakeListButton(const FText& Label, const FLin
 	}
 	Button->SetVisibility(ESlateVisibility::Visible);
 	Button->SetBackgroundColor(Color);
+	Button->SetColorAndOpacity(FLinearColor::White);
 	UHorizontalBox* RowBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 	if (RowBox)
 	{
 		Button->SetContent(RowBox);
+		if (UButtonSlot* ContentSlot = Cast<UButtonSlot>(RowBox->Slot))
+		{
+			ContentSlot->SetHorizontalAlignment(HAlign_Fill);
+			ContentSlot->SetPadding(FMargin(12.f, 8.f));
+		}
 	}
 	UTextBlock* LabelText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	LabelText->SetText(Label);
@@ -433,11 +529,15 @@ UButton* UHSRRelicEquipmentWidget::MakeListButton(const FText& Label, const FLin
 	LabelText->SetColorAndOpacity(FSlateColor(FLinearColor(0.90f, 0.92f, 0.96f, 1.0f)));
 	// 默认字体偏小，放大到 14 让列表行文字清晰可点。
 	FSlateFontInfo Font = LabelText->GetFont();
-	Font.Size = 14;
+	Font.Size = 18;
+	LabelText->SetAutoWrapText(true);
 	LabelText->SetFont(Font);
 	if (RowBox)
 	{
-		RowBox->AddChild(LabelText);
+		if (auto* TextSlot = RowBox->AddChildToHorizontalBox(LabelText))
+		{
+			TextSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		}
 	}
 	return Button;
 }
@@ -461,8 +561,8 @@ void UHSRRelicEquipmentWidget::PopulateCandidates()
 	ListBindings.Reset();
 	for (const FHSRRelicCandidateRow& Row : CurrentSnapshot.Candidates)
 	{
-		const FText Label = FText::Format(NSLOCTEXT("HSRRelic", "CandidateLabel", "{0} (Lv{1})"),
-			FText::FromName(Row.DefinitionId), FText::AsNumber(Row.Instance.EnhancementLevel));
+		const FText Label = FText::Format(NSLOCTEXT("HSRRelic", "CandidateDetails", "{0} +{1}\n{2}"),
+			ItemLabel(Row.ItemId), FText::AsNumber(Row.Instance.EnhancementLevel), RelicModifierLabel(Row.Instance.Modifiers));
 		UButton* Button = MakeListButton(Label,
 			Row.bIsSelected ? FLinearColor(0.78f, 0.61f, 0.24f, 0.35f) : FLinearColor(1.0f, 1.0f, 1.0f, 0.05f));
 		if (!Button)
@@ -508,16 +608,17 @@ void UHSRRelicEquipmentWidget::PopulateEnhancementOptions()
 	Host->ClearChildren();
 	for (const FHSRRelicEnhancementOption& Option : CurrentSnapshot.EnhancementOptions)
 	{
-		const FText Label = FText::Format(NSLOCTEXT("HSRRelic", "EnhanceLabel", "Lv{0} (-{1} {2})"),
+		const FText Label = FText::Format(NSLOCTEXT("HSRRelic", "EnhanceDetails", "强化至 +{0}　消耗 {2} ×{1}\n{3}\n{4}"),
 			FText::AsNumber(Option.TargetLevel), FText::AsNumber(Option.MaterialCost),
-			FText::FromName(Option.MaterialItemId));
+			ItemLabel(Option.MaterialItemId), RelicModifierLabel(Option.TargetModifiers),
+			!Option.bAvailable ? NSLOCTEXT("HSRRelic", "OptionUnavailable", "此等级不可用") : (!Option.bAffordable ? NSLOCTEXT("HSRRelic", "OptionUnaffordable", "材料不足") : NSLOCTEXT("HSRRelic", "OptionAvailable", "材料充足，选择后确认")));
 		UButton* Button = MakeListButton(Label,
-			Option.bAffordable ? FLinearColor(1.0f, 1.0f, 1.0f, 0.08f) : FLinearColor(0.4f, 0.4f, 0.4f, 0.15f));
+			Option.TargetLevel == SelectedEnhancementLevel ? FLinearColor(0.78f, 0.61f, 0.24f, 0.4f) : FLinearColor(0.08f, 0.12f, 0.18f, 0.8f));
 		if (!Button)
 		{
 			continue;
 		}
-		Button->SetIsEnabled(Option.bAffordable);
+		Button->SetIsEnabled(CurrentSnapshot.Stage == EHSRRelicEquipmentStage::Enhancement && Option.bAvailable && Option.bAffordable);
 		USizeBox* RowSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
 		RowSize->SetMinDesiredWidth(280.0f);
 		RowSize->SetMinDesiredHeight(44.0f);
@@ -553,12 +654,131 @@ void UHSRRelicListClickBridge::HandleClicked()
 	{
 		return;
 	}
-	if (TargetLevel >= 0)
+	if (SlotIndex != INDEX_NONE)
 	{
-		Owner->CommitEnhancement(TargetLevel);
+		Owner->SelectSlot(static_cast<EHSRRelicSlot>(SlotIndex));
+	}
+	else if (TargetLevel >= 0)
+	{
+		Owner->SelectEnhancementLevel(TargetLevel);
 	}
 	else
 	{
 		Owner->SelectCandidate(InstanceId);
 	}
+}
+
+void UHSRRelicListClickBridge::InitializeSlot(UHSRRelicEquipmentWidget* InOwner, EHSRRelicSlot InSlot)
+{
+	Owner = InOwner;
+	SlotIndex = static_cast<int32>(InSlot);
+}
+
+FText UHSRRelicEquipmentWidget::InstanceLabel(const FHSREquipmentInstance& Instance) const
+{
+	FHSRItemEquipmentMappingEntry Mapping;
+	if (MappingCatalog && MappingCatalog->ResolveEquipmentDefinition(Instance.DefinitionId, Mapping))
+		return ItemLabel(Mapping.ItemId);
+	return NSLOCTEXT("HSRRelic", "Relic", "遗器");
+}
+
+void UHSRRelicEquipmentWidget::PopulateSlots()
+{
+	UPanelWidget* Host = WidgetTree ? WidgetTree->FindWidget<UPanelWidget>(TEXT("SlotListHost")) : nullptr;
+	if (!Host) return;
+	Host->ClearChildren();
+	SlotBindings.Reset();
+	for (const FHSRRelicSlotRow& Row : CurrentSnapshot.Slots)
+	{
+		const FText Detail = Row.bHasEquipped
+			? FText::Format(NSLOCTEXT("HSRRelic", "EquippedRelic", "{0} +{1}"), InstanceLabel(Row.EquippedInstance), FText::AsNumber(Row.EquippedInstance.EnhancementLevel))
+			: NSLOCTEXT("HSRRelic", "EmptyRelic", "未装备");
+		UButton* Button = MakeListButton(FText::Format(NSLOCTEXT("HSRRelic", "SlotDetails", "{0}\n{1}"), RelicSlotLabel(Row.Slot), Detail),
+			Row.bIsSelected ? FLinearColor(0.78f, 0.61f, 0.24f, 0.4f) : FLinearColor(0.08f, 0.12f, 0.18f, 0.8f));
+		if (!Button) continue;
+		USizeBox* RowSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+		RowSize->SetMinDesiredWidth(260.f);
+		RowSize->SetMinDesiredHeight(68.f);
+		RowSize->SetContent(Button);
+		if (UVerticalBoxSlot* ListSlot = Cast<UVerticalBoxSlot>(Host->AddChild(RowSize)))
+		{
+			ListSlot->SetHorizontalAlignment(HAlign_Fill);
+			ListSlot->SetPadding(FMargin(4.f, 3.f));
+		}
+		UHSRRelicListClickBridge* Bridge = NewObject<UHSRRelicListClickBridge>(this);
+		Bridge->InitializeSlot(this, Row.Slot);
+		Button->OnClicked.AddDynamic(Bridge, &UHSRRelicListClickBridge::HandleClicked);
+		SlotBindings.Add(Bridge);
+	}
+}
+
+void UHSRRelicEquipmentWidget::RefreshPresentation()
+{
+	if (!WidgetTree) return;
+	const auto SetText = [this](const TCHAR* Name, const FText& Label)
+	{
+		if (UTextBlock* Text = WidgetTree->FindWidget<UTextBlock>(Name))
+		{
+			Text->SetText(Label);
+			Text->SetColorAndOpacity(FSlateColor(FLinearColor(0.92f, 0.95f, 1.f)));
+			Text->SetAutoWrapText(true);
+		}
+	};
+	SetText(TEXT("TXT_Title"), NSLOCTEXT("HSRRelic", "Title", "遗器装备"));
+	SetText(TEXT("TXT_SlotsTitle"), NSLOCTEXT("HSRRelic", "SlotsTitle", "装备槽位"));
+	SetText(TEXT("TXT_CandidatesTitle"), NSLOCTEXT("HSRRelic", "CandidatesTitle", "背包中的适用遗器"));
+	SetText(TEXT("TXT_ComparisonTitle"), NSLOCTEXT("HSRRelic", "ComparisonTitle", "属性对比 · 当前 → 候选"));
+	SetText(TEXT("TXT_EnhanceTitle"), NSLOCTEXT("HSRRelic", "EnhanceTitle", "遗器强化"));
+	SetText(TEXT("TXT_Equip"), NSLOCTEXT("HSRRelic", "Equip", "确认装备"));
+	SetText(TEXT("TXT_Enhance"), NSLOCTEXT("HSRRelic", "Enhance", "强化所选遗器"));
+	SetText(TEXT("TXT_ConfirmEnhance"), NSLOCTEXT("HSRRelic", "ConfirmEnhance", "确认强化"));
+	SetText(TEXT("PR_Label_BTN_Unequip"), NSLOCTEXT("HSRRelic", "Unequip", "卸下当前遗器"));
+	SetText(TEXT("TXT_Unequip"), NSLOCTEXT("HSRRelic", "Unequip", "卸下当前遗器"));
+	SetText(TEXT("TXT_Back"), NSLOCTEXT("HSRRelic", "Back", "返回"));
+	const bool bEnhancing = CurrentSnapshot.Stage == EHSRRelicEquipmentStage::Enhancement;
+	const bool bValid = bHasSnapshot && CurrentSnapshot.bIsValid;
+	const bool bCandidateExists = CurrentSnapshot.SelectedCandidateId.IsValid() && CurrentSnapshot.Candidates.ContainsByPredicate(
+		[this](const FHSRRelicCandidateRow& Row) { return Row.InstanceId == CurrentSnapshot.SelectedCandidateId; });
+	const auto SetEnabled = [this](const TCHAR* Name, bool bEnabled)
+	{
+		if (UButton* Button = WidgetTree->FindWidget<UButton>(Name)) Button->SetIsEnabled(bEnabled);
+	};
+	const auto ShowAction = [this](const TCHAR* Name, bool bShow)
+	{
+		if (UButton* Button = WidgetTree->FindWidget<UButton>(Name))
+			Button->SetVisibility(bShow ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	};
+	ShowAction(TEXT("BTN_Equip"), CurrentSnapshot.Stage == EHSRRelicEquipmentStage::Comparison);
+	ShowAction(TEXT("BTN_ConfirmEnhance"), bEnhancing);
+	ShowAction(TEXT("BTN_Enhance"), !bEnhancing && (bCandidateExists || CurrentSnapshot.CurrentInstanceId.IsValid()));
+	ShowAction(TEXT("BTN_Unequip"), !bEnhancing && CurrentSnapshot.CurrentInstanceId.IsValid());
+	SetEnabled(TEXT("BTN_Equip"), bValid && CurrentSnapshot.Stage == EHSRRelicEquipmentStage::Comparison
+		&& CurrentSnapshot.Comparison.bIsValid && bCandidateExists
+		&& CurrentSnapshot.Comparison.CandidateInstanceId == CurrentSnapshot.SelectedCandidateId);
+	SetEnabled(TEXT("BTN_Unequip"), bValid && !bEnhancing && CurrentSnapshot.CurrentInstanceId.IsValid());
+	SetEnabled(TEXT("BTN_Enhance"), bValid && !bEnhancing && (bCandidateExists || CurrentSnapshot.CurrentInstanceId.IsValid()));
+	SetEnabled(TEXT("BTN_ConfirmEnhance"), bValid && bEnhancing && CurrentSnapshot.EnhancementInstanceId.IsValid()
+		&& CurrentSnapshot.EnhancementOptions.ContainsByPredicate([this](const FHSRRelicEnhancementOption& Option)
+		{ return Option.TargetLevel == SelectedEnhancementLevel && Option.bAvailable && Option.bAffordable; }));
+	// Replace legacy Blueprint stat rows, which stringify the internal stat enum.
+	if (UPanelWidget* Host = WidgetTree->FindWidget<UPanelWidget>(TEXT("ComparisonBodyHost"))) Host->ClearChildren();
+	TArray<FString> Lines;
+	if (CurrentSnapshot.Comparison.bIsValid)
+	{
+		const FText CurrentItem = CurrentSnapshot.Comparison.CurrentInstanceId.IsValid()
+			? InstanceLabel(CurrentSnapshot.Comparison.CurrentInstance) : NSLOCTEXT("HSRRelic", "EmptyRelic", "未装备");
+		Lines.Add(FText::Format(NSLOCTEXT("HSRRelic", "ComparisonItems", "{0} → {1}"), CurrentItem, InstanceLabel(CurrentSnapshot.Comparison.CandidateInstance)).ToString());
+		for (const FHSRRelicStatDeltaRow& Row : CurrentSnapshot.Comparison.StatDeltas)
+			Lines.Add(FText::Format(NSLOCTEXT("HSRRelic", "ComparisonStat", "{0}  {1} → {2}  （{3}{4}）"),
+				RelicStatLabel(Row.Stat), FText::AsNumber(Row.CurrentValue), FText::AsNumber(Row.CandidateValue),
+				Row.Delta > 0.f ? FText::FromString(TEXT("+")) : FText::GetEmpty(), FText::AsNumber(Row.Delta)).ToString());
+	}
+	SetText(TEXT("TXT_ComparisonBody"), FText::FromString(FString::Join(Lines, TEXT("\n"))));
+	SetText(TEXT("TXT_EnhanceBody"), CurrentSnapshot.EnhancementInstanceId.IsValid()
+		? FText::Format(NSLOCTEXT("HSRRelic", "EnhancementItem", "{0} +{1}\n当前属性：{2}\n选择下方目标等级查看消耗与强化后属性"),
+			InstanceLabel(CurrentSnapshot.EnhancementInstance), FText::AsNumber(CurrentSnapshot.EnhancementInstance.EnhancementLevel), RelicModifierLabel(CurrentSnapshot.EnhancementInstance.Modifiers))
+		: FText::GetEmpty());
+	if (!OperationMessage.IsEmpty()) SetText(TEXT("TXT_Status"), OperationMessage);
+	else if (!bValid) SetText(TEXT("TXT_Status"), NSLOCTEXT("HSRRelic", "UnavailableHint", "遗器数据暂不可用，请重新选择槽位或返回后重试"));
+	else UpdateStatusText(CurrentSnapshot);
 }

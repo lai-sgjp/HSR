@@ -146,11 +146,12 @@ FName UHSRCharacterShellViewModel::SelectInitialCharacter(
 	if (Party.IsValid())
 	{
 		FHSRPartySnapshot PartySnapshot;
-		if (Party->GetSnapshot(PartySnapshot) && !PartySnapshot.Slots.IsEmpty()
-			&& !PartySnapshot.Slots[0].IsEmpty()
-			&& ContainsCharacter(Entries, PartySnapshot.Slots[0].CharacterId))
+		if (Party->GetSnapshot(PartySnapshot) && !PartySnapshot.Slots.IsEmpty())
 		{
-			return PartySnapshot.Slots[0].CharacterId;
+			const int32 Active = PartySnapshot.Slots.IsValidIndex(PartySnapshot.ActiveSlot)
+				&& !PartySnapshot.Slots[PartySnapshot.ActiveSlot].IsEmpty() ? PartySnapshot.ActiveSlot : 0;
+			if (ContainsCharacter(Entries, PartySnapshot.Slots[Active].CharacterId))
+				return PartySnapshot.Slots[Active].CharacterId;
 		}
 	}
 	return Entries.IsEmpty() ? NAME_None : Entries[0].CharacterId;
@@ -307,10 +308,8 @@ void UHSRCharacterShellViewModel::Broadcast()
 // HandleProfileChanged：角色档案变化时，若影响的是当前选中角色或尚无选中角色则刷新。
 void UHSRCharacterShellViewModel::HandleProfileChanged(FName CharacterId, int64)
 {
-	if (CharacterId == SelectedCharacterId || SelectedCharacterId.IsNone())
-	{
-		Refresh();
-	}
+	// A newly acquired or restored character must appear without closing the page.
+	Refresh();
 }
 
 // HandleCharacterDetailChanged：详情子 ViewModel 的广播回流。
@@ -326,6 +325,7 @@ void UHSRCharacterShellViewModel::HandleCharacterDetailChanged(const FHSRCharact
 	Snapshot.FailureReason = InSnapshot.bIsValid
 		? EHSRCharacterShellResult::Success
 		: MapCharacterResult(InSnapshot.FailureReason);
+	UpdateSelectedTabState();
 	bHasSnapshot = true;
 	Broadcast();
 }

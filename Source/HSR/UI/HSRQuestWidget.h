@@ -20,6 +20,9 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category = "HSR|Quest")
 	void OnQuestSnapshotChanged(const FHSRQuestFrontendSnapshot& Snapshot);
 
+	/** Presentation only; stable IDs are never used as player-facing labels. */
+	static FText FormatQuestCard(const FHSRQuestViewData& Quest);
+
 #if WITH_DEV_AUTOMATION_TESTS
 	void AttachForAutomation() { BindAndRefresh(); }
 	int32 GetBindCountForAutomation() const { return BindCount; }
@@ -34,6 +37,7 @@ private:
 	void BindAndRefresh();
 	void Unbind();
 	void HandleSnapshot(const FHSRQuestFrontendSnapshot& InSnapshot);
+	void RefreshQuestList();
 
 	UPROPERTY(Transient) TObjectPtr<UHSRQuestViewModel> ViewModel;
 	FDelegateHandle Subscription;

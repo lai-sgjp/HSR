@@ -267,6 +267,14 @@ bool AHSRPlayerController::SwitchExplorationCharacter(int32 PartySlot)
 		UE_LOG(LogTemp, Warning, TEXT("HSR Exploration switch REJECTED SpawnFailed Char=%s Slot=%d"), *CharacterId.ToString(), PartySlot);
 		return false;
 	}
+	// Every slot can share the same Blueprint class. Project its identity, mesh and
+	// equipment before possession; spawning the class alone leaves its default mesh.
+	AHSRCharacterBase* ProjectedCharacter = Cast<AHSRCharacterBase>(NewPawn);
+	if (!ProjectedCharacter || !ProjectedCharacter->SetProjectedCharacterId(CharacterId))
+	{
+		NewPawn->Destroy();
+		return false;
+	}
 	// Possess 新角色并校验。
 	Possess(NewPawn);
 	if (GetPawn() != NewPawn)

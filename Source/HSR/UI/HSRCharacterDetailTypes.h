@@ -6,6 +6,7 @@
 UENUM(BlueprintType) enum class EHSRCharacterDetailResult:uint8 { Success, NotInitialized, InvalidCharacterId, ProfileNotFound, DefinitionNotFound, InvalidSnapshot, PartySlotEmpty };
 USTRUCT(BlueprintType) struct HSR_API FHSRCharacterDetailSkill { GENERATED_BODY() UPROPERTY(BlueprintReadOnly) FName SkillId; UPROPERTY(BlueprintReadOnly) int32 Level=0; UPROPERTY(BlueprintReadOnly) int32 MaxLevel=0; };
 USTRUCT(BlueprintType) struct HSR_API FHSRCharacterDetailSnapshot { GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly) int32 EquipmentRevision = 0;
 	UPROPERTY(BlueprintReadOnly) FName CharacterId; UPROPERTY(BlueprintReadOnly) FText DisplayName; UPROPERTY(BlueprintReadOnly) int32 Level=1; UPROPERTY(BlueprintReadOnly) int32 MaxLevel=1; UPROPERTY(BlueprintReadOnly) int32 Experience=0;
 	/** Cumulative experience thresholds for the current level and its next level. */
 	UPROPERTY(BlueprintReadOnly) int32 ExperienceForCurrentLevel=0; UPROPERTY(BlueprintReadOnly) int32 ExperienceForNextLevel=0; UPROPERTY(BlueprintReadOnly) bool bAtMaxLevel=false;

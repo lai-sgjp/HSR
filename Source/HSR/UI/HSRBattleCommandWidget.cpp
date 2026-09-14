@@ -7,6 +7,16 @@
 #include "Components/ComboBoxString.h"
 #include "Components/TextBlock.h"
 #include "InputCoreTypes.h"
+#include "HSRBattleEntryButton.h"
+#include "../Battle/HSRBattleStage.h"
+#include "EngineUtils.h"
+#include "GameFramework/PlayerController.h"
+#include "Blueprint/WidgetTree.h"
+#include "Blueprint/WidgetLayoutLibrary.h"
+#include "Rendering/DrawElements.h"
+#include "Styling/CoreStyle.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
 UHSRBattleCommandWidget::UHSRBattleCommandWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -35,6 +45,23 @@ void UHSRBattleCommandWidget::NativeConstruct()
 FReply UHSRBattleCommandWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
 	const FKey Key = InKeyEvent.GetKey();
+	if (PR_Skills && !GetCurrentViewState().ResultViewState.bVisible)
+	{
+		const FHSRBattleCommandViewState State = GetCurrentViewState();
+		if (Key == EKeys::Enter || Key == EKeys::SpaceBar) { HandleExecuteClicked(); return FReply::Handled(); }
+		if (Key == EKeys::Left || Key == EKeys::Right)
+		{
+			const TArray<FName> Targets = GetTargetOptions();
+			if (!Targets.IsEmpty())
+			{
+				const int32 Index = Targets.IndexOfByKey(State.SelectedTargetId);
+				SelectTarget(Targets[(FMath::Max(0,Index)+(Key == EKeys::Right ? 1 : Targets.Num()-1))%Targets.Num()]);
+			}
+			return FReply::Handled();
+		}
+		const int32 SkillIndex = Key == EKeys::Q ? 0 : Key == EKeys::E ? 1 : Key == EKeys::R ? 2 : INDEX_NONE;
+		if (State.Skills.IsValidIndex(SkillIndex)) { SelectSkillById(State.Skills[SkillIndex].SkillId); return FReply::Handled(); }
+	}
 	if (GetCurrentViewState().ResultViewState.bVisible && (Key == EKeys::Enter || Key == EKeys::SpaceBar || Key == EKeys::Gamepad_FaceButton_Bottom))
 	{
 		const bool bAccepted = ConfirmBattleResult();
@@ -42,6 +69,53 @@ FReply UHSRBattleCommandWidget::NativeOnKeyDown(const FGeometry& InGeometry, con
 		return FReply::Handled();
 	}
 	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
+}
+
+FReply UHSRBattleCommandWidget::NativeOnMouseButtonDown(const FGeometry& Geometry,const FPointerEvent& Event)
+{
+	if (PR_Enemies && Event.GetEffectingButton() == EKeys::LeftMouseButton)
+	{
+		if (APlayerController* PC=GetOwningPlayer())
+		{
+			FHitResult Hit;
+			if (PC->GetHitResultUnderCursor(ECC_Visibility,false,Hit) && Hit.GetActor())
+				for (FName Id : GetTargetOptions())
+					if (Hit.GetActor()->ActorHasTag(Id)) { SelectTarget(Id); SetKeyboardFocus(); return FReply::Handled(); }
+		}
+	}
+	return Super::NativeOnMouseButtonDown(Geometry,Event);
+}
+
+void UHSRBattleCommandWidget::RefreshPresentationCards(const FHSRBattleCommandViewState& State)
+{
+	if (!PR_Party || !PR_Enemies || !PR_Order || !PR_Skills || !WidgetTree) return;
+	TSet<FName> Live;
+	const auto Card = [&](FName Key, FName Id, UPanelWidget* Panel, bool bSkill)
+	{
+		Live.Add(Key);
+		TObjectPtr<UHSRBattleEntryButton>& Entry=PresentationCards.FindOrAdd(Key);
+		if (!Entry) { Entry=WidgetTree->ConstructWidget<UHSRBattleEntryButton>(); Entry->InitializeCard(this,Id,bSkill); Panel->AddChild(Entry); }
+		return Entry.Get();
+	};
+	const bool bUnlocked=State.bCurrentActorPlayerControlled && !State.bCommandPending && !State.bPresentationLocked && !State.ResultViewState.bVisible;
+	const auto* Skill=State.FindSelectedSkill();
+	for (const auto& V : State.Participants)
+	{
+		const bool bCandidate=Skill && Skill->CandidateTargetIds.Contains(V.ParticipantId);
+		Card(FName(*(TEXT("Party_")+V.ParticipantId.ToString())),V.ParticipantId,V.bPlayerTeam ? PR_Party.Get() : PR_Enemies.Get(),false)
+			->ShowParticipant(V,V.ParticipantId==State.SelectedTargetId,bUnlocked && bCandidate);
+	}
+	for (const auto& V : State.Skills)
+		Card(FName(*(TEXT("Skill_")+V.SkillId.ToString())),V.SkillId,PR_Skills,true)->ShowSkill(V,V.SkillId==State.SelectedSkillId,bUnlocked);
+	// Forecast IDs may repeat; position is the identity of a display row.
+	const int32 ForecastCount = State.TurnForecast.IsEmpty() ? State.TurnOrderParticipantIds.Num() : State.TurnForecast.Num();
+	for (int32 I=0; I<ForecastCount && I<8; ++I)
+		if (const auto* V=State.FindParticipant(State.TurnForecast.IsEmpty() ? State.TurnOrderParticipantIds[I] : State.TurnForecast[I].ParticipantId))
+			Card(FName(*FString::Printf(TEXT("Forecast_%d"),I)),V->ParticipantId,PR_Order,false)->ShowForecast(*V,I+1);
+	for (auto It=PresentationCards.CreateIterator();It;++It)
+		if (!Live.Contains(It.Key())) { It.Value()->RemoveFromParent(); It.RemoveCurrent(); }
+	const auto* Target=State.FindParticipant(State.SelectedTargetId);
+	for (TActorIterator<AHSRBattleStage> It(GetWorld());It;++It) It->ShowSide(Target && Target->bPlayerTeam,State.ResultViewState.bVisible);
 }
 
 // 绑定 ViewModel 与命令汇（CommandSink）。命令汇必须实现 IHSRBattleCommandSink 接口，
@@ -85,37 +159,66 @@ FHSRBattleCommandViewState UHSRBattleCommandWidget::GetCurrentViewState() const
 // 它们不回算、不读战斗对象，纯粹是 Widget 向 VM 取值的最小接口。
 FText UHSRBattleCommandWidget::GetCurrentActorText() const
 {
-	return ViewModel.IsValid() ? ViewModel->GetCurrentActorText() : FText::GetEmpty();
+	const auto State = GetCurrentViewState();
+	if (State.bActionPlaying)
+		return FText::Format(NSLOCTEXT("HSRBattle", "PlayingAction", "{0} · {1}"), State.GetParticipantLabel(State.CurrentActorId), State.PlayingSkillName);
+	return State.CurrentActorId.IsNone() ? FText::GetEmpty() : FText::Format(
+		NSLOCTEXT("HSRBattle", "ActingCharacter", "当前行动：{0}"), State.GetParticipantLabel(State.CurrentActorId));
 }
 
 FText UHSRBattleCommandWidget::GetEnergyText() const
 {
-	return ViewModel.IsValid() ? ViewModel->GetEnergyText() : FText::GetEmpty();
+	const auto State = GetCurrentViewState();
+	return FText::Format(NSLOCTEXT("HSRBattle", "EnergyDisplay", "能量 {0} / {1}"),
+		FText::AsNumber(FMath::RoundToInt(State.Energy)), FText::AsNumber(FMath::RoundToInt(State.MaxEnergy)));
 }
 
 FText UHSRBattleCommandWidget::GetSkillPointsText() const
 {
-	return ViewModel.IsValid() ? ViewModel->GetSkillPointsText() : FText::GetEmpty();
+	const auto State = GetCurrentViewState();
+	return FText::Format(NSLOCTEXT("HSRBattle", "SkillPointsDisplay", "战技点 {0} / {1}"),
+		FText::AsNumber(State.SkillPoints), FText::AsNumber(State.MaxSkillPoints));
 }
 
 FText UHSRBattleCommandWidget::GetLastResolutionText() const
 {
-	return ViewModel.IsValid() ? ViewModel->GetLastResolutionText() : FText::GetEmpty();
+	const auto State = GetCurrentViewState();
+	return State.LastResolution.ActionId.IsValid() && State.LastResolution.Status != EHSRAbilityResolutionStatus::Succeeded
+		? HSRBattleText::FailureReason(State.LastResolution.FailureReason) : FText::GetEmpty();
 }
 
 FText UHSRBattleCommandWidget::GetWeaknessText() const
 {
-	return ViewModel.IsValid() ? ViewModel->GetWeaknessText() : FText::GetEmpty();
+	const auto State = GetCurrentViewState();
+	const auto* Target = State.FindParticipant(State.SelectedTargetId);
+	if (!Target || Target->bPlayerTeam || !Target->bHasAttributes) return FText::GetEmpty();
+	TArray<FText> Labels;
+	for (const FGameplayTag& Tag : Target->WeaknessTags)
+	{
+		const FString Name = Tag.ToString();
+		if (Name == TEXT("Weakness.Arc")) Labels.Add(NSLOCTEXT("HSRBattle", "Arc", "电弧"));
+		else if (Name == TEXT("Weakness.Gale")) Labels.Add(NSLOCTEXT("HSRBattle", "Gale", "疾风"));
+		else if (Name == TEXT("Weakness.Tide")) Labels.Add(NSLOCTEXT("HSRBattle", "Tide", "潮汐"));
+		else Labels.Add(NSLOCTEXT("HSRBattle", "UnknownWeakness", "未知属性"));
+	}
+	return FText::Format(NSLOCTEXT("HSRBattle", "WeaknessDisplay", "弱点：{0}"), Labels.IsEmpty()
+		? NSLOCTEXT("HSRBattle", "NoWeakness", "无") : FText::Join(FText::FromString(TEXT(" · ")), Labels));
 }
 
 FText UHSRBattleCommandWidget::GetToughnessText() const
 {
-	return ViewModel.IsValid() ? ViewModel->GetToughnessText() : FText::GetEmpty();
+	const auto State = GetCurrentViewState();
+	const auto* Target = State.FindParticipant(State.SelectedTargetId);
+	return Target && Target->bHasAttributes && !Target->bPlayerTeam
+		? FText::Format(NSLOCTEXT("HSRBattle", "ToughnessDisplay", "韧性 {0} / {1}"),
+			FText::AsNumber(FMath::RoundToInt(Target->Toughness)), FText::AsNumber(FMath::RoundToInt(Target->MaxToughness))) : FText::GetEmpty();
 }
 
 FText UHSRBattleCommandWidget::GetBreakText() const
 {
-	return ViewModel.IsValid() ? ViewModel->GetBreakText() : FText::GetEmpty();
+	const auto State = GetCurrentViewState();
+	return State.LastResolution.bHasBreakResult && State.LastResolution.BreakResult.bTriggered
+		? NSLOCTEXT("HSRBattle", "WeaknessBroken", "弱点击破") : FText::GetEmpty();
 }
 
 FText UHSRBattleCommandWidget::GetDelayText() const
@@ -135,7 +238,9 @@ FText UHSRBattleCommandWidget::GetParticipantsText() const
 
 FText UHSRBattleCommandWidget::GetPresentationText() const
 {
-	return ViewModel.IsValid() ? ViewModel->GetPresentationText() : FText::GetEmpty();
+	TArray<FText> Lines;
+	for (const auto& Floating : FloatingTexts) Lines.Add(Floating.Text);
+	return FText::Join(FText::FromString(TEXT("  ·  ")), Lines);
 }
 
 FText UHSRBattleCommandWidget::GetStatusText() const
@@ -311,6 +416,10 @@ FHSRAbilityResolution UHSRBattleCommandWidget::SubmitCommand(FGuid ActionId, FNa
 	LastSubmittedActionId = ActionId;
 	LastSubmittedResolution = Resolution;
 	ViewModel->ResolveCommandSubmit(Command.BattleId, Resolution);
+	if (Resolution.Status == EHSRAbilityResolutionStatus::Succeeded && GetWorld())
+	{
+		for (TActorIterator<AHSRBattleStage> It(GetWorld()); It; ++It) It->ShowAction();
+	}
 	++SubmitCount;
 	UE_LOG(LogTemp, Log, TEXT("P6-004A Widget Submit Count=%d ActionId=%s ActorId=%s SkillId=%s TargetId=%s Status=%d Reason=%d"), SubmitCount, *ActionId.ToString(), *ActorParticipantId.ToString(), *SkillId.ToString(), *TargetParticipantId.ToString(), static_cast<int32>(Resolution.Status), static_cast<int32>(Resolution.FailureReason));
 	return Resolution;
@@ -335,6 +444,7 @@ void UHSRBattleCommandWidget::HandleViewStateChanged(const FHSRBattleCommandView
 {
 	UE_LOG(LogTemp, Verbose, TEXT("P6-004A Widget Snapshot Widget=%s Generation=%d Actor=%s Skills=%d Energy=%.2f/%.2f SP=%d/%d"), *GetName(), BindGeneration, *State.CurrentActorId.ToString(), State.Skills.Num(), State.Energy, State.MaxEnergy, State.SkillPoints, State.MaxSkillPoints);
 	OnCommandViewStateChanged(State);
+	RefreshCombatFeedback(State);
 	RefreshDesignerControls(State);
 }
 
@@ -352,11 +462,11 @@ void UHSRBattleCommandWidget::RefreshSkillControls(const FHSRBattleCommandViewSt
 	const bool bUnlockedPlayerTurn = !State.ResultViewState.bVisible && State.bCurrentActorPlayerControlled && !State.bCommandPending && !State.bPresentationLocked;
 	if (Button)
 	{
-		Button->SetIsEnabled(Skill && Skill->bAvailable && bUnlockedPlayerTurn);
+		Button->SetIsEnabled(Skill && bUnlockedPlayerTurn);
 	}
 	if (NameText)
 	{
-		NameText->SetText(Skill ? Skill->DisplayName : FText::FromString(TEXT("Unavailable")));
+		NameText->SetText(Skill ? Skill->DisplayName : NSLOCTEXT("HSRBattle", "MissingSkill", "技能不可用"));
 	}
 	// Long authored descriptions belong to the future detail screen, not command buttons.
 	// 长描述属于未来的详情界面，命令按钮上不展示，直接折叠。
@@ -381,6 +491,7 @@ void UHSRBattleCommandWidget::RefreshSkillControls(const FHSRBattleCommandViewSt
 // 控件事件（如下拉框选项变化）反过来触发选择逻辑造成循环。
 void UHSRBattleCommandWidget::RefreshDesignerControls(const FHSRBattleCommandViewState& State)
 {
+	RefreshPresentationCards(State);
 	bRefreshingDesignerControls = true;
 	if (TXT_CurrentActor)
 	{
@@ -433,12 +544,13 @@ void UHSRBattleCommandWidget::RefreshDesignerControls(const FHSRBattleCommandVie
 	if (TXT_Presentation)
 	{
 		TXT_Presentation->SetText(GetPresentationText());
+		if (PR_Party) TXT_Presentation->SetVisibility(ESlateVisibility::Collapsed);
 	}
 	if (TXT_Result)
 	{
 		const FHSRBattleResultViewState& Result = State.ResultViewState;
 		TXT_Result->SetText(Result.bVisible
-			? (Result.Outcome == EHSRBattleOutcome::PlayerVictory ? NSLOCTEXT("HSRResult", "Victory", "Victory") : NSLOCTEXT("HSRResult", "Defeat", "Defeat"))
+			? (Result.Outcome == EHSRBattleOutcome::PlayerVictory ? NSLOCTEXT("HSRResult", "Victory", "战斗胜利") : NSLOCTEXT("HSRResult", "Defeat", "战斗失败"))
 			: FText::GetEmpty());
 	}
 	if (BTN_ResultConfirm)
@@ -472,29 +584,25 @@ void UHSRBattleCommandWidget::RefreshDesignerControls(const FHSRBattleCommandVie
 		FText Reason = FText::GetEmpty();
 		if (!State.bCurrentActorPlayerControlled)
 		{
-			Reason = NSLOCTEXT("HSRCommand", "EnemyTurn", "Waiting for enemy action");
+			Reason = NSLOCTEXT("HSRCommand", "EnemyTurn", "敌方行动中");
 		}
 		else if (State.bCommandPending)
 		{
-			Reason = NSLOCTEXT("HSRCommand", "Pending", "Command pending");
+			Reason = NSLOCTEXT("HSRCommand", "Pending", "正在执行行动…");
 		}
 		else if (State.bPresentationLocked)
 		{
-			Reason = NSLOCTEXT("HSRCommand", "PresentationLocked", "Presentation locked");
+			Reason = NSLOCTEXT("HSRCommand", "PresentationLocked", "等待行动结束");
 		}
 		else if (SelectedSkill && !SelectedSkill->bAvailable)
 		{
-			// 技能自身不可用时，用枚举的显示名给出具体原因。
-			if (const UEnum* FailureEnum = StaticEnum<EHSRAbilityFailureReason>())
-			{
-				Reason = FailureEnum->GetDisplayNameTextByValue(static_cast<int64>(SelectedSkill->DisabledReason));
-			}
+			Reason = HSRBattleText::FailureReason(SelectedSkill->DisabledReason);
 		}
 		TXT_DisabledReason->SetText(Reason);
 	}
 	if (PendingOverlay)
 	{
-		PendingOverlay->SetText(State.bCommandPending ? NSLOCTEXT("HSRCommand", "PendingOverlay", "Command Pending...") : FText::GetEmpty());
+		PendingOverlay->SetText(State.bCommandPending ? NSLOCTEXT("HSRCommand", "PendingOverlay", "行动执行中…") : FText::GetEmpty());
 		PendingOverlay->SetVisibility((State.bCommandPending || State.bPresentationLocked) ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
 	}
 	if (BTN_Execute)
@@ -518,6 +626,14 @@ void UHSRBattleCommandWidget::RefreshDesignerControls(const FHSRBattleCommandVie
 			CB_Target->SetSelectedOption(State.SelectedTargetId.ToString());
 		}
 		CB_Target->SetIsEnabled(!State.ResultViewState.bVisible && State.bCurrentActorPlayerControlled && !State.bCommandPending && !State.bPresentationLocked && SelectedSkill && SelectedSkill->CandidateTargetIds.Num() > 1);
+	}
+	if (PR_Party && WidgetTree)
+	{
+		for (const TCHAR* Name : {TEXT("PR_Party"), TEXT("PR_Enemies"), TEXT("PR_Order"), TEXT("PR_Skills"),
+			TEXT("PR_Help"), TEXT("TXT_CurrentActor"), TEXT("TXT_Weakness"), TEXT("TXT_SkillPoints"),
+			TEXT("TXT_DisabledReason"), TEXT("BTN_Execute")})
+			if (UWidget* Control = WidgetTree->FindWidget(FName(Name)))
+				Control->SetVisibility(State.ResultViewState.bVisible ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 	}
 	bRefreshingDesignerControls = false;
 }
@@ -630,6 +746,7 @@ void UHSRBattleCommandWidget::FocusResultConfirm()
 // 解除与 ViewModel 的全部关联：移除事件订阅、清空引用、复位提交去重状态。
 void UHSRBattleCommandWidget::UnbindViewModel()
 {
+	ClearCombatFeedback();
 	if (ViewModel.IsValid() && StateChangedHandle.IsValid())
 	{
 		ViewModel->OnChanged().Remove(StateChangedHandle);
@@ -649,4 +766,120 @@ void UHSRBattleCommandWidget::NativeDestruct()
 	UnbindViewModel();
 	UE_LOG(LogTemp, Log, TEXT("P6-004A Widget NativeDestruct Widget=%s Generation=%d SubmitCount=%d"), *GetName(), BindGeneration, SubmitCount);
 	Super::NativeDestruct();
+}
+
+void UHSRBattleCommandWidget::ClearCombatFeedback()
+{
+	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(FeedbackTimer);
+	FeedbackTimer.Invalidate();
+	FloatingTexts.Reset();
+	ObservedPresentationEvents.Reset();
+	FeedbackBattleId.Invalidate();
+}
+
+void UHSRBattleCommandWidget::RefreshCombatFeedback(const FHSRBattleCommandViewState& State)
+{
+	if (FeedbackBattleId != State.BattleId)
+	{
+		ClearCombatFeedback();
+		FeedbackBattleId = State.BattleId;
+	}
+	UWorld* World = GetWorld();
+	if (!World) return;
+	for (const FHSRBattlePresentationEvent& Event : State.PresentationEvents)
+	{
+		if (!Event.EventId.IsValid() || ObservedPresentationEvents.Contains(Event.EventId)) continue;
+		ObservedPresentationEvents.Add(Event.EventId);
+		if (!FMath::IsFinite(Event.Value) || (Event.Value <= 0.f && Event.EventType != EHSRPresentationEventType::Break)) continue;
+		FCombatFloatingText Floating;
+		Floating.StartedAt = FPlatformTime::Seconds();
+		Floating.VerticalLane = FloatingTexts.Num() % 3;
+		const FText Number = FText::AsNumber(FMath::RoundToInt(Event.Value));
+		switch (Event.EventType)
+		{
+		case EHSRPresentationEventType::Damage:
+			Floating.Text = Event.bCritical ? FText::Format(NSLOCTEXT("HSRBattle", "CriticalNumber", "暴击 {0}"), Number) : Number;
+			Floating.Tint = Event.bCritical ? FLinearColor(1.f,.76f,.25f) : FLinearColor(1.f,.95f,.88f);
+			break;
+		case EHSRPresentationEventType::Heal:
+			Floating.Text = FText::Format(NSLOCTEXT("HSRBattle", "HealingNumber", "治疗 +{0}"), Number);
+			Floating.Tint = FLinearColor(.35f,1.f,.62f);
+			break;
+		case EHSRPresentationEventType::Break:
+			Floating.Text = NSLOCTEXT("HSRBattle", "BreakFloating", "弱点击破");
+			Floating.Tint = FLinearColor(1.f,.61f,.25f);
+			break;
+		case EHSRPresentationEventType::Toughness:
+			Floating.Text = FText::Format(NSLOCTEXT("HSRBattle", "ToughnessNumber", "削韧 −{0}"), Number);
+			Floating.Tint = FLinearColor(.35f,.85f,1.f);
+			break;
+		default: continue;
+		}
+		// Resolve the visual actor once per event. No actor tick or gameplay mutation is involved.
+		for (TActorIterator<AActor> It(World); It; ++It)
+		{
+			if (It->ActorHasTag(Event.TargetParticipantId)) { Floating.Target = *It; break; }
+		}
+		if (!Floating.Target.IsValid())
+			Floating.Text = FText::Format(NSLOCTEXT("HSRBattle", "UnprojectedFeedback", "{0}  {1}"),
+				State.GetParticipantLabel(Event.TargetParticipantId), Floating.Text);
+		FloatingTexts.Add(MoveTemp(Floating));
+	}
+	// Bound only the visible queue; the event-ID set remains for the duration of this battle.
+	if (FloatingTexts.Num() > 24) FloatingTexts.RemoveAt(0, FloatingTexts.Num() - 24);
+	if (!FloatingTexts.IsEmpty() && !World->GetTimerManager().IsTimerActive(FeedbackTimer))
+		World->GetTimerManager().SetTimer(FeedbackTimer, this, &ThisClass::AdvanceCombatFeedback, 1.f / 30.f, true);
+	InvalidateLayoutAndVolatility();
+}
+
+void UHSRBattleCommandWidget::AdvanceCombatFeedback()
+{
+	const double Now = FPlatformTime::Seconds();
+	FloatingTexts.RemoveAll([Now](const FCombatFloatingText& Entry) { return Now - Entry.StartedAt >= 1.8; });
+	if (FloatingTexts.IsEmpty() && GetWorld()) GetWorld()->GetTimerManager().ClearTimer(FeedbackTimer);
+	if (TXT_Presentation && !PR_Party) TXT_Presentation->SetText(GetPresentationText());
+	InvalidateLayoutAndVolatility();
+}
+
+int32 UHSRBattleCommandWidget::NativePaint(const FPaintArgs& Args, const FGeometry& Geometry, const FSlateRect& Clip,
+	FSlateWindowElementList& Elements, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const
+{
+	Layer = Super::NativePaint(Args, Geometry, Clip, Elements, Layer, Style, bParentEnabled);
+	if (!PR_Party || FloatingTexts.IsEmpty()) return Layer;
+	const FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle("Bold", 23);
+	const double Now = FPlatformTime::Seconds();
+	const FVector2D Size = Geometry.GetLocalSize();
+	int32 FallbackRow = 0;
+	for (const FCombatFloatingText& Entry : FloatingTexts)
+	{
+		const float Age = static_cast<float>(Now - Entry.StartedAt);
+		if (Age < 0.f || Age >= 1.8f) continue;
+		FVector2D Position = FVector2D::ZeroVector;
+		bool bProjected = false;
+		if (AActor* TargetActor = Entry.Target.Get())
+		{
+			FVector Center, Extent;
+			TargetActor->GetActorBounds(true, Center, Extent);
+			bProjected = UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(GetOwningPlayer(),
+				Center + FVector(0,0,Extent.Z + 35.f), Position, false);
+			if (bProjected)
+			{
+				const FGeometry Viewport = UWidgetLayoutLibrary::GetViewportWidgetGeometry(GetOwningPlayer());
+				Position = Geometry.AbsoluteToLocal(Viewport.LocalToAbsolute(Position));
+				Position += FVector2D(-55.f, -Age * 38.f - Entry.VerticalLane * 29.f);
+			}
+		}
+		if (!bProjected) Position = FVector2D(Size.X * .43f, Size.Y * .33f + FallbackRow++ * 31.f - Age * 20.f);
+		Position.X = FMath::Clamp(Position.X, 16., FMath::Max(16., Size.X - 240.));
+		Position.Y = FMath::Clamp(Position.Y, 30., FMath::Max(30., Size.Y - 150.));
+		FLinearColor Tint = Entry.Tint;
+		Tint.A = FMath::Clamp((1.8f - Age) / .5f, 0.f, 1.f);
+		FSlateDrawElement::MakeText(Elements, Layer + 1,
+			Geometry.ToPaintGeometry(FVector2D(240,40), FSlateLayoutTransform(Position + FVector2D(1,2))),
+			Entry.Text, Font, ESlateDrawEffect::None, FLinearColor(0.f,0.f,0.f,Tint.A * .9f));
+		FSlateDrawElement::MakeText(Elements, Layer + 2,
+			Geometry.ToPaintGeometry(FVector2D(240,40), FSlateLayoutTransform(Position)),
+			Entry.Text, Font, ESlateDrawEffect::None, Tint);
+	}
+	return Layer + 2;
 }

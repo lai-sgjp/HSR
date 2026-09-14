@@ -24,14 +24,14 @@ class HSR_API UHSRInventoryRowClickBridge : public UObject
 	GENERATED_BODY()
 
 public:
-	void Initialize(UHSRInventoryModuleWidget* InOwner, int32 InRowIndex);
+	void Initialize(UHSRInventoryModuleWidget* InOwner, const FHSRInventoryEntryKey& InKey);
 
 	UFUNCTION()
 	void HandleClicked();
 
 private:
 	TWeakObjectPtr<UHSRInventoryModuleWidget> Owner;
-	int32 RowIndex = -1;
+	FHSRInventoryEntryKey Key;
 };
 
 UCLASS(Blueprintable)
@@ -97,6 +97,19 @@ public:
 	UFUNCTION(BlueprintPure, Category = "HSR|Inventory|Enhance")
 	int32 GetSelectedEnhancementTargetLevel() const;
 
+	UFUNCTION(BlueprintCallable, Category = "HSR|Inventory")
+	bool PreviewAction(EHSRInventoryAction Action, int32 TargetLevel = -1);
+	UFUNCTION(BlueprintCallable, Category = "HSR|Inventory")
+	EHSRInventoryViewModelResult ConfirmAction();
+	UFUNCTION(BlueprintCallable, Category = "HSR|Inventory")
+	void CancelAction();
+	UFUNCTION(BlueprintPure, Category = "HSR|Inventory")
+	bool HasPendingAction() const { return bHasPendingAction; }
+	UFUNCTION(BlueprintCallable, Category = "HSR|Inventory")
+	void CycleTargetCharacter();
+	UFUNCTION(BlueprintCallable, Category = "HSR|Inventory")
+	void CycleSortMode();
+
 	/** Rebuilds the list rows, detail text, and action button enablement from the current snapshot. */
 	UFUNCTION(BlueprintCallable, Category = "HSR|Inventory")
 	void RefreshListAndDetail();
@@ -109,21 +122,38 @@ public:
 
 #if WITH_DEV_AUTOMATION_TESTS
 	void AttachForAutomation() { BindAndRefresh(); }
+	bool RoutePreviewBackForAutomation(const FKey& Key) { return CancelPreviewForBackKey(Key); }
 	int32 GetBindCountForAutomation() const { return BindCount; }
 	int32 GetUnbindCountForAutomation() const { return UnbindCount; }
 #endif
 
 protected:
 	virtual void NativeConstruct() override;
+	virtual FReply NativeOnPreviewKeyDown(const FGeometry& Geometry, const FKeyEvent& KeyEvent) override;
 	virtual void NativeDestruct() override;
 
 private:
 	void InitializeRuntimeContext();
+	bool CancelPreviewForBackKey(const FKey& Key);
 	void BindAndRefresh();
 	void HandleSnapshot(const FHSRInventoryModuleSnapshot& InSnapshot);
 	void UpdateTargetCharacterText();
 	void PopulateListAndDetail();
 	void PopulateListRows();
+	void RefreshActionPreview();
+	void RefreshBrowseControls();
+	void RefreshPresentationLabels();
+	UFUNCTION() void HandleSearchChanged(const FText& Text);
+	UFUNCTION() void HandleCategoryAll();
+	UFUNCTION() void HandleCategoryWeapon();
+	UFUNCTION() void HandleCategoryRelic();
+	UFUNCTION() void HandleCategoryConsumable();
+	UFUNCTION() void HandleCategoryMaterial();
+	UFUNCTION() void HandleCategoryOther();
+	void ShowActionResult(EHSRInventoryViewModelResult Result);
+	UFUNCTION() void HandleConfirmClicked();
+	UFUNCTION() void HandleCancelClicked();
+	UFUNCTION() void HandleNextEnhancementClicked();
 	UButton* FindButtonByName(const FName Name) const;
 	UTextBlock* FindTextByName(const FName Name) const;
 	void SetActionButton(const FName ButtonName, const EHSRInventoryAction Action);
@@ -158,6 +188,16 @@ private:
 	TObjectPtr<UHSRInventoryViewModel> ViewModel;
 
 	FGuid CharacterId;
+	bool bHasPendingAction = false;
+	bool bSubmitting = false;
+	bool bUpdatingSearch = false;
+	EHSRInventoryAction PendingAction = EHSRInventoryAction::Equip;
+	int32 PendingTargetLevel = -1;
+	FHSRInventoryEntryKey PendingKey;
+	int64 PendingInventoryRevision = 0;
+	int32 PendingEquipmentRevision = 0;
+	FGuid PendingCharacterId;
+	FText ActionMessage;
 	FDelegateHandle SnapshotHandle;
 	FHSRInventoryModuleSnapshot CurrentSnapshot;
 	bool bHasSnapshot = false;

@@ -15,6 +15,7 @@
 #include "../Quest/HSRQuestSubsystem.h"
 #include "../Reward/HSRRewardSubsystem.h"
 #include "../Save/HSRSaveSubsystem.h"
+#include "../Save/HSRSaveVersion.h"
 
 namespace HSR::P14::Tests
 {
@@ -182,6 +183,71 @@ bool FHSRQuestSaveV4Test::RunTest(const FString&)
 	Bad.Quests = FHSRQuestSaveData();
 	TestEqual(TEXT("v3 migrates empty quest state"), Target.Save->LoadSnapshot(Bad), EHSRSaveResult::Success);
 	TestFalse(TEXT("quest state cleared by v3 migration"), Target.Quest->GetQuestState(TEXT("Quest.P14.Branching"), State));
+	return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRQuestCanonicalRestoreTest, "HSR.Save.QuestCanonicalRestore", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FHSRQuestCanonicalRestoreTest::RunTest(const FString&)
+{
+	using namespace HSR::P14::Tests;
+	FFixture Source = MakeFixture(*this);
+	FHSRQuestRuntimeState State;
+	Source.Quest->StartQuest(TEXT("Quest.P14.Branching"), State);
+	const FGuid OriginalClaimId = State.RewardClaimId;
+	FHSRDialogueChoiceResult Choice;
+	Source.Dialogue->SelectChoice(TEXT("Dialogue.P14.NPC"), TEXT("Start"), TEXT("Greet"), Choice);
+	FHSRSaveData Captured;
+	TestEqual(TEXT("capture partial quest"), Source.Save->SaveSnapshot(Captured), EHSRSaveResult::Success);
+	const auto RoundTrip = [this](const FHSRSaveData& Input, FHSRSaveData& Output)
+	{
+		TArray<uint8> Bytes;
+		if (!TestTrue(TEXT("encode real envelope"), HSRSaveVersion::EncodeEnvelope(Input, TEXT("QuestCanonicalRegression"), 0, FGuid(17, 18, 19, 20), 1, Bytes))) return false;
+		return TestEqual(TEXT("decode real envelope"), HSRSaveVersion::DecodeEnvelope(Bytes, TEXT("QuestCanonicalRegression"), 0, Output), EHSRSaveDecodeResult::Success);
+	};
+	FHSRSaveData Decoded;
+	if (!RoundTrip(Captured, Decoded)) return false;
+	TestEqual(TEXT("wire order differs from authored order"), Decoded.Quests.States[0].Objectives[0].ObjectiveId, FName(TEXT("Objective.Choice")));
+	TestEqual(TEXT("codec preserves original reward claim"), Decoded.Quests.States[0].RewardClaimId, OriginalClaimId);
+	FFixture Target = MakeFixture(*this);
+	TestEqual(TEXT("restore canonical partial quest"), Target.Save->LoadSnapshot(Decoded), EHSRSaveResult::Success);
+	Target.Quest->GetQuestState(TEXT("Quest.P14.Branching"), State);
+	TestEqual(TEXT("runtime restores authored objective order"), State.Objectives[0].ObjectiveId, FName(TEXT("Objective.Greet")));
+	TestTrue(TEXT("progress remains on greeted objective"), State.Objectives[0].bCompleted);
+	TestFalse(TEXT("choice remains unfinished"), State.Objectives[1].bCompleted);
+	FHSRQuestSaveData Bad = Decoded.Quests;
+	FHSRQuestRestoreState Sentinel;
+	Sentinel.Revision = 777;
+	Bad.States[0].Objectives[1] = Bad.States[0].Objectives[0];
+	TestFalse(TEXT("duplicate objective rejected"), Target.Quest->PrepareRestore(Bad, Sentinel));
+	TestEqual(TEXT("failed prepare leaves output untouched"), Sentinel.Revision, int64(777));
+	Bad = Decoded.Quests;
+	Bad.States[0].Objectives[1].ObjectiveId = TEXT("Objective.Unknown");
+	TestFalse(TEXT("unknown/missing objective rejected"), Target.Quest->PrepareRestore(Bad, Sentinel));
+	Bad = Decoded.Quests;
+	Bad.States[0].RewardClaimId = FGuid(91, 92, 93, 94);
+	TestFalse(TEXT("forged claim remains rejected"), Target.Quest->PrepareRestore(Bad, Sentinel));
+	Bad = Decoded.Quests;
+	Bad.States[0].Objectives[0].RequiredCount = 5;
+	TestFalse(TEXT("changed objective requirements rejected"), Target.Quest->PrepareRestore(Bad, Sentinel));
+	TestEqual(TEXT("restored active quest advances correct objective"),
+		Target.Dialogue->SelectChoice(TEXT("Dialogue.P14.NPC"), TEXT("Branch"), TEXT("ChoiceA"), Choice), EHSRQuestOperationResult::Success);
+	Target.Quest->GetQuestState(TEXT("Quest.P14.Branching"), State);
+	TestEqual(TEXT("restored quest completes"), State.State, EHSRQuestState::Completed);
+	TestTrue(TEXT("completion rewards claimed"), State.bRewardClaimed);
+	TestEqual(TEXT("completion keeps original claim identity"), State.RewardClaimId, OriginalClaimId);
+	TestEqual(TEXT("capture completed quest"), Target.Save->SaveSnapshot(Captured), EHSRSaveResult::Success);
+	if (!RoundTrip(Captured, Decoded)) return false;
+	FFixture Restarted = MakeFixture(*this);
+	TestEqual(TEXT("completed disk quest restores"), Restarted.Save->LoadSnapshot(Decoded), EHSRSaveResult::Success);
+	TestEqual(TEXT("repeated completed disk restore succeeds"), Restarted.Save->LoadSnapshot(Decoded), EHSRSaveResult::Success);
+	FHSRQuestRewardClaimResult Claim;
+	TestEqual(TEXT("restored reward cannot be claimed twice"), Restarted.Quest->ClaimQuestReward(TEXT("Quest.P14.Branching"), Claim), EHSRQuestOperationResult::NoOp);
+	FHSRInventorySnapshot InventorySnapshot;
+	Restarted.Inventory->GetSnapshot(InventorySnapshot);
+	TestEqual(TEXT("reward quantity remains exactly once"), InventorySnapshot.GetStackQuantity(TEXT("Item.P14.QuestToken")), 3);
+	FHSRRewardReceipt Receipt;
+	TestTrue(TEXT("original reward ledger receipt preserved"), Restarted.Reward->GetReceipt(OriginalClaimId, Receipt));
 	return true;
 }
 

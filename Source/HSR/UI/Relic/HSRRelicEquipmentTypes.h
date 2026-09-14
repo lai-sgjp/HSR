@@ -107,6 +107,8 @@ struct HSR_API FHSRRelicEquipmentSnapshot
 	UPROPERTY(BlueprintReadOnly) FGuid SelectedCandidateId;
 	UPROPERTY(BlueprintReadOnly) FGuid CurrentInstanceId;
 	UPROPERTY(BlueprintReadOnly) int32 CurrentEnhancementLevel = 0;
+	UPROPERTY(BlueprintReadOnly) FGuid EnhancementInstanceId;
+	UPROPERTY(BlueprintReadOnly) FHSREquipmentInstance EnhancementInstance;
 	UPROPERTY(BlueprintReadOnly) int64 InventoryRevision = 0;
 	UPROPERTY(BlueprintReadOnly) int32 EquipmentRevision = 0;
 	UPROPERTY(BlueprintReadOnly) TArray<FHSRRelicSlotRow> Slots;

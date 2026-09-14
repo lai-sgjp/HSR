@@ -41,6 +41,9 @@ struct FHSRQuestObjectiveDefinition
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Quest", meta = (ClampMin = "1"))
 	int32 RequiredCount = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Quest")
+	FText Description;
 };
 
 USTRUCT(BlueprintType)
@@ -132,4 +135,3 @@ struct FHSRQuestRewardClaimResult
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRQuestChanged, const FHSRQuestRuntimeState&);
 DECLARE_MULTICAST_DELEGATE_OneParam(FHSRQuestRestored, int64);
-

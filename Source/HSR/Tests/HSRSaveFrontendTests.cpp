@@ -22,6 +22,8 @@ bool FHSRSaveFrontendIntentTest::RunTest(const FString&)
 	UHSRSaveSubsystem* Save = NewObject<UHSRSaveSubsystem>(GameInstance);
 	UHSRSaveViewModel* ViewModel = NewObject<UHSRSaveViewModel>();
 	ViewModel->Initialize(Save);
+	int32 ResultChanges = 0;
+	ViewModel->OnChanged().AddLambda([&ResultChanges]() { ++ResultChanges; });
 
 	FHSRSaveLoadResult Result;
 	TestTrue(TEXT("initial result is projected"), ViewModel->GetLastResult(Result));
@@ -37,11 +39,14 @@ bool FHSRSaveFrontendIntentTest::RunTest(const FString&)
 	UGameplayStatics::DeleteGameInSlot(ExistingSlot, 0);
 	TestTrue(TEXT("create existing slot"), UGameplayStatics::SaveGameToSlot(NewObject<UHSRSaveGame>(), ExistingSlot, 0));
 	TestEqual(TEXT("existing slot requires confirmation"), ViewModel->RequestSave(ExistingSlot), EHSRSaveFrontendActionResult::ConfirmationRequired);
+	TestTrue(TEXT("overwrite publishes visible confirmation"), ViewModel->GetFrontendResult(FrontendResult) && FrontendResult.bAwaitingOverwrite);
 	FString PendingSlot;
 	TestTrue(TEXT("confirmation records slot"), ViewModel->GetPendingOverwriteSlot(PendingSlot));
 	TestEqual(TEXT("confirmation preserves slot name"), PendingSlot, ExistingSlot);
 	ViewModel->CancelOverwrite();
 	TestFalse(TEXT("cancel clears pending overwrite"), ViewModel->GetPendingOverwriteSlot(PendingSlot));
+	TestTrue(TEXT("cancel clears projected confirmation"), ViewModel->GetFrontendResult(FrontendResult) && !FrontendResult.bAwaitingOverwrite);
+	TestTrue(TEXT("load and confirmation transitions notify subscribers"), ResultChanges >= 3);
 	UGameplayStatics::DeleteGameInSlot(ExistingSlot, 0);
 	ViewModel->Shutdown();
 	return true;

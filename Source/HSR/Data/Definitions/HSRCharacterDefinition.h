@@ -8,6 +8,8 @@ class UHSRSkillDefinition;
 class USkeletalMesh;
 class UTexture2D;
 class AHSRCharacterBase;
+class UAnimInstance;
+class UAnimSequenceBase;
 
 /** Immutable authored input for a playable character. Runtime progression never writes this asset. */
 UCLASS(BlueprintType)
@@ -25,6 +27,18 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation")
 	TSoftObjectPtr<USkeletalMesh> CharacterMesh;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation")
+	TSoftClassPtr<UAnimInstance> AnimationClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation|Combat")
+	TSoftObjectPtr<UAnimSequenceBase> AttackAnimation;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation|Combat")
+	TSoftObjectPtr<UAnimSequenceBase> SkillAnimation;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation|Combat")
+	TSoftObjectPtr<UAnimSequenceBase> HitAnimation;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation|Combat")
+	TSoftObjectPtr<UAnimSequenceBase> DefeatAnimation;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation|Combat")
+	bool bMeleeBasicAttack = true;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation")
 	TSoftObjectPtr<UTexture2D> Portrait;

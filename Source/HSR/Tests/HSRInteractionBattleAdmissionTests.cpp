@@ -19,6 +19,13 @@
 #include "../Party/HSRPartySubsystem.h"
 #include "../Progression/HSRCharacterProfileSubsystem.h"
 #include "../Reward/HSRRewardSubsystem.h"
+#include "../Challenge/HSRChallengeProgressionSubsystem.h"
+#include "../Equipment/HSREquipmentSubsystem.h"
+#include "../Quest/HSRQuestSubsystem.h"
+#include "../Save/HSRSaveSubsystem.h"
+#include "../Save/HSRSaveVersion.h"
+#include "../Map/HSRMapSubsystem.h"
+#include "../Data/Definitions/HSRMapDefinition.h"
 
 namespace
 {
@@ -358,6 +365,143 @@ bool FHSRInteractionBattleAdmissionTest::RunTest(const FString& Parameters)
 		EHSREncounterResultType::Success);
 	FailureFixture.Shutdown();
 
+	return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHSRPersistentEncounterAdmissionTest,
+	"HSR.InteractionBattle.PersistentCompletionAdmission",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHSRPersistentEncounterAdmissionTest::RunTest(const FString&)
+{
+	const auto MakeSave = [](const FHSRAdmissionFixture& Fixture)
+	{
+		UHSRSaveSubsystem* Save = NewObject<UHSRSaveSubsystem>(Fixture.GameInstance);
+		Save->InitializeForDevelopmentTest(Fixture.GameInstance->GetSubsystem<UHSRCharacterProfileSubsystem>(),
+			Fixture.GameInstance->GetSubsystem<UHSRPartySubsystem>(),
+			Fixture.GameInstance->GetSubsystem<UHSREquipmentSubsystem>(),
+			Fixture.GameInstance->GetSubsystem<UHSRInventorySubsystem>(),
+			Fixture.GameInstance->GetSubsystem<UHSRRewardSubsystem>(),
+			Fixture.GameInstance->GetSubsystem<UHSRQuestSubsystem>());
+		return Save;
+	};
+	FHSRAdmissionFixture Source;
+	if (!TestTrue(TEXT("Source admission fixture initializes"), Source.Initialize(true)))
+	{
+		Source.Shutdown();
+		return false;
+	}
+	const FName EncounterId = Source.Encounter->EncounterId;
+	UHSRChallengeProgressionSubsystem* SourceProgression = Source.GameInstance->GetSubsystem<UHSRChallengeProgressionSubsystem>();
+	SourceProgression->CompleteEncounter(EncounterId);
+	FHSRSaveData Captured;
+	if (!TestEqual(TEXT("Capture persisted completion"), MakeSave(Source)->SaveSnapshot(Captured), EHSRSaveResult::Success))
+	{
+		Source.Shutdown();
+		return false;
+	}
+	TArray<uint8> Bytes;
+	TestTrue(TEXT("Completion envelope encodes"), HSRSaveVersion::EncodeEnvelope(Captured, TEXT("AdmissionRegression"), 0, FGuid(21, 22, 23, 24), 1, Bytes));
+	FHSRSaveData Decoded;
+	const bool bDecoded = TestEqual(TEXT("Completion envelope decodes"), HSRSaveVersion::DecodeEnvelope(Bytes, TEXT("AdmissionRegression"), 0, Decoded), EHSRSaveDecodeResult::Success);
+	Source.Shutdown();
+	if (!bDecoded) return false;
+
+	FHSRAdmissionFixture Restored;
+	if (!TestTrue(TEXT("Fresh restart fixture initializes"), Restored.Initialize(true)))
+	{
+		Restored.Shutdown();
+		return false;
+	}
+	// This request represents a pre-battle UI opened before restoring the completed save.
+	FHSREncounterRequest StaleRequest;
+	StaleRequest.RequestId = FGuid::NewGuid();
+	StaleRequest.EncounterId = EncounterId;
+	StaleRequest.EnemyDefinitionId = Restored.Encounter->EnemyDefinitionId;
+	StaleRequest.BattleMapPath = FName(*Restored.Encounter->BattleMap.GetLongPackageName());
+	StaleRequest.PlayerCharacterId = TEXT("Character.A");
+	StaleRequest.PlayerPartyIds = { StaleRequest.PlayerCharacterId };
+	UHSRSaveSubsystem* RestoredSave = MakeSave(Restored);
+	if (!TestEqual(TEXT("Restore into fresh runtime"), RestoredSave->LoadSnapshot(Decoded), EHSRSaveResult::Success))
+	{
+		Restored.Shutdown();
+		return false;
+	}
+	UHSRChallengeProgressionSubsystem* Progression = Restored.GameInstance->GetSubsystem<UHSRChallengeProgressionSubsystem>();
+	TestTrue(TEXT("Persistent completion restored"), Progression->IsCompleted(EncounterId));
+	TestFalse(TEXT("Fresh transition has no transient completion membership"), Restored.Transition->GetAutomationSnapshot(EncounterId).bResolvedMembership);
+	FHSRInventorySnapshot BeforeInventory;
+	Restored.GameInstance->GetSubsystem<UHSRInventorySubsystem>()->GetSnapshot(BeforeInventory);
+	const int64 BeforeProgressionRevision = Progression->GetSnapshot().Revision;
+	TestEqual(TEXT("World interaction rejects restored victory"), Restored.Transition->RequestEncounterForInteractor(
+		Restored.Encounter, EHSREncounterInitiative::Player, Restored.Pawn).ResultType, EHSREncounterResultType::AlreadyConsumed);
+	TestEqual(TEXT("Public encounter entry rejects restored victory"), Restored.Transition->RequestEncounter(
+		Restored.Encounter, EHSREncounterInitiative::Player).ResultType, EHSREncounterResultType::AlreadyConsumed);
+	FHSREncounterRequest OutTemplate;
+	TestEqual(TEXT("Pre-battle UI template rejects restored victory"), Restored.Transition->BuildPreBattleEncounterTemplate(
+		Restored.Encounter, EHSREncounterInitiative::Player, OutTemplate).ResultType, EHSREncounterResultType::AlreadyConsumed);
+	TestFalse(TEXT("Rejected template does not mint a request ID"), OutTemplate.RequestId.IsValid());
+	TestEqual(TEXT("Stale UI request cannot bypass restored completion"), Restored.Transition->SubmitEncounterRequestFromUI(StaleRequest).ResultType,
+		EHSREncounterResultType::AlreadyConsumed);
+	const FHSRTransitionAutomationSnapshot After = Restored.Transition->GetAutomationSnapshot(EncounterId);
+	TestEqual(TEXT("All rejected paths keep admission untouched"), After.AdmissionMutationCount, 0);
+	TestEqual(TEXT("All rejected paths initiate no travel"), After.TravelInitiationCount, 0);
+	TestFalse(TEXT("No pending request after rejection"), After.PendingRequest.RequestId.IsValid());
+	FHSRInventorySnapshot AfterInventory;
+	Restored.GameInstance->GetSubsystem<UHSRInventorySubsystem>()->GetSnapshot(AfterInventory);
+	TestEqual(TEXT("No inventory mutation or duplicate reward"), AfterInventory.Revision, BeforeInventory.Revision);
+	TestEqual(TEXT("Completion revision is untouched"), Progression->GetSnapshot().Revision, BeforeProgressionRevision);
+	// The UI submission boundary must also preserve the existing same-session policy.
+	const FName SessionId(TEXT("Encounter.Admission.SessionOnly"));
+	Restored.Transition->SeedResolvedEncounterForAutomation(SessionId);
+	StaleRequest.EncounterId = SessionId;
+	TestEqual(TEXT("UI cannot bypass same-session completion"), Restored.Transition->SubmitEncounterRequestFromUI(StaleRequest).ResultType,
+		EHSREncounterResultType::AlreadyConsumed);
+	FHSRSaveData InvalidRestore = Decoded;
+	InvalidRestore.SchemaVersion = 0;
+	TestEqual(TEXT("Failed restore is rejected"), RestoredSave->LoadSnapshot(InvalidRestore), EHSRSaveResult::UnsupportedSchema);
+	TestTrue(TEXT("Failed restore preserves session completion"), Restored.Transition->GetAutomationSnapshot(SessionId).bResolvedMembership);
+	// A save with no completion history still permits the original encounter.
+	// Do not reset the transition fixture: only the real restore commit may clear this history.
+	FHSRSaveData Earlier = Decoded;
+	Earlier.ChallengeProgression = FHSRChallengeProgressionSaveData();
+	TestEqual(TEXT("Restore earlier progress without a completion"), RestoredSave->LoadSnapshot(Earlier), EHSRSaveResult::Success);
+	TestFalse(TEXT("Committed restore clears stale session-only completion"), Restored.Transition->GetAutomationSnapshot(SessionId).bResolvedMembership);
+	TestFalse(TEXT("Completion query reflects restored state without a stale cache"), Progression->IsCompleted(EncounterId));
+	TestEqual(TEXT("Uncompleted encounter remains playable"), Restored.Transition->RequestEncounterForInteractor(
+		Restored.Encounter, EHSREncounterInitiative::Player, Restored.Pawn).ResultType, EHSREncounterResultType::Success);
+	const FHSREncounterResult Consumed = Restored.Transition->ConsumePendingEncounter();
+	TestEqual(TEXT("Real encounter request consumed"), Consumed.ResultType, EHSREncounterResultType::Success);
+	UHSRMapDefinition* ReturnMap = NewObject<UHSRMapDefinition>(Restored.GameInstance);
+	ReturnMap->MapId = TEXT("Map.Admission.Return");
+	ReturnMap->World = Restored.Encounter->BattleMap;
+	ReturnMap->RegionId = TEXT("Region.Admission");
+	ReturnMap->DefaultArrivalId = TEXT("Arrival.Admission");
+	TestEqual(TEXT("Authorize return destination"), Restored.GameInstance->GetSubsystem<UHSRMapSubsystem>()->RegisterMapDefinition(*ReturnMap), EHSRMapOperationResult::Success);
+	FHSRBattleResult Victory;
+	Victory.RequestId = Consumed.RequestId;
+	Victory.EncounterId = EncounterId;
+	Victory.Outcome = EHSRBattleOutcome::PlayerVictory;
+	Victory.ReturnContext.RequestId = Consumed.RequestId;
+	Victory.ReturnContext.ExplorationMapPath = StaleRequest.BattleMapPath;
+	Victory.ReturnContext.ReturnTransform = Restored.Pawn->GetActorTransform();
+	// Production completion and return APIs populate both persisted and session history.
+	Progression->CompleteEncounter(EncounterId);
+	TestEqual(TEXT("Real victory return succeeds"), Restored.Transition->RequestBattleReturn(Victory).ResultType, EHSREncounterReturnResultType::Success);
+	TestEqual(TEXT("Return context consumed without clearing victory history"), Restored.Transition->ConsumeReturnContext().ResultType, EHSREncounterReturnResultType::Success);
+	TestTrue(TEXT("Victory return records session resolution"), Restored.Transition->GetAutomationSnapshot(EncounterId).bResolvedMembership);
+	TestEqual(TEXT("Same-session completed encounter remains blocked"), Restored.Transition->RequestEncounterForInteractor(
+		Restored.Encounter, EHSREncounterInitiative::Player, Restored.Pawn).ResultType, EHSREncounterResultType::AlreadyConsumed);
+	TestEqual(TEXT("Failed rollback remains rejected"), RestoredSave->LoadSnapshot(InvalidRestore), EHSRSaveResult::UnsupportedSchema);
+	TestTrue(TEXT("Failed rollback retains real victory session history"), Restored.Transition->GetAutomationSnapshot(EncounterId).bResolvedMembership);
+	TestTrue(TEXT("Failed rollback retains persistent victory"), Progression->IsCompleted(EncounterId));
+	TestEqual(TEXT("Rollback earlier save in the same GameInstance"), RestoredSave->LoadSnapshot(Earlier), EHSRSaveResult::Success);
+	TestFalse(TEXT("Successful rollback removes real victory session history"), Restored.Transition->GetAutomationSnapshot(EncounterId).bResolvedMembership);
+	TestFalse(TEXT("Successful rollback restores earlier persistent progress"), Progression->IsCompleted(EncounterId));
+	TestEqual(TEXT("Original encounter playable after actual victory rollback"), Restored.Transition->RequestEncounterForInteractor(
+		Restored.Encounter, EHSREncounterInitiative::Player, Restored.Pawn).ResultType, EHSREncounterResultType::Success);
+	Restored.Shutdown();
 	return true;
 }
 

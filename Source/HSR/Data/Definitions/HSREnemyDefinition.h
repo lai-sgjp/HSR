@@ -9,6 +9,7 @@
 class UHSREncounterDefinition;
 class UBehaviorTree;
 class UBlackboardData;
+class UStaticMesh;
 
 UCLASS(BlueprintType)
 class HSR_API UHSREnemyDefinition : public UPrimaryDataAsset
@@ -16,6 +17,19 @@ class HSR_API UHSREnemyDefinition : public UPrimaryDataAsset
 	GENERATED_BODY()
 
 public:
+	/** Elite single-target attacks favor wounded opponents; ordinary enemies are uniform. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Tactics")
+	bool bPreferWoundedTargets = false;
+	/** Opt-in combat values; legacy enemy assets continue using their initialization effect. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Stats") bool bUseAuthoredBaseStats = false;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Stats", meta=(EditCondition="bUseAuthoredBaseStats", ClampMin="1.0")) float BaseMaxHealth = 100.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Stats", meta=(EditCondition="bUseAuthoredBaseStats", ClampMin="0.0")) float BaseAttack = 10.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Stats", meta=(EditCondition="bUseAuthoredBaseStats", ClampMin="0.0")) float BaseDefense = 5.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Stats", meta=(EditCondition="bUseAuthoredBaseStats", ClampMin="0.001")) float BaseSpeed = 90.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Presentation") TSoftObjectPtr<UStaticMesh> BattleMesh;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Presentation", meta=(ClampMin="0.1")) float BattleMeshScale=1.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy|Formation", meta=(ClampMin="1",ClampMax="5")) int32 FormationCount=1;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|AI")
 	TSoftObjectPtr<UBehaviorTree> BehaviorTreeAsset = TSoftObjectPtr<UBehaviorTree>(FSoftObjectPath(TEXT("/Game/AI/Enemy/BT_HSREnemy_Exploration.BT_HSREnemy_Exploration")));
 

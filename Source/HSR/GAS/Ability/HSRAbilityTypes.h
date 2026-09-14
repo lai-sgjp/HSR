@@ -28,7 +28,9 @@ enum class EHSRAbilityResolutionStatus : uint8
 	Succeeded,
 	Rejected,
 	Cancelled,
-	Failed
+	Failed,
+	/** Admitted for presentation; the final result is published at impact. */
+	Accepted
 };
 
 UENUM(BlueprintType)

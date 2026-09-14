@@ -11,6 +11,8 @@
 #include "../Equipment/HSREquipmentTypes.h"
 #include "GameplayEffect.h"
 #include "Engine/GameInstance.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimInstance.h"
 
 AHSRCharacterBase::AHSRCharacterBase()
 {
@@ -333,10 +335,28 @@ bool AHSRCharacterBase::SetProjectedCharacterId(const FName CharacterId)
 		return false;
 	}
 	ProjectedCharacterId = CharacterId;
+	ApplyCharacterPresentation(CharacterId);
 	// 设置角色 ID 后立刻按定义断言基础属性，并投影装备负载，让世界中的表现与角色详情页一致。
 	ApplyCharacterBaseStatsToAbilitySystem();
 	ProjectEquipmentToAbilitySystem();
 	return true;
+}
+
+void AHSRCharacterBase::ApplyCharacterPresentation(FName CharacterId)
+{
+	const auto* Profiles=GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRCharacterProfileSubsystem>() : nullptr;
+	const UHSRCharacterDefinition* Definition=nullptr;
+	if (!Profiles || !Profiles->GetDefinition(CharacterId,Definition) || !Definition || Definition->CharacterMesh.IsNull()) return;
+	if (USkeletalMesh* AuthoredMesh=Definition->CharacterMesh.LoadSynchronous())
+	{
+		GetMesh()->SetAnimInstanceClass(nullptr);
+		GetMesh()->SetSkeletalMesh(AuthoredMesh);
+		GetMesh()->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+		GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+		GetMesh()->SetComponentTickEnabled(true);
+		if (UClass* Anim=Definition->AnimationClass.LoadSynchronous()) GetMesh()->SetAnimInstanceClass(Anim);
+		else UE_LOG(LogTemp, Error, TEXT("Missing playable animation: %s"), *CharacterId.ToString());
+	}
 }
 
 void AHSRCharacterBase::ApplyCharacterBaseStatsToAbilitySystem()
@@ -394,6 +414,8 @@ void AHSRCharacterBase::ProjectEquipmentToAbilitySystem()
 	{
 		return;
 	}
+	// Preserve health across the temporary removal/reapplication of equipment sources.
+	const float HealthBeforeProjection = AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
 	// 先卸载旧的投影，保证重复调用（例如角色切换后）不会叠加两套装备 GE。
 	UnprojectEquipmentFromAbilitySystem();
 	if (!EquipmentEffectBridge)
@@ -430,6 +452,8 @@ void AHSRCharacterBase::ProjectEquipmentToAbilitySystem()
 		}
 	}
 	// 订阅负载变更：此后装备/圣遗物变动会回调 HandleEquipmentLoadoutChanged 重新投影，保持同步。
+	AbilitySystemComponent->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), FMath::Min(HealthBeforeProjection,
+		AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxHealthAttribute())));
 	EquipmentLoadoutChangedHandle = Equipment->OnLoadoutChanged().AddUObject(this, &AHSRCharacterBase::HandleEquipmentLoadoutChanged);
 	UE_LOG(LogTemp, Log, TEXT("AHSRCharacterBase::ProjectEquipmentToAbilitySystem - %s projected equipment loadout to ASC"), *GetName());
 }

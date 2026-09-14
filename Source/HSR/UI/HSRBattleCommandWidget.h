@@ -12,6 +12,7 @@ class UComboBoxString;
 class UHSRSkillButtonWidget;
 class UPanelWidget;
 class UTextBlock;
+class UHSRBattleEntryButton;
 
 UCLASS(Abstract)
 class HSR_API UHSRBattleCommandWidget : public UUserWidget
@@ -70,11 +71,35 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& Event) override;
+	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect,
+		FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Battle|Command", meta = (DisplayName = "Command View State Changed"))
 	void OnCommandViewStateChanged(const FHSRBattleCommandViewState& State);
 
 private:
+	struct FCombatFloatingText
+	{
+		TWeakObjectPtr<AActor> Target;
+		FText Text;
+		FLinearColor Tint;
+		double StartedAt = 0.;
+		int32 VerticalLane = 0;
+	};
+	void RefreshCombatFeedback(const FHSRBattleCommandViewState& State);
+	void AdvanceCombatFeedback();
+	void ClearCombatFeedback();
+	TArray<FCombatFloatingText> FloatingTexts;
+	TSet<FGuid> ObservedPresentationEvents;
+	FGuid FeedbackBattleId;
+	FTimerHandle FeedbackTimer;
+	void RefreshPresentationCards(const FHSRBattleCommandViewState& State);
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UPanelWidget> PR_Party;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UPanelWidget> PR_Enemies;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UPanelWidget> PR_Order;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UPanelWidget> PR_Skills;
+	UPROPERTY(Transient) TMap<FName,TObjectPtr<UHSRBattleEntryButton>> PresentationCards;
 	FGuid LastSubmittedActionId;
 	FHSRAbilityResolution LastSubmittedResolution;
 	UFUNCTION() void HandleBasicClicked();

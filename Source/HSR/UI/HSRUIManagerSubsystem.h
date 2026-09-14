@@ -11,6 +11,7 @@ class UHSRInputModeCoordinator;
 class UHSRScreenStack;
 class UHSRScreenWidget;
 class UHSRInventoryWidget;
+class UHSRPreBattleCandidateWidget;
 class UHSRInventoryModuleWidget;
 class UHSRInventoryRewardViewModel;
 class UHSRDialoguePresentationViewModel;
@@ -61,6 +62,9 @@ public:
 	EHSRUIScreenResult OpenInventoryScreen();
 
 	UFUNCTION(BlueprintCallable, Category = "HSR|UI")
+	EHSRUIScreenResult OpenInventoryForCharacter(FName CharacterId, bool bRelics = false);
+
+	UFUNCTION(BlueprintCallable, Category = "HSR|UI")
 	EHSRUIScreenResult RequestBack();
 
 	UFUNCTION(BlueprintCallable, Category = "HSR|UI|Frontend")
@@ -81,6 +85,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "HSR|UI")
 	bool HasOpenPauseScreen() const { return FrontendShellInstance != nullptr; }
 	const UHSRFrontendRouter* GetFrontendRouter() const { return FrontendRouter; }
+
+	/** Restore the current module after a transient selection popup closes. */
+	UFUNCTION(BlueprintCallable, Category = "HSR|UI|Frontend")
+	bool RestoreActiveFrontendFocus();
+	void RegisterPreBattlePopup(UHSRPreBattleCandidateWidget* Popup);
+	void UnregisterPreBattlePopup(UHSRPreBattleCandidateWidget* Popup);
 
 	UFUNCTION(BlueprintPure, Category = "HSR|UI")
 	bool HasOpenCharacterDetailScreen() const { return CharacterDetailWidgetInstance != nullptr; }
@@ -145,10 +155,13 @@ public:
 	void ConfigureAutomationDialogueOverlayBackend(bool bHasClass, bool bCreateSucceeds,
 		bool bAttachSucceeds);
 	int32 GetFrontendModuleContentCountForAutomation() const;
+	bool IsFrontendShellVisibleForAutomation() const;
 	EHSRFrontendModule GetFrontendModuleContentModuleForAutomation() const;
 #endif
 
 private:
+	bool DismissPreBattlePopup();
+	UPROPERTY(Transient) TObjectPtr<UHSRPreBattleCandidateWidget> PreBattlePopup;
 	int64 AllocateRequestToken();
 	int64 AllocateFrontendRequestToken();
 	EHSRFrontendRouteResult SubmitFrontendRoute(const FHSRFrontendRouteRequest& Request);
@@ -185,6 +198,10 @@ private:
 	void TryClearRecoverableInconsistency();
 	void ClearHostReferences();
 	FGuid ResolveInventoryCharacterGuid() const;
+	FGuid PendingInventoryCharacterGuid;
+	bool bPendingInventoryRelics = false;
+	FName InventoryReturnCharacterId;
+	bool bInventoryReturnRelics = false;
 	TSubclassOf<UUserWidget> GetFrontendModuleWidgetClass(EHSRFrontendModule Module) const;
 	UUserWidget* CreateFrontendModuleContentCandidate(AHSRPlayerController* PlayerController,
 		EHSRFrontendModule Module);
@@ -291,6 +308,8 @@ private:
 
 	UPROPERTY(Transient)
 	TWeakObjectPtr<UHSRUserWidget> RegisteredRootWidget;
+
+	void RefreshExplorationHUDVisibility();
 
 	FGuid PauseOwnerToken;
 	int64 NextRequestToken = 1;

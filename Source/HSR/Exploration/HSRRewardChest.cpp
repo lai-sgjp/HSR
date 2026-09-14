@@ -71,7 +71,16 @@ void AHSRRewardChest::BeginPlay()
 // 交互可用性：配置有效、尚未被领取、且未待销毁。
 bool AHSRRewardChest::IsInteractionAvailable_Implementation() const
 {
-	return bClaimConfigurationValid && !bClaimed && !IsPendingKillPending();
+	if (!bClaimConfigurationValid || IsPendingKillPending()) return false;
+	// Receipts are restored by the save authority; a level-local bool cannot
+	// represent both loading an already claimed chest and restoring an earlier save.
+	if (UGameInstance* GI = GetGameInstance())
+		if (const auto* Reward = GI->GetSubsystem<UHSRRewardSubsystem>())
+		{
+			FHSRRewardReceipt Receipt;
+			return !Reward->GetReceipt(StableClaimId, Receipt);
+		}
+	return !bClaimed;
 }
 
 // 交互提示文本。
@@ -92,7 +101,7 @@ FHSRInteractionResult AHSRRewardChest::ExecuteInteraction_Implementation(const F
 	{
 		return FHSRInteractionResult::MakeFailure(EHSRInteractionFailureReason::OutOfRange);
 	}
-	if (bClaimed)
+	if (!IsInteractionAvailable_Implementation())
 	{
 		return FHSRInteractionResult::MakeFailure(EHSRInteractionFailureReason::Unavailable);
 	}

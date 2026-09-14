@@ -6,6 +6,10 @@
 
 class UHSRAttributeViewModel;
 class UHSRInteractionViewModel;
+class UPanelWidget;
+class UTextBlock;
+class UHSRQuestViewModel;
+struct FHSRQuestFrontendSnapshot;
 
 UCLASS()
 class HSR_API UHSRUserWidget : public UUserWidget
@@ -37,6 +41,13 @@ public:
 	virtual void NativeDestruct() override;
 
 private:
+	void RefreshQuestPresentation(const FHSRQuestFrontendSnapshot& Snapshot);
+	void RefreshPartyPresentation(int64 Revision);
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UPanelWidget> PR_MinimapHost;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> PR_QuestTracker;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> PR_PartyText;
+	UPROPERTY(Transient) TObjectPtr<UHSRQuestViewModel> QuestPresentation;
+	FDelegateHandle QuestPresentationHandle, PartyPresentationHandle;
 	// Internal UFUNCTION for ViewModel delegate binding
 	UFUNCTION()
 	void OnInternalPromptChanged(bool bVisible, const FText& PromptText);

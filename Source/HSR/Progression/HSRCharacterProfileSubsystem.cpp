@@ -39,6 +39,13 @@ EHSRCharacterProfileResult UHSRCharacterProfileSubsystem::RegisterLoadedCatalog(
 		}
 		Loaded.Add(Definition);
 	}
+	for (const auto& Definition : Catalog->CharacterAssets)
+	{
+		if (!Definition) return EHSRCharacterProfileResult::AssetLoadFailed;
+		if (Definition->CumulativeExperienceCurve.IsNull() || !Definition->CumulativeExperienceCurve.LoadSynchronous())
+			return EHSRCharacterProfileResult::ExperienceCurveLoadFailed;
+		Loaded.Add(Definition);
+	}
 	return RegisterDefinitions(Loaded);
 }
 

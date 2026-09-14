@@ -97,7 +97,10 @@ bool UHSREquipmentEffectBridge::Apply(const FGuid& Key, UAbilitySystemComponent*
 	// 若旧 Effect 移除失败，则回滚新 Effect（同时移除），避免残留两个同名 Effect 叠加。
 	if (FSource* O = Sources.Find(Key))
 	{
-		if (O->ASC.IsValid() && O->Handle.IsValid() && O->ASC->GetActiveGameplayEffect(O->Handle))
+		// A stacking effect may update the existing active effect in place and
+		// return its handle. Removing that handle would remove the new bonus too.
+		if (O->ASC.IsValid() && O->Handle.IsValid() && O->ASC->GetActiveGameplayEffect(O->Handle)
+			&& !(O->ASC.Get() == ASC && O->Handle == H))
 		{
 			if (!O->ASC->RemoveActiveGameplayEffect(O->Handle))
 			{

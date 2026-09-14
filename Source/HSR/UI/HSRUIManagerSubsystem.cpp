@@ -1,8 +1,10 @@
 #include "HSRUIManagerSubsystem.h"
+#include "HSRPreBattleCandidateWidget.h"
 #include "HSRInputModeCoordinator.h"
 #include "HSRScreenStack.h"
 #include "HSRScreenWidget.h"
 #include "HSRCharacterDetailWidget.h"
+#include "Character/HSRCharacterShellWidget.h"
 #include "HSRInventoryRewardWidget.h"
 #include "HSRInventoryRewardViewModel.h"
 #include "Inventory/HSRInventoryModuleWidget.h"
@@ -13,6 +15,7 @@
 #include "../Equipment/HSREquipmentTypes.h"
 #include "../Party/HSRPartySubsystem.h"
 #include "../Party/HSRPartyTypes.h"
+#include "../Progression/HSRCharacterProfileSubsystem.h"
 #include "../Reward/HSRRewardSubsystem.h"
 #include "../Map/HSRMapSubsystem.h"
 #include "../Battle/HSRBattleTransitionSubsystem.h"
@@ -32,6 +35,29 @@
 // 屏幕 ID / 焦点 Token，贯穿整个前端 UI 生命周期，因此集中定义避免散落各处出现拼写漂移。
 namespace
 {
+	/** A hidden hub must be visible before focus can return to it. Failed transactions restore its prior visibility. */
+	class FScopedShellVisibility
+	{
+	public:
+		explicit FScopedShellVisibility(UWidget* InShell) : Shell(InShell)
+		{
+			if (InShell) { Previous = InShell->GetVisibility(); InShell->SetVisibility(ESlateVisibility::Visible); }
+		}
+		~FScopedShellVisibility()
+		{
+			if (!bCommitted && Shell.IsValid()) Shell->SetVisibility(Previous);
+		}
+		void Commit()
+		{
+			bCommitted = true;
+			if (Shell.IsValid()) Shell->SetVisibility(ESlateVisibility::Visible);
+		}
+	private:
+		TWeakObjectPtr<UWidget> Shell;
+		ESlateVisibility Previous = ESlateVisibility::Visible;
+		bool bCommitted = false;
+	};
+
 	// 探索世界常驻的根屏幕，位于 HUD 层，代表探索状态本身
 	const FName ExplorationRootId(TEXT("UI.Screen.ExplorationRoot"));
 	// 暂停（Pause）屏幕，Modal 层，是前端各子页（角色/背包/队伍…）的宿主外壳
@@ -87,6 +113,7 @@ void UHSRUIManagerSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 // 最后清空核心对象指针，避免任何对象在释放过程中回调一个已失效的子系统。
 void UHSRUIManagerSubsystem::Deinitialize()
 {
+	DismissPreBattlePopup();
 	// 1) 撤销地图到达订阅，防止世界正在卸载时再收到回调
 	if (UGameInstance* GameInstance = GetLocalPlayer() ? GetLocalPlayer()->GetGameInstance() : nullptr)
 	{
@@ -292,6 +319,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::TeardownExplorationHostForTravel(AHSR
 // 准备进入跨地图旅行：若当前宿主健康则捕获其 UI 状态并拆除，以便旅行到达后恢复
 EHSRUIScreenResult UHSRUIManagerSubsystem::PrepareExplorationTravel()
 {
+	DismissPreBattlePopup();
 	// 子系统不健康时不处理
 	if (!bInitialized || bInconsistent)
 	{
@@ -605,6 +633,8 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenPauseScreen()
 
 	// 全部成功：记录外壳实例并向其呈现当前路由快照
 	FrontendShellInstance = Candidate;
+	RefreshExplorationHUDVisibility();
+	FrontendShellInstance->SetVisibility(ESlateVisibility::Visible);
 	Candidate->PresentRoute(FrontendRouter->GetSnapshot());
 	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 OpenPause Success Token=%lld Stack=%d FocusResult=%d"),
 		OpenToken, GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
@@ -785,6 +815,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenCharacterDetailInternal()
 	// 记录新的模块根与角色详情实例
 	FrontendModuleRootInstance = RootCandidate;
 	CharacterDetailWidgetInstance = Candidate;
+	if (FrontendShellInstance) FrontendShellInstance->SetVisibility(ESlateVisibility::Collapsed);
 	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 CharacterDetail Open Success Stack=%d FocusResult=%d"),
 		GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
 	return EHSRUIScreenResult::Success;
@@ -794,6 +825,37 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenCharacterDetailInternal()
 EHSRUIScreenResult UHSRUIManagerSubsystem::OpenInventoryScreen()
 {
 	return OpenFrontendModule(EHSRFrontendModule::Inventory);
+}
+
+EHSRUIScreenResult UHSRUIManagerSubsystem::OpenInventoryForCharacter(FName CharacterId, bool bRelics)
+{
+	UGameInstance* Instance = GetLocalPlayer() ? GetLocalPlayer()->GetGameInstance() : nullptr;
+	UHSRCharacterProfileSubsystem* Profiles = Instance ? Instance->GetSubsystem<UHSRCharacterProfileSubsystem>() : nullptr;
+	FHSRCharacterProfileSnapshot Profile;
+	if (!Profiles || !Profiles->GetProfileSnapshot(CharacterId, Profile))
+		return EHSRUIScreenResult::ViewModelInitializationFailed;
+	// The legacy inventory cannot represent a character-specific equipment intent.
+	if (!InventoryModuleWidgetClass) return EHSRUIScreenResult::MissingWidgetClass;
+	const FGuid CharacterGuid = HSRCharacterGuidFromProfileName(CharacterId);
+	const bool bFromCharacter = FrontendRouter &&
+		FrontendRouter->GetSnapshot().GetActiveRoute().Module == EHSRFrontendModule::Character;
+	TGuardValue<FGuid> ContextGuard(PendingInventoryCharacterGuid, CharacterGuid);
+	TGuardValue<bool> CategoryGuard(bPendingInventoryRelics, bRelics);
+	const EHSRUIScreenResult Result = OpenFrontendModule(EHSRFrontendModule::Inventory);
+	if (Result == EHSRUIScreenResult::Success && bFromCharacter)
+	{
+		InventoryReturnCharacterId = CharacterId;
+		bInventoryReturnRelics = bRelics;
+	}
+	if (Result == EHSRUIScreenResult::NoOp)
+	{
+		if (UHSRInventoryModuleWidget* Inventory = Cast<UHSRInventoryModuleWidget>(FrontendModuleContentInstance))
+		{
+			Inventory->InitializeCommandContext(CharacterGuid);
+			Inventory->SelectCategory(bRelics ? EHSRInventoryCategory::Relic : EHSRInventoryCategory::Weapon);
+		}
+	}
+	return Result;
 }
 
 // 打开背包屏（内部实现）：与 OpenCharacterDetailInternal 同构，但额外拥有
@@ -1021,6 +1083,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenInventoryInternal()
 	FrontendModuleRootInstance = RootCandidate;
 	InventoryWidgetInstance = Candidate;
 	InventoryViewModelInstance = ViewModelCandidate;
+	if (FrontendShellInstance) FrontendShellInstance->SetVisibility(ESlateVisibility::Collapsed);
 	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Inventory Open Success Stack=%d FocusResult=%d"),
 		GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
 	return EHSRUIScreenResult::Success;
@@ -1031,6 +1094,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenInventoryInternal()
 // 每个分支失败时都尝试恢复到打开前的策略/焦点状态，且失败路径绝不触发"关到根"。
 EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 {
+	if (DismissPreBattlePopup()) return EHSRUIScreenResult::Success;
 	// 基础守卫
 	if (!bInitialized || !ScreenStack || !InputModeCoordinator)
 	{
@@ -1054,6 +1118,14 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 		return EHSRUIScreenResult::Inconsistent;
 	}
 
+	// Controller/parent-widget back routes must match the inventory's own cancel-first button.
+	if (auto* InventoryModule = Cast<UHSRInventoryModuleWidget>(FrontendModuleContentInstance);
+		InventoryModule && InventoryModule->HasPendingAction())
+	{
+		InventoryModule->CancelAction();
+		return EHSRUIScreenResult::Success;
+	}
+
 	// 屏幕栈只剩探索根时无可返回
 	const FHSRScreenStackSnapshot Snapshot = ScreenStack->GetSnapshot();
 	if (Snapshot.Entries.Num() <= 1)
@@ -1064,11 +1136,27 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 	// 当前活跃前端模块（供策略/焦点分派用）
 	const EHSRFrontendModule ActiveFrontendModule = FrontendRouter
 		? FrontendRouter->GetSnapshot().GetActiveRoute().Module : EHSRFrontendModule::None;
+	if (ActiveFrontendModule == EHSRFrontendModule::Inventory && !InventoryReturnCharacterId.IsNone())
+	{
+		const FName ReturnCharacter = InventoryReturnCharacterId;
+		const bool bReturnRelics = bInventoryReturnRelics;
+		const EHSRUIScreenResult Result = OpenCharacterDetailScreen();
+		if (Result == EHSRUIScreenResult::Success)
+		{
+			if (UHSRCharacterShellWidget* Character = Cast<UHSRCharacterShellWidget>(CharacterDetailWidgetInstance))
+			{
+				Character->SelectCharacter(ReturnCharacter);
+				Character->SelectTab(bReturnRelics ? EHSRCharacterShellTab::Relics : EHSRCharacterShellTab::Weapon);
+			}
+		}
+		return Result;
+	}
 
 	// 分支 A：共享模块根的前端模块（角色/背包/队伍/地图/挑战/任务/存档等）。
 	// 这些模块的内容都挂在同一个模块根容器上，返回 = 路由回退一级 + 关闭该模块内容。
 	if (FrontendModuleRootInstance || HSRFrontendModule::UsesSharedModuleRoot(ActiveFrontendModule))
 	{
+		FScopedShellVisibility ShellVisibility(FrontendShellInstance);
 		const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter->GetSnapshot();
 		const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
 
@@ -1163,6 +1251,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 
 		// 外壳呈现回退后的路由快照
 		FrontendShellInstance->PresentRoute(FrontendRouter->GetSnapshot());
+		ShellVisibility.Commit();
 
 		// A module reopened by travel restore has no shell layer beneath it to fall back to, so
 		// backing out of it must land on the root rather than leaving the shell on the stack.
@@ -1235,6 +1324,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::RequestBack()
 // 外壳未开时先开暂停屏；再按模块类型分派到对应打开路径。
 EHSRUIScreenResult UHSRUIManagerSubsystem::OpenFrontendModule(const EHSRFrontendModule Module)
 {
+	DismissPreBattlePopup();
 	// None 不是有效模块
 	if (Module == EHSRFrontendModule::None)
 	{
@@ -1344,6 +1434,8 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenFrontendModule(const EHSRFrontend
 		if (UHSRInventoryModuleWidget* InventoryContent = Cast<UHSRInventoryModuleWidget>(ContentCandidate))
 		{
 			InventoryContent->InitializeCommandContext(ResolveInventoryCharacterGuid());
+			if (PendingInventoryCharacterGuid.IsValid())
+				InventoryContent->SelectCategory(bPendingInventoryRelics ? EHSRInventoryCategory::Relic : EHSRInventoryCategory::Weapon);
 	#if WITH_DEV_AUTOMATION_TESTS
 			if (!bUseAutomationBackend)
 	#endif
@@ -1458,6 +1550,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenFrontendModule(const EHSRFrontend
 		FrontendModuleContentInstance = ContentCandidate;
 		FrontendModuleContentModule = Module;
 		FrontendShellInstance->PresentRoute(FrontendRouter->GetSnapshot());
+		FrontendShellInstance->SetVisibility(ESlateVisibility::Collapsed);
 		// NoOp 请求也视为成功打开，但结果类型保持 NoOp 供调用方区分
 		return RouteResult == EHSRFrontendRouteResult::NoOp ? EHSRUIScreenResult::NoOp : EHSRUIScreenResult::Success;
 	}
@@ -1643,6 +1736,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::OpenDialogueOverlayInternal(
 
 	// 全部成功：记录实例
 	DialogueOverlayWidgetInstance = WidgetCandidate;
+	RefreshExplorationHUDVisibility();
 	DialogueViewModelInstance = ViewModelCandidate;
 	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Dialogue Overlay Open Success Dialogue=%s Node=%s FocusResult=%d"),
 		*DialogueId.ToString(), *NodeId.ToString(), static_cast<uint8>(FocusResult));
@@ -1702,6 +1796,16 @@ void UHSRUIManagerSubsystem::ReleaseDialogueOverlay()
 		DialogueViewModelInstance->Shutdown();
 		DialogueViewModelInstance = nullptr;
 	}
+	RefreshExplorationHUDVisibility();
+}
+
+void UHSRUIManagerSubsystem::RefreshExplorationHUDVisibility()
+{
+	if (UHSRUserWidget* Root = RegisteredRootWidget.Get())
+	{
+		// Keep the exploration focus target alive while modal pages cover its visuals.
+		Root->SetRenderOpacity(FrontendShellInstance || DialogueOverlayWidgetInstance ? 0.f : 1.f);
+	}
 }
 
 // 创建对话浮层 Widget（自动化后端用 NewObject + 标志位模拟创建结果）
@@ -1746,6 +1850,7 @@ EHSRFocusApplyResult UHSRUIManagerSubsystem::ApplyDialogueFocusBackend(
 // 是暂停屏、旅行恢复模块等的"一键收起"路径，任何一步失败都会回滚到之前状态。
 EHSRUIScreenResult UHSRUIManagerSubsystem::CloseFrontendToRoot()
 {
+	DismissPreBattlePopup();
 	// 若对话浮层开着，先关闭它（对话浮层是前端之上的独立层）
 	if (HasOpenDialogueOverlay())
 	{
@@ -1845,6 +1950,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::CloseFrontendToRoot()
 	// 8) 移除前端外壳并撤销暂停所有权
 	FrontendShellInstance->RemoveFromParent();
 	FrontendShellInstance = nullptr;
+	RefreshExplorationHUDVisibility();
 	PauseOwnerToken.Invalidate();
 	return EHSRUIScreenResult::Success;
 }
@@ -1860,6 +1966,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::CloseCharacterDetailScreen()
 		return EHSRUIScreenResult::InvalidHost;
 	}
 
+	FScopedShellVisibility ShellVisibility(FrontendShellInstance);
 	// 记录关闭前的路由与策略快照
 	const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter->GetSnapshot();
 	const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
@@ -1905,6 +2012,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::CloseCharacterDetailScreen()
 	CharacterDetailWidgetInstance->RemoveFromParent();
 	CharacterDetailWidgetInstance = nullptr;
 	FrontendShellInstance->PresentRoute(FrontendRouter->GetSnapshot());
+	ShellVisibility.Commit();
 	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 CharacterDetail Close Success Stack=%d FocusResult=%d"),
 		GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
 	return EHSRUIScreenResult::Success;
@@ -1919,6 +2027,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::CloseInventoryScreen()
 	if (!InventoryWidgetInstance || !InventoryViewModelInstance || !IsBackendHostValid(PC, RootWidget, World))
 		return EHSRUIScreenResult::InvalidHost;
 
+	FScopedShellVisibility ShellVisibility(FrontendShellInstance);
 	// 记录关闭前的路由与策略快照
 	const FHSRFrontendRouteSnapshot OldRoute = FrontendRouter->GetSnapshot();
 	const FHSRInputModePolicy OldPolicy = GetResolvedInputPolicy();
@@ -1974,6 +2083,7 @@ EHSRUIScreenResult UHSRUIManagerSubsystem::CloseInventoryScreen()
 
 	// 外壳呈现更新后的路由
 	FrontendShellInstance->PresentRoute(FrontendRouter->GetSnapshot());
+	ShellVisibility.Commit();
 	UE_LOG(LogTemp, Log, TEXT("HSRUI P17 Inventory Close Success Stack=%d FocusResult=%d"),
 		GetLogicalScreenCount(), static_cast<uint8>(FocusResult));
 	return EHSRUIScreenResult::Success;
@@ -1993,6 +2103,38 @@ int64 UHSRUIManagerSubsystem::AllocateRequestToken()
 // 恢复指定前端模块的焦点。共享模块根的模块统一走根容器焦点；
 // 角色/背包/暂停集线各自走专门后端。新增模块若漏加 case 会静默丢焦点，
 // 因此共享模块先经过 UsesSharedModuleRoot 谓词统一处理。
+bool UHSRUIManagerSubsystem::RestoreActiveFrontendFocus()
+{
+	AHSRPlayerController* PC = RegisteredPlayerController.Get();
+	if (!IsValid(PC) || !FrontendRouter || !FrontendShellInstance || PreBattlePopup || !PauseOwnerToken.IsValid())
+	{
+		return false;
+	}
+	return ApplyPolicyBackend(PC, GetResolvedInputPolicy(), EHSRPlayerControlMode::UIOnly)
+		&& RestoreFrontendModuleFocus(PC, FrontendRouter->GetSnapshot().GetActiveRoute().Module);
+}
+
+void UHSRUIManagerSubsystem::RegisterPreBattlePopup(UHSRPreBattleCandidateWidget* Popup)
+{
+	if (PreBattlePopup != Popup) DismissPreBattlePopup();
+	PreBattlePopup = Popup;
+}
+
+void UHSRUIManagerSubsystem::UnregisterPreBattlePopup(UHSRPreBattleCandidateWidget* Popup)
+{
+	if (PreBattlePopup == Popup) PreBattlePopup = nullptr;
+}
+
+bool UHSRUIManagerSubsystem::DismissPreBattlePopup()
+{
+	if (!IsValid(PreBattlePopup)) return false;
+	UHSRPreBattleCandidateWidget* Popup = PreBattlePopup;
+	PreBattlePopup = nullptr;
+	Popup->CancelCandidate();
+	Popup->RemoveFromParent();
+	return true;
+}
+
 bool UHSRUIManagerSubsystem::RestoreFrontendModuleFocus(AHSRPlayerController* PlayerController,
 	const EHSRFrontendModule Module)
 {
@@ -2212,6 +2354,7 @@ void UHSRUIManagerSubsystem::ClearHostReferences()
 // 槽位无效/为空时回退到队长（槽 0）。结果用于模块化背包内容的命令上下文。
 FGuid UHSRUIManagerSubsystem::ResolveInventoryCharacterGuid() const
 {
+	if (PendingInventoryCharacterGuid.IsValid()) return PendingInventoryCharacterGuid;
 	UGameInstance* GameInstance = GetLocalPlayer() ? GetLocalPlayer()->GetGameInstance() : nullptr;
 	UHSRPartySubsystem* Party = GameInstance ? GameInstance->GetSubsystem<UHSRPartySubsystem>() : nullptr;
 	FHSRPartySnapshot PartySnapshot;
@@ -2696,6 +2839,8 @@ bool UHSRUIManagerSubsystem::AttachFrontendModuleContentCandidate(
 // 释放前端模块内容：清空根容器内容、移除内容 Widget、重置模块归属
 void UHSRUIManagerSubsystem::ReleaseFrontendModuleContent()
 {
+	InventoryReturnCharacterId = NAME_None;
+	bInventoryReturnRelics = false;
 	if (FrontendModuleRootInstance)
 	{
 		FrontendModuleRootInstance->ClearModuleContent();
@@ -3127,5 +3272,13 @@ void UHSRUIManagerSubsystem::DeinitializeForAutomation()
 	ActiveHostGeneration = 0;
 	bTravelRestorePending = false;
 	bTravelArrivalObserved = false;
+}
+#endif
+
+#if WITH_DEV_AUTOMATION_TESTS
+bool UHSRUIManagerSubsystem::IsFrontendShellVisibleForAutomation() const
+{
+	return FrontendShellInstance && FrontendShellInstance->GetVisibility() != ESlateVisibility::Collapsed
+		&& FrontendShellInstance->GetVisibility() != ESlateVisibility::Hidden;
 }
 #endif

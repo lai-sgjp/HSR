@@ -85,7 +85,7 @@ FHSRInteractionResult AHSRGrayboxInteractable::ExecuteInteraction_Implementation
 						*GetName(), static_cast<int32>(EncResult.ResultType), *EncResult.Message.ToString());
 					return FHSRInteractionResult::MakeFailure(
 						EHSRInteractionFailureReason::ExecutionFailed,
-						FText::Format(NSLOCTEXT("Graybox", "EncounterFailed", "Encounter failed: {0}"), EncResult.Message));
+						FText::Format(NSLOCTEXT("Graybox", "EncounterFailed", "无法进入遭遇：{0}"), EncResult.Message));
 				}
 			}
 			else

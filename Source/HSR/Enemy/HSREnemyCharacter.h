@@ -7,6 +7,7 @@
 
 class UHSREnemyDefinition;
 class USphereComponent;
+class UStaticMeshComponent;
 
 UCLASS()
 class HSR_API AHSREnemyCharacter : public ACharacter
@@ -21,6 +22,8 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
 	TObjectPtr<UHSREnemyDefinition> EnemyDefinition;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Enemy")
+	TObjectPtr<UStaticMeshComponent> PatrolMesh;
 
 	UFUNCTION(BlueprintPure, Category = "Enemy")
 	FVector GetSpawnOrigin() const { return bSpawnOriginCaptured ? SpawnOrigin : GetActorLocation(); }

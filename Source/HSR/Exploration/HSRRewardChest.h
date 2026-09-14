@@ -18,6 +18,8 @@ class HSR_API AHSRRewardChest : public AActor, public IHSRInteractableInterface
 
 public:
 	AHSRRewardChest();
+	FGuid GetStableClaimId() const { return StableClaimId; }
+	const UHSRRewardDefinition* GetRewardDefinition() const { return RewardDefinition; }
 	virtual bool IsInteractionAvailable_Implementation() const override;
 	virtual FText GetInteractionPrompt_Implementation() const override;
 	virtual FHSRInteractionResult ExecuteInteraction_Implementation(const FHSRInteractionContext& Context) override;

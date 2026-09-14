@@ -3,12 +3,33 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/OverlaySlot.h"
 #include "Components/PanelWidget.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/TextBlock.h"
 
 // 展示一个模块：记录当前模块并广播给监听方（蓝图事件 OnModuleChanged）。
 void UHSRFrontendModuleRootWidget::PresentModule(const EHSRFrontendModule InModule)
 {
 	PresentedModule = InModule;
 	OnModuleChanged(InModule);
+	if (!WidgetTree) return;
+	FText Title;
+	switch (InModule)
+	{
+	case EHSRFrontendModule::Character: Title=NSLOCTEXT("HSRFrontend","Character","角色");break;
+	case EHSRFrontendModule::Inventory: Title=NSLOCTEXT("HSRFrontend","Inventory","背包");break;
+	case EHSRFrontendModule::Party: Title=NSLOCTEXT("HSRFrontend","Party","队伍");break;
+	case EHSRFrontendModule::Map: Title=NSLOCTEXT("HSRFrontend","Map","地图与旅行");break;
+	case EHSRFrontendModule::Quest: Title=NSLOCTEXT("HSRFrontend","Quest","任务");break;
+	case EHSRFrontendModule::Save: Title=NSLOCTEXT("HSRFrontend","Save","存档");break;
+	case EHSRFrontendModule::Challenge: Title=NSLOCTEXT("HSRFrontend","Challenge","挑战");break;
+	default: break;
+	}
+	if (auto* Text=WidgetTree->FindWidget<UTextBlock>(TEXT("TXT_ModuleTitle"))) Text->SetText(Title);
+	if (auto* Text=WidgetTree->FindWidget<UTextBlock>(TEXT("TXT_Back"))) Text->SetText(NSLOCTEXT("HSRFrontend","Back","返回  Esc"));
+	if (auto* Text=WidgetTree->FindWidget<UTextBlock>(TEXT("TXT_Close"))) Text->SetText(NSLOCTEXT("HSRFrontend","Close","关闭  X"));
+	// Inventory owns a complete header; other modules use this shared navigation.
+	for (FName Name : {FName(TEXT("TXT_ModuleTitle")),FName(TEXT("Row_Bottom"))})
+		if (UWidget* Widget=WidgetTree->FindWidget(Name)) Widget->SetVisibility(InModule==EHSRFrontendModule::Inventory ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 }
 
 // 把模块内容挂到内容宿主上。返回 false 表示宿主或内容无效。

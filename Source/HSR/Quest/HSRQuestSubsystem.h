@@ -22,6 +22,8 @@ public:
 	EHSRQuestOperationResult ClaimQuestReward(FName QuestId, FHSRQuestRewardClaimResult& OutResult);
 	bool GetQuestState(FName QuestId, FHSRQuestRuntimeState& OutState) const;
 	bool HasDefinition(FName QuestId) const { return QuestDefinitions.Contains(QuestId); }
+	FText GetQuestDisplayName(FName QuestId) const;
+	FText GetObjectiveDescription(FName QuestId, FName ObjectiveId) const;
 	void GetQuestStates(TArray<FHSRQuestRuntimeState>& OutStates) const;
 	void ExportSaveData(FHSRQuestSaveData& OutData) const;
 	bool PrepareRestore(const FHSRQuestSaveData& Data, FHSRQuestRestoreState& OutCandidate) const;
@@ -41,6 +43,7 @@ private:
 	struct FQuestRule
 	{
 		FName QuestId;
+		FText DisplayName;
 		TArray<FHSRQuestObjectiveDefinition> Objectives;
 		FName RewardDefinitionId;
 		int32 RewardSeed = 0;

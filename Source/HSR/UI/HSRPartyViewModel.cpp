@@ -2,6 +2,7 @@
 
 #include "../Party/HSRPartySubsystem.h"
 #include "../Progression/HSRCharacterProfileSubsystem.h"
+#include "../Data/Definitions/HSRCharacterDefinition.h"
 
 // BeginDestroy：ViewModel 销毁前先解绑队伍子系统监听，避免回调悬挂。
 void UHSRPartyViewModel::BeginDestroy()
@@ -214,6 +215,10 @@ void UHSRPartyViewModel::Rebuild()
 			for (const FHSRCharacterProfileSnapshot& Profile : ProfileSnapshots)
 			{
 				Next.AvailableCharacterIds.Add(Profile.RuntimeState.CharacterId);
+				const UHSRCharacterDefinition* Definition = nullptr;
+				Next.CharacterDisplayNames.Add(Profile.RuntimeState.CharacterId,
+					Profiles->GetDefinition(Profile.RuntimeState.CharacterId, Definition) && Definition && !Definition->DisplayName.IsEmpty()
+						? Definition->DisplayName : NSLOCTEXT("HSRParty", "UnknownCharacter", "未知角色"));
 			}
 		}
 		for (int32 Index = 0; Index < Candidate.Slots.Num(); ++Index)
@@ -221,6 +226,7 @@ void UHSRPartyViewModel::Rebuild()
 			FHSRPartySlotViewData& View = Next.Slots.AddDefaulted_GetRef();
 			View.SlotIndex = Index;
 			View.CharacterId = Candidate.Slots[Index].CharacterId;
+			if (const FText* Name = Next.CharacterDisplayNames.Find(View.CharacterId)) View.DisplayName = *Name;
 			View.bOccupied = !Candidate.Slots[Index].IsEmpty();
 			bAnyOccupied |= View.bOccupied;
 		}

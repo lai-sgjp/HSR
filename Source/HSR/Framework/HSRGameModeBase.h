@@ -66,6 +66,8 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character|Bootstrap")
 	FName InitialCharacterId = TEXT("Character.A");
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character|Bootstrap")
+	TArray<FName> InitialPartyIds;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Character|Bootstrap")
 	EHSRCharacterBootstrapMode CharacterBootstrapMode = EHSRCharacterBootstrapMode::NewGameDefaults;

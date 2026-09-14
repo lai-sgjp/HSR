@@ -1497,6 +1497,13 @@ EHSRSaveResult UHSRSaveSubsystem::LoadSnapshot(const FHSRSaveData& Candidate)
 	Quest->CommitRestore(MoveTemp(QuestCandidate), false);
 	Map->CommitRestore(MoveTemp(MapCandidate), false);
 	ChallengeProgression->CommitRestore(MoveTemp(ChallengeProgressionCandidate), bChallengeProgressionChanged);
+	// A successful rollback to an earlier save also rolls back session-only victories.
+	// Keep this after commit: failed validation/projection/travel must preserve admission state.
+	if (UHSRBattleTransitionSubsystem* Transition = GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>() : nullptr)
+	{
+		Transition->ResetResolvedEncountersAfterRestore();
+	}
 
 	// 更新 Current：盖上当前 schema、补齐队伍宽度、清掉旧 schema 缺失的域。
 	Current = Candidate;
@@ -1506,6 +1513,9 @@ EHSRSaveResult UHSRSaveSubsystem::LoadSnapshot(const FHSRSaveData& Candidate)
 		Current.PartySlots.SetNum(HSRSaveVersion::PartySlotCount);
 	}
 	HSRSaveSchemaGates::ClearDomainsAbsentAtSchema(Current, Candidate.SchemaVersion);
+	// A rebuilt map can normalize a legacy position to its safe arrival. Reflect the committed
+	// candidate in the public save snapshot, rather than retaining the original invalid coordinates.
+	Map->ExportSaveData(Current.Map);
 
 	// 广播变更：仅通知实际变化的领域，减少 UI/战斗侧无谓刷新。
 	Profiles->NotifyRestored(ChangedIds);

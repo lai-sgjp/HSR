@@ -62,6 +62,7 @@ private:
 	void PublishFailure(EHSRInventoryViewModelResult Result) const;
 	EHSRInventoryViewModelResult SubmitEquip();
 	EHSRInventoryViewModelResult SubmitEnhancement(int32 TargetLevel);
+	bool ResolveSelectedInstance(const FHSRInventoryEntryRow& Row, FHSREquipmentInstance& OutInstance) const;
 	void BuildActionStates(FHSRInventoryModuleSnapshot& InOutSnapshot,
 		const FHSRInventorySnapshot& InventorySnapshot) const;
 	void BuildEnhancementOptions(FHSRInventoryModuleSnapshot& InOutSnapshot,
@@ -88,7 +89,7 @@ private:
 	FDelegateHandle InventoryHandle;
 	FDelegateHandle EquipmentHandle;
 	FGuid CharacterId;
-	EHSRInventoryCategory Category = EHSRInventoryCategory::Other;
+	EHSRInventoryCategory Category = EHSRInventoryCategory::All;
 	FString FilterText;
 	EHSRInventorySortMode SortMode = EHSRInventorySortMode::CatalogOrder;
 	FHSRInventoryModuleSnapshot Snapshot;

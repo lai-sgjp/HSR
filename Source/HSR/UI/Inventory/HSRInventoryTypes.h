@@ -2,7 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "../../Inventory/HSRItemTypes.h"
+#include "../../Equipment/HSREquipmentTypes.h"
 #include "HSRInventoryTypes.generated.h"
+
+class UTexture2D;
 
 UENUM(BlueprintType)
 enum class EHSRInventoryCategory : uint8
@@ -11,7 +14,8 @@ enum class EHSRInventoryCategory : uint8
 	Relic,
 	Consumable,
 	Material,
-	Other
+	Other,
+	All
 };
 
 UENUM(BlueprintType)
@@ -64,6 +68,10 @@ struct HSR_API FHSRInventoryCatalogEntry
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory")
 	int32 SortOrder = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory") FText Description;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory") TSoftObjectPtr<UTexture2D> Icon;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory", meta=(ClampMin="1", ClampMax="5")) int32 Rarity = 1;
 };
 
 USTRUCT(BlueprintType)
@@ -120,6 +128,13 @@ struct HSR_API FHSRInventoryEntryRow
 
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	FHSRItemInstance UniqueInstance;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory") FText Description;
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory") TSoftObjectPtr<UTexture2D> Icon;
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory") int32 Rarity = 1;
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory") int32 EnhancementLevel = 0;
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory") FGuid EquippedCharacterId;
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory") TArray<FHSREquipmentModifier> Modifiers;
 };
 
 USTRUCT(BlueprintType)
@@ -132,6 +147,10 @@ struct HSR_API FHSRInventoryDetailSnapshot
 
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	FHSRInventoryEntryRow Entry;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory") bool bReplacesEquipment = false;
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory") FText ReplacedEquipmentName;
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory") TArray<FHSREquipmentModifier> ReplacedModifiers;
 };
 
 USTRUCT(BlueprintType)
@@ -164,6 +183,10 @@ struct HSR_API FHSRInventoryEnhancementOption
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	int32 MaterialCost = 0;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory") FText MaterialName;
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory") int32 OwnedMaterial = 0;
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory") TArray<FHSREquipmentModifier> TargetModifiers;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	bool bAffordable = false;
 
@@ -193,6 +216,8 @@ struct HSR_API FHSRInventoryModuleSnapshot
 
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	int32 EquipmentRevision = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory") FGuid TargetCharacterId;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	TArray<FHSRInventoryEntryRow> Entries;

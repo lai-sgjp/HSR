@@ -149,6 +149,14 @@ void UHSRCoreAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCal
 }
 
 // 属性“当前值”即将变化前的钳制（与基础值变化规则一致，保证任何入口都合法）。
+void UHSRCoreAttributeSet::PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue)
+{
+	Super::PostAttributeChange(Attribute, OldValue, NewValue);
+	// Infinite equipment modifiers also change the maximum when removed.
+	if (Attribute == GetMaxHealthAttribute() && GetHealth() > NewValue)
+		SetHealth(FMath::Max(0.f, NewValue));
+}
+
 void UHSRCoreAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
 	Super::PreAttributeChange(Attribute, NewValue);

@@ -97,7 +97,7 @@ void UHSRInventoryViewModel::Initialize(UHSRInventorySubsystem* InInventory,
 	Shutdown();
 	Inventory = InInventory;
 	Catalog = InCatalog;
-	Category = EHSRInventoryCategory::Other;
+	Category = EHSRInventoryCategory::All;
 	FilterText.Reset();
 	SortMode = EHSRInventorySortMode::CatalogOrder;
 
@@ -155,7 +155,7 @@ void UHSRInventoryViewModel::Shutdown()
 	MappingCatalog.Reset();
 	EnhancementCatalog.Reset();
 	CharacterId.Invalidate();
-	Category = EHSRInventoryCategory::Other;
+	Category = EHSRInventoryCategory::All;
 	FilterText.Reset();
 	SortMode = EHSRInventorySortMode::CatalogOrder;
 	Snapshot = FHSRInventoryModuleSnapshot();
@@ -338,7 +338,7 @@ EHSRInventoryViewModelResult UHSRInventoryViewModel::SubmitEquip()
 // 需要该装备已注册实例且归属于当前角色，且强化目录能解析出对应规则。
 EHSRInventoryViewModelResult UHSRInventoryViewModel::SubmitEnhancement(const int32 TargetLevel)
 {
-	if (!Equipment.IsValid() || !EnhancementCatalog.IsValid() || !CharacterId.IsValid())
+	if (!Equipment.IsValid() || !EnhancementCatalog.IsValid() || !MappingCatalog.IsValid() || !CharacterId.IsValid())
 	{
 		PublishFailure(EHSRInventoryViewModelResult::AuthorityUnavailable);
 		return EHSRInventoryViewModelResult::AuthorityUnavailable;
@@ -357,23 +357,23 @@ EHSRInventoryViewModelResult UHSRInventoryViewModel::SubmitEnhancement(const int
 
 	// 装备实例必须已注册
 	FHSREquipmentInstance CurrentInstance;
-	if (!Equipment->FindRegisteredInstance(Row.Key.InstanceId, CurrentInstance))
+	if (!ResolveSelectedInstance(Row, CurrentInstance))
 	{
 		PublishFailure(EHSRInventoryViewModelResult::AuthorityRejected);
 		return EHSRInventoryViewModelResult::AuthorityRejected;
 	}
 	// 实例归属必须就是当前角色（不允许强化别人身上的装备）
 	FGuid OwnerCharacterId;
-	if (!Equipment->FindInstanceOwner(Row.Key.InstanceId, OwnerCharacterId)
-		|| OwnerCharacterId != CharacterId)
+	if (Equipment->FindInstanceOwner(Row.Key.InstanceId, OwnerCharacterId)
+		&& OwnerCharacterId != CharacterId)
 	{
 		PublishFailure(EHSRInventoryViewModelResult::AuthorityRejected);
 		return EHSRInventoryViewModelResult::AuthorityRejected;
 	}
 	// 读取角色配装与修订号（强化也要乐观并发校验）
 	FHSREquipmentLoadout Loadout;
-	int32 EquipmentRevision = 0;
-	if (!Equipment->GetLoadout(CharacterId, Loadout, EquipmentRevision))
+	int32 EquipmentRevision = Snapshot.EquipmentRevision;
+	if (OwnerCharacterId.IsValid() && !Equipment->GetLoadout(CharacterId, Loadout, EquipmentRevision))
 	{
 		PublishFailure(EHSRInventoryViewModelResult::AuthorityRejected);
 		return EHSRInventoryViewModelResult::AuthorityRejected;
@@ -398,8 +398,9 @@ EHSRInventoryViewModelResult UHSRInventoryViewModel::SubmitEnhancement(const int
 	Request.ExpectedEquipmentRevision = EquipmentRevision;
 	Request.ExpectedEnhancementLevel = CurrentInstance.EnhancementLevel;
 	Request.TargetLevel = TargetLevel;
-	const FHSREquipmentEnhancementResult AuthorityResult = Equipment->ExecuteEnhancement(
-		Request, *Inventory, *EnhancementCatalog);
+	const FHSREquipmentEnhancementResult AuthorityResult = OwnerCharacterId.IsValid()
+		? Equipment->ExecuteEnhancement(Request, *Inventory, *EnhancementCatalog)
+		: Equipment->ExecuteInventoryEnhancement(Request, *Inventory, *EnhancementCatalog, *MappingCatalog);
 	const EHSRInventoryViewModelResult Result = MapEnhancementResult(AuthorityResult.Code);
 	if (Result != EHSRInventoryViewModelResult::Success)
 	{
@@ -535,6 +536,7 @@ EHSRInventoryViewModelResult UHSRInventoryViewModel::BuildSnapshot(
 	OutSnapshot.FilterText = InFilterText;
 	OutSnapshot.SortMode = InSortMode;
 	OutSnapshot.SelectedKey = InSelectedKey;
+	OutSnapshot.TargetCharacterId = CharacterId;
 
 	// 数据源校验
 	if (!Inventory.IsValid())
@@ -591,7 +593,7 @@ EHSRInventoryViewModelResult UHSRInventoryViewModel::BuildSnapshot(
 		{
 			return false;
 		}
-		if (CatalogEntry.Category != InCategory)
+		if (InCategory != EHSRInventoryCategory::All && CatalogEntry.Category != InCategory)
 		{
 			return true;
 		}
@@ -601,6 +603,9 @@ EHSRInventoryViewModelResult UHSRInventoryViewModel::BuildSnapshot(
 		Row.DefinitionId = DefinitionId;
 		Row.Category = CatalogEntry.Category;
 		Row.DisplayName = CatalogEntry.DisplayName;
+		Row.Description = CatalogEntry.Description;
+		Row.Icon = CatalogEntry.Icon;
+		Row.Rarity = CatalogEntry.Rarity;
 		Row.Quantity = Quantity;
 		Row.MaxStack = MaxStack;
 		Row.bIsUnique = bIsUnique;
@@ -610,6 +615,12 @@ EHSRInventoryViewModelResult UHSRInventoryViewModel::BuildSnapshot(
 		if (UniqueInstance)
 		{
 			Row.UniqueInstance = *UniqueInstance;
+		}
+		if (Equipment.IsValid() && Row.Key.InstanceId.IsValid())
+		{
+			FHSREquipmentInstance Instance;
+			if (ResolveSelectedInstance(Row, Instance)) { Row.EnhancementLevel = Instance.EnhancementLevel; Row.Modifiers = Instance.Modifiers; }
+			Equipment->FindInstanceOwner(Row.Key.InstanceId, Row.EquippedCharacterId);
 		}
 		// 命中过滤词才进列表
 		if (HasFilterMatch(Row, NormalizedFilter))
@@ -645,6 +656,26 @@ EHSRInventoryViewModelResult UHSRInventoryViewModel::BuildSnapshot(
 		}
 	}
 
+	if (Equipment.IsValid() && MappingCatalog.IsValid() && CharacterId.IsValid())
+	{
+		FHSREquipmentLoadout Loadout; int32 Revision = 0;
+		if (Equipment->GetLoadout(CharacterId, Loadout, Revision))
+		{
+			auto AddEquipped = [&](const FHSREquipmentInstance& Instance)
+			{
+				FHSRItemEquipmentMappingEntry Mapping;
+				if (MappingCatalog->ResolveEquipmentDefinition(Instance.DefinitionId, Mapping)
+					&& !OutSnapshot.Entries.ContainsByPredicate([&](const FHSRInventoryEntryRow& Row) { return Row.Key.InstanceId == Instance.InstanceId; }))
+				{
+					FHSRItemInstance Item; Item.InstanceId = Instance.InstanceId; Item.DefinitionId = Mapping.ItemId;
+					AddRow(Mapping.ItemId, Instance.DefinitionId, 1, 1, true, &Item);
+				}
+			};
+			for (const auto& Pair : Loadout.Equipment) AddEquipped(Pair.Value);
+			for (const auto& Pair : Loadout.Relics) AddEquipped(Pair.Value);
+		}
+	}
+
 	// 按排序模式稳定排序
 	OutSnapshot.Entries.Sort([InSortMode](const FHSRInventoryEntryRow& A, const FHSRInventoryEntryRow& B)
 	{
@@ -663,6 +694,25 @@ EHSRInventoryViewModelResult UHSRInventoryViewModel::BuildSnapshot(
 	else
 	{
 		OutSnapshot.SelectedKey = FHSRInventoryEntryKey();
+	}
+	if (Selected && Equipment.IsValid() && MappingCatalog.IsValid())
+	{
+		FHSRItemEquipmentMappingEntry Mapping;
+		FHSREquipmentLoadout Loadout; int32 Revision = 0;
+		if (MappingCatalog->Resolve(Selected->ItemId, Mapping) && Equipment->GetLoadout(CharacterId, Loadout, Revision))
+		{
+			const FHSREquipmentInstance* Current = Mapping.Kind == EHSREquipmentKind::Equipment
+				? Loadout.Equipment.Find(static_cast<EHSREquipmentSlot>(Mapping.Slot))
+				: Loadout.Relics.Find(static_cast<EHSRRelicSlot>(Mapping.Slot));
+			if (Current && Current->InstanceId != Selected->Key.InstanceId)
+			{
+				OutSnapshot.Detail.bReplacesEquipment = true;
+				OutSnapshot.Detail.ReplacedModifiers = Current->Modifiers;
+				FHSRItemEquipmentMappingEntry OldMapping; FHSRInventoryCatalogEntry OldEntry;
+				OutSnapshot.Detail.ReplacedEquipmentName = MappingCatalog->ResolveEquipmentDefinition(Current->DefinitionId, OldMapping)
+					&& Catalog->FindEntry(OldMapping.ItemId, OldEntry) ? OldEntry.DisplayName : NSLOCTEXT("HSRInventory", "CurrentEquipment", "当前装备");
+			}
+		}
 	}
 	BuildActionStates(OutSnapshot, InventorySnapshot);
 	OutSnapshot.bIsValid = true;
@@ -726,8 +776,8 @@ void UHSRInventoryViewModel::BuildActionStates(FHSRInventoryModuleSnapshot& InOu
 			// disabled for items that just entered the bag.
 			// 掉落奖励物品可能尚未注册装备实例；ExecuteMovement 会在执行时现场铸造。
 			// 因此只要映射可解析就视为可装备，避免刚进背包的物品按钮被禁用。
-			ActionState.bIsAvailable = true;
-			ActionState.UnavailableReason = EHSRInventoryViewModelResult::Success;
+			ActionState.bIsAvailable = !Row.EquippedCharacterId.IsValid();
+			ActionState.UnavailableReason = ActionState.bIsAvailable ? EHSRInventoryViewModelResult::Success : EHSRInventoryViewModelResult::AuthorityRejected;
 		}
 		else if (Action == EHSRInventoryAction::Enhance)
 		{
@@ -739,9 +789,9 @@ void UHSRInventoryViewModel::BuildActionStates(FHSRInventoryModuleSnapshot& InOu
 			}
 			FHSREquipmentInstance RegisteredInstance;
 			FGuid OwnerCharacterId;
-			if (!Equipment->FindRegisteredInstance(Row.Key.InstanceId, RegisteredInstance)
-				|| !Equipment->FindInstanceOwner(Row.Key.InstanceId, OwnerCharacterId)
-				|| OwnerCharacterId != CharacterId)
+			if (!ResolveSelectedInstance(Row, RegisteredInstance)
+				|| (Equipment->FindInstanceOwner(Row.Key.InstanceId, OwnerCharacterId)
+				&& OwnerCharacterId != CharacterId))
 			{
 				ActionState.UnavailableReason = EHSRInventoryViewModelResult::AuthorityRejected;
 				continue;
@@ -777,9 +827,9 @@ void UHSRInventoryViewModel::BuildEnhancementOptions(
 	// 实例必须已注册且归属当前角色
 	FHSREquipmentInstance CurrentInstance;
 	FGuid OwnerCharacterId;
-	if (!Equipment->FindRegisteredInstance(Row.Key.InstanceId, CurrentInstance)
-		|| !Equipment->FindInstanceOwner(Row.Key.InstanceId, OwnerCharacterId)
-		|| OwnerCharacterId != CharacterId)
+	if (!ResolveSelectedInstance(Row, CurrentInstance)
+		|| (Equipment->FindInstanceOwner(Row.Key.InstanceId, OwnerCharacterId)
+		&& OwnerCharacterId != CharacterId))
 	{
 		return;
 	}
@@ -793,6 +843,10 @@ void UHSRInventoryViewModel::BuildEnhancementOptions(
 		Option.TargetLevel = Rule.TargetLevel;
 		Option.MaterialItemId = Rule.MaterialItemId;
 		Option.MaterialCost = Rule.MaterialCost;
+		Option.OwnedMaterial = FindStackQuantity(InventorySnapshot, Rule.MaterialItemId);
+		Option.TargetModifiers = Rule.TargetModifiers;
+		FHSRInventoryCatalogEntry Material;
+		Option.MaterialName = Catalog->FindEntry(Rule.MaterialItemId, Material) ? Material.DisplayName : NSLOCTEXT("HSRInventory", "EnhanceMaterial", "强化材料");
 		Option.bAffordable = FindStackQuantity(InventorySnapshot, Rule.MaterialItemId) >= Rule.MaterialCost;
 		Option.bAvailable = Option.bAffordable && Rule.TargetLevel > CurrentInstance.EnhancementLevel;
 	}
@@ -863,7 +917,7 @@ bool UHSRInventoryViewModel::IsInitialized() const
 // 分类合法性：枚举区间检查
 bool UHSRInventoryViewModel::IsValidCategory(const EHSRInventoryCategory InCategory)
 {
-	return InCategory >= EHSRInventoryCategory::Weapon && InCategory <= EHSRInventoryCategory::Other;
+	return InCategory >= EHSRInventoryCategory::Weapon && InCategory <= EHSRInventoryCategory::All;
 }
 
 // 排序模式合法性：枚举区间检查
@@ -878,4 +932,12 @@ bool UHSRInventoryViewModel::AreKeysEqual(const FHSRInventoryEntryKey& A,
 	const FHSRInventoryEntryKey& B)
 {
 	return A == B;
+}
+
+
+bool UHSRInventoryViewModel::ResolveSelectedInstance(const FHSRInventoryEntryRow& Row, FHSREquipmentInstance& OutInstance) const
+{
+	if (!Equipment.IsValid()) return false;
+	if (Equipment->FindRegisteredInstance(Row.Key.InstanceId, OutInstance)) return true;
+	return MappingCatalog.IsValid() && Equipment->PreviewMappedInstance(Row.ItemId, Row.Key.InstanceId, *MappingCatalog, OutInstance);
 }

@@ -194,7 +194,7 @@ bool UHSRBattleCommandViewModel::SelectTarget(FName TargetId)
 bool UHSRBattleCommandViewModel::BeginCommandSubmit(const FGuid& ActionId, FName ActorParticipantId, FName SkillId, FName TargetParticipantId)
 {
 	const FHSRBattleCommandSkillView* Skill = State.FindSkill(SkillId);
-	if (!ActionId.IsValid() || !State.BattleId.IsValid() || !State.bCurrentActorPlayerControlled || bCommandPending || bPresentationLocked || ActorParticipantId != State.CurrentActorId
+	if (!ActionId.IsValid() || !State.BattleId.IsValid() || !State.bCurrentActorPlayerControlled || bCommandPending || State.bPresentationLocked || ActorParticipantId != State.CurrentActorId
 		|| !Skill || !Skill->bAvailable || SkillId != SelectedSkillId || TargetParticipantId != SelectedTargetId || !Skill->CandidateTargetIds.Contains(TargetParticipantId))
 	{
 		return false;
@@ -305,10 +305,10 @@ void UHSRBattleCommandViewModel::RefreshCommandState()
 	State.SelectedSkillId = SelectedSkillId;
 	State.SelectedTargetId = SelectedTargetId;
 	State.bCommandPending = bCommandPending;
-	State.bPresentationLocked = bPresentationLocked;
+	State.bPresentationLocked = bPresentationLocked || State.bActionPlaying;
 	State.PendingActionId = PendingActionId;
 	const FHSRBattleCommandSkillView* Skill = FindSelectedSkill();
-	State.bCanSubmit = !State.ResultViewState.bVisible && !bCommandPending && !bPresentationLocked && Coordinator.IsValid() && State.BattleId.IsValid() && State.bCurrentActorPlayerControlled
+	State.bCanSubmit = !State.ResultViewState.bVisible && !bCommandPending && !State.bPresentationLocked && Coordinator.IsValid() && State.BattleId.IsValid() && State.bCurrentActorPlayerControlled
 		&& Skill && Skill->bAvailable && Skill->CandidateTargetIds.Contains(SelectedTargetId);
 }
 

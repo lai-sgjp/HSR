@@ -7,13 +7,35 @@
 #include "../Status/HSRStatusTypes.h"
 #include "HSRBattleCommandTypes.generated.h"
 
+namespace HSRBattleText
+{
+	inline FText FailureReason(EHSRAbilityFailureReason Reason)
+	{
+		switch (Reason)
+		{
+		case EHSRAbilityFailureReason::None: return FText::GetEmpty();
+		case EHSRAbilityFailureReason::InvalidBattle: return NSLOCTEXT("HSRBattle", "InvalidBattle", "战斗尚未就绪");
+		case EHSRAbilityFailureReason::DuplicateAction: return NSLOCTEXT("HSRBattle", "DuplicateAction", "此行动已经提交");
+		case EHSRAbilityFailureReason::NotCurrentActor: return NSLOCTEXT("HSRBattle", "NotCurrentActor", "尚未轮到此角色行动");
+		case EHSRAbilityFailureReason::DefinitionMissing: return NSLOCTEXT("HSRBattle", "DefinitionMissing", "技能配置不可用");
+		case EHSRAbilityFailureReason::InvalidTarget: return NSLOCTEXT("HSRBattle", "InvalidTarget", "请选择有效目标");
+		case EHSRAbilityFailureReason::AlreadyAtFullHealth: return NSLOCTEXT("HSRBattle", "FullHealth", "目标生命值已满");
+		case EHSRAbilityFailureReason::InsufficientSkillPoint: return NSLOCTEXT("HSRBattle", "InsufficientPoints", "战技点不足");
+		case EHSRAbilityFailureReason::InsufficientEnergy: return NSLOCTEXT("HSRBattle", "InsufficientEnergy", "能量不足");
+		case EHSRAbilityFailureReason::CommitFailed: return NSLOCTEXT("HSRBattle", "CommitFailed", "行动提交失败，请重试");
+		case EHSRAbilityFailureReason::EffectFailed: return NSLOCTEXT("HSRBattle", "EffectFailed", "技能执行失败");
+		default: return NSLOCTEXT("HSRBattle", "Unavailable", "当前无法使用此技能");
+		}
+	}
+}
+
 UENUM(BlueprintType)
 enum class EHSRPresentationEventType : uint8
 {
-	Damage UMETA(DisplayName = "Damage"),
-	Toughness UMETA(DisplayName = "Toughness"),
-	Break UMETA(DisplayName = "Break"),
-	Heal UMETA(DisplayName = "Heal")
+	Damage UMETA(DisplayName = "伤害"),
+	Toughness UMETA(DisplayName = "削韧"),
+	Break UMETA(DisplayName = "击破"),
+	Heal UMETA(DisplayName = "治疗")
 };
 
 USTRUCT(BlueprintType)
@@ -38,11 +60,15 @@ struct FHSRBattlePresentationEvent
 	 */
 	FText GetEventTypeLabel() const
 	{
-		if (const UEnum* EnumType = StaticEnum<EHSRPresentationEventType>())
+		// Explicit localized strings survive cooked builds where UENUM metadata is stripped.
+		switch (EventType)
 		{
-			return EnumType->GetDisplayNameTextByValue(static_cast<int64>(EventType));
+		case EHSRPresentationEventType::Damage: return NSLOCTEXT("HSRBattle", "DamageEvent", "伤害");
+		case EHSRPresentationEventType::Toughness: return NSLOCTEXT("HSRBattle", "ToughnessEvent", "削韧");
+		case EHSRPresentationEventType::Break: return NSLOCTEXT("HSRBattle", "BreakEvent", "击破");
+		case EHSRPresentationEventType::Heal: return NSLOCTEXT("HSRBattle", "HealEvent", "治疗");
+		default: return NSLOCTEXT("HSRBattle", "StatusEvent", "状态变化");
 		}
-		return FText::AsNumber(static_cast<int32>(EventType));
 	}
 };
 
@@ -96,16 +122,16 @@ struct FHSRBattleCommandSkillView
 		TArray<FText> Parts;
 		if (SkillPointDelta < 0)
 		{
-			Parts.Add(FText::Format(NSLOCTEXT("HSRCommand", "EntrySkillPointSpend", "SP -{0}"), FText::AsNumber(-SkillPointDelta)));
+			Parts.Add(FText::Format(NSLOCTEXT("HSRCommand", "EntrySkillPointSpend", "战技点 −{0}"), FText::AsNumber(-SkillPointDelta)));
 		}
 		else if (SkillPointDelta > 0)
 		{
-			Parts.Add(FText::Format(NSLOCTEXT("HSRCommand", "EntrySkillPointGain", "SP +{0}"), FText::AsNumber(SkillPointDelta)));
+			Parts.Add(FText::Format(NSLOCTEXT("HSRCommand", "EntrySkillPointGain", "战技点 +{0}"), FText::AsNumber(SkillPointDelta)));
 		}
 
 		if (bEnergyCostIsKnown && EnergyCost > 0.0f)
 		{
-			Parts.Add(FText::Format(NSLOCTEXT("HSRCommand", "EntryEnergyCost", "Energy -{0}"), FText::AsNumber(FMath::RoundToInt(EnergyCost))));
+			Parts.Add(FText::Format(NSLOCTEXT("HSRCommand", "EntryEnergyCost", "能量 −{0}"), FText::AsNumber(FMath::RoundToInt(EnergyCost))));
 		}
 
 		return Parts.IsEmpty() ? FText::GetEmpty() : FText::Join(FText::FromString(TEXT("  ")), Parts);
@@ -156,6 +182,8 @@ struct FHSRBattleCommandViewState
 
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FGuid BattleId;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FName CurrentActorId;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") bool bActionPlaying = false;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FText PlayingSkillName;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") TArray<FName> TurnOrderParticipantIds;
 
 	/** Action-distance forecast for the turn-order bar. Empty outside an active battle. */

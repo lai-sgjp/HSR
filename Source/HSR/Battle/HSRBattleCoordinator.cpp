@@ -1,4 +1,14 @@
 #include "HSRBattleCoordinator.h"
+#include "HSRCombatMotionComponent.h"
+#include "HSREnemyTargetPolicy.h"
+#include "TimerManager.h"
+#include "Animation/AnimSequenceBase.h"
+#include "HSRBattleStage.h"
+#include "HSRBattleAttributeInitialization.h"
+#include "../Data/Definitions/HSRCharacterDefinition.h"
+#include "../Progression/HSRCharacterProfileSubsystem.h"
+#include "EngineUtils.h"
+#include "Components/StaticMeshComponent.h"
 #include "../Reward/HSRRewardTypes.h"
 #include "../Data/Definitions/HSREnemyDefinition.h"
 #include "../Data/Definitions/HSREnemyCatalog.h"
@@ -507,6 +517,14 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 			Participant.AbilitySystemComponent.IsValid() ? *Participant.AbilitySystemComponent->GetName() : TEXT("null"));
 	}
 
+	if (!InitializeFormalEquipment(BattleWorld))
+	{
+		RollbackBuild();
+		ParticipantDefinitions.Empty();
+		CurrentState = EHSRBattleCoordinatorState::Failed;
+		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed,
+			FText::FromString(TEXT("Formal battle equipment projection failed.")));
+	}
 	if (!ApplyStageBuffs(BattleWorld))
 	{
 		UE_LOG(LogTemp, Error, TEXT("P17-009D Stage Buff application failed RequestId=%s"), *CurrentRequestId.ToString());
@@ -516,6 +534,10 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed,
 			FText::FromString(TEXT("Stage Buff application or resource transaction failed.")));
 	}
+
+	if (FHSRBattleBaseAttributes::IsFormalArena(BattleWorld))
+		for (const auto& Participant : Participants)
+			if (Participant.AbilitySystemComponent.IsValid()) FHSRBattleBaseAttributes::FillHealth(*Participant.AbilitySystemComponent.Get());
 
 	// 初始化回合管理器与状态组件。
 	TurnManager = NewObject<UHSRTurnManager>(this);
@@ -545,6 +567,7 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildParticipants(UWorld* BattleWorl
 		}
 	}
 	BindEnemyTurnManager(TurnManager);
+	TargetRandomStream.Initialize(74129);
 	DevelopmentDamageRandomStream.Initialize(DevelopmentDamageSeed);
 	DevelopmentDamageConsumeCount = 0;
 	DevelopmentDamageResults.Empty();
@@ -579,6 +602,13 @@ bool UHSRBattleCoordinator::RequestBasicAttack(FName AttackerParticipantId, FNam
 // 公开指令入口：维护调度深度计数，交给核心解析，并在最外层解析结束后排空敌人回合队列。
 FHSRAbilityResolution UHSRBattleCoordinator::RequestAction(const FHSRBattleActionCommand& Command)
 {
+	if (PresentedAction.IsSet() && !bApplyingPresentedAction)
+	{
+		FHSRAbilityResolution Busy;
+		Busy.ActionId = Command.ActionId;
+		Busy.FailureReason = EHSRAbilityFailureReason::NotCurrentActor;
+		return Busy;
+	}
 	++RequestActionDispatchDepth;
 	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	++PublicRequestActionDepth;
@@ -987,10 +1017,18 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 #endif
 		}
 		Finalize(Resolution);
-		if (!PendingDefeatedParticipantId.IsNone()) { const FName Defeated = PendingDefeatedParticipantId; PendingDefeatedParticipantId = NAME_None; ResolveDefeat(Defeated); }
-		else if (!bBattleResultProduced)
+		if (!PendingDefeatedParticipantId.IsNone())
 		{
-			if (!TurnManager->ResolveAction(Command.ActorParticipantId))
+			const FName Defeated = PendingDefeatedParticipantId;
+			PendingDefeatedParticipantId = NAME_None;
+			ResolveDefeat(Defeated);
+		}
+		// A casualty may leave teammates alive. Its killer must still finish this action;
+		// only a terminal team wipe stops the turn loop. Otherwise an automated enemy's
+		// already-consumed turn key leaves the battle permanently on that enemy.
+		if (!bBattleResultProduced && CurrentState == EHSRBattleCoordinatorState::Spawned)
+		{
+			if (!ResolveActionOrWait(Command.ActorParticipantId))
 			{
 				UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::RequestAction - turn resolve failed after formal commit ActionId=%s"), *Command.ActionId.ToString());
 			}
@@ -1026,7 +1064,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		return Reject(Ability->GetLastFailureReason());
 	}
 
-	if (!bBattleResultProduced && !TurnManager->ResolveAction(Command.ActorParticipantId))
+	if (!bBattleResultProduced && !ResolveActionOrWait(Command.ActorParticipantId))
 	{
 		ensureMsgf(false, TEXT("UHSRBattleCoordinator::RequestAction post-GE ResolveAction failure violates the synchronous preflight invariant. ActionId=%s"), *Command.ActionId.ToString());
 		UE_LOG(LogTemp, Error, TEXT("UHSRBattleCoordinator::RequestAction - FAILED post-GE turn resolve ActionId=%s; GE side effect already occurred and this branch is contractually unreachable after preflight"), *Command.ActionId.ToString());
@@ -1185,7 +1223,7 @@ void UHSRBattleCoordinator::RecordCurrentEnemyTurnIfNeeded()
 
 void UHSRBattleCoordinator::DrainPendingEnemyTurns()
 {
-	if (bDrainingEnemyTurns || RequestActionDispatchDepth != 0)
+	if (bDrainingEnemyTurns || RequestActionDispatchDepth != 0 || PresentedAction.IsSet())
 	{
 		return;
 	}
@@ -1237,7 +1275,23 @@ void UHSRBattleCoordinator::DrainPendingEnemyTurns()
 		Command.BattleId = CurrentRequestId;
 		Command.ActorParticipantId = EnemyId;
 		Command.SkillId = EnemyAttack->SkillId;
-		Command.TargetParticipantIds.Add(Targets[0]);
+		TArray<float> Weights;
+		for (const FName TargetId : Targets)
+		{
+			const FHSRBattleParticipant* Candidate = FindParticipant(TargetId);
+			const float MaxHP = Candidate->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxHealthAttribute());
+			const float HP = Candidate->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+			Weights.Add(HSREnemyTargetPolicy::Weight(HP, MaxHP, EnemyDefinition && EnemyDefinition->bPreferWoundedTargets, LastEnemyTargets.FindRef(EnemyId) == TargetId));
+		}
+		const int32 Selected = HSREnemyTargetPolicy::Choose(Weights, TargetRandomStream);
+		if (!Targets.IsValidIndex(Selected)) continue;
+		Command.TargetParticipantIds.Add(Targets[Selected]);
+		LastEnemyTargets.Add(EnemyId, Targets[Selected]);
+		if (PresentationWorld.IsValid())
+		{
+			QueuePresentedAction(Command);
+			break;
+		}
 		UE_LOG(LogTemp, Log, TEXT("P10-001A EnemyTurn Dispatch Key=%s ActionId=%s"), *QueuedKey, *Command.ActionId.ToString());
 	#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		++EnemyTurnDispatchCount;
@@ -1267,6 +1321,9 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 {
 	FHSRBattleCommandViewState State;
 	State.BattleId = CurrentRequestId;
+	State.bActionPlaying = PresentedAction.IsSet();
+	if (PresentedAction.IsSet())
+		if (const auto* Skill = FindSkillDefinition(PresentedAction->SkillId)) State.PlayingSkillName = Skill->DisplayName;
 	State.SkillPoints = TeamResourceState.CurrentSkillPoints;
 	State.MaxSkillPoints = TeamResourceState.MaxSkillPoints;
 	if (TurnManager && CurrentState == EHSRBattleCoordinatorState::Spawned)
@@ -1468,7 +1525,12 @@ TArray<FHSRBattleRosterEntry> UHSRBattleCoordinator::BuildEffectiveEnemyRoster()
 	TArray<FHSRBattleRosterEntry> Fallback;
 	// The enemy shell is the native APawn: encounters author stats through EnemyDefinition
 	// rather than a pawn Blueprint, so there is no per-entry class to resolve yet.
-	if (!CurrentEnemyDefinitionId.IsNone()) Fallback.Add({ CurrentEnemyDefinitionId, APawn::StaticClass() });
+	const UHSREnemyDefinition* Authored=EnemyDefinition;
+	if (EnemyCatalog) for (const auto& E:EnemyCatalog->Enemies)
+		if (E && E->EnemyDefinitionId==CurrentEnemyDefinitionId) { Authored=E; break; }
+	const int32 Count=Authored ? Authored->FormationCount : 1;
+	if (!CurrentEnemyDefinitionId.IsNone() && Count>=1 && Count<=5)
+		for (int32 I=0; I<Count; ++I) Fallback.Add({ CurrentEnemyDefinitionId, APawn::StaticClass() });
 	return Fallback;
 }
 
@@ -1991,11 +2053,16 @@ void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	++BattleResultBroadcastCount;
 #endif
-	BattleResultReady.Broadcast(BattleResult);
+	// Let the final hit and defeat pose finish before opening the result panel.
+	if (!PresentedAction.IsSet()) BattleResultReady.Broadcast(BattleResult);
 }
 
 void UHSRBattleCoordinator::ClearRuntimeDelegates()
 {
+	if (PresentationWorld.IsValid()) PresentationWorld->GetTimerManager().ClearTimer(PresentationTimer);
+	PresentedAction.Reset();
+	PresentedTurnToResolve = NAME_None;
+	LastEnemyTargets.Reset();
 	ClearEnemyTurnAutomation();
 	ClearStatusComponents();
 	for (const FHSRBattleParticipant& Participant : Participants)
@@ -2022,7 +2089,34 @@ AActor* UHSRBattleCoordinator::SpawnParticipantActor(UWorld* World, const FHSRBa
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	APawn* Pawn = World->SpawnActor<APawn>(Definition.PawnClass ? Definition.PawnClass.Get() : APawn::StaticClass(), FTransform::Identity, Params);
+	FTransform SpawnTransform = FTransform::Identity;
+	AHSRBattleStage* Stage = nullptr;
+	for (TActorIterator<AHSRBattleStage> It(World); It; ++It)
+	{
+		if (Stage) return nullptr; // Ambiguous authoring is never an arbitrary first match.
+		Stage = *It;
+	}
+	int32 SlotIndex = 0;
+	for (const FHSRBattleParticipantDefinition& Entry : ParticipantDefinitions)
+	{
+		if (Entry.ParticipantId == Definition.ParticipantId) break;
+		if (Entry.Team == Definition.Team) ++SlotIndex;
+	}
+	if (Stage)
+	{
+		if (!Stage->ResolveSlot(Definition.Team == EHSRBattleParticipantTeam::Player, SlotIndex,
+			Stage->BossDefinitionIds.Contains(Definition.DefinitionId), SpawnTransform))
+		{
+			UE_LOG(LogTemp, Error, TEXT("BattleStage: missing formation slot %d for %s"), SlotIndex, *Definition.ParticipantId.ToString());
+			return nullptr;
+		}
+	}
+	else if (World->GetOutermost()->GetName().Contains(TEXT("Map_HertaSupportSection")))
+	{
+		UE_LOG(LogTemp, Error, TEXT("BattleStage: formal arena requires exactly one authored stage"));
+		return nullptr;
+	}
+	APawn* Pawn = World->SpawnActor<APawn>(Definition.PawnClass ? Definition.PawnClass.Get() : APawn::StaticClass(), SpawnTransform, Params);
 	if (!Pawn)
 	{
 		UE_LOG(LogTemp, Warning,
@@ -2033,9 +2127,30 @@ AActor* UHSRBattleCoordinator::SpawnParticipantActor(UWorld* World, const FHSRBa
 
 	if (AActor* SpawnedActor = Cast<AActor>(Pawn))
 	{
+		SpawnedActor->Tags.AddUnique(Definition.ParticipantId);
 #if WITH_EDITOR
 		SpawnedActor->SetActorLabel(Definition.Team == EHSRBattleParticipantTeam::Player ? TEXT("BattlePlayerPawn") : TEXT("BattleEnemyPawn"));
 #endif
+	}
+	if (Definition.Team==EHSRBattleParticipantTeam::Player)
+	{
+		if (auto* Character=Cast<AHSRCharacterBase>(Pawn)) Character->ApplyCharacterPresentation(Definition.DefinitionId);
+	}
+	else if (EnemyDefinition && !EnemyDefinition->BattleMesh.IsNull())
+	{
+		if (UStaticMesh* Mesh=EnemyDefinition->BattleMesh.LoadSynchronous())
+		{
+			auto* Visual=NewObject<UStaticMeshComponent>(Pawn,TEXT("BattleVisual"));
+			Pawn->AddInstanceComponent(Visual);
+			Pawn->SetRootComponent(Visual);
+			Visual->SetStaticMesh(Mesh);
+			Visual->SetCollisionProfileName(TEXT("BlockAllDynamic"));
+			Visual->RegisterComponent();
+			FTransform VisualTransform=SpawnTransform;
+			VisualTransform.AddToTranslation(FVector(0,0,-100));
+			VisualTransform.SetScale3D(FVector(EnemyDefinition->BattleMeshScale));
+			Pawn->SetActorTransform(VisualTransform);
+		}
 	}
 
 	UE_LOG(LogTemp, Log,
@@ -2297,7 +2412,7 @@ bool UHSRBattleCoordinator::ApplyParticipantInitializationGameplayEffect(const F
 	if (const AHSRCharacterBase* Character = Cast<AHSRCharacterBase>(Participant.Actor.Get()); Character && Character->HasAppliedInitialAttributes())
 	{
 		// Character BeginPlay owns the one-shot base layer; Battle owns only progression.
-		return ApplyCharacterProgressionGameplayEffect(Participant);
+		return ApplyAuthoredBaseAndProgression(Participant);
 	}
 	if (!Participant.AbilitySystemComponent.IsValid() || !ParticipantInitializationGameplayEffect)
 	{
@@ -2337,7 +2452,7 @@ bool UHSRBattleCoordinator::ApplyParticipantInitializationGameplayEffect(const F
 	{
 		return false;
 	}
-	return ApplyCharacterProgressionGameplayEffect(Participant);
+	return ApplyAuthoredBaseAndProgression(Participant);
 }
 
 bool UHSRBattleCoordinator::ApplyCharacterProgressionGameplayEffect(const FHSRBattleParticipant& Participant)
@@ -2738,10 +2853,13 @@ bool UHSRBattleCoordinator::ProjectEquipmentRestore(const TMap<FGuid,FHSREquipme
 	TMap<FName,FName> DesiredSetParticipants;
 	for (const auto& Pair : Candidate)
 	{
-		const FGuid PlayerCharacterGuid = HSRCharacterGuidFromProfileName(PlayerCharacterId);
-		const FHSRBattleParticipant* Participant = Pair.Key == PlayerCharacterGuid
-			? FindParticipant(GetLeaderParticipantId(EHSRBattleParticipantTeam::Player))
-			: nullptr;
+		const FHSRBattleParticipant* Participant = Participants.FindByPredicate([&Pair](const FHSRBattleParticipant& Entry)
+		{
+			return Entry.Team == EHSRBattleParticipantTeam::Player && !Entry.DefinitionId.IsNone()
+				&& HSRCharacterGuidFromProfileName(Entry.DefinitionId) == Pair.Key;
+		});
+		if (!Participant && Pair.Key == HSRCharacterGuidFromProfileName(PlayerCharacterId))
+			Participant = FindParticipant(GetLeaderParticipantId(EHSRBattleParticipantTeam::Player));
 		if (!Participant || !Participant->AbilitySystemComponent.IsValid())
 		{
 			continue;
@@ -3198,4 +3316,57 @@ bool UHSRBattleCoordinator::BuildVictoryRewardRequest(const FHSRBattleResult& Re
 	OutRequest.RewardDefinitionId = CurrentRewardDefinitionId;
 	OutRequest.Seed = CurrentRewardSeed;
 	return true;
+}
+
+
+bool UHSRBattleCoordinator::ApplyAuthoredBaseAndProgression(const FHSRBattleParticipant& Participant)
+{
+	UAbilitySystemComponent* ASC = Participant.AbilitySystemComponent.Get();
+	if (!ASC) return false;
+	UWorld* World = Participant.Actor.IsValid() ? Participant.Actor->GetWorld() : nullptr;
+	const bool bFormalArena = FHSRBattleBaseAttributes::IsFormalArena(World);
+	if (bFormalArena && Participant.Team == EHSRBattleParticipantTeam::Player)
+	{
+		const auto* Profiles = World->GetGameInstance() ? World->GetGameInstance()->GetSubsystem<UHSRCharacterProfileSubsystem>() : nullptr;
+		const UHSRCharacterDefinition* Definition = nullptr;
+		if (!Profiles || !Profiles->GetDefinition(Participant.DefinitionId, Definition) || !Definition
+			|| !FHSRBattleBaseAttributes::FromCharacter(*Definition).Apply(*ASC))
+		{
+			UE_LOG(LogTemp, Error, TEXT("FormalBattle base initialization failed: character definition=%s"), *Participant.DefinitionId.ToString());
+			return false;
+		}
+	}
+	else if (Participant.Team == EHSRBattleParticipantTeam::Enemy && EnemyDefinition && EnemyDefinition->bUseAuthoredBaseStats)
+	{
+		if (!FHSRBattleBaseAttributes::FromEnemy(*EnemyDefinition, ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxEnergyAttribute())).Apply(*ASC))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Authored enemy base initialization failed: definition=%s"), *Participant.DefinitionId.ToString());
+			return false;
+		}
+	}
+	if (!ApplyCharacterProgressionGameplayEffect(Participant)) return false;
+	if (bFormalArena || (Participant.Team == EHSRBattleParticipantTeam::Enemy && EnemyDefinition && EnemyDefinition->bUseAuthoredBaseStats))
+		FHSRBattleBaseAttributes::FillHealth(*ASC);
+	return true;
+}
+
+bool UHSRBattleCoordinator::InitializeFormalEquipment(UWorld* BattleWorld)
+{
+	if (!FHSRBattleBaseAttributes::IsFormalArena(BattleWorld)) return true;
+	auto* Equipment = BattleWorld->GetGameInstance() ? BattleWorld->GetGameInstance()->GetSubsystem<UHSREquipmentSubsystem>() : nullptr;
+	if (!Equipment) return false;
+	FHSREquipmentRestoreMap Candidate;
+	for (const auto& Participant : Participants)
+	{
+		if (Participant.Team != EHSRBattleParticipantTeam::Player) continue;
+		const FGuid CharacterGuid = HSRCharacterGuidFromProfileName(Participant.DefinitionId);
+		FHSREquipmentRestoreState State;
+		if (Equipment->GetLoadout(CharacterGuid, State.Loadout, State.Revision)) Candidate.Add(CharacterGuid, MoveTemp(State));
+	}
+	if (Candidate.IsEmpty()) return true;
+	if (!EquipmentGameplayEffect) EquipmentGameplayEffect = LoadClass<UGameplayEffect>(nullptr, TEXT("/Game/GameplayEffects/GE_Equipment_P12.GE_Equipment_P12_C"));
+	if (!RelicSetGameplayEffect) RelicSetGameplayEffect = LoadClass<UGameplayEffect>(nullptr, TEXT("/Game/GameplayEffects/GE_RelicSet_P12_A.GE_RelicSet_P12_A_C"));
+	// Match the character detail contract: persistent piece modifiers are projected once per instance.
+	// Do not synthesize test set bonuses from a set id while the UI has no authored set-stat projection.
+	return ProjectEquipmentRestore(Candidate);
 }

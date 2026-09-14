@@ -571,7 +571,21 @@ void AHSREnemyAIController::RunNavReadyPatrolIntent(int32 ScheduledEpoch)
 		return;
 	}
 
-	// 纪元一致：正式补发一次巡逻意图。
+	// Navigation can finish well after the first frame (PIE and streamed maps).
+	// Retry only while it is building, and never overwrite an active chase/encounter.
+	if (CurrentState != EHSREnemyExplorationState::PatrolWaiting &&
+		CurrentState != EHSREnemyExplorationState::MovingToPatrol &&
+		CurrentState != EHSREnemyExplorationState::Idle)
+	{
+		return;
+	}
+	if (UNavigationSystemV1::IsNavigationBeingBuiltOrLocked(GetWorld()))
+	{
+		ScheduleNavReadyPatrolIntent();
+		return;
+	}
+
+	// 纪元一致且导航完成：发布真实可达的巡逻意图。
 	AHSREnemyCharacter* Enemy = Cast<AHSREnemyCharacter>(GetPawn());
 	UHSREnemyDefinition* Definition = Enemy ? Enemy->EnemyDefinition : nullptr;
 	if (Enemy && Definition)

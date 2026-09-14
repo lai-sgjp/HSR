@@ -88,6 +88,9 @@ class UNREALMCPYTHON_API UMCPythonHelper : public UBlueprintFunctionLibrary
 {
     GENERATED_BODY()
 public:
+    /** Author a float curve with explicit keys; editor bridge only, no gameplay state. */
+    UFUNCTION(BlueprintCallable, Category="Editor|MCPython", CallInEditor)
+    static bool SetFloatCurveKeys(class UCurveFloat* Curve, const TArray<float>& Times, const TArray<float>& Values);
     // 모든 에디터에서 열려있는 에셋 반환
     UFUNCTION(BlueprintCallable, Category="Editor|MCPython", CallInEditor)
     static TArray<UObject*> GetAllEditedAssets();
@@ -355,4 +358,12 @@ public:
     /** Deproject a viewport pixel to a world location at the given distance along the view ray. Returns JSON. */
     UFUNCTION(BlueprintCallable, Category="Editor|MCPython")
     static FString ScreenToWorld(float ScreenX, float ScreenY, float Distance);
+
+    /** Start an isolated-size PIE window using transient settings; leaves the user's saved play settings unchanged. */
+    UFUNCTION(BlueprintCallable, Category="Editor|MCPython")
+    static bool BeginPresentationPIE(int32 Width, int32 Height);
+
+    /** Capture the actual PIE viewport including Slate UI to Saved/Presentation/Captures. */
+    UFUNCTION(BlueprintCallable, Category="Editor|MCPython")
+    static FString CapturePlayViewport(const FString& FileName);
 };

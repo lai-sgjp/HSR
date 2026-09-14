@@ -2,6 +2,10 @@
 
 #include "../Battle/HSRBattleTransitionSubsystem.h"
 #include "Engine/GameInstance.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/TextBlock.h"
+#include "Components/PanelWidget.h"
+#include "../Map/HSRMapSubsystem.h"
 
 // UnbindProgression：解除对挑战进度子系统的监听。
 // 与 Bind 对称，用于重新初始化或控件销毁前清理，防止进度变化时回调已销毁的控件。
@@ -30,6 +34,7 @@ void UHSRChallengeDirectoryWidget::HandleProgressionChanged(const FHSRChallengeP
 	{
 		ViewModel->Refresh();
 		OnDirectoryChanged(ViewModel->GetSnapshot());
+		RefreshPresentation();
 	}
 }
 
@@ -58,7 +63,42 @@ EHSRChallengeDirectoryResult UHSRChallengeDirectoryWidget::InitializeDirectory(
 	// 重置选中项，避免重新初始化后仍选中旧目录中已不存在的挑战。
 	SelectedEncounterId = NAME_None;
 	OnDirectoryChanged(ViewModel->GetSnapshot());
+	RefreshPresentation();
 	return Result;
+}
+
+void UHSRChallengeDirectoryWidget::RefreshPresentation()
+{
+	if (!WidgetTree || !ViewModel) return;
+	const auto SetText=[](UUserWidget* Owner,FName Name,const FText& Value)
+	{
+		if (auto* Text=Cast<UTextBlock>(Owner->GetWidgetFromName(Name))) Text->SetText(Value);
+	};
+	SetText(this,TEXT("TXT_Title"),NSLOCTEXT("HSRChallenge","Title","区域挑战"));
+	SetText(this,TEXT("TXT_Enter"),NSLOCTEXT("HSRChallenge","Prepare","进入战斗准备"));
+	auto* List=WidgetTree->FindWidget<UPanelWidget>(TEXT("EntryListContent"));
+	if (!List) return;
+	const auto& Entries=ViewModel->GetSnapshot().Entries;
+	for(int32 I=0;I<FMath::Min(List->GetChildrenCount(),Entries.Num());++I)
+	{
+		auto* Card=Cast<UUserWidget>(List->GetChildAt(I));if(!Card) continue;
+		const auto& Entry=Entries[I];
+		SetText(Card,TEXT("TXT_EncounterId"),Entry.DisplayName);
+		SetText(Card,TEXT("TXT_EnemyInfo"),Entry.Description);
+		FText MapTitle=NSLOCTEXT("HSRChallenge","Arena","战斗区域");
+		if(auto* Maps=GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRMapSubsystem>() : nullptr)
+		{
+			FName MapId;if(Maps->ResolveMapIdByPackage(Entry.BattleMapPath,MapId)) MapTitle=Maps->GetMapDisplayName(MapId);
+		}
+		SetText(Card,TEXT("TXT_Map"),MapTitle);
+		SetText(Card,TEXT("TXT_Diagnostic"),Entry.Diagnostic);
+		if (UWidget* Diagnostic = Card->GetWidgetFromName(TEXT("TXT_Diagnostic")))
+		{
+			Diagnostic->SetVisibility(ESlateVisibility::HitTestInvisible);
+			if (UPanelWidget* Cell = Diagnostic->GetParent()) Cell->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
+		SetText(Card,TEXT("TXT_Select"),Entry.bAvailable ? NSLOCTEXT("HSRChallenge","Select","选择") : Entry.bCompleted ? NSLOCTEXT("HSRChallenge","Done","已完成") : NSLOCTEXT("HSRChallenge","NotReady","未解锁"));
+	}
 }
 
 // InitializeConfiguredDirectory：用蓝图配置好的 ChallengeSources 初始化，并输出诊断日志。

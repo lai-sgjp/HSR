@@ -49,7 +49,8 @@ public:
 	// IHSRBattleCommandSink: the narrow surface the command UI is allowed to see. Both forward to the
 	// existing authority methods, so implementing the interface adds no second code path.
 	virtual FGuid GetActiveBattleId() const override { return CurrentRequestId; }
-	virtual FHSRAbilityResolution SubmitBattleCommand(const FHSRBattleActionCommand& Command) override { return RequestAction(Command); }
+	virtual FHSRAbilityResolution SubmitBattleCommand(const FHSRBattleActionCommand& Command) override;
+	void EnableActionPresentation(UWorld* World) { PresentationWorld = World; }
 
 	EHSRBattleCoordinatorState GetCurrentState() const { return CurrentState; }
 	FGuid GetCurrentRequestId() const { return CurrentRequestId; }
@@ -386,6 +387,8 @@ private:
 	AActor* SpawnParticipantActor(UWorld* World, const FHSRBattleParticipantDefinition& Definition);
 	bool InitParticipantASC(AActor* TargetActor);
 	bool ApplyParticipantInitializationGameplayEffect(const FHSRBattleParticipant& Participant);
+	bool ApplyAuthoredBaseAndProgression(const FHSRBattleParticipant& Participant);
+	bool InitializeFormalEquipment(UWorld* BattleWorld);
 	bool CanProjectEquipmentMovement(const FHSREquipmentMovementRequest& Request, const FHSREquipmentLoadout& Candidate) const;
 	bool ApplyEquipmentMovementProjection(const FHSREquipmentMovementRequest& Request, const FHSREquipmentLoadout& Candidate);
 	void CommitEquipmentMovementProjection(const FHSREquipmentMovementRequest&, const FHSREquipmentLoadout&) {}
@@ -402,6 +405,18 @@ private:
 	void RecordEnemyTurnIfCurrent(UHSRTurnManager* SourceManager, const struct FHSRTurnLifecycleEvent& Event);
 	void RecordCurrentEnemyTurnIfNeeded();
 	void DrainPendingEnemyTurns();
+	FHSRAbilityResolution QueuePresentedAction(const FHSRBattleActionCommand& Command);
+	void ApplyPresentedAction();
+	void FinishPresentedAction();
+	bool ResolveActionOrWait(FName ActorId);
+	void PlayActionMotion(const FHSRBattleActionCommand& Command, bool bImpact);
+	TWeakObjectPtr<UWorld> PresentationWorld;
+	FTimerHandle PresentationTimer;
+	TOptional<FHSRBattleActionCommand> PresentedAction;
+	bool bApplyingPresentedAction = false;
+	FName PresentedTurnToResolve;
+	FRandomStream TargetRandomStream{74129};
+	TMap<FName, FName> LastEnemyTargets;
 	FString MakeEnemyTurnKey(const UHSRTurnManager* Manager, uint64 BattleEpoch, uint64 TurnSequence, FName ParticipantId) const;
 	bool ReserveSkillPoints(const FGuid& ActionId, int32 Delta);
 	void RollbackSkillPoints(const FGuid& ActionId);

@@ -52,4 +52,5 @@ private:
 	FDelegateHandle ProgressionChangedHandle;
 	void HandleProgressionChanged(const FHSRChallengeProgressionSnapshot& Snapshot);
 	void UnbindProgression();
+	void RefreshPresentation();
 };

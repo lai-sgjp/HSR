@@ -65,6 +65,8 @@ void UHSRRelicEquipmentViewModel::Shutdown()
 	Stage = EHSRRelicEquipmentStage::SlotSelection;
 	SelectedSlot = EHSRRelicSlot::Head;
 	SelectedCandidateId.Invalidate();
+	EnhancementInstanceId.Invalidate();
+	bSubmitting = false;
 	Snapshot = FHSRRelicEquipmentSnapshot();
 	bHasSnapshot = false;
 }
@@ -117,14 +119,18 @@ EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::SelectCandidate(const FGui
 // 进入强化阶段：切换阶段后重建；若该装备没有任何可强化选项，则拒绝并回退
 EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::OpenEnhancement()
 {
+	if (Stage == EHSRRelicEquipmentStage::Enhancement && Snapshot.EnhancementInstanceId.IsValid())
+		return EHSRRelicEquipmentResult::Success;
 	if (!IsInitialized())
 	{
 		PublishFailure(EHSRRelicEquipmentResult::NotInitialized);
 		return EHSRRelicEquipmentResult::NotInitialized;
 	}
+	EnhancementReturnStage = SelectedCandidateId.IsValid() ? EHSRRelicEquipmentStage::Comparison : Stage;
+	EnhancementInstanceId = SelectedCandidateId.IsValid() ? SelectedCandidateId : Snapshot.CurrentInstanceId;
 	Stage = EHSRRelicEquipmentStage::Enhancement;
 	Rebuild();
-	if (Snapshot.EnhancementOptions.IsEmpty())
+	if (!Snapshot.EnhancementInstanceId.IsValid())
 	{
 		PublishFailure(EHSRRelicEquipmentResult::NoEnhancementOption);
 		return EHSRRelicEquipmentResult::NoEnhancementOption;
@@ -136,6 +142,7 @@ EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::OpenEnhancement()
 // 当前槽位已装备则意图为 Replace，否则为 Equip；执行成功后回到候选选择阶段。
 EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::CommitSelectedMovement()
 {
+	if (bSubmitting) return EHSRRelicEquipmentResult::AuthorityRejected;
 	if (!IsInitialized())
 	{
 		PublishFailure(EHSRRelicEquipmentResult::NotInitialized);
@@ -173,6 +180,7 @@ EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::CommitSelectedMovement()
 	Request.ExpectedEquipmentRevision = Snapshot.EquipmentRevision;
 
 	// 交给装备子系统执行，并把结果码映射为 ViewModel 结果
+	TGuardValue<bool> SubmittingGuard(bSubmitting, true);
 	const FHSREquipmentMovementResult Result = Equipment->ExecuteMovement(Request, *Inventory, *MappingCatalog);
 	const EHSRRelicEquipmentResult MappedResult = MapMovementResult(Result.Code);
 	if (MappedResult != EHSRRelicEquipmentResult::Success)
@@ -187,10 +195,36 @@ EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::CommitSelectedMovement()
 	return EHSRRelicEquipmentResult::Success;
 }
 
+EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::UnequipSelectedSlot()
+{
+	if (!IsInitialized() || !MappingCatalog.IsValid()) return EHSRRelicEquipmentResult::NotInitialized;
+	if (bSubmitting || !Snapshot.CurrentInstanceId.IsValid()) return EHSRRelicEquipmentResult::CandidateUnavailable;
+	FHSREquipmentMovementRequest Request;
+	Request.OperationId = FGuid::NewGuid();
+	Request.CharacterId = CharacterId;
+	Request.InstanceId = Snapshot.CurrentInstanceId;
+	Request.Intent = EHSREquipmentMovementIntent::Unequip;
+	Request.Kind = EHSREquipmentKind::Relic;
+	Request.Slot = static_cast<int32>(SelectedSlot);
+	Request.ExpectedInventoryRevision = Snapshot.InventoryRevision;
+	Request.ExpectedEquipmentRevision = Snapshot.EquipmentRevision;
+	TGuardValue<bool> SubmittingGuard(bSubmitting, true);
+	const auto Result = MapMovementResult(Equipment->ExecuteMovement(Request, *Inventory, *MappingCatalog).Code);
+	if (Result == EHSRRelicEquipmentResult::Success)
+	{
+		SelectedCandidateId.Invalidate();
+		Stage = EHSRRelicEquipmentStage::CandidateSelection;
+		Rebuild();
+	}
+	else PublishFailure(Result);
+	return Result;
+}
+
 // 提交强化：以目标等级在快照强化选项里查找规则。
 // 预检失败时，材料不足单独上报（玩家可行动），其余合并为通用拒绝。
 EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::CommitEnhancement(const int32 TargetLevel)
 {
+	if (bSubmitting) return EHSRRelicEquipmentResult::AuthorityRejected;
 	if (!IsInitialized())
 	{
 		PublishFailure(EHSRRelicEquipmentResult::NotInitialized);
@@ -203,7 +237,7 @@ EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::CommitEnhancement(const in
 		PublishFailure(EHSRRelicEquipmentResult::InvalidTargetLevel);
 		return EHSRRelicEquipmentResult::InvalidTargetLevel;
 	}
-	if (!Option->bAffordable || !Option->bAvailable || !Snapshot.CurrentInstanceId.IsValid())
+	if (!Option->bAffordable || !Option->bAvailable || !Snapshot.EnhancementInstanceId.IsValid())
 	{
 		UE_LOG(LogTemp, Warning,
 			TEXT("HSR.Relic CommitEnhancement PreflightRejected Target=%d Affordable=%d Available=%d CurInst=%d ")
@@ -231,14 +265,16 @@ EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::CommitEnhancement(const in
 	FHSREquipmentEnhancementRequest Request;
 	Request.OperationId = FGuid::NewGuid();
 	Request.CharacterId = CharacterId;
-	Request.InstanceId = Snapshot.CurrentInstanceId;
+	Request.InstanceId = Snapshot.EnhancementInstanceId;
 	Request.Kind = EHSREquipmentKind::Relic;
 	Request.ExpectedInventoryRevision = Snapshot.InventoryRevision;
 	Request.ExpectedEquipmentRevision = Snapshot.EquipmentRevision;
-	Request.ExpectedEnhancementLevel = Snapshot.CurrentEnhancementLevel;
+	Request.ExpectedEnhancementLevel = Snapshot.EnhancementInstance.EnhancementLevel;
 	Request.TargetLevel = TargetLevel;
-	const FHSREquipmentEnhancementResult Result = Equipment->ExecuteEnhancement(
-		Request, *Inventory, *EnhancementCatalog);
+	TGuardValue<bool> SubmittingGuard(bSubmitting, true);
+	const FHSREquipmentEnhancementResult Result = SelectedCandidateId.IsValid()
+		? Equipment->ExecuteInventoryEnhancement(Request, *Inventory, *EnhancementCatalog, *MappingCatalog)
+		: Equipment->ExecuteEnhancement(Request, *Inventory, *EnhancementCatalog);
 	const EHSRRelicEquipmentResult MappedResult = MapEnhancementResult(Result.Code);
 	if (MappedResult != EHSRRelicEquipmentResult::Success)
 	{
@@ -267,7 +303,8 @@ EHSRRelicEquipmentResult UHSRRelicEquipmentViewModel::Back()
 	switch (Stage)
 	{
 	case EHSRRelicEquipmentStage::Enhancement:
-		Stage = EHSRRelicEquipmentStage::Comparison;
+		Stage = EnhancementReturnStage;
+		EnhancementInstanceId.Invalidate();
 		Rebuild();
 		return EHSRRelicEquipmentResult::Success;
 	case EHSRRelicEquipmentStage::Comparison:
@@ -424,8 +461,7 @@ bool UHSRRelicEquipmentViewModel::BuildSlotRows(FHSREquipmentLoadout& OutLoadout
 	return true;
 }
 
-// 构建候选行：从背包唯一物品里筛出"属于当前槽位且未被装备"的圣遗物。
-// 掉落圣遗物在背包里是唯一物品但尚未注册装备实例，这里先确保注册再入候选。
+// Build pure candidate previews from bag membership and authored definitions; commands mint instances.
 void UHSRRelicEquipmentViewModel::BuildCandidateRows(const FHSREquipmentLoadout&)
 {
 	Snapshot.Candidates.Reset();
@@ -460,15 +496,10 @@ void UHSRRelicEquipmentViewModel::BuildCandidateRows(const FHSREquipmentLoadout&
 			UE_LOG(LogTemp, Log, TEXT("HSRRelic BuildCandidates Skip SlotMismatch ItemId=%s MapSlot=%d SelSlot=%d"), *Item.DefinitionId.ToString(), Mapping.Slot, static_cast<int32>(SelectedSlot));
 			continue;
 		}
-		// A dropped relic has an inventory unique item but no equipment instance until one is
-		// minted; ensure it here so the candidate list shows every relic in the bag for this slot.
-		// 掉落圣遗物在背包里是唯一物品，但装备实例要到铸造时才存在；
-		// 这里先确保实例注册，候选列表才能展示该槽位的全部背包圣遗物
-		Equipment->EnsureRegisteredFromItem(Item.DefinitionId, Item.InstanceId, *MappingCatalog);
 
-		// 实例必须已注册且与映射的设备定义一致
+		// Preview is either the registered instance or the authored level-zero instance.
 		FHSREquipmentInstance Instance;
-		if (!Equipment->FindRegisteredInstance(Item.InstanceId, Instance)
+		if (!Equipment->PreviewMappedInstance(Item.DefinitionId, Item.InstanceId, *MappingCatalog, Instance)
 			|| Instance.Kind != EHSREquipmentKind::Relic
 			|| Instance.DefinitionId != Mapping.EquipmentDefinitionId)
 		{
@@ -550,20 +581,20 @@ bool UHSRRelicEquipmentViewModel::BuildComparison()
 bool UHSRRelicEquipmentViewModel::BuildEnhancementOptions()
 {
 	Snapshot.EnhancementOptions.Reset();
-	if (!EnhancementCatalog.IsValid() || !Snapshot.CurrentInstanceId.IsValid())
+	Snapshot.EnhancementInstanceId.Invalidate();
+	if (!EnhancementCatalog.IsValid() || !EnhancementInstanceId.IsValid()) return false;
+	FHSREquipmentInstance Target;
+	if (const FHSRRelicCandidateRow* Candidate = Snapshot.Candidates.FindByPredicate(
+		[this](const FHSRRelicCandidateRow& Row) { return Row.InstanceId == EnhancementInstanceId; }))
 	{
-		return false;
+		Target = Candidate->Instance;
 	}
-	const FHSRRelicSlotRow* Current = Snapshot.Slots.FindByPredicate(
-		[this](const FHSRRelicSlotRow& Row) { return Row.Slot == SelectedSlot; });
-	if (Current == nullptr || !Current->bHasEquipped)
-	{
-		return false;
-	}
-	// 取强化目录规则
+	else if (!Equipment->FindRegisteredInstance(EnhancementInstanceId, Target)
+		|| Snapshot.CurrentInstanceId != EnhancementInstanceId) return false;
+	Snapshot.EnhancementInstanceId = EnhancementInstanceId;
+	Snapshot.EnhancementInstance = Target;
 	TArray<FHSREquipmentEnhancementRule> Rules;
-	EnhancementCatalog->GetRulesFor(Current->EquippedInstance.DefinitionId,
-		Current->EquippedInstance.Kind, Current->EquippedInstance.EnhancementLevel, Rules);
+	EnhancementCatalog->GetRulesFor(Target.DefinitionId, Target.Kind, Target.EnhancementLevel, Rules);
 
 	// 取库存快照用于材料数量判定
 	FHSRInventorySnapshot InventorySnapshot;
@@ -578,11 +609,11 @@ bool UHSRRelicEquipmentViewModel::BuildEnhancementOptions()
 		Option.TargetModifiers = Rule.TargetModifiers;
 		Option.bAffordable = InventorySnapshot.GetStackQuantity(Rule.MaterialItemId) >= Rule.MaterialCost;
 		// 可用 = 付得起 且 目标等级高于当前 且 有材料消耗
-		Option.bAvailable = Rule.TargetLevel > Current->EquippedInstance.EnhancementLevel
+		Option.bAvailable = Rule.TargetLevel > Target.EnhancementLevel
 			&& Rule.MaterialCost > 0;
 		Snapshot.EnhancementOptions.Add(MoveTemp(Option));
 	}
-	return !Snapshot.EnhancementOptions.IsEmpty();
+	return true; // Keep a maximum-level item visible even when there are no further options.
 }
 
 // 查询当前持有某材料数量（未初始化时返回 -1，用于日志区分）
@@ -600,7 +631,7 @@ int32 UHSRRelicEquipmentViewModel::GetHeldMaterialQuantity(const FName ItemId) c
 // 装备配装变化回调：仅当变化发生在当前角色身上时才重建
 void UHSRRelicEquipmentViewModel::HandleEquipmentChanged(const FGuid& ChangedCharacterId, int32)
 {
-	if (ChangedCharacterId == CharacterId)
+	if (!bSubmitting && ChangedCharacterId == CharacterId)
 	{
 		Rebuild();
 	}
@@ -609,7 +640,7 @@ void UHSRRelicEquipmentViewModel::HandleEquipmentChanged(const FGuid& ChangedCha
 // 背包变化回调：直接重建（候选/强化材料都来自背包）
 void UHSRRelicEquipmentViewModel::HandleInventoryChanged(int64)
 {
-	Rebuild();
+	if (!bSubmitting) Rebuild();
 }
 
 // Sums one instance through the same aggregator the authority uses, so the comparison panel cannot

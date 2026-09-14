@@ -2079,6 +2079,7 @@ void AHSRBattleGameMode::BeginPlay()
 		*Coordinator->GetCurrentRequestId().ToString());
 
 	// Build participants in the Battle World
+	Coordinator->EnableActionPresentation(GetWorld());
 	FHSRBattleInitResult BuildResult = Coordinator->BuildParticipants(GetWorld());
 	if (!BuildResult.IsSuccess())
 	{

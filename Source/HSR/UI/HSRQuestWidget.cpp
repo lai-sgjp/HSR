@@ -2,6 +2,10 @@
 
 #include "../Quest/HSRQuestSubsystem.h"
 #include "Engine/GameInstance.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/Border.h"
+#include "Components/PanelWidget.h"
+#include "Components/TextBlock.h"
 
 // 设置/替换 ViewModel。若本 Widget 之前拥有一个自建 VM（bOwnsViewModel），
 // 替换前先关闭它，避免泄漏。然后绑定新 VM 并刷新显示。
@@ -100,4 +104,56 @@ void UHSRQuestWidget::HandleSnapshot(const FHSRQuestFrontendSnapshot& InSnapshot
 	Current = InSnapshot;
 	bHasSnapshot = true;
 	OnQuestSnapshotChanged(Current);
+	RefreshQuestList();
+}
+
+FText UHSRQuestWidget::FormatQuestCard(const FHSRQuestViewData& Quest)
+{
+	const FText Title = Quest.DisplayName.IsEmpty()
+		? NSLOCTEXT("HSRQuest", "UnnamedQuest", "未命名任务") : Quest.DisplayName;
+	FText State = NSLOCTEXT("HSRQuest", "InProgress", "进行中");
+	if (Quest.bRewardClaimed) State = NSLOCTEXT("HSRQuest", "RewardClaimed", "已完成 · 奖励已领取");
+	else if (Quest.State == EHSRQuestState::Completed) State = NSLOCTEXT("HSRQuest", "Completed", "已完成");
+	else if (Quest.State == EHSRQuestState::NotStarted) State = NSLOCTEXT("HSRQuest", "NotStarted", "未开始");
+	TArray<FText> Lines;
+	Lines.Add(FText::Format(NSLOCTEXT("HSRQuest", "CardHeading", "{0}  ·  {1}"), Title, State));
+	for (const FHSRQuestObjectiveViewData& Objective : Quest.Objectives)
+	{
+		const FText Description = Objective.Description.IsEmpty()
+			? NSLOCTEXT("HSRQuest", "UnnamedObjective", "完成调查") : Objective.Description;
+		Lines.Add(FText::Format(NSLOCTEXT("HSRQuest", "ObjectiveLine", "{0}  {1}  {2}/{3}"),
+			Objective.bCompleted ? FText::FromString(TEXT("✓")) : FText::FromString(TEXT("◇")),
+			Description, FText::AsNumber(Objective.CurrentCount), FText::AsNumber(Objective.RequiredCount)));
+	}
+	return FText::Join(FText::FromString(TEXT("\n")), Lines);
+}
+
+void UHSRQuestWidget::RefreshQuestList()
+{
+	if (!WidgetTree) return;
+	UPanelWidget* List = Cast<UPanelWidget>(WidgetTree->FindWidget(TEXT("QuestList")));
+	if (!List) return;
+	List->ClearChildren();
+	for (const FHSRQuestViewData& Quest : Current.Quests)
+	{
+		UBorder* Card = WidgetTree->ConstructWidget<UBorder>();
+		Card->SetPadding(FMargin(24.f, 20.f));
+		Card->SetBrushColor(FLinearColor(.025f, .045f, .075f, .94f));
+		UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>();
+		Text->SetText(FormatQuestCard(Quest));
+		Text->SetAutoWrapText(true);
+		FSlateFontInfo Font = Text->GetFont();
+		Font.Size = 22;
+		Text->SetFont(Font);
+		Text->SetColorAndOpacity(FSlateColor(FLinearColor(.9f, .93f, 1.f)));
+		Card->SetContent(Text);
+		List->AddChild(Card);
+	}
+	const bool bReady = Current.Status == EHSRQuestFrontendStatus::Ready;
+	if (UWidget* Scroll = WidgetTree->FindWidget(TEXT("QuestScrollBox")))
+		Scroll->SetVisibility(bReady ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	if (UWidget* Empty = WidgetTree->FindWidget(TEXT("EmptyState")))
+		Empty->SetVisibility(Current.Status == EHSRQuestFrontendStatus::Empty ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	if (UWidget* Unavailable = WidgetTree->FindWidget(TEXT("UnavailableState")))
+		Unavailable->SetVisibility(Current.Status == EHSRQuestFrontendStatus::Unavailable ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 }

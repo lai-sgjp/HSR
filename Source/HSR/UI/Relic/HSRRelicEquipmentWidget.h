@@ -8,6 +8,7 @@
 class UHSREquipmentEnhancementCatalog;
 class UHSRItemEquipmentMappingCatalog;
 class UHSRRelicEquipmentViewModel;
+class UHSRInventoryCatalog;
 class UButton;
 
 /** Forwards a candidate/option button click back to the relic widget. Dynamic UMG delegates
@@ -19,6 +20,7 @@ class HSR_API UHSRRelicListClickBridge : public UObject
 
 public:
 	void Initialize(UHSRRelicEquipmentWidget* InOwner, FGuid InInstanceId, int32 InTargetLevel);
+	void InitializeSlot(UHSRRelicEquipmentWidget* InOwner, EHSRRelicSlot InSlot);
 
 	UFUNCTION()
 	void HandleClicked();
@@ -27,6 +29,7 @@ private:
 	TWeakObjectPtr<UHSRRelicEquipmentWidget> Owner;
 	FGuid InstanceId;
 	int32 TargetLevel = -1;
+	int32 SlotIndex = INDEX_NONE;
 };
 
 UCLASS(Blueprintable)
@@ -54,6 +57,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "HSR|Relic Equipment")
 	EHSRRelicEquipmentResult CommitSelectedMovement();
+	UFUNCTION(BlueprintCallable, Category = "HSR|Relic Equipment")
+	EHSRRelicEquipmentResult UnequipSelectedSlot();
+	UFUNCTION(BlueprintCallable, Category = "HSR|Relic Equipment")
+	void SelectEnhancementLevel(int32 TargetLevel);
 
 	UFUNCTION(BlueprintCallable, Category = "HSR|Relic Equipment")
 	EHSRRelicEquipmentResult CommitEnhancement(int32 TargetLevel);
@@ -74,6 +81,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "HSR|Relic Equipment")
 	bool HasEnhancementOptions() const;
+
+#if WITH_DEV_AUTOMATION_TESTS
+	void PresentSnapshotForAutomation(const FHSRRelicEquipmentSnapshot& Snapshot) { HandleSnapshot(Snapshot); }
+#endif
 
 	static bool ShouldShowSlotAndCandidateLists(EHSRRelicEquipmentStage Stage)
 	{
@@ -97,14 +108,24 @@ protected:
 
 private:
 	void InitializeRuntimeContext();
+	UFUNCTION() void HandleConfirmEnhancement();
+	UFUNCTION() void HandleUnequip();
+	UFUNCTION() void HandleEquip();
+	UFUNCTION() void HandleOpenEnhancement();
 	void HandleSnapshot(const FHSRRelicEquipmentSnapshot& InSnapshot);
 	void UpdateStatusText(const FHSRRelicEquipmentSnapshot& InSnapshot);
 	void ShowOperationResult(EHSRRelicEquipmentResult Result);
 	/** C++-driven list population so the relic panel does not depend on fragile BP graph loops. */
 	void PopulateCandidates();
+	void PopulateSlots();
+	void RefreshPresentation();
 	void PopulateEnhancementOptions();
 	void ApplyStageVisibility();
 	UButton* MakeListButton(const FText& Label, const FLinearColor& Color);
+	FText ItemLabel(FName ItemId) const;
+	FText InstanceLabel(const FHSREquipmentInstance& Instance) const;
+	FText OperationMessage;
+	UPROPERTY(Transient) TArray<TObjectPtr<UObject>> SlotBindings;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UObject>> ListBindings;
@@ -114,6 +135,8 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "HSR|Relic Equipment", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UHSREquipmentEnhancementCatalog> EnhancementCatalog;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "HSR|Relic Equipment", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UHSRInventoryCatalog> PresentationCatalog;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UHSRRelicEquipmentViewModel> ViewModel;
@@ -122,4 +145,5 @@ private:
 	FDelegateHandle SnapshotHandle;
 	FHSRRelicEquipmentSnapshot CurrentSnapshot;
 	bool bHasSnapshot = false;
+	int32 SelectedEnhancementLevel = INDEX_NONE;
 };

@@ -41,6 +41,8 @@ USTRUCT(BlueprintType)
 struct HSR_API FHSRChallengeDirectoryEntry
 {
 	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly, Category="HSR|Challenge") FText DisplayName;
+	UPROPERTY(BlueprintReadOnly, Category="HSR|Challenge") FText Description;
 
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Challenge")
 	FName EncounterId;

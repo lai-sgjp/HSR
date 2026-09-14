@@ -6,14 +6,23 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Engine/GameInstance.h"
+#include "HSRMinimapWidget.h"
+#include "Components/PanelWidget.h"
 
 // SetViewModel：外部注入一个已有的地图 ViewModel（外部拥有其生命周期）。
 void UHSRMapWidget::SetViewModel(UHSRMapViewModel* InViewModel)
 {
 	Unbind();
+	if (bOwnsViewModel && ViewModel && ViewModel != InViewModel)
+	{
+		ViewModel->Shutdown();
+	}
+	const bool bRetainOwnership = bOwnsViewModel && ViewModel == InViewModel;
 	ViewModel = InViewModel;
 	// 外部注入的 VM 不由本控件负责 Shutdown。
-	bOwnsViewModel = false;
+	bOwnsViewModel = bRetainOwnership;
+	bHasSnapshot = false;
+	Current = FHSRMapRuntimeSnapshot();
 	BindAndRefresh();
 }
 
@@ -31,13 +40,17 @@ bool UHSRMapWidget::GetCurrentSnapshot(FHSRMapRuntimeSnapshot& OutSnapshot) cons
 // RequestTeleport：请求传送到指定传送点（转发给 ViewModel，无 VM 时返回失败）。
 EHSRMapOperationResult UHSRMapWidget::RequestTeleport(const FName TeleportId)
 {
-	return ViewModel ? ViewModel->RequestTeleport(TeleportId) : EHSRMapOperationResult::InvalidWorld;
+	const auto Result=ViewModel ? ViewModel->RequestTeleport(TeleportId) : EHSRMapOperationResult::InvalidWorld;
+	if (Result!=EHSRMapOperationResult::Success)
+		if (auto* Text=WidgetTree ? WidgetTree->FindWidget<UTextBlock>(TEXT("Text_Result")) : nullptr)
+			Text->SetText(Result==EHSRMapOperationResult::Locked ? NSLOCTEXT("HSRMap","Locked","该目的地尚未解锁") : NSLOCTEXT("HSRMap","TravelFailed","暂时无法旅行，请返回后重试"));
+	return Result;
 }
 
 // GetMapDisplayName：获取地图的显示名（转发给 ViewModel，无 VM 时退回用 MapId 当名字）。
 FText UHSRMapWidget::GetMapDisplayName(const FName MapId) const
 {
-	return ViewModel ? ViewModel->GetMapDisplayName(MapId) : FText::FromName(MapId);
+	return ViewModel ? ViewModel->GetMapDisplayName(MapId) : NSLOCTEXT("HSRMap", "UnknownMap", "未知区域");
 }
 
 // GetAvailableTeleports：输出所有可用传送点的投影信息，供蓝图构建传送列表。
@@ -94,6 +107,7 @@ void UHSRMapWidget::RefreshReachableTeleportPanel()
 			if (UButton* Button = Cast<UButton>(Tree->FindWidget(ButtonNames[Index])))
 			{
 				Button->SetIsEnabled(bFound && Reachable.bUsable);
+				Button->SetVisibility(bFound ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 			}
 		}
 	}
@@ -114,6 +128,11 @@ EHSRMapOperationResult UHSRMapWidget::RequestReachableTeleport(const int32 Index
 void UHSRMapWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	if (auto* Host=WidgetTree ? WidgetTree->FindWidget<UPanelWidget>(TEXT("PR_MapHost")) : nullptr)
+	{
+		Host->ClearChildren();
+		if(auto* Map=CreateWidget<UHSRMinimapWidget>(GetOwningPlayer())) Host->AddChild(Map);
+	}
 	if (!ViewModel)
 	{
 		if (UGameInstance* GameInstance = GetGameInstance())

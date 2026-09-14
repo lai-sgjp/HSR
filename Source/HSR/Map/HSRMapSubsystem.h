@@ -36,7 +36,8 @@ public:
 	EHSRMapOperationResult RequestTeleportTravel(FName TeleportId);
 	EHSRMapOperationResult RequestRestoreTravel();
 	EHSRMapOperationResult RequestRestoreTravel(const FHSRMapRuntimeSnapshot& RestoreTarget);
-	EHSRMapOperationResult ApplyRestoreLocation(const FHSRMapRuntimeSnapshot& RestoreTarget);
+	/** Normalizes the candidate after successful placement; the save transaction commits it later. */
+	EHSRMapOperationResult ApplyRestoreLocation(FHSRMapRuntimeSnapshot& RestoreTarget);
 	EHSRMapOperationResult CommitPendingArrival(FName DestinationMapId, FName ArrivalId, APawn* Pawn, const FTransform& ArrivalTransform);
 	EHSRMapOperationResult CommitPendingRestoreArrival(FName DestinationMapId, APawn* Pawn, const FTransform& SavedTransform);
 	EHSRMapOperationResult ValidatePendingArrivalContext(FName DestinationMapId, FName ArrivalId, const FString& LoadedWorldPackage, int32 MatchingArrivalCount) const;

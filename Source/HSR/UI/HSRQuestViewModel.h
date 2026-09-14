@@ -19,6 +19,7 @@ struct HSR_API FHSRQuestObjectiveViewData
 {
 	GENERATED_BODY()
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Quest") FName ObjectiveId;
+	UPROPERTY(BlueprintReadOnly, Category = "HSR|Quest") FText Description;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Quest") int32 CurrentCount = 0;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Quest") int32 RequiredCount = 0;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Quest") bool bCompleted = false;
@@ -29,6 +30,7 @@ struct HSR_API FHSRQuestViewData
 {
 	GENERATED_BODY()
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Quest") FName QuestId;
+	UPROPERTY(BlueprintReadOnly, Category = "HSR|Quest") FText DisplayName;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Quest") EHSRQuestState State = EHSRQuestState::NotStarted;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Quest") TArray<FHSRQuestObjectiveViewData> Objectives;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Quest") bool bRewardClaimed = false;

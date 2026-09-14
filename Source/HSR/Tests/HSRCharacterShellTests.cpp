@@ -53,6 +53,7 @@ bool FHSRCharacterShellViewModelTest::RunTest(const FString&)
 	Save->InitializeForDevelopmentTest(Profiles, Party);
 	Party->AddCharacter(Alpha->CharacterId);
 	Party->AddCharacter(Beta->CharacterId);
+	Party->SetActiveSlot(1);
 
 	UHSREquipmentDefinition* WeaponDefinition = NewObject<UHSREquipmentDefinition>(GameInstance);
 	WeaponDefinition->DefinitionId = TEXT("Equipment.Weapon.Alpha");
@@ -73,6 +74,9 @@ bool FHSRCharacterShellViewModelTest::RunTest(const FString&)
 	int32 Events = 0;
 	ViewModel->OnChanged().AddLambda([&Events](const FHSRCharacterShellSnapshot&) { ++Events; });
 	ViewModel->Initialize(Profiles, Save, Party, Equipment);
+	FHSRCharacterShellSnapshot InitialSelection;
+	TestTrue(TEXT("initial selection available"), ViewModel->GetSnapshot(InitialSelection));
+	TestEqual(TEXT("opening character page follows active explorer"), InitialSelection.SelectedCharacterId, Beta->CharacterId);
 
 	TestEqual(TEXT("select alpha"), ViewModel->SelectCharacter(Alpha->CharacterId),
 		EHSRCharacterShellResult::Success);

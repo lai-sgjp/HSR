@@ -31,6 +31,16 @@ private:
 	void BindViewModelChanged();
 	void UnbindViewModelChanged();
 	void Refresh();
+	void RefreshPresentation();
+	void BindActionButtons();
+	UFUNCTION() void HandleSave1();
+	UFUNCTION() void HandleSave2();
+	UFUNCTION() void HandleLoad1();
+	UFUNCTION() void HandleLoad2();
+	UFUNCTION() void HandleConfirmOverwrite();
+	UFUNCTION() void HandleCancelOverwrite();
+	bool bLastActionWasSave = false;
+	bool bOverwriteCancelled = false;
 	UPROPERTY(Transient) TObjectPtr<UHSRSaveViewModel> ViewModel;
 	FDelegateHandle ViewModelChangedHandle;
 	FHSRSaveFrontendResult Current;

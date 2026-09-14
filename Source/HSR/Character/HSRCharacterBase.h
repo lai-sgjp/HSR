@@ -21,6 +21,7 @@ class HSR_API AHSRCharacterBase : public ACharacter, public IAbilitySystemInterf
 
 public:
 	AHSRCharacterBase();
+	void ApplyCharacterPresentation(FName CharacterId);
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -99,6 +100,7 @@ protected:
 
 private:
 	friend class AHSRGameModeBase;
+	friend class AHSRPlayerController;
 	// 设置投影角色 ID 并触发基础属性断言与装备投影。仅 GameMode 等内部调用，故为私有。
 	bool SetProjectedCharacterId(FName CharacterId);
 

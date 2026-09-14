@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "HSRScreenWidget.h"
 #include "HSRPartyViewModel.h"
+#include "Components/ComboBoxString.h"
 #include "HSRPartyWidget.generated.h"
 
 UCLASS(Blueprintable)
@@ -41,6 +42,24 @@ private:
 	void BindAndRefresh();
 	void Unbind();
 	void HandleSnapshot(const FHSRPartyFrontendSnapshot& InSnapshot);
+	void BindCharacterSelectors();
+	void RefreshCharacterSelectors();
+	void RefreshPresentation();
+	EHSRPartyResult PresentActionResult(EHSRPartyResult Result, const FText& SuccessMessage);
+	UFUNCTION() void HandleClear0();
+	UFUNCTION() void HandleClear1();
+	UFUNCTION() void HandleClear2();
+	UFUNCTION() void HandleClear3();
+	UFUNCTION() void HandleConfirm();
+	UFUNCTION() void HandleCancel();
+	FText ActionMessage;
+	void HandleCharacterSelection(int32 SlotIndex, const FString& Label);
+	UFUNCTION() void HandleSlot0(FString Label, ESelectInfo::Type SelectionType);
+	UFUNCTION() void HandleSlot1(FString Label, ESelectInfo::Type SelectionType);
+	UFUNCTION() void HandleSlot2(FString Label, ESelectInfo::Type SelectionType);
+	UFUNCTION() void HandleSlot3(FString Label, ESelectInfo::Type SelectionType);
+	TArray<FString> CharacterOptionLabels;
+	bool bUpdatingSelectors = false;
 
 	UPROPERTY(Transient) TObjectPtr<UHSRPartyViewModel> ViewModel;
 	FDelegateHandle Subscription;

@@ -47,6 +47,11 @@ bool FHSRPreBattleCandidateTest::RunTest(const FString&)
 	TestEqual(TEXT("request carries encounter"), Request.EncounterId, Template.EncounterId);
 	TestEqual(TEXT("request carries buff metadata"), ViewModel->GetSnapshot().BuffIds.Num(), 1);
 	TestEqual(TEXT("request carries buff ids"), Request.BuffIds.Num(), 1);
+	TestEqual(TEXT("selected buff can be removed"), ViewModel->RemoveBuff(TEXT("Buff.Test")), EHSRPreBattleCandidateResult::Success);
+	TestTrue(TEXT("buff removal clears candidate metadata"), ViewModel->GetSnapshot().BuffIds.IsEmpty());
+	TestEqual(TEXT("non-leader can be removed"), ViewModel->SetCandidateSlot(1, NAME_None), EHSRPreBattleCandidateResult::Success);
+	TestTrue(TEXT("removed member leaves an empty candidate slot"), ViewModel->GetSnapshot().CandidateCharacterIds[1].IsNone());
+	TestEqual(TEXT("leader cannot be removed"), ViewModel->SetCandidateSlot(0, NAME_None), EHSRPreBattleCandidateResult::EmptyLeader);
 	Party->GetSnapshot(AfterEdit);
 	TestEqual(TEXT("confirm does not mutate permanent party"), AfterEdit.Revision, Before.Revision);
 	TestEqual(TEXT("cancel succeeds"), ViewModel->CancelCandidate(), EHSRPreBattleCandidateResult::Success);

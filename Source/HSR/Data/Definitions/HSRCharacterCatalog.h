@@ -10,4 +10,6 @@ class HSR_API UHSRCharacterCatalog : public UDataAsset
 public:
 	/** Data-only Blueprint definitions are selected as classes; their immutable authored data comes from the CDO. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly) TArray<TSubclassOf<UHSRCharacterDefinition>> Characters;
+	/** Formal authored DataAsset definitions; legacy Blueprint-class entries remain supported. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly) TArray<TObjectPtr<UHSRCharacterDefinition>> CharacterAssets;
 };

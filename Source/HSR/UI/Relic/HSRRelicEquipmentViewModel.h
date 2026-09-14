@@ -35,6 +35,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "HSR|Relic Equipment")
 	EHSRRelicEquipmentResult CommitSelectedMovement();
+	UFUNCTION(BlueprintCallable, Category = "HSR|Relic Equipment")
+	EHSRRelicEquipmentResult UnequipSelectedSlot();
 
 	UFUNCTION(BlueprintCallable, Category = "HSR|Relic Equipment")
 	EHSRRelicEquipmentResult CommitEnhancement(int32 TargetLevel);
@@ -82,6 +84,9 @@ private:
 	EHSRRelicEquipmentStage Stage = EHSRRelicEquipmentStage::SlotSelection;
 	EHSRRelicSlot SelectedSlot = EHSRRelicSlot::Head;
 	FGuid SelectedCandidateId;
+	FGuid EnhancementInstanceId;
+	EHSRRelicEquipmentStage EnhancementReturnStage = EHSRRelicEquipmentStage::CandidateSelection;
+	bool bSubmitting = false;
 	FHSRRelicEquipmentSnapshot Snapshot;
 	bool bHasSnapshot = false;
 	FHSRRelicEquipmentChanged Changed;

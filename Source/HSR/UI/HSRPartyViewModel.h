@@ -21,6 +21,7 @@ struct HSR_API FHSRPartySlotViewData
 	GENERATED_BODY()
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") int32 SlotIndex = INDEX_NONE;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") FName CharacterId;
+	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") FText DisplayName;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") bool bOccupied = false;
 };
 
@@ -31,6 +32,7 @@ struct HSR_API FHSRPartyFrontendSnapshot
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") EHSRPartyFrontendStatus Status = EHSRPartyFrontendStatus::Unavailable;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") TArray<FHSRPartySlotViewData> Slots;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") TArray<FName> AvailableCharacterIds;
+	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") TMap<FName, FText> CharacterDisplayNames;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") int64 Revision = 0;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") int32 ActiveSlot = 0;
 	UPROPERTY(BlueprintReadOnly, Category = "HSR|Party") bool bHasPendingChanges = false;

@@ -18,6 +18,8 @@ class HSR_API UHSREncounterDefinition : public UPrimaryDataAsset
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter")
 	FName EncounterId;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter|Presentation") FText DisplayName;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter|Presentation") FText Description;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Encounter")
 	FName EnemyDefinitionId;

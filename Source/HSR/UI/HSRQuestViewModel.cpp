@@ -79,6 +79,7 @@ void UHSRQuestViewModel::Rebuild()
 		{
 			FHSRQuestViewData& View = Next.Quests.AddDefaulted_GetRef();
 			View.QuestId = State.QuestId;
+			View.DisplayName = Quest->GetQuestDisplayName(State.QuestId);
 			View.State = State.State;
 			View.bRewardClaimed = State.bRewardClaimed;
 			// 任务定义是否存在也纳入视图（用于前端区分“有定义/已失效”的任务）。
@@ -89,6 +90,7 @@ void UHSRQuestViewModel::Rebuild()
 			{
 				FHSRQuestObjectiveViewData& ObjectiveView = View.Objectives.AddDefaulted_GetRef();
 				ObjectiveView.ObjectiveId = Objective.ObjectiveId;
+				ObjectiveView.Description = Quest->GetObjectiveDescription(State.QuestId, Objective.ObjectiveId);
 				ObjectiveView.CurrentCount = Objective.CurrentCount;
 				ObjectiveView.RequiredCount = Objective.RequiredCount;
 				ObjectiveView.bCompleted = Objective.bCompleted;

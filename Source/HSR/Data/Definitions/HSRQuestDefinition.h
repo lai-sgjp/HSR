@@ -15,6 +15,9 @@ public:
 	FName QuestId;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Quest")
+	FText DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Quest")
 	TArray<FHSRQuestObjectiveDefinition> Objectives;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Quest|Reward")
@@ -26,4 +29,3 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Quest|Reward")
 	bool bAutoClaimReward = true;
 };
-

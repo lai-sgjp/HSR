@@ -113,13 +113,18 @@ EHSRSaveFrontendActionResult UHSRSaveViewModel::RequestSave(const FString& SlotN
 	{
 		// 槽位已有内容：不立即写盘，先把槽名记入待确认状态，等用户明确确认。
 		PendingOverwriteSlot = SlotName;
+		FrontendResult.SlotName = SlotName;
+		FrontendResult.bAwaitingOverwrite = true;
+		Changed.Broadcast();
 		return EHSRSaveFrontendActionResult::ConfirmationRequired;
 	}
 
 	// 空槽位：直接写盘，并把"本次是保存操作"标记置位（影响前端 Generation 的取值来源）。
 	bLastOperationWasSave = true;
-	RefreshResult(Save->SaveToSlot(SlotName), SlotName);
-	return EHSRSaveFrontendActionResult::Success;
+	const EHSRSaveResult Result = Save->SaveToSlot(SlotName);
+	RefreshResult(Result, SlotName);
+	return Result == EHSRSaveResult::Success ? EHSRSaveFrontendActionResult::Success
+		: EHSRSaveFrontendActionResult::OperationFailed;
 }
 
 // ConfirmOverwrite：用户确认覆盖已有存档后真正执行写盘。
@@ -132,16 +137,21 @@ EHSRSaveFrontendActionResult UHSRSaveViewModel::ConfirmOverwrite()
 	}
 
 	const FString Slot = MoveTemp(PendingOverwriteSlot);
+	PendingOverwriteSlot.Reset();
 	ActiveSlotName = Slot;
 	bLastOperationWasSave = true;
-	RefreshResult(Save->SaveToSlot(Slot), Slot);
-	return EHSRSaveFrontendActionResult::Success;
+	const EHSRSaveResult Result = Save->SaveToSlot(Slot);
+	RefreshResult(Result, Slot);
+	return Result == EHSRSaveResult::Success ? EHSRSaveFrontendActionResult::Success
+		: EHSRSaveFrontendActionResult::OperationFailed;
 }
 
 // CancelOverwrite：放弃覆盖操作，仅清空待确认槽位，不改动任何存档数据。
 void UHSRSaveViewModel::CancelOverwrite()
 {
 	PendingOverwriteSlot.Reset();
+	FrontendResult.bAwaitingOverwrite = false;
+	Changed.Broadcast();
 }
 
 // GetPendingOverwriteSlot：读取当前待确认覆盖的槽位名；无待确认项时返回 false。
@@ -216,5 +226,13 @@ void UHSRSaveViewModel::RefreshResult(const EHSRSaveResult Result, const FString
 	FrontendResult.bRecoveredFromBackup = LastResult.bRecoveredFromBackup;
 	FrontendResult.bRuntimeChanged = LastResult.bRuntimeChanged;
 	FrontendResult.bPending = Save.IsValid() && Save->HasPendingRestore();
+	FrontendResult.bAwaitingOverwrite = !PendingOverwriteSlot.IsEmpty();
+	// A save does not inherit the last load's recovery/runtime-change badges.
+	if (bLastOperationWasSave)
+	{
+		FrontendResult.bRecoveredFromBackup = false;
+		FrontendResult.bRuntimeChanged = false;
+	}
 	bHasResult = true;
+	Changed.Broadcast();
 }

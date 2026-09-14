@@ -1,0 +1,808 @@
+﻿path,bytes,git,decision,reason
+.agents/agents.md,96409,modified tracked,include,
+.agents/skills/phase-next-steps/SKILL.md,3113,modified tracked,include,
+.agents/skills/phase-next-steps/references/phase-workflow.md,5335,modified tracked,include,
+ArtSource/Presentation/ItemIcons/Body.png,45632,untracked,include,
+ArtSource/Presentation/ItemIcons/EquipmentIcons.blend,162457,untracked,include,
+ArtSource/Presentation/ItemIcons/Feet.png,49100,untracked,include,
+ArtSource/Presentation/ItemIcons/Hands.png,45248,untracked,include,
+ArtSource/Presentation/ItemIcons/Head.png,47145,untracked,include,
+ArtSource/Presentation/ItemIcons/LinkRope.png,42034,untracked,include,
+ArtSource/Presentation/ItemIcons/Material.png,40699,untracked,include,
+ArtSource/Presentation/ItemIcons/PlanarSphere.png,48630,untracked,include,
+ArtSource/Presentation/ItemIcons/Weapon.png,40303,untracked,include,
+ArtSource/Presentation/NightCityKit.blend,233128,untracked,include,
+ArtSource/Presentation/NightCityKit.blend1,211418,untracked,exclude,local recovery copy
+ArtSource/Presentation/Portraits/EvernightMoon.png,112860,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+ArtSource/Presentation/Portraits/Huohua.png,112860,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+ArtSource/Presentation/Portraits/Remiel.png,112860,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+ArtSource/Presentation/Portraits/Verina.png,112860,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+ArtSource/Presentation/Quaternius/LICENSE,7169,untracked,include,
+ArtSource/Presentation/Quaternius/QuaterniusCast.fbx,975980,untracked,include,
+ArtSource/Presentation/Quaternius/QuaterniusDeath.fbx,1137148,untracked,include,
+ArtSource/Presentation/Quaternius/QuaterniusHeal.fbx,975980,untracked,include,
+ArtSource/Presentation/Quaternius/README.md,1272,untracked,include,
+ArtSource/Presentation/README.md,1477,untracked,include,
+ArtSource/Presentation/SM_Arch.fbx,23276,untracked,include,
+ArtSource/Presentation/SM_Banner.fbx,25788,untracked,include,
+ArtSource/Presentation/SM_Bench.fbx,36348,untracked,include,
+ArtSource/Presentation/SM_Bin.fbx,21644,untracked,include,
+ArtSource/Presentation/SM_Brazier.fbx,29340,untracked,include,
+ArtSource/Presentation/SM_Chest.fbx,26380,untracked,include,
+ArtSource/Presentation/SM_Column.fbx,26732,untracked,include,
+ArtSource/Presentation/SM_Facade.fbx,64748,untracked,include,
+ArtSource/Presentation/SM_Hydrant.fbx,24300,untracked,include,
+ArtSource/Presentation/SM_Palm.fbx,18220,untracked,include,
+ArtSource/Presentation/SM_Planter.fbx,27388,untracked,include,
+ArtSource/Presentation/SM_Railing.fbx,36012,untracked,include,
+ArtSource/Presentation/SM_Sentry.fbx,52428,untracked,include,
+ArtSource/Presentation/SM_StreetLamp.fbx,31004,untracked,include,
+ArtSource/Presentation/SM_TravelAnchor.fbx,30012,untracked,include,
+ArtSource/Presentation/layouts.json,256449,untracked,include,
+Config/DefaultEngine.ini,1679,modified tracked,include,
+Config/DefaultGame.ini,751,modified tracked,include,
+Content/Data/VerticalSlice/Characters/Curve_CharacterExperience.uasset,6418,untracked,include,
+Content/Data/VerticalSlice/Characters/DA_CharacterCatalog_VerticalSlice.uasset,2139,untracked,include,
+Content/Data/VerticalSlice/Characters/DA_Character_EvernightMoon.uasset,4420,modified tracked,include,
+Content/Data/VerticalSlice/Characters/DA_Character_Huohua.uasset,4231,modified tracked,include,
+Content/Data/VerticalSlice/Characters/DA_Character_Remiel.uasset,4197,modified tracked,include,
+Content/Data/VerticalSlice/Characters/DA_Character_Verina.uasset,4345,modified tracked,include,
+Content/Data/VerticalSlice/Dialogues/DA_Dialogue_Catherine.uasset,4458,untracked,include,
+Content/Data/VerticalSlice/Encounters/DA_Encounter_CourtyardPatrol.uasset,4249,untracked,include,
+Content/Data/VerticalSlice/Encounters/DA_Encounter_Laigushi.uasset,4339,modified tracked,include,
+Content/Data/VerticalSlice/Encounters/DA_Encounter_SupportSectionInspector.uasset,4345,modified tracked,include,
+Content/Data/VerticalSlice/Enemies/DA_Boss_Laigushi.uasset,2798,modified tracked,include,
+Content/Data/VerticalSlice/Enemies/DA_EnemyCatalog.uasset,1846,modified tracked,include,
+Content/Data/VerticalSlice/Enemies/DA_Enemy_CourtyardPatrol.uasset,3093,untracked,include,
+Content/Data/VerticalSlice/Enemies/DA_Enemy_SupportSectionInspector.uasset,2736,modified tracked,include,
+Content/Data/VerticalSlice/Equipment/DA_EnhancementCatalog_VerticalSlice.uasset,12792,untracked,include,
+Content/Data/VerticalSlice/Equipment/DA_Weapon_EchoConductor.uasset,1842,untracked,include,
+Content/Data/VerticalSlice/Items/DA_InventoryCatalog_VerticalSlice.uasset,5831,untracked,include,
+Content/Data/VerticalSlice/Items/DA_ItemEquipmentMappingCatalog_VerticalSlice.uasset,3316,modified tracked,include,
+Content/Data/VerticalSlice/Items/Weapons/DA_Item_EchoConductor.uasset,1783,untracked,include,
+Content/Data/VerticalSlice/Maps/DA_MapCatalog_VerticalSlice.uasset,2409,untracked,include,
+Content/Data/VerticalSlice/Maps/DA_Map_HertaSupportSection.uasset,1934,modified tracked,include,
+Content/Data/VerticalSlice/Maps/DA_Map_NewEriduSixthStreetMetro.uasset,1987,modified tracked,include,
+Content/Data/VerticalSlice/Maps/DA_Map_ObservationCar.uasset,1900,modified tracked,include,
+Content/Data/VerticalSlice/Quests/DA_Quest_DomainEcho.uasset,3165,modified tracked,include,
+Content/Data/VerticalSlice/Relics/Pieces/DA_Relic_HeavenLiveRoom_LinkRope.uasset,2107,modified tracked,include,
+Content/Data/VerticalSlice/Relics/Pieces/DA_Relic_HeavenLiveRoom_PlanarSphere.uasset,2136,modified tracked,include,
+Content/Data/VerticalSlice/Relics/Pieces/DA_Relic_ShiningMagicalGirl_Body.uasset,2109,modified tracked,include,
+Content/Data/VerticalSlice/Relics/Pieces/DA_Relic_ShiningMagicalGirl_Feet.uasset,2107,modified tracked,include,
+Content/Data/VerticalSlice/Relics/Pieces/DA_Relic_ShiningMagicalGirl_Hands.uasset,2115,modified tracked,include,
+Content/Data/VerticalSlice/Relics/Pieces/DA_Relic_ShiningMagicalGirl_Head.uasset,1979,modified tracked,include,
+Content/Data/VerticalSlice/Rewards/DA_Reward_WangXiaYiTong.uasset,1997,modified tracked,include,
+Content/Data/VerticalSlice/Skills/DA_Skill_EvernightMoon_Basic.uasset,2983,modified tracked,include,
+Content/Data/VerticalSlice/Skills/DA_Skill_EvernightMoon_FullMoon.uasset,3691,modified tracked,include,
+Content/Data/VerticalSlice/Skills/DA_Skill_EvernightMoon_Nightfall.uasset,3326,modified tracked,include,
+Content/Data/VerticalSlice/Skills/DA_Skill_Huohua_Basic.uasset,3010,modified tracked,include,
+Content/Data/VerticalSlice/Skills/DA_Skill_Huohua_BloomingStage.uasset,3470,modified tracked,include,
+Content/Data/VerticalSlice/Skills/DA_Skill_Huohua_GrandOpening.uasset,3888,modified tracked,include,
+Content/Data/VerticalSlice/Skills/DA_Skill_Remiel_Basic.uasset,3062,modified tracked,include,
+Content/Data/VerticalSlice/Skills/DA_Skill_Remiel_Riftlight.uasset,3277,modified tracked,include,
+Content/Data/VerticalSlice/Skills/DA_Skill_Remiel_SkyJudgment.uasset,3874,modified tracked,include,
+Content/Data/VerticalSlice/Skills/DA_Skill_Verina_Basic.uasset,3010,modified tracked,include,
+Content/Data/VerticalSlice/Skills/DA_Skill_Verina_BreathingGarden.uasset,3265,modified tracked,include,
+Content/Data/VerticalSlice/Skills/DA_Skill_Verina_HealingSprout.uasset,2760,modified tracked,include,
+Content/GameplayEffects/GE_Equipment_P12.uasset,27410,modified tracked,include,
+Content/Maps/VerticalSlice/Map_HertaSupportSection.umap,116436,modified tracked,include,
+Content/Maps/VerticalSlice/Map_NewEriduSixthStreetMetro.umap,356194,modified tracked,include,
+Content/Maps/VerticalSlice/Map_ObservationCar.umap,130394,modified tracked,include,
+Content/Presentation/Animation/ABP_Playable_EvernightMoon.uasset,378254,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/ABP_Playable_Huohua.uasset,378685,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/ABP_Playable_Remiel.uasset,376420,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/ABP_Playable_Verina.uasset,378037,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/CC0/IK_Quaternius.uasset,47330,untracked,include,
+Content/Presentation/Animation/CC0/QuaterniusCast.uasset,100517,untracked,include,
+Content/Presentation/Animation/CC0/QuaterniusDeath.uasset,1880899,untracked,include,
+Content/Presentation/Animation/CC0/QuaterniusDeath_Anim.uasset,320599,untracked,include,
+Content/Presentation/Animation/CC0/QuaterniusDeath_PhysicsAsset.uasset,12676,untracked,include,
+Content/Presentation/Animation/CC0/QuaterniusDeath_Skeleton.uasset,19385,untracked,include,
+Content/Presentation/Animation/CC0/QuaterniusHeal.uasset,106341,untracked,include,
+Content/Presentation/Animation/Combat/CAST_Remiel_QuaterniusCast.uasset,1022841,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/CAST_Verina_QuaterniusCast.uasset,915069,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/CAST_Verina_QuaterniusHeal.uasset,916099,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/EvernightMoon_MM_Attack_01.uasset,459655,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/EvernightMoon_MM_Death_Front_01.uasset,461658,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/EvernightMoon_MM_HitReact_Front_Med_01.uasset,462041,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/FULL_EvernightMoon_QuaterniusDeath_Anim.uasset,508099,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/FULL_Huohua_QuaterniusDeath_Anim.uasset,516033,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/FULL_Remiel_QuaterniusDeath_Anim.uasset,1060978,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/FULL_Verina_QuaterniusDeath_Anim.uasset,953677,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/Huohua_MM_Attack_01.uasset,467886,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/Huohua_MM_Death_Front_01.uasset,469526,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/Huohua_MM_HitReact_Front_Med_01.uasset,469909,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_EvernightMoon_MM_Attack_01.uasset,566774,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_EvernightMoon_MM_ChargedAttack.uasset,649297,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_EvernightMoon_MM_Death_Front_01.uasset,675598,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_EvernightMoon_MM_HitReact_Front_Med_01.uasset,604834,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_Huohua_MM_Attack_01.uasset,573183,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_Huohua_MM_ChargedAttack.uasset,658405,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_Huohua_MM_Death_Front_01.uasset,685164,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_Huohua_MM_HitReact_Front_Med_01.uasset,614298,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_Remiel_MM_Attack_01.uasset,1119788,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_Remiel_MM_ChargedAttack.uasset,1202889,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_Remiel_MM_Death_Front_01.uasset,1230406,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_Remiel_MM_HitReact_Front_Med_01.uasset,1157735,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_Verina_MM_Attack_01.uasset,1011049,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_Verina_MM_ChargedAttack.uasset,1089529,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_Verina_MM_Death_Front_01.uasset,1113249,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/LIVE_Verina_MM_HitReact_Front_Med_01.uasset,1050502,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/Remiel_MM_Attack_01.uasset,1011917,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/Remiel_MM_Death_Front_01.uasset,1013920,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/Remiel_MM_HitReact_Front_Med_01.uasset,1014303,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/Verina_MM_Attack_01.uasset,905349,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/Verina_MM_Death_Front_01.uasset,907352,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Combat/Verina_MM_HitReact_Front_Med_01.uasset,907735,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_ABP_Unarmed.uasset,379595,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_BS_Idle_Walk_Run.uasset,53849,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Jog_Bwd.uasset,740014,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Jog_Bwd_Left.uasset,741978,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Jog_Bwd_Right.uasset,741869,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Jog_Fwd.uasset,786052,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Jog_Fwd_Left.uasset,788192,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Jog_Fwd_Right.uasset,788232,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Jog_Left.uasset,749497,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Jog_Right.uasset,786609,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Walk_Bwd.uasset,856987,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Walk_Bwd_Left.uasset,860203,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Walk_Bwd_Right.uasset,860087,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Walk_Fwd.uasset,738043,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Walk_Fwd_Left.uasset,739977,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Walk_Fwd_Right.uasset,739730,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Walk_Left.uasset,746985,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MF_Unarmed_Walk_Right.uasset,746637,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MM_Fall_Loop.uasset,999634,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MM_Idle.uasset,1815235,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MM_Jump.uasset,623896,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FINAL_EvernightMoon_MM_Land.uasset,622608,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_ABP_Unarmed.uasset,379820,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_BS_Idle_Walk_Run.uasset,54112,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Jog_Bwd.uasset,459804,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Jog_Bwd_Left.uasset,458692,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Jog_Bwd_Right.uasset,458697,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Jog_Fwd.uasset,459814,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Jog_Fwd_Left.uasset,458692,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Jog_Fwd_Right.uasset,458697,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Jog_Left.uasset,459812,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Jog_Right.uasset,459830,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Walk_Bwd.uasset,459850,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Walk_Bwd_Left.uasset,458736,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Walk_Bwd_Right.uasset,458741,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Walk_Fwd.uasset,459533,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Walk_Fwd_Left.uasset,458408,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Walk_Fwd_Right.uasset,458413,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Walk_Left.uasset,459541,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MF_Unarmed_Walk_Right.uasset,459524,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MM_Fall_Loop.uasset,458715,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MM_Idle.uasset,458591,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MM_Jump.uasset,458687,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/FIX_EvernightMoon_MM_Land.uasset,458847,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_ABP_Unarmed.uasset,379496,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_BS_Idle_Walk_Run.uasset,53743,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Jog_Bwd.uasset,742669,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Jog_Bwd_Left.uasset,744532,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Jog_Bwd_Right.uasset,744506,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Jog_Fwd.uasset,789049,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Jog_Fwd_Left.uasset,791278,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Jog_Fwd_Right.uasset,791279,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Jog_Left.uasset,749004,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Jog_Right.uasset,786184,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Walk_Bwd.uasset,860768,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Walk_Bwd_Left.uasset,863900,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Walk_Bwd_Right.uasset,863829,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Walk_Fwd.uasset,743143,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Walk_Fwd_Left.uasset,744911,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Walk_Fwd_Right.uasset,744801,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Walk_Left.uasset,746277,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MF_Unarmed_Walk_Right.uasset,745953,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MM_Fall_Loop.uasset,999595,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MM_Idle.uasset,1815193,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MM_Jump.uasset,623877,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/EvernightMoon/LIVE_EvernightMoon_MM_Land.uasset,622487,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_ABP_Unarmed.uasset,379822,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_BS_Idle_Walk_Run.uasset,54813,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Jog_Bwd.uasset,749712,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Jog_Bwd_Left.uasset,751741,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Jog_Bwd_Right.uasset,751601,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Jog_Fwd.uasset,796012,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Jog_Fwd_Left.uasset,798169,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Jog_Fwd_Right.uasset,798022,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Jog_Left.uasset,753170,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Jog_Right.uasset,792916,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Walk_Bwd.uasset,866609,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Walk_Bwd_Left.uasset,869720,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Walk_Bwd_Right.uasset,869570,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Walk_Fwd.uasset,750413,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Walk_Fwd_Left.uasset,752159,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Walk_Fwd_Right.uasset,752010,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Walk_Left.uasset,756516,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MF_Unarmed_Walk_Right.uasset,759064,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MM_Fall_Loop.uasset,1009198,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MM_Idle.uasset,1824514,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MM_Jump.uasset,633470,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FINAL_Huohua_MM_Land.uasset,630261,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_ABP_Unarmed.uasset,379533,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_BS_Idle_Walk_Run.uasset,54022,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Jog_Bwd.uasset,467952,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Jog_Bwd_Left.uasset,466830,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Jog_Bwd_Right.uasset,466835,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Jog_Fwd.uasset,467952,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Jog_Fwd_Left.uasset,466830,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Jog_Fwd_Right.uasset,466835,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Jog_Left.uasset,467960,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Jog_Right.uasset,467968,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Walk_Bwd.uasset,467988,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Walk_Bwd_Left.uasset,466874,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Walk_Bwd_Right.uasset,466879,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Walk_Fwd.uasset,467671,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Walk_Fwd_Left.uasset,466546,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Walk_Fwd_Right.uasset,466551,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Walk_Left.uasset,467679,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MF_Unarmed_Walk_Right.uasset,467672,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MM_Fall_Loop.uasset,466853,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MM_Idle.uasset,466739,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MM_Jump.uasset,466837,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/FIX_Huohua_MM_Land.uasset,466997,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_ABP_Unarmed.uasset,379721,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_BS_Idle_Walk_Run.uasset,53925,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Jog_Bwd.uasset,747598,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Jog_Bwd_Left.uasset,749438,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Jog_Bwd_Right.uasset,749394,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Jog_Fwd.uasset,796924,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Jog_Fwd_Left.uasset,799175,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Jog_Fwd_Right.uasset,799118,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Jog_Left.uasset,753862,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Jog_Right.uasset,790616,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Walk_Bwd.uasset,864472,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Walk_Bwd_Left.uasset,867551,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Walk_Bwd_Right.uasset,867508,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Walk_Fwd.uasset,748180,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Walk_Fwd_Left.uasset,749941,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Walk_Fwd_Right.uasset,749782,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Walk_Left.uasset,757244,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MF_Unarmed_Walk_Right.uasset,756884,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MM_Fall_Loop.uasset,1013817,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MM_Idle.uasset,1823669,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MM_Jump.uasset,632355,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Huohua/LIVE_Huohua_MM_Land.uasset,629392,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_ABP_Unarmed.uasset,377629,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_BS_Idle_Walk_Run.uasset,52131,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Jog_Bwd.uasset,1300056,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Jog_Bwd_Left.uasset,1306309,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Jog_Bwd_Right.uasset,1306302,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Jog_Fwd.uasset,1347269,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Jog_Fwd_Left.uasset,1354620,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Jog_Fwd_Right.uasset,1354571,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Jog_Left.uasset,1306379,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Jog_Right.uasset,1344118,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Walk_Bwd.uasset,1420002,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Walk_Bwd_Left.uasset,1429341,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Walk_Bwd_Right.uasset,1429320,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Walk_Fwd.uasset,1297515,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Walk_Fwd_Left.uasset,1303871,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Walk_Fwd_Right.uasset,1303685,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Walk_Left.uasset,1306380,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MF_Unarmed_Walk_Right.uasset,1306271,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MM_Fall_Loop.uasset,1551573,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MM_Idle.uasset,2366843,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MM_Jump.uasset,1175688,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FINAL_Remiel_MM_Land.uasset,1174155,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_ABP_Unarmed.uasset,377664,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_BS_Idle_Walk_Run.uasset,52272,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Jog_Bwd.uasset,1011211,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Jog_Bwd_Left.uasset,1010089,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Jog_Bwd_Right.uasset,1010094,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Jog_Fwd.uasset,1011211,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Jog_Fwd_Left.uasset,1010089,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Jog_Fwd_Right.uasset,1010094,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Jog_Left.uasset,1011219,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Jog_Right.uasset,1011227,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Walk_Bwd.uasset,1011247,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Walk_Bwd_Left.uasset,1010133,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Walk_Bwd_Right.uasset,1010138,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Walk_Fwd.uasset,1010930,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Walk_Fwd_Left.uasset,1009805,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Walk_Fwd_Right.uasset,1009810,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Walk_Left.uasset,1010938,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MF_Unarmed_Walk_Right.uasset,1010931,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MM_Fall_Loop.uasset,1010112,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MM_Idle.uasset,1009998,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MM_Jump.uasset,1010096,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/FIX_Remiel_MM_Land.uasset,1010256,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_ABP_Unarmed.uasset,377558,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_BS_Idle_Walk_Run.uasset,52117,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Jog_Bwd.uasset,1299829,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Jog_Bwd_Left.uasset,1306069,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Jog_Bwd_Right.uasset,1306046,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Jog_Fwd.uasset,1350342,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Jog_Fwd_Left.uasset,1357811,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Jog_Fwd_Right.uasset,1357802,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Jog_Left.uasset,1306165,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Jog_Right.uasset,1343950,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Walk_Bwd.uasset,1419722,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Walk_Bwd_Left.uasset,1429027,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Walk_Bwd_Right.uasset,1428986,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Walk_Fwd.uasset,1300090,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Walk_Fwd_Left.uasset,1306280,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Walk_Fwd_Right.uasset,1306194,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Walk_Left.uasset,1306106,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MF_Unarmed_Walk_Right.uasset,1305969,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MM_Fall_Loop.uasset,1557376,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MM_Idle.uasset,2366866,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MM_Jump.uasset,1175686,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Remiel/LIVE_Remiel_MM_Land.uasset,1174138,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_ABP_Unarmed.uasset,379384,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_BS_Idle_Walk_Run.uasset,53654,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Jog_Bwd.uasset,1187459,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Jog_Bwd_Left.uasset,1189317,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Jog_Bwd_Right.uasset,1189265,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Jog_Fwd.uasset,1233454,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Jog_Fwd_Left.uasset,1235527,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Jog_Fwd_Right.uasset,1235597,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Jog_Left.uasset,1190716,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Jog_Right.uasset,1230523,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Walk_Bwd.uasset,1304482,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Walk_Bwd_Left.uasset,1307643,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Walk_Bwd_Right.uasset,1307464,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Walk_Fwd.uasset,1185498,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Walk_Fwd_Left.uasset,1187098,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Walk_Fwd_Right.uasset,1186986,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Walk_Left.uasset,1194316,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MF_Unarmed_Walk_Right.uasset,1193857,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MM_Fall_Loop.uasset,1447402,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MM_Idle.uasset,2262939,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MM_Jump.uasset,1069700,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FINAL_Verina_MM_Land.uasset,1068552,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_ABP_Unarmed.uasset,379564,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_BS_Idle_Walk_Run.uasset,53718,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Jog_Bwd.uasset,907277,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Jog_Bwd_Left.uasset,906161,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Jog_Bwd_Right.uasset,906166,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Jog_Fwd.uasset,907285,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Jog_Fwd_Left.uasset,906161,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Jog_Fwd_Right.uasset,906166,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Jog_Left.uasset,907285,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Jog_Right.uasset,907301,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Walk_Bwd.uasset,907313,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Walk_Bwd_Left.uasset,906205,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Walk_Bwd_Right.uasset,906210,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Walk_Fwd.uasset,907004,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Walk_Fwd_Left.uasset,905877,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Walk_Fwd_Right.uasset,905882,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Walk_Left.uasset,907004,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MF_Unarmed_Walk_Right.uasset,906997,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MM_Fall_Loop.uasset,906178,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MM_Idle.uasset,906064,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MM_Jump.uasset,906162,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/FIX_Verina_MM_Land.uasset,906322,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_ABP_Unarmed.uasset,379294,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_BS_Idle_Walk_Run.uasset,53569,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Jog_Bwd.uasset,1188017,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Jog_Bwd_Left.uasset,1188509,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Jog_Bwd_Right.uasset,1188396,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Jog_Fwd.uasset,1236725,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Jog_Fwd_Left.uasset,1237041,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Jog_Fwd_Right.uasset,1237732,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Jog_Left.uasset,1196901,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Jog_Right.uasset,1234281,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Walk_Bwd.uasset,1308462,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Walk_Bwd_Left.uasset,1309649,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Walk_Bwd_Right.uasset,1309232,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Walk_Fwd.uasset,1187795,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Walk_Fwd_Left.uasset,1188218,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Walk_Fwd_Right.uasset,1188230,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Walk_Left.uasset,1196962,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MF_Unarmed_Walk_Right.uasset,1196732,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MM_Fall_Loop.uasset,1447364,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MM_Idle.uasset,2262941,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MM_Jump.uasset,1071441,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/Locomotion/Verina/LIVE_Verina_MM_Land.uasset,1070225,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_BS_Idle_Walk_Run.uasset,53050,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Jog_Bwd.uasset,469690,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Jog_Bwd_Left.uasset,468552,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Jog_Bwd_Right.uasset,468557,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Jog_Fwd.uasset,469674,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Jog_Fwd_Left.uasset,468552,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Jog_Fwd_Right.uasset,468557,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Jog_Left.uasset,469682,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Jog_Right.uasset,469690,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Walk_Bwd.uasset,469710,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Walk_Bwd_Left.uasset,468596,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Walk_Bwd_Right.uasset,468601,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Walk_Fwd.uasset,469393,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Walk_Fwd_Left.uasset,468268,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Walk_Fwd_Right.uasset,468273,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Walk_Left.uasset,469401,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MF_Unarmed_Walk_Right.uasset,469394,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MM_Fall_Loop.uasset,468575,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MM_Idle1.uasset,468466,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MM_Jump.uasset,468559,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PLAY_MM_Land.uasset,468719,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_ABP_EvernightMoon_Unarmed.uasset,385820,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_ABP_Remiel_Unarmed.uasset,383868,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_BS_Idle_Walk_Run.uasset,51620,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_BS_Idle_Walk_Run1.uasset,53091,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Bwd.uasset,1011151,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Bwd1.uasset,461502,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Bwd_Left.uasset,1010013,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Bwd_Left1.uasset,460364,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Bwd_Right.uasset,1010018,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Bwd_Right1.uasset,460369,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Fwd.uasset,1011135,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Fwd1.uasset,461486,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Fwd_Left.uasset,1010013,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Fwd_Left1.uasset,460354,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Fwd_Right.uasset,1010018,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Fwd_Right1.uasset,460369,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Left.uasset,1011143,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Left1.uasset,461484,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Right.uasset,1011151,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Jog_Right1.uasset,461502,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Bwd.uasset,1011171,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Bwd1.uasset,461522,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Bwd_Left.uasset,1010057,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Bwd_Left1.uasset,460396,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Bwd_Right.uasset,1010062,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Bwd_Right1.uasset,460413,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Fwd.uasset,1010854,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Fwd1.uasset,461205,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Fwd_Left.uasset,1009729,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Fwd_Left1.uasset,460080,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Fwd_Right.uasset,1009734,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Fwd_Right1.uasset,460085,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Left.uasset,1010862,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Left1.uasset,461213,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Right.uasset,1010855,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MF_Unarmed_Walk_Right1.uasset,461206,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MM_Fall_Loop.uasset,1010036,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MM_Fall_Loop1.uasset,460387,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MM_Idle1.uasset,1009927,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MM_Idle2.uasset,460273,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MM_Jump.uasset,1010020,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MM_Jump1.uasset,460371,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MM_Land.uasset,1010180,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/PR_MM_Land1.uasset,460520,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/RTG_Combat_EvernightMoon.uasset,23824,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/RTG_Combat_Huohua.uasset,24183,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/RTG_Combat_Remiel.uasset,23908,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/RTG_Combat_Verina.uasset,24390,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/RTG_CompleteDefeat_EvernightMoon.uasset,23302,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/RTG_CompleteDefeat_Huohua.uasset,23455,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/RTG_CompleteDefeat_Remiel.uasset,23223,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/RTG_CompleteDefeat_Verina.uasset,23631,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/RTG_EvernightMoon.uasset,5416,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/RTG_Playable_Huohua.uasset,5714,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Animation/RTG_Remiel.uasset,5386,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/Blueprints/BP_HertaSupportSectionGameMode.uasset,25069,untracked,include,
+Content/Presentation/Blueprints/BP_NewEriduSixthStreetMetroGameMode.uasset,21969,untracked,include,
+Content/Presentation/Blueprints/BP_ObservationCarGameMode.uasset,21771,untracked,include,
+Content/Presentation/Materials/M_Fabric_Wine.uasset,8926,untracked,include,
+Content/Presentation/Materials/M_Glass_Midnight.uasset,8892,untracked,include,
+Content/Presentation/Materials/M_Glow_Amber.uasset,10321,untracked,include,
+Content/Presentation/Materials/M_Glow_Cyan.uasset,10331,untracked,include,
+Content/Presentation/Materials/M_Leaves_Teal.uasset,9413,untracked,include,
+Content/Presentation/Materials/M_Metal_Brass.uasset,9615,untracked,include,
+Content/Presentation/Materials/M_Metal_Charcoal.uasset,8791,untracked,include,
+Content/Presentation/Materials/M_NightSky.uasset,7301,untracked,include,
+Content/Presentation/Materials/M_Paving.uasset,11352,untracked,include,
+Content/Presentation/Materials/M_Stone_Blue.uasset,11636,untracked,include,
+Content/Presentation/Materials/M_Stone_Ivory.uasset,11441,untracked,include,
+Content/Presentation/Materials/M_Water.uasset,9072,untracked,include,
+Content/Presentation/Materials/M_Wood_Walnut.uasset,9255,untracked,include,
+Content/Presentation/Meshes/SM_Arch.uasset,34122,untracked,include,
+Content/Presentation/Meshes/SM_Banner.uasset,34633,untracked,include,
+Content/Presentation/Meshes/SM_Bench.uasset,49719,untracked,include,
+Content/Presentation/Meshes/SM_Bin.uasset,27317,untracked,include,
+Content/Presentation/Meshes/SM_Brazier.uasset,38383,untracked,include,
+Content/Presentation/Meshes/SM_Chest.uasset,35245,untracked,include,
+Content/Presentation/Meshes/SM_Column.uasset,38194,untracked,include,
+Content/Presentation/Meshes/SM_Facade.uasset,92410,untracked,include,
+Content/Presentation/Meshes/SM_Hydrant.uasset,32782,untracked,include,
+Content/Presentation/Meshes/SM_Palm.uasset,25528,untracked,include,
+Content/Presentation/Meshes/SM_Planter.uasset,35847,untracked,include,
+Content/Presentation/Meshes/SM_Railing.uasset,49970,untracked,include,
+Content/Presentation/Meshes/SM_Sentry.uasset,75856,untracked,include,
+Content/Presentation/Meshes/SM_StreetLamp.uasset,41585,untracked,include,
+Content/Presentation/Meshes/SM_TravelAnchor.uasset,41064,untracked,include,
+Content/Presentation/UI/T_Item_Body.uasset,47922,untracked,include,
+Content/Presentation/UI/T_Item_Feet.uasset,51619,untracked,include,
+Content/Presentation/UI/T_Item_Hands.uasset,47147,untracked,include,
+Content/Presentation/UI/T_Item_Head.uasset,49840,untracked,include,
+Content/Presentation/UI/T_Item_LinkRope.uasset,45474,untracked,include,
+Content/Presentation/UI/T_Item_Material.uasset,43201,untracked,include,
+Content/Presentation/UI/T_Item_PlanarSphere.uasset,51311,untracked,include,
+Content/Presentation/UI/T_Item_Weapon.uasset,39375,untracked,include,
+Content/Presentation/UI/T_Portrait_EvernightMoon.uasset,92985,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/UI/T_Portrait_Huohua.uasset,92114,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/UI/T_Portrait_Remiel.uasset,94791,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/Presentation/UI/T_Portrait_Verina.uasset,84117,untracked,exclude,derived from local third-party character / animation assets; public redistribution evidence unavailable
+Content/UI/P17/Character/WBP_CharacterShellEntry_P17.uasset,62799,modified tracked,include,
+Content/UI/P17/Character/WBP_CharacterShell_P17.uasset,355976,modified tracked,include,
+Content/UI/P17/Dialogue/WBP_DialogueOverlay_P17.uasset,91634,modified tracked,include,
+Content/UI/P17/Frontend/WBP_FrontendModuleRoot_P17.uasset,81443,modified tracked,include,
+Content/UI/P17/Frontend/WBP_FrontendShell_P17.uasset,202558,modified tracked,include,
+Content/UI/P17/Frontend/WBP_HSRChallengeDirectory_P17.uasset,165414,modified tracked,include,
+Content/UI/P17/Frontend/WBP_HSRChallengeEntry_P17.uasset,169387,modified tracked,include,
+Content/UI/P17/Frontend/WBP_HSRMapPanel_P17.uasset,126316,modified tracked,include,
+Content/UI/P17/Frontend/WBP_HSRObjectiveEntry_P17.uasset,36394,modified tracked,include,
+Content/UI/P17/Frontend/WBP_HSRPartyPanel_P17.uasset,654498,modified tracked,include,
+Content/UI/P17/Frontend/WBP_HSRPartySlotEntry_P17.uasset,92934,modified tracked,include,
+Content/UI/P17/Frontend/WBP_HSRPreBattlePanel_P17.uasset,493106,modified tracked,include,
+Content/UI/P17/Frontend/WBP_HSRQuestEntry_P17.uasset,41551,modified tracked,include,
+Content/UI/P17/Frontend/WBP_HSRQuestPanel_P17.uasset,279812,modified tracked,include,
+Content/UI/P17/Frontend/WBP_HSRSavePanel_P17.uasset,446366,modified tracked,include,
+Content/UI/P17/Inventory/WBP_Inventory_P17.uasset,212318,modified tracked,include,
+Content/UI/P17/Relic/WBP_RelicCandidateEntry_P17.uasset,62739,modified tracked,include,
+Content/UI/P17/Relic/WBP_RelicEnhancementOptionRow_P17.uasset,52691,modified tracked,include,
+Content/UI/P17/Relic/WBP_RelicEquipment_P17.uasset,401444,modified tracked,include,
+Content/UI/P17/Relic/WBP_RelicSlotEntry_P17.uasset,63286,modified tracked,include,
+Content/UI/P17/Relic/WBP_RelicStatRow_P17.uasset,39571,modified tracked,include,
+Content/UI/WBP_AttributeDebug.uasset,280360,modified tracked,include,
+Content/UI/WBP_BattleCommandPanel.uasset,194014,modified tracked,include,
+Content/UI/WBP_CharacterDetail_P11.uasset,188495,modified tracked,include,
+Content/UI/WBP_EquipmentDetail_P12.uasset,152355,modified tracked,include,
+Content/UI/WBP_ExplorationHUD.uasset,66404,modified tracked,include,
+Content/UI/WBP_Inventory_P13.uasset,81765,modified tracked,include,
+Content/UI/WBP_RewardSummary_P13.uasset,49243,modified tracked,include,
+Content/UI/WBP_Reward_Summary_P13.uasset,40791,modified tracked,include,
+PROJECT_STATE.md,106392,modified tracked,include,
+Plugins/UnrealMCPython/Source/UnrealMCPython/Private/MCPythonHelper_Curve.cpp,702,untracked,include,
+Plugins/UnrealMCPython/Source/UnrealMCPython/Private/MCPythonHelper_Presentation.cpp,2949,untracked,include,
+Plugins/UnrealMCPython/Source/UnrealMCPython/Private/MCPythonHelper_UMG.cpp,33249,modified tracked,include,
+Plugins/UnrealMCPython/Source/UnrealMCPython/Public/MCPythonHelper.h,19808,modified tracked,include,
+Plugins/VRM4U/Binaries/Win64/UnrealEditor-VRM4U.dll,1400320,modified tracked,exclude,pre-existing local plugin binary; source provenance not verified
+Plugins/VRM4U/Binaries/Win64/UnrealEditor-VRM4UCapture.dll,286720,modified tracked,exclude,pre-existing local plugin binary; source provenance not verified
+Plugins/VRM4U/Binaries/Win64/UnrealEditor-VRM4UCaptureEditor.dll,97280,modified tracked,exclude,pre-existing local plugin binary; source provenance not verified
+Plugins/VRM4U/Binaries/Win64/UnrealEditor-VRM4UEditor.dll,77824,modified tracked,exclude,pre-existing local plugin binary; source provenance not verified
+Plugins/VRM4U/Binaries/Win64/UnrealEditor-VRM4UImporter.dll,489472,modified tracked,exclude,pre-existing local plugin binary; source provenance not verified
+Plugins/VRM4U/Binaries/Win64/UnrealEditor-VRM4ULoader.dll,1257472,modified tracked,exclude,pre-existing local plugin binary; source provenance not verified
+Plugins/VRM4U/Binaries/Win64/UnrealEditor-VRM4UMisc.dll,52736,modified tracked,exclude,pre-existing local plugin binary; source provenance not verified
+Plugins/VRM4U/Binaries/Win64/UnrealEditor-VRM4URender.dll,312320,modified tracked,exclude,pre-existing local plugin binary; source provenance not verified
+Source/HSR/Battle/HSRBattleAttributeInitialization.cpp,2518,untracked,include,
+Source/HSR/Battle/HSRBattleAttributeInitialization.h,747,untracked,include,
+Source/HSR/Battle/HSRBattleCoordinator.cpp,150352,modified tracked,include,
+Source/HSR/Battle/HSRBattleCoordinator.h,29616,modified tracked,include,
+Source/HSR/Battle/HSRBattleCoordinatorPresentation.cpp,5970,untracked,include,
+Source/HSR/Battle/HSRBattleGameMode.cpp,260974,modified tracked,include,
+Source/HSR/Battle/HSRBattleStage.cpp,2511,untracked,include,
+Source/HSR/Battle/HSRBattleStage.h,1638,untracked,include,
+Source/HSR/Battle/HSRBattleTransitionSubsystem.cpp,37935,modified tracked,include,
+Source/HSR/Battle/HSRBattleTransitionSubsystem.h,5704,modified tracked,include,
+Source/HSR/Battle/HSRCombatMotionComponent.cpp,2385,untracked,include,
+Source/HSR/Battle/HSRCombatMotionComponent.h,833,untracked,include,
+Source/HSR/Battle/HSREnemyTargetPolicy.h,772,untracked,include,
+Source/HSR/Character/HSRCharacterBase.cpp,21703,modified tracked,include,
+Source/HSR/Character/HSRCharacterBase.h,4661,modified tracked,include,
+Source/HSR/Data/Definitions/HSRCharacterCatalog.h,675,modified tracked,include,
+Source/HSR/Data/Definitions/HSRCharacterDefinition.h,3875,modified tracked,include,
+Source/HSR/Data/Definitions/HSREncounterDefinition.h,1769,modified tracked,include,
+Source/HSR/Data/Definitions/HSREnemyDefinition.h,4338,modified tracked,include,
+Source/HSR/Data/Definitions/HSRQuestDefinition.h,843,modified tracked,include,
+Source/HSR/Enemy/HSREnemyAIController.cpp,29793,modified tracked,include,
+Source/HSR/Enemy/HSREnemyCharacter.cpp,3985,modified tracked,include,
+Source/HSR/Enemy/HSREnemyCharacter.h,1573,modified tracked,include,
+Source/HSR/Equipment/HSREquipmentEffectBridge.cpp,7984,modified tracked,include,
+Source/HSR/Equipment/HSREquipmentSubsystem.cpp,59451,modified tracked,include,
+Source/HSR/Equipment/HSREquipmentSubsystem.h,11045,modified tracked,include,
+Source/HSR/Exploration/HSRGrayboxInteractable.cpp,5662,modified tracked,include,
+Source/HSR/Exploration/HSRInstancedScene.cpp,1417,untracked,include,
+Source/HSR/Exploration/HSRInstancedScene.h,555,untracked,include,
+Source/HSR/Exploration/HSRRewardChest.cpp,6900,modified tracked,include,
+Source/HSR/Exploration/HSRRewardChest.h,2130,modified tracked,include,
+Source/HSR/Exploration/HSRSceneContent.cpp,4390,untracked,include,
+Source/HSR/Exploration/HSRSceneContent.h,1658,untracked,include,
+Source/HSR/Exploration/HSRSceneInteraction.cpp,2137,untracked,include,
+Source/HSR/Exploration/HSRSceneInteraction.h,907,untracked,include,
+Source/HSR/Framework/HSRGameModeBase.cpp,13834,modified tracked,include,
+Source/HSR/Framework/HSRGameModeBase.h,3040,modified tracked,include,
+Source/HSR/GAS/Ability/HSRAbilityTypes.h,2609,modified tracked,include,
+Source/HSR/GAS/Ability/HSRHealAbility.cpp,5432,modified tracked,include,
+Source/HSR/GAS/Ability/HSRHealAbility.h,1786,modified tracked,include,
+Source/HSR/GAS/Attribute/HSRCoreAttributeSet.cpp,7555,modified tracked,include,
+Source/HSR/GAS/Attribute/HSRCoreAttributeSet.h,3108,modified tracked,include,
+Source/HSR/HSR.Build.cs,558,modified tracked,include,
+Source/HSR/Map/HSRMapSubsystem.cpp,39525,modified tracked,include,
+Source/HSR/Map/HSRMapSubsystem.h,5973,modified tracked,include,
+Source/HSR/Map/HSRSafePlacement.cpp,3842,untracked,include,
+Source/HSR/Map/HSRSafePlacement.h,433,untracked,include,
+Source/HSR/Map/HSRWorldMarkers.cpp,3436,untracked,include,
+Source/HSR/Map/HSRWorldMarkers.h,330,untracked,include,
+Source/HSR/Player/HSRPlayerController.cpp,30648,modified tracked,include,
+Source/HSR/Progression/HSRCharacterProfileSubsystem.cpp,12433,modified tracked,include,
+Source/HSR/Quest/HSRQuestSubsystem.cpp,18331,modified tracked,include,
+Source/HSR/Quest/HSRQuestSubsystem.h,2513,modified tracked,include,
+Source/HSR/Quest/HSRQuestTypes.h,3023,modified tracked,include,
+Source/HSR/Save/HSRSaveSubsystem.cpp,81830,modified tracked,include,
+Source/HSR/Tests/HSRBattleAttributeInitializationTests.cpp,7934,untracked,include,
+Source/HSR/Tests/HSRBattleCasualtyTurnTests.cpp,9295,untracked,include,
+Source/HSR/Tests/HSRCharacterShellPresentationTests.cpp,10195,untracked,include,
+Source/HSR/Tests/HSRCharacterShellTests.cpp,7749,modified tracked,include,
+Source/HSR/Tests/HSREquipmentPresentationFlowTests.cpp,8805,untracked,include,
+Source/HSR/Tests/HSRHealEnergyPresentationTests.cpp,11327,untracked,include,
+Source/HSR/Tests/HSRInteractionBattleAdmissionTests.cpp,28592,modified tracked,include,
+Source/HSR/Tests/HSRInventoryViewModelTests.cpp,37129,modified tracked,include,
+Source/HSR/Tests/HSRPartyFrontendTests.cpp,9746,modified tracked,include,
+Source/HSR/Tests/HSRPlayableFixTests.cpp,8808,untracked,include,
+Source/HSR/Tests/HSRPreBattleCandidateTests.cpp,6125,modified tracked,include,
+Source/HSR/Tests/HSRPreBattlePresentationTests.cpp,6119,untracked,include,
+Source/HSR/Tests/HSRPresentationBenchmark.cpp,3864,untracked,include,
+Source/HSR/Tests/HSRPresentationRebuildTests.cpp,2829,untracked,include,
+Source/HSR/Tests/HSRPresentationRouteTests.cpp,2484,untracked,include,
+Source/HSR/Tests/HSRQuestDialogueTests.cpp,14164,modified tracked,include,
+Source/HSR/Tests/HSRRelicPresentationTests.cpp,4873,untracked,include,
+Source/HSR/Tests/HSRRewardNotificationTests.cpp,3498,untracked,include,
+Source/HSR/Tests/HSRSafePlacementPresentationTests.cpp,12815,untracked,include,
+Source/HSR/Tests/HSRSaveFrontendTests.cpp,6707,modified tracked,include,
+Source/HSR/UI/Character/HSRCharacterShellViewModel.cpp,14303,modified tracked,include,
+Source/HSR/UI/Character/HSRCharacterShellWidget.cpp,20380,modified tracked,include,
+Source/HSR/UI/Character/HSRCharacterShellWidget.h,3292,modified tracked,include,
+Source/HSR/UI/Frontend/HSRFrontendModuleRootWidget.cpp,4091,modified tracked,include,
+Source/HSR/UI/HSRBattleCommandTypes.h,13686,modified tracked,include,
+Source/HSR/UI/HSRBattleCommandViewModel.cpp,17547,modified tracked,include,
+Source/HSR/UI/HSRBattleCommandWidget.cpp,37954,modified tracked,include,
+Source/HSR/UI/HSRBattleCommandWidget.h,10451,modified tracked,include,
+Source/HSR/UI/HSRBattleEntryButton.cpp,5261,untracked,include,
+Source/HSR/UI/HSRBattleEntryButton.h,1212,untracked,include,
+Source/HSR/UI/HSRChallengeDirectoryTypes.h,1871,modified tracked,include,
+Source/HSR/UI/HSRChallengeDirectoryViewModel.cpp,6913,modified tracked,include,
+Source/HSR/UI/HSRChallengeDirectoryWidget.cpp,7308,modified tracked,include,
+Source/HSR/UI/HSRChallengeDirectoryWidget.h,2214,modified tracked,include,
+Source/HSR/UI/HSRCharacterDetailTypes.h,2171,modified tracked,include,
+Source/HSR/UI/HSRCharacterDetailViewModel.cpp,9824,modified tracked,include,
+Source/HSR/UI/HSREquipmentDetailWidget.cpp,1372,modified tracked,include,
+Source/HSR/UI/HSRInventoryRewardWidget.cpp,9462,modified tracked,include,
+Source/HSR/UI/HSRInventoryRewardWidget.h,3144,modified tracked,include,
+Source/HSR/UI/HSRMapWidget.cpp,6859,modified tracked,include,
+Source/HSR/UI/HSRMinimapWidget.cpp,4207,untracked,include,
+Source/HSR/UI/HSRMinimapWidget.h,738,untracked,include,
+Source/HSR/UI/HSRPartyViewModel.cpp,8140,modified tracked,include,
+Source/HSR/UI/HSRPartyViewModel.h,3364,modified tracked,include,
+Source/HSR/UI/HSRPartyWidget.cpp,15353,modified tracked,include,
+Source/HSR/UI/HSRPartyWidget.h,3241,modified tracked,include,
+Source/HSR/UI/HSRPreBattleCandidateViewModel.cpp,7360,modified tracked,include,
+Source/HSR/UI/HSRPreBattleCandidateViewModel.h,1588,modified tracked,include,
+Source/HSR/UI/HSRPreBattleCandidateWidget.cpp,17231,modified tracked,include,
+Source/HSR/UI/HSRPreBattleCandidateWidget.h,3245,modified tracked,include,
+Source/HSR/UI/HSRQuestViewModel.cpp,3660,modified tracked,include,
+Source/HSR/UI/HSRQuestViewModel.h,2787,modified tracked,include,
+Source/HSR/UI/HSRQuestWidget.cpp,5754,modified tracked,include,
+Source/HSR/UI/HSRQuestWidget.h,1512,modified tracked,include,
+Source/HSR/UI/HSRSaveViewModel.cpp,9737,modified tracked,include,
+Source/HSR/UI/HSRSaveViewModel.h,2392,modified tracked,include,
+Source/HSR/UI/HSRSaveWidget.cpp,12268,modified tracked,include,
+Source/HSR/UI/HSRSaveWidget.h,2093,modified tracked,include,
+Source/HSR/UI/HSRUIManagerSubsystem.cpp,134607,modified tracked,include,
+Source/HSR/UI/HSRUIManagerSubsystem.h,19408,modified tracked,include,
+Source/HSR/UI/HSRUserWidget.cpp,7769,modified tracked,include,
+Source/HSR/UI/HSRUserWidget.h,2346,modified tracked,include,
+Source/HSR/UI/HSRWorldGuidanceWidget.cpp,2184,untracked,include,
+Source/HSR/UI/HSRWorldGuidanceWidget.h,616,untracked,include,
+Source/HSR/UI/Inventory/HSRInventoryModuleWidget.cpp,31331,modified tracked,include,
+Source/HSR/UI/Inventory/HSRInventoryModuleWidget.h,7780,modified tracked,include,
+Source/HSR/UI/Inventory/HSRInventoryTypes.h,7085,modified tracked,include,
+Source/HSR/UI/Inventory/HSRInventoryViewModel.cpp,37306,modified tracked,include,
+Source/HSR/UI/Inventory/HSRInventoryViewModel.h,4465,modified tracked,include,
+Source/HSR/UI/Relic/HSRRelicEquipmentTypes.h,4263,modified tracked,include,
+Source/HSR/UI/Relic/HSRRelicEquipmentViewModel.cpp,30229,modified tracked,include,
+Source/HSR/UI/Relic/HSRRelicEquipmentViewModel.h,3577,modified tracked,include,
+Source/HSR/UI/Relic/HSRRelicEquipmentWidget.cpp,36059,modified tracked,include,
+Source/HSR/UI/Relic/HSRRelicEquipmentWidget.h,5751,modified tracked,include,
+Tools/Presentation/audit_asset_usage.py,1170,untracked,include,
+Tools/Presentation/audit_backup_paths.py,2684,untracked,include,
+Tools/Presentation/audit_playable_characters.py,2202,untracked,include,
+Tools/Presentation/audit_ui_pie.py,1804,untracked,include,
+Tools/Presentation/author_cast_animations.py,2300,untracked,include,
+Tools/Presentation/author_combat_animations.py,3368,untracked,include,
+Tools/Presentation/author_combo_style.py,1061,untracked,include,
+Tools/Presentation/author_complete_defeat.py,3465,untracked,include,
+Tools/Presentation/author_content.py,16631,untracked,include,
+Tools/Presentation/author_maps.py,5862,untracked,include,
+Tools/Presentation/author_patrol_fix.py,3534,untracked,include,
+Tools/Presentation/author_prebattle.py,2649,untracked,include,
+Tools/Presentation/author_skill_descriptions.py,1507,untracked,include,
+Tools/Presentation/author_ui.py,21179,untracked,include,
+Tools/Presentation/bake_patrol_navigation.py,751,untracked,include,
+Tools/Presentation/baseline.py,1348,untracked,include,
+Tools/Presentation/build_cleanup_inventory.py,6934,untracked,include,
+Tools/Presentation/build_delivery_report.py,4649,untracked,include,
+Tools/Presentation/build_item_icons.py,4299,untracked,include,
+Tools/Presentation/build_models.py,8874,untracked,include,
+Tools/Presentation/capture_battle_pie.py,557,untracked,include,
+Tools/Presentation/capture_city.py,601,untracked,include,
+Tools/Presentation/capture_current.py,403,untracked,include,
+Tools/Presentation/capture_dialogue_pie.py,421,untracked,include,
+Tools/Presentation/capture_four_characters.py,1078,untracked,include,
+Tools/Presentation/capture_full_map_pie.py,689,untracked,include,
+Tools/Presentation/capture_map_views.py,1862,untracked,include,
+Tools/Presentation/capture_portraits.py,2295,untracked,include,
+Tools/Presentation/capture_prebattle_pie.py,1175,untracked,include,
+Tools/Presentation/close_editor.py,176,untracked,include,
+Tools/Presentation/collect_validation_chests.py,637,untracked,include,
+Tools/Presentation/confirm_battle_pie.py,287,untracked,include,
+Tools/Presentation/confirm_battle_result.py,297,untracked,include,
+Tools/Presentation/confirm_prebattle_pie.py,530,untracked,include,
+Tools/Presentation/editor_bridge.py,1224,untracked,include,
+Tools/Presentation/editor_work_mode.py,269,untracked,include,
+Tools/Presentation/export_quaternius_death.py,1637,untracked,include,
+Tools/Presentation/finalize_party_animation.py,1002,untracked,include,
+Tools/Presentation/hide_interaction_shapes.py,726,untracked,include,
+Tools/Presentation/import_item_icons.py,2539,untracked,include,
+Tools/Presentation/import_kit.py,4165,untracked,include,
+Tools/Presentation/import_quaternius_death.py,923,untracked,include,
+Tools/Presentation/inspect_animation_sources.py,1206,untracked,include,
+Tools/Presentation/inspect_bindings.py,1567,untracked,include,
+Tools/Presentation/inspect_capture_api.py,147,untracked,include,
+Tools/Presentation/inspect_cc0_animation.py,694,untracked,include,
+Tools/Presentation/inspect_content.py,881,untracked,include,
+Tools/Presentation/inspect_fix_ui.py,796,untracked,include,
+Tools/Presentation/inspect_floor_api.py,270,untracked,include,
+Tools/Presentation/inspect_frontend.py,425,untracked,include,
+Tools/Presentation/inspect_game_window.py,921,untracked,include,
+Tools/Presentation/inspect_geometry.py,609,untracked,include,
+Tools/Presentation/inspect_hit.py,332,untracked,include,
+Tools/Presentation/inspect_inventory_live.py,866,untracked,include,
+Tools/Presentation/inspect_navigation.py,778,untracked,include,
+Tools/Presentation/inspect_navigation_geometry.py,499,untracked,include,
+Tools/Presentation/inspect_pie.py,1022,untracked,include,
+Tools/Presentation/inspect_portrait_bones.py,762,untracked,include,
+Tools/Presentation/inspect_prebattle_graph.py,451,untracked,include,
+Tools/Presentation/inspect_runtime_assets.py,1746,untracked,include,
+Tools/Presentation/inspect_ui_layouts.py,585,untracked,include,
+Tools/Presentation/inspect_visual_state.py,924,untracked,include,
+Tools/Presentation/load_fix_validation_save.py,851,untracked,include,
+Tools/Presentation/measure_packaged_gpu.py,1013,untracked,include,
+Tools/Presentation/package_windows.ps1,435,untracked,include,
+Tools/Presentation/pie_action.py,1801,untracked,include,
+Tools/Presentation/rebuild_locomotion_from_source.py,3024,untracked,include,
+Tools/Presentation/refine_battle_hint.py,590,untracked,include,
+Tools/Presentation/refine_hub_lighting.py,1565,untracked,include,
+Tools/Presentation/refine_materials.py,2590,untracked,include,
+Tools/Presentation/refresh_inventory_visuals_pie.py,1151,untracked,include,
+Tools/Presentation/repair_curve.py,1047,untracked,include,
+Tools/Presentation/repair_equipment_effect.py,580,untracked,include,
+Tools/Presentation/repair_party_anim_graphs.py,389,untracked,include,
+Tools/Presentation/repair_widget_guids.py,749,untracked,include,
+Tools/Presentation/retarget_party.py,2053,untracked,include,
+Tools/Presentation/run_automation.py,588,untracked,include,
+Tools/Presentation/scene_layout.py,6724,untracked,include,
+Tools/Presentation/start_capture_pie.py,594,untracked,include,
+Tools/Presentation/start_fix_verification.py,451,untracked,include,
+Tools/Presentation/start_pie.py,1100,untracked,include,
+Tools/Presentation/stop_pie.py,161,untracked,include,
+Tools/Presentation/stop_verification_callbacks.py,642,untracked,include,
+Tools/Presentation/update_project_checkpoint.py,2710,untracked,include,
+Tools/Presentation/verify_battle_heal_pie.py,2356,untracked,include,
+Tools/Presentation/verify_battle_pie.py,1384,untracked,include,
+Tools/Presentation/verify_character_tabs_pie.py,1659,untracked,include,
+Tools/Presentation/verify_exploration_pie.py,2938,untracked,include,
+Tools/Presentation/verify_four_character_motion.py,2660,untracked,include,
+Tools/Presentation/verify_inventory_pie.py,1637,untracked,include,
+Tools/Presentation/verify_motion_clips_pie.py,2324,untracked,include,
+Tools/Presentation/verify_paced_battle.py,3297,untracked,include,
+Tools/Presentation/verify_patrol_flow_pie.py,2211,untracked,include,
+Tools/Presentation/verify_patrol_motion.py,943,untracked,include,
+Tools/Presentation/verify_patrol_return_pie.py,558,untracked,include,
+Tools/Presentation/verify_prebattle_back_pie.py,779,untracked,include,
+Tools/Presentation/verify_prebattle_pie.py,1087,untracked,include,
+Tools/Presentation/verify_relic_page_pie.py,2007,untracked,include,
+Tools/Presentation/verify_relic_save_pie.py,3808,untracked,include,
+Tools/Presentation/verify_relic_stats_pie.py,2458,untracked,include,
+Tools/Presentation/verify_restart_rewards_pie.py,1641,untracked,include,
+Tools/Presentation/verify_reward_layout.py,1465,untracked,include,
+Tools/Presentation/verify_route_clearance.py,2108,untracked,include,
+Tools/Presentation/verify_walk_pie.py,2095,untracked,include,
+Tools/Presentation/write_backup_review.py,2057,untracked,include,
+docs/CODEX-NAVIGATION-GUIDE.md,3515,modified tracked,include,
+docs/asset-cleanup-review/README.md,11894,untracked,include,
+docs/asset-cleanup-review/files.csv,2279577,untracked,include,
+docs/asset-cleanup-review/summary.json,149,untracked,include,
+docs/git-backup-review/README.md,1295,untracked,include,
+docs/git-backup-review/paths.csv,114504,untracked,include,
+docs/playable-fixes-and-cleanup.md,5439,untracked,include,
+docs/presentation-rebuild-delivery.md,3775,untracked,include,
+docs/presentation-rebuild-execution.md,11773,untracked,include,
+docs/presentation-rebuild-self-evaluation.md,1914,untracked,include,
+tasks/active-task.md,48152,modified tracked,include,
+todo_plan.md,51272,modified tracked,include,
+worklog.md,270845,modified tracked,include,
