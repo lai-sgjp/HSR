@@ -4,6 +4,7 @@ from pathlib import Path
 import unreal
 
 registry = unreal.AssetRegistryHelpers.get_asset_registry()
+registry.search_all_assets(True)
 options = unreal.AssetRegistryDependencyOptions(include_soft_package_references=True, include_hard_package_references=True,
     include_searchable_names=False, include_soft_management_references=True, include_hard_management_references=True)
 assets = registry.get_assets_by_path('/Game', recursive=True)

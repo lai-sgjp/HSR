@@ -1,0 +1,21 @@
+{
+  "approved": 2093,
+  "deleted": 2093,
+  "pending_approved": 0,
+  "removed_bytes": 7758630565,
+  "unapproved_missing": [],
+  "remaining_files": 1264,
+  "remaining_verdicts": {
+    "待核实": 556,
+    "仍被使用": 708
+  },
+  "backup_dir": "E:\\work\\unreal_projects\\HSR_asset_backups\\20260914_172410_approved_cleanup",
+  "backup_verified": true,
+  "backup_commit": "0691fe397cf3d5506c3f16313e6936d43a4e7640",
+  "new_candidates_authorized": false,
+  "deletion_methods": {
+    "native_editor_packages": 1925,
+    "editor_reference_checked_fallback_packages": 89,
+    "import_source_files": 79
+  }
+}

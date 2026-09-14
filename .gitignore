@@ -20,12 +20,26 @@ Saved/
 *.tmp
 __pycache__/
 *.pyc
+*.blend1
 
 # Local-only experimental assets
 Content/ModResources/
 
 # Local AssetViewer / Editor preview state
 /Config/DefaultEditor.ini
+
+# Local Blender thumbnail cache
+**/.thumbnails/
+
+# Derived character animation and portrait assets without redistribution provenance
+/Content/Presentation/Animation/*
+!/Content/Presentation/Animation/CC0/
+!/Content/Presentation/Animation/CC0/**
+/ArtSource/Presentation/Portraits/
+/Content/Presentation/UI/T_Portrait_*.uasset
+
+# Local VRM4U plugin binaries; keep source/plugin metadata separate
+/Plugins/VRM4U/Binaries/
 
 # Large imported art/sample packs kept local and excluded from source commits
 /Content/Assets/

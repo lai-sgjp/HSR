@@ -4,13 +4,18 @@ Roots include executable source/config references and the three formal maps.
 Authoring scripts and tests are separate retention roots; read-only inventory
 tools do not make everything they inspect a gameplay dependency.
 """
-import csv,json,re,subprocess,hashlib
+import csv,json,re,subprocess,hashlib,argparse
 from pathlib import Path
 from collections import defaultdict,Counter
 
 root=Path(__file__).resolve().parents[2]
 graph=json.loads((root/'Saved/Presentation/asset_dependency_graph.json').read_text(encoding='utf-8'))
-out=root/'docs/asset-cleanup-review';out.mkdir(exist_ok=True)
+parser=argparse.ArgumentParser()
+parser.add_argument('--output',default='docs/asset-cleanup-review')
+args=parser.parse_args()
+out=(root/args.output).resolve()
+if not out.is_relative_to(root/'docs'):raise ValueError('Inventory output must remain under project docs')
+out.mkdir(exist_ok=True)
 def git(*args):
     return subprocess.check_output(['git','-c','core.quotePath=false',*args],cwd=root,stderr=subprocess.DEVNULL).decode('utf-8').splitlines()
 tracked=set(git('ls-files','Content'))
