@@ -19,6 +19,7 @@ TSharedRef<SWidget> UHSRCharacterPreviewWidget::RebuildWidget()
 	if (!WidgetTree->RootWidget)
 	{
 		auto* Root = WidgetTree->ConstructWidget<UOverlay>();
+		Root->SetClipping(EWidgetClipping::ClipToBounds);
 		WidgetTree->RootWidget = Root;
 		PreviewImage = WidgetTree->ConstructWidget<UImage>();
 		PreviewImage->SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -27,11 +28,14 @@ TSharedRef<SWidget> UHSRCharacterPreviewWidget::RebuildWidget()
 		ImageSlot->SetVerticalAlignment(VAlign_Fill);
 		StatusText = WidgetTree->ConstructWidget<UTextBlock>();
 		StatusText->SetAutoWrapText(true);
+		StatusText->SetJustification(ETextJustify::Center);
 		StatusText->SetVisibility(ESlateVisibility::HitTestInvisible);
 		FSlateFontInfo Font = StatusText->GetFont(); Font.Size = 17; StatusText->SetFont(Font);
 		auto* StatusSlot = Root->AddChildToOverlay(StatusText);
 		StatusSlot->SetVerticalAlignment(VAlign_Bottom);
-		StatusSlot->SetHorizontalAlignment(HAlign_Center);
+		// Auto-wrap must receive the available width, not a centered desired size
+		// that shrinks again after a Loading -> Ready text change.
+		StatusSlot->SetHorizontalAlignment(HAlign_Fill);
 		StatusSlot->SetPadding(FMargin(12, 12, 12, 54));
 		auto* Reset = WidgetTree->ConstructWidget<UButton>();
 		auto* Label = WidgetTree->ConstructWidget<UTextBlock>();

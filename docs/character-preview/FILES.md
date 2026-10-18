@@ -14,6 +14,7 @@
 | 修改 | `README.md` |
 | 修改 | `Source/HSR/Data/Definitions/HSRCharacterDefinition.h` |
 | 新增 | `Source/HSR/Tests/HSRCharacterPreviewTests.cpp` |
+| 新增 | `Source/HSR/Tests/HSRCharacterPreviewPackagedProbe.cpp` |
 | 新增 | `Source/HSR/UI/Character/HSRCharacterPreviewWidget.cpp` |
 | 新增 | `Source/HSR/UI/Character/HSRCharacterPreviewWidget.h` |
 | 修改 | `Source/HSR/UI/Character/HSRCharacterShellWidget.cpp` |
@@ -26,6 +27,7 @@
 | 新增 | `Tools/Presentation/character_preview_bridge.py` |
 | 新增 | `Tools/Presentation/inspect_character_preview_input.py` |
 | 新增 | `Tools/Presentation/mouse_character_preview.py` |
+| 新增 | `Tools/Presentation/packaged_character_preview.py` |
 | 新增 | `Tools/Presentation/profile_character_preview_pie.py` |
 | 新增 | `Tools/Presentation/run_character_preview_tests.py` |
 | 新增 | `Tools/Presentation/start_character_preview_pie.py` |

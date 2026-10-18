@@ -17,7 +17,7 @@
 ## 1. UI 点击到 RenderTarget 的真实调用链
 
 ```text
-Esc / 暂停菜单「角色」
+Tab / 暂停菜单「角色」
   → AHSRPlayerController::RequestOpenCharacterDetailScreen
   → UHSRUIManagerSubsystem::OpenFrontendModule(Character)
   → OpenCharacterDetailInternal
@@ -111,4 +111,4 @@ BeginDestroy 是兜底；GC 期间避免直接改 World Actor 列表，必要时
 
 目前展示复用项目本地已有四个 MMD 模型及匹配 idle；没有下载新角色。它们的本地使用和技术测试不证明公开再分发授权。面试应说明这是本地展示资产，不能把商业角色和相应模型称为本人原创，也不能把本地包成功当作可以公开发布。
 
-最短体验：默认 `Map_ObservationCar` → Play → Esc → 角色 → 左侧切换 → 预览区左拖、滚轮、重置 → Esc 返回或 X 关闭。实际可复现程度仍以最终验证记录为准。
+最短体验：默认 `Map_ObservationCar` → Play → Tab → 角色 → 左侧切换 → 预览区左拖、滚轮、重置 → Esc 返回或 X 关闭。实际可复现程度仍以最终验证记录为准。

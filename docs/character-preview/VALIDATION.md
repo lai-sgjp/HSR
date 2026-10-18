@@ -1,12 +1,12 @@
 # Character Preview：验收与交付记录
 
-日期：2026-10-18（Asia/Shanghai）。结论：**本地运行功能完成；整体交付部分完成，Production Development Cook/Package 与包内运行尚未执行。** 原因是现有四个 MMD 模型的打包授权边界，已请求仅本机 Development 包授权，未将未回答当作批准。
+日期：2026-10-18（Asia/Shanghai）。结论：**预览功能及本机 Development Cook/Package、包内运行验证完成；最终视觉验收仍有缺陷项。** 用户已明确批准四个本地模型仅进入本机 Development 验证包，未授权上传或分发。
 
 ## A. 完成结论
 
 真实 `Map_ObservationCar` → 原角色界面 → 四角色实时 3D → 待机、鼠标左拖、滚轮、重置、返回/关闭已经接通并实际验证。预览不生成 Character/Pawn/ASC，不改变角色、装备、队伍或 v9 存档协议。Editor 和非 Editor Development 游戏目标均已编译通过；游戏目标编译不等于包内运行通过。
 
-当前未完成：正式三地图 Cook/Package、Development 包内运行和最终用户人工验收。没有发布或上传资产/包，没有推送远端。
+三地图 Cook/Package 已成功，实际包内 69 项原生 API/渲染/生命周期检查全部通过，另已执行前台 OS 鼠标操作。仍待最终用户人工接受；用户指出火花脚部不自然，作为紧接此交付的修复项。部分旧 UI 字形切换后偶发缺片，详见视觉限制。没有发布或上传资产/包，没有推送远端。
 
 ## B. 实际架构
 
@@ -37,8 +37,8 @@ Session 的 UPROPERTY 引用维持 Stage、RT、加载期定义；组件持有 M
 | 预览/角色壳/导航/装备/队伍/存档相关 Automation | Pass | 47/47，`automation-final.json`，完整日志 `Saved/Logs/CharacterPreviewEditorR3.log`。 |
 | 首次 Capture 顺序最终复验 | Pass | 4/4 预览专项，`automation-preview-delivery.json`；是同一组测试的复验，不重复累计测试数量。 |
 | 战斗结算、GAS 治疗、存档 Envelope 回归 | Pass | 8/8，`core-regression.json`，完整日志 `Saved/Logs/CharacterPreviewEditorFinal.log`。合计 55 个不同测试通过，来自两个相关验证轮次。 |
-| 正式 Cook/Package | Not Run | 等待本地角色资产打包授权；未以 Game build 代替 Cook。 |
-| 包内非 Editor 角色预览 | Not Run | 依赖上一步；未用 Editor `-game` 冒充 packaged。 |
+| 三地图 Cook/Package | Pass（仅本机） | UAT BuildCookRun：build/cook/stage/pak/iostore/archive，1237 packages，ExitCode=0；`Saved/CharacterPreview/package-development-final.log`。 |
+| 包内非 Editor 角色预览 | Pass（技术检查） | 运行 `Saved/CharacterPreview/Package/Windows/HSR/Binaries/Win64/HSR.exe`；原生 69/69 检查、四角色 RT/UI PNG、20 次开关，`PackagedEvidence/probe-report.json`。 |
 
 ### P0 必须项
 
@@ -78,6 +78,16 @@ Session 的 UPROPERTY 引用维持 Stage、RT、加载期定义；组件持有 M
 | 分辨率 | Pass（已测） | 1280×720 最终完整矩阵；2560×1440 首轮截图/矩阵。首轮 Python 快照比较含 wrapper 地址，单独保留失败记录 `pie_matrix-r1-2560.json`，修正后 1280 矩阵全过；不抹去历史失败。 |
 | 长时资源泄漏 | Not Run | 20 轮零残留 Actor/捕获不是数小时 UObject/显存泄漏专项证明。 |
 
+### 本机 Development 包补充验证
+
+实际执行文件的 SHA-256 为 `PackagedEvidence/exe-sha256.json`。独立 `-userdir` 位于本任务 Saved，不读取或写入用户日常存档。原生命令 `HSR.CharacterPreviewProbe` 仅非 Shipping 编译存在，未自动运行；通过 `-ExecCmds=HSR.CharacterPreviewProbe` 显式启动。
+
+69/69 断言：实际角色页入口、四个 definition 对应 Mesh、每次单一 Stage、RT 真正读回 PNG、原生带 UI 截图、旋转/缩放/重置 API、重复请求无重复加载、暂停捕获增长、最新请求胜出、Loading 中关闭、20 轮真实 Ready/关闭、无延迟复活、Pawn/Transform/角色 ID/Revision/Level/XP 不变。原始 UTF-16 报告及 CSV/图片位于 `Saved/CharacterPreview/PackagedProbeUser/Saved/CharacterPreviewProbe`；UTF-8 报告副本为 `Saved/CharacterPreview/PackagedEvidence/probe-report.json`。完整日志 `PackagedEvidence/probe-runtime.log`。它是包内真实 UI/session 调用，不冒充物理鼠标或完整属性/装备快照比较。
+
+物理鼠标独立证据：PID 和绝对 exe 路径校验、前台 HWND 断言后才输入；Tab → 角色、四角色点击、左拖、滚轮、重置、Esc/X 返回大世界，动作日志 `PackagedEvidence/actions.jsonl`。最终修正后截图 `final_mouse_huohua/rotated/zoomed/reset/world.png`；四角色早轮截图 `packaged_character_*.png`。前台被用户文件选择器占用时曾安全停止；用户关闭后续测，不将那轮停止算 Pass。
+
+视觉缺陷：切换后操作提示收窄已通过 Fill 布局修正，最终四角色截图恢复单行。部分旧界面的属性名、Tab/返回字形仍偶发缺片（最终包 `character_01_ui.png`、`02_ui.png` 可见），原因待定位，**Fail：全 UI 字形视觉质量**；上述 69 项技术断言不检测该问题。用户反馈火花脚姿不自然，**尚未通过对应主观验收**。
+
 ### 真实截图
 
 ![真实现有角色面板](../../Saved/Presentation/Captures/PREVIEW_initial.png)
@@ -98,15 +108,15 @@ Session 的 UPROPERTY 引用维持 Stage、RT、加载期定义；组件持有 M
 
 ## F. 面试复述
 
-90 秒版本及完整追问依据见 [CHARACTER_PREVIEW_INTERVIEW.md](../../CHARACTER_PREVIEW_INTERVIEW.md)。可以陈述真实渲染、交互和生命周期已在本地 PIE 验证；当前不能陈述已完成 packaged 验收或取得商业角色资产发行权。
+90 秒版本及完整追问依据见 [CHARACTER_PREVIEW_INTERVIEW.md](../../CHARACTER_PREVIEW_INTERVIEW.md)。可以陈述真实渲染、交互和生命周期已在本地 PIE 验证；本机 Development 包技术验证已完成；不能陈述所有视觉问题通过人工验收或取得商业角色资产发行权。
 
 ## G. 最短人工验收
 
-1. 打开 `E:/work/unreal_projects/HSR/HSR.uproject`，进入默认 `Map_ObservationCar`，Play。
-2. Esc → 角色，确认当前活动角色出现；点击左侧另外一个角色。
+1. 直接运行 `Saved/CharacterPreview/Package/Windows/HSR.exe`（仅本机）；或打开 `HSR.uproject`，默认 `Map_ObservationCar`，Play。
+2. Tab → 角色，确认当前活动角色出现；点击左侧另外一个角色。
 3. 在中间预览区域按住左键左右拖动，滚轮缩放，点击「重置视角」。
 4. Esc 返回菜单，X 回到大世界；确认真实 Pawn、队伍与装备未改变。
 
 复现自动化：按架构文档先构建并启动 Editor，然后运行 `run_character_preview_tests.py`；启动 `start_character_preview_pie.py` 后依次运行 `verify_character_preview_pie.py`、外部 `verify_character_preview_mouse.py`、`verify_character_preview_edges_pie.py`。带异步 Slate callback 的脚本返回 queued 后，以结果 JSON/COMPLETE 日志为完成依据，不能把 queued 当成 Pass。
 
-尚待最终人工接受；打包执行依赖本地资产授权回复。该确认来自仓库 `.agents/agents.md` 第 2 节的明确打包限制，不是新增的通用审批流程。
+用户已批准仅本机打包验证；公开授权仍未确认。尚待最终视觉人工接受。复现包内探针：对包内 Win64/HSR.exe 添加 `-ExecCmds=HSR.CharacterPreviewProbe` 与隔离的 `-userdir`，等待日志 `completed: PASS`，然后检查报告和真实截图。

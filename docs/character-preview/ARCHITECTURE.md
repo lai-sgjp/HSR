@@ -22,7 +22,7 @@
 
 ```mermaid
 flowchart LR
-  A[Esc 暂停菜单 → 角色] --> B[UIManager OpenFrontendModule Character]
+  A[Tab 暂停菜单 → 角色] --> B[UIManager OpenFrontendModule Character]
   B --> C[CharacterShellWidget + 原有 ViewModel]
   C -->|SelectedCharacterId| D[CharacterPreviewWidget]
   D --> E[Widget 拥有的 PreviewSession]
@@ -110,7 +110,7 @@ BGRA8 RT 的颜色面基础占用为 `宽 × 高 × 4` 字节，例如 512×768 
 
 默认上限约 30 captures/s，降低 RT 尺寸、禁用高成本特效、保持一个 Capture、静态按需刷新、关闭彻底停止，是当前实现的成本控制。未来可按设备配置分辨率和频率、复用会话或使用 idle pose 缓存，但当前不声称这些策略已实现。
 
-最短体验路径：打开 `HSR.uproject` → 正式默认地图 `Map_ObservationCar` → Play → Esc → 角色 → 左侧选择角色 → 预览区左拖/滚轮/重置 → Esc 返回或 X 关闭前端。正常输入导航沿用当前游戏配置。
+最短体验路径：打开 `HSR.uproject` → 正式默认地图 `Map_ObservationCar` → Play → Tab → 角色 → 左侧选择角色 → 预览区左拖/滚轮/重置 → Esc 返回或 X 关闭前端。正常输入导航沿用当前游戏配置。
 
 复现命令（先检查本机路径和运行中的 Editor 状态）：
 
@@ -126,3 +126,5 @@ python Tools/Presentation/character_preview_bridge.py Tools/Presentation/verify_
 ## 11. 未来扩展（尚未实现）
 
 换装需从原装备权威读取外观快照，再为 stage 添加只展示的附属组件；不能把装备真源搬进 UI。动作预览可在现有 generation 与无 Notify 采样机制上切换序列，但需补动作 Bounds、循环策略和资源优先级。多角色展示可扩展 stage 的组件集合与联合 Bounds，ShowOnly 清单也需同步；它会提高蒙皮及渲染成本。完全独立的 runtime scene、透明背景、动态画质策略和多窗口会话池均属于后续设计。
+
+本机 Development 包已按用户明确授权完成验证。最终包目录 `Saved/CharacterPreview/Package/Windows`；与旧 `Saved/Presentation/Package` 分开保存。非 Shipping 专项命令 `HSR.CharacterPreviewProbe` 定义于 `Source/HSR/Tests/HSRCharacterPreviewPackagedProbe.cpp`，仅显式启动时测试现有 UI/session，输出报告和真实 RT/UI PNG，不属于正常玩家流程。
