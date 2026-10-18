@@ -205,6 +205,20 @@ struct FRun
 			const bool bMatch = Profiles.IsValid() && Profiles->GetDefinition(Ids[Index], Definition)
 				&& Definition && Mesh && Mesh == Definition->CharacterMesh.Get();
 			Check(TEXT("owned_character_mesh_matches_definition"), bMatch, Ids[Index].ToString());
+			if (Ids[Index] == FName(TEXT("Demo.Character.Huohua")))
+			{
+				const auto* Component = Session->GetStage()->GetPreviewMesh();
+				bool bFootChainsAgree = true;
+				for (const TCHAR* Side : {TEXT("左"), TEXT("右")})
+				{
+					const FName Ankle(*(FString(Side) + TEXT("足首")));
+					const FName Driver(*(FString(Side) + TEXT("足首D")));
+					bFootChainsAgree &= Component->GetBoneIndex(Ankle) != INDEX_NONE
+						&& Component->GetBoneIndex(Driver) != INDEX_NONE
+						&& FVector::Distance(Component->GetSocketLocation(Ankle), Component->GetSocketLocation(Driver)) < 0.05;
+				}
+				Check(TEXT("huohua_weighted_foot_chains_coherent"), bFootChainsAgree);
+			}
 			Check(TEXT("one_live_stage"), StageCount() == 1);
 			const FString Name = FString::Printf(TEXT("character_%02d"), Index);
 			const bool bSaved = SaveRenderTarget(Name);

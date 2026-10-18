@@ -1,6 +1,6 @@
 # Character Preview 文件清单
 
-仅本轮任务变更。开始时已有 8 个 VRM4U DLL 原样保留且不纳入提交；原始模型/动画未改动。
+仅本轮任务变更。开始时已有 8 个 VRM4U DLL 原样保留且不纳入提交；预览主任务未改动原始模型/动画；追加火花动画修复单列于末段。
 
 | 状态 | 文件 |
 |---|---|
@@ -43,3 +43,7 @@
 二进制作者/来源：原 4 个角色 DA 仅增加 PreviewIdle/yaw 配置；原 CharacterShell WBP 增加宿主及布局、绑定材质；新 Material 由 Editor MaterialEditingLibrary 创建。操作脚本 `Tools/Presentation/author_character_preview.py`，原资产备份与 SHA-256 见 `Saved/CharacterPreview/BeforeAssets/`、`asset_wiring.json`。RT 为运行时 transient，无 RT 资产文件。
 
 本地运行截图、日志、CSV、缓存和插件 DLL 不作为源码交付；证据位于 `Saved/CharacterPreview` 与 `Saved/Logs`。当前模型和 idle 属于原有本地忽略资产，干净 public clone 不会自动带齐这些模型；本功能没有隐式下载替代资源。
+
+用户追加的火花脚部修复：新增 `Tools/Presentation/fix_huohua_foot_chains.py`、`Tools/Presentation/verify_huohua_foot_chains.py` 和 `docs/character-preview/HUOHUA_FOOT_REPAIR.md`；专项包内 probe 增加火花脚链断言。23 个本地忽略动画的精确清单及备份见 [HUOHUA_FOOT_REPAIR.md](HUOHUA_FOOT_REPAIR.md)，Mesh/Skeleton/DA 不变。
+
+脚部工具独立进程复验曾将已一致的 `Content/Presentation/Animation/Combat/FULL_Huohua_QuaterniusDeath_Anim.uasset` 重保存一次（没有轨道烘焙），单列为本地序列化变更；最终工具跳过分支不保存，24文件新进程重复执行哈希不变。

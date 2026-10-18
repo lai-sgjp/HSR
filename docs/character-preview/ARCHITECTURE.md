@@ -128,3 +128,5 @@ python Tools/Presentation/character_preview_bridge.py Tools/Presentation/verify_
 换装需从原装备权威读取外观快照，再为 stage 添加只展示的附属组件；不能把装备真源搬进 UI。动作预览可在现有 generation 与无 Notify 采样机制上切换序列，但需补动作 Bounds、循环策略和资源优先级。多角色展示可扩展 stage 的组件集合与联合 Bounds，ShowOnly 清单也需同步；它会提高蒙皮及渲染成本。完全独立的 runtime scene、透明背景、动态画质策略和多窗口会话池均属于后续设计。
 
 本机 Development 包已按用户明确授权完成验证。最终包目录 `Saved/CharacterPreview/Package/Windows`；与旧 `Saved/Presentation/Package` 分开保存。非 Shipping 专项命令 `HSR.CharacterPreviewProbe` 定义于 `Source/HSR/Tests/HSRCharacterPreviewPackagedProbe.cpp`，仅显式启动时测试现有 UI/session，输出报告和真实 RT/UI PNG，不属于正常玩家流程。
+
+预览主任务未改原始 Mesh/动画；之后按用户追加请求单独修复了火花现有23个动画的普通脚趾链，Mesh、Skeleton 与定义不变，详见 [脚部修复记录](HUOHUA_FOOT_REPAIR.md)。不要把此追加的离线修复误解为通用预览 Session 的运行时骨骼补偿。

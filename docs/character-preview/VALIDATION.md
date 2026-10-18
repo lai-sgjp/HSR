@@ -6,7 +6,7 @@
 
 真实 `Map_ObservationCar` → 原角色界面 → 四角色实时 3D → 待机、鼠标左拖、滚轮、重置、返回/关闭已经接通并实际验证。预览不生成 Character/Pawn/ASC，不改变角色、装备、队伍或 v9 存档协议。Editor 和非 Editor Development 游戏目标均已编译通过；游戏目标编译不等于包内运行通过。
 
-三地图 Cook/Package 已成功，实际包内 69 项原生 API/渲染/生命周期检查全部通过，另已执行前台 OS 鼠标操作。仍待最终用户人工接受；用户指出火花脚部不自然，作为紧接此交付的修复项。部分旧 UI 字形切换后偶发缺片，详见视觉限制。没有发布或上传资产/包，没有推送远端。
+三地图 Cook/Package 已成功，实际包内 69 项原生 API/渲染/生命周期检查全部通过，另已执行前台 OS 鼠标操作。仍待最终用户人工接受；用户指出的火花脚部变形已随后修复，并在最终包中复验；主观自然程度仍待用户接受。部分旧 UI 字形切换后偶发缺片，详见视觉限制。没有发布或上传资产/包，没有推送远端。
 
 ## B. 实际架构
 
@@ -20,7 +20,7 @@ Session 的 UPROPERTY 引用维持 Stage、RT、加载期定义；组件持有 M
 
 精确路径见 [FILES.md](FILES.md)。改动范围只有：原角色定义展示字段、原角色壳接入、3 个预览类、专项测试、原 WBP、原 4 个角色 DA、1 个 UI Material、QA/接线脚本和文档。
 
-没有持久化 RenderTarget `.uasset`：RT 是运行时创建并在会话内复用的 transient UObject。没有新地图、新角色账本、新 Subsystem、第三方插件、Runtime editor-only 模块依赖或存档协议修改。原始角色 Mesh/动画、已有地图未改动。
+没有持久化 RenderTarget `.uasset`：RT 是运行时创建并在会话内复用的 transient UObject。没有新地图、新角色账本、新 Subsystem、第三方插件、Runtime editor-only 模块依赖或存档协议修改。预览主任务未改原始角色 Mesh/动画与已有地图；追加火花脚部修复单独修改了23个本地动画，见本文末段。
 
 开始时已有的 8 个 VRM4U DLL 被备份并排除。其 SHA-256 与开始时一致，见 `Saved/CharacterPreview/baseline-plugin-hashes.json`；该证据检查不等于将 DLL 作为本任务提交。
 
@@ -86,7 +86,7 @@ Session 的 UPROPERTY 引用维持 Stage、RT、加载期定义；组件持有 M
 
 物理鼠标独立证据：PID 和绝对 exe 路径校验、前台 HWND 断言后才输入；Tab → 角色、四角色点击、左拖、滚轮、重置、Esc/X 返回大世界，动作日志 `PackagedEvidence/actions.jsonl`。最终修正后截图 `final_mouse_huohua/rotated/zoomed/reset/world.png`；四角色早轮截图 `packaged_character_*.png`。前台被用户文件选择器占用时曾安全停止；用户关闭后续测，不将那轮停止算 Pass。
 
-视觉缺陷：切换后操作提示收窄已通过 Fill 布局修正，最终四角色截图恢复单行。部分旧界面的属性名、Tab/返回字形仍偶发缺片（最终包 `character_01_ui.png`、`02_ui.png` 可见），原因待定位，**Fail：全 UI 字形视觉质量**；上述 69 项技术断言不检测该问题。用户反馈火花脚姿不自然，**尚未通过对应主观验收**。
+视觉缺陷：切换后操作提示收窄已通过 Fill 布局修正，最终四角色截图恢复单行。部分旧界面的属性名、Tab/返回字形仍偶发缺片（最终包 `character_01_ui.png`、`02_ui.png` 可见），原因待定位，**Fail：全 UI 字形视觉质量**；上述 69 项技术断言不检测该问题。用户反馈的火花脚部变形已在后续修复包中消除，详见末段；**对应主观自然程度尚待用户验收**。
 
 ### 真实截图
 
@@ -120,3 +120,9 @@ Session 的 UPROPERTY 引用维持 Stage、RT、加载期定义；组件持有 M
 复现自动化：按架构文档先构建并启动 Editor，然后运行 `run_character_preview_tests.py`；启动 `start_character_preview_pie.py` 后依次运行 `verify_character_preview_pie.py`、外部 `verify_character_preview_mouse.py`、`verify_character_preview_edges_pie.py`。带异步 Slate callback 的脚本返回 queued 后，以结果 JSON/COMPLETE 日志为完成依据，不能把 queued 当成 Pass。
 
 用户已批准仅本机打包验证；公开授权仍未确认。尚待最终视觉人工接受。复现包内探针：对包内 Win64/HSR.exe 添加 `-ExecCmds=HSR.CharacterPreviewProbe` 与隔离的 `-userdir`，等待日志 `completed: PASS`，然后检查报告和真实截图。
+
+## 用户追加：火花脚部修复
+
+在预览系统本机包交付后执行，根因、23 个受影响动作、5,428 次 Source/Compressed 验证、备份与真实近景见 [HUOHUA_FOOT_REPAIR.md](HUOHUA_FOOT_REPAIR.md)。上述 55 个回归和原性能结果是脚部修复前的预览轮次；脚部修复后的包内验证单独记录，不混合为重跑结果。
+
+最终火花修复包：`Saved/HuohuaFeet/package-delivery.log` BUILD SUCCESSFUL；`Saved/HuohuaFeet/package-report.json` **70/70 Pass**（在上一轮69项基础上增加火花脚链一致性，不能把两轮叠加成139项）；真实鼠标与最终包截图见脚部文档。最终可体验产物仍为 `Saved/CharacterPreview/Package/Windows/HSR.exe`。主观动画自然程度和现有 UI 字形缺片仍按各自边界保留，未声称全部视觉验收通过。
