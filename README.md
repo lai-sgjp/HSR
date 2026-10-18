@@ -57,6 +57,7 @@ MVP 不包含完整技能、伤害公式、击破、状态、成长、装备、�
 
 ## 项目文档
 
+- [角色 3D 预览：架构与使用](docs/character-preview/ARCHITECTURE.md) · [验收证据](docs/character-preview/VALIDATION.md) · [面试复述](CHARACTER_PREVIEW_INTERVIEW.md)
 - [协作规范](.agents/agents.md)
 - [规则迁移分析](docs/rule-migration-analysis.md)
 - [第一阶段计划](docs/phase-1-project-baseline.md)

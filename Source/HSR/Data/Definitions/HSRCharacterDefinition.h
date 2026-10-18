@@ -27,6 +27,15 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation")
 	TSoftObjectPtr<USkeletalMesh> CharacterMesh;
+	/** Presentation-only sequence. No Pawn, movement, GAS or save dependency. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation|Preview")
+	TSoftObjectPtr<UAnimSequenceBase> PreviewIdleAnimation;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation|Preview")
+	float PreviewYaw = 0.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation|Preview")
+	FVector PreviewOffset = FVector::ZeroVector;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation|Preview", meta=(ClampMin="0.01", ClampMax="100"))
+	float PreviewScale = 1.f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation")
 	TSoftClassPtr<UAnimInstance> AnimationClass;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Presentation|Combat")

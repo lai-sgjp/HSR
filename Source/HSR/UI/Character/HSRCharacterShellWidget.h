@@ -11,6 +11,8 @@ class UHSRRelicEquipmentWidget;
 class UHSRInventoryCatalog;
 class UHSRItemEquipmentMappingCatalog;
 class UPanelWidget;
+class UHSRCharacterPreviewWidget;
+class UMaterialInterface;
 
 UCLASS()
 class HSR_API UHSRCharacterChoiceButton : public UObject
@@ -48,6 +50,8 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "HSR|Character Shell")
 	int32 GetRefreshCount() const { return RefreshCount; }
+	UFUNCTION(BlueprintPure, Category = "HSR|Character Shell")
+	UHSRCharacterPreviewWidget* GetCharacterPreview() const { return CharacterPreview; }
 
 #if WITH_DEV_AUTOMATION_TESTS
 	void ApplySnapshotForAutomation(const FHSRCharacterShellSnapshot& Snapshot) { HandleShellChanged(Snapshot); }
@@ -77,6 +81,8 @@ private:
 	UPROPERTY(Transient) TArray<TObjectPtr<UHSRCharacterChoiceButton>> ChoiceBindings;
 	UPROPERTY(Transient) TObjectPtr<UHSRRelicEquipmentWidget> RelicPanel;
 	UPROPERTY(Transient) TObjectPtr<UPanelWidget> NativeTabContent;
+	UPROPERTY(Transient) TObjectPtr<UHSRCharacterPreviewWidget> CharacterPreview;
+	UPROPERTY(EditDefaultsOnly, Category = "Presentation|Preview") TObjectPtr<UMaterialInterface> PreviewMaterial;
 	UPROPERTY(EditAnywhere, Category = "Presentation") TSubclassOf<UHSRRelicEquipmentWidget> RelicWidgetClass;
 	UPROPERTY(EditAnywhere, Category = "Presentation") TObjectPtr<UHSRInventoryCatalog> PresentationCatalog;
 	UPROPERTY(EditAnywhere, Category = "Presentation") TObjectPtr<UHSRItemEquipmentMappingCatalog> EquipmentMappingCatalog;

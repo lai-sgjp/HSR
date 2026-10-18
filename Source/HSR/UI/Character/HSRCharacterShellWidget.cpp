@@ -1,6 +1,7 @@
 #include "HSRCharacterShellWidget.h"
 
 #include "HSRCharacterShellViewModel.h"
+#include "HSRCharacterPreviewWidget.h"
 #include "../HSRUIManagerSubsystem.h"
 #include "../../Equipment/HSREquipmentSubsystem.h"
 #include "../../Party/HSRPartySubsystem.h"
@@ -30,6 +31,15 @@ void UHSRCharacterShellWidget::NativeConstruct()
 	Super::NativeConstruct();
 	if (WidgetTree)
 	{
+		if (auto* PreviewHost = Cast<UPanelWidget>(WidgetTree->FindWidget(TEXT("CharacterPreviewHost"))))
+		{
+			CharacterPreview = CreateWidget<UHSRCharacterPreviewWidget>(GetOwningPlayer());
+			if (CharacterPreview)
+			{
+				CharacterPreview->SetPreviewMaterial(PreviewMaterial);
+				PreviewHost->AddChild(CharacterPreview);
+			}
+		}
 		if (UButton* ChangeWeapon = WidgetTree->FindWidget<UButton>(TEXT("BTN_ChangeWeapon")))
 			ChangeWeapon->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleChangeWeaponClicked);
 	}
@@ -61,6 +71,11 @@ void UHSRCharacterShellWidget::NativeConstruct()
 // 析构：解绑订阅并卸载 ViewModel。
 void UHSRCharacterShellWidget::NativeDestruct()
 {
+	if (CharacterPreview)
+	{
+		CharacterPreview->RemoveFromParent();
+		CharacterPreview = nullptr;
+	}
 	if (WidgetTree)
 	{
 		if (UButton* ChangeWeapon = WidgetTree->FindWidget<UButton>(TEXT("BTN_ChangeWeapon")))
@@ -143,6 +158,7 @@ void UHSRCharacterShellWidget::HandleShellChanged(const FHSRCharacterShellSnapsh
 		OnShellUnavailable(InSnapshot.FailureReason);
 	}
 	RefreshPresentation(); // Native presentation is applied after legacy Blueprint callbacks.
+	if (CharacterPreview) CharacterPreview->SetCharacter(InSnapshot.bIsValid ? InSnapshot.SelectedCharacterId : NAME_None);
 }
 
 // 用快照中的派生属性刷新详情面板文本（HP/攻击/防御/速度）。
