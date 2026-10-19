@@ -93,6 +93,11 @@ struct FHSRBattleCommandSkillView
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FName SkillId;
+	/** Ultimate identity is actor + skill, since party members can share one definition. */
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FName ActorParticipantId;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") bool bPending = false;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") bool bExecuting = false;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") int64 AcceptedSequence = 0;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") EHSRSkillCategory Category = EHSRSkillCategory::BasicAttack;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") EHSRTargetType TargetType = EHSRTargetType::SingleEnemy;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FText DisplayName;
@@ -110,6 +115,11 @@ struct FHSRBattleCommandSkillView
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") TArray<FName> CandidateTargetIds;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") bool bAvailable = false;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") EHSRAbilityFailureReason DisabledReason = EHSRAbilityFailureReason::None;
+
+	bool IsGroupTarget() const
+	{
+		return TargetType == EHSRTargetType::AllAllies || TargetType == EHSRTargetType::AllEnemies;
+	}
 
 	/**
 	 * Player-facing cost line, derived from the authored numbers rather than from Category. A skill
@@ -195,6 +205,9 @@ struct FHSRBattleCommandViewState
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") float Energy = 0.0f;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") float MaxEnergy = 0.0f;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") TArray<FHSRBattleCommandSkillView> Skills;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") TArray<FHSRBattleCommandSkillView> UltimateSkills;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FName ExecutingUltimateActorId;
+	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FName SelectedUltimateActorId;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Command") FHSRAbilityResolution LastResolution;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Status") TArray<FHSRStatusPublicSnapshot> Statuses;
 	UPROPERTY(BlueprintReadOnly, Category = "Battle|Status") FHSRStatusPublicOperationEvent LastStatusOperation;
@@ -248,6 +261,33 @@ struct FHSRBattleCommandViewState
 
 	const FHSRBattleCommandSkillView* FindSelectedSkill() const
 	{
+		if (!SelectedUltimateActorId.IsNone())
+		{
+			return UltimateSkills.FindByPredicate([this](const FHSRBattleCommandSkillView& Candidate)
+			{
+				return Candidate.ActorParticipantId == SelectedUltimateActorId && Candidate.SkillId == SelectedSkillId;
+			});
+		}
 		return FindSkill(SelectedSkillId);
+	}
+
+	/** Pure intent projection. Group confirmation carries the exact displayed candidate set. */
+	FHSRBattleActionCommand BuildSelectedCommand(const FGuid& ActionId) const
+	{
+		FHSRBattleActionCommand Command;
+		Command.ActionId = ActionId;
+		Command.BattleId = BattleId;
+		Command.ActorParticipantId = SelectedUltimateActorId.IsNone() ? CurrentActorId : SelectedUltimateActorId;
+		Command.SkillId = SelectedSkillId;
+		const auto* Skill = FindSelectedSkill();
+		if (Skill && Skill->IsGroupTarget())
+		{
+			Command.TargetParticipantIds = Skill->CandidateTargetIds;
+		}
+		else if (!SelectedTargetId.IsNone())
+		{
+			Command.TargetParticipantIds.Add(SelectedTargetId);
+		}
+		return Command;
 	}
 };

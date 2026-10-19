@@ -13,6 +13,7 @@ class UHSRSkillButtonWidget;
 class UPanelWidget;
 class UTextBlock;
 class UHSRBattleEntryButton;
+class UVerticalBox;
 
 UCLASS(Abstract)
 class HSR_API UHSRBattleCommandWidget : public UUserWidget
@@ -51,6 +52,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Battle|Status") FText GetStatusOperationText() const;
 	/** Preferred selection entry point: reaches every authored skill, including several sharing a category. */
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkillById(FName SkillId);
+	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectUltimate(FName ActorParticipantId);
 
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkill(EHSRSkillCategory Category);
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectTarget(FName TargetId);
@@ -100,6 +102,9 @@ private:
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UPanelWidget> PR_Order;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UPanelWidget> PR_Skills;
 	UPROPERTY(Transient) TMap<FName,TObjectPtr<UHSRBattleEntryButton>> PresentationCards;
+	UPROPERTY(Transient) TMap<FName,TObjectPtr<UVerticalBox>> PartyCardContainers;
+	/** Tokens route reusable card clicks to actor identities; no resource or execution state lives here. */
+	TMap<FName, FName> UltimateCardActorIds;
 	FGuid LastSubmittedActionId;
 	FHSRAbilityResolution LastSubmittedResolution;
 	UFUNCTION() void HandleBasicClicked();
@@ -179,4 +184,5 @@ private:
 	int32 BindGeneration = 0;
 	int32 SubmitCount = 0;
 	bool bRefreshingDesignerControls = false;
+	bool bPartyUltimateLayoutApplied = false;
 };

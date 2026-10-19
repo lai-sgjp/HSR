@@ -57,6 +57,16 @@ void AHSRBattleStage::ShowAction()
 
 void AHSRBattleStage::RestoreSide() { ShowSide(bShowingAllies,bShowingResult); }
 
+void AHSRBattleStage::ShowUltimate(AActor* Source)
+{
+    if (bShowingResult || !IsValid(Source)) return;
+    const FVector Focus = Source->GetActorLocation() + FVector(0,0,35);
+    const FVector Position = Focus + FVector(-430,-550,230);
+    Camera->SetWorldLocationAndRotation(Position, (Focus - Position).Rotation());
+    if (auto* PC = GetWorld()->GetFirstPlayerController()) PC->SetViewTarget(this);
+    GetWorldTimerManager().SetTimer(ActionCameraTimer,this,&ThisClass::RestoreSide,1.4f,false);
+}
+
 void AHSRBattleStage::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     GetWorldTimerManager().ClearTimer(ActionCameraTimer);

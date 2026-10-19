@@ -55,6 +55,7 @@ public:
 	/** Select by stable skill id. Use this for data-driven skill lists: it can address every entry
 	    in a loadout, including several skills sharing one category. */
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkillById(FName SkillId);
+	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectUltimate(FName ActorParticipantId);
 
 	/** Legacy category-keyed selection; forwards to SelectSkillById on the first category match. */
 	UFUNCTION(BlueprintCallable, Category = "Battle|Command") bool SelectSkill(EHSRSkillCategory Category);
@@ -88,6 +89,7 @@ private:
 	UPROPERTY()
 	FHSRBattleCommandViewState State;
 	UPROPERTY() FName SelectedSkillId;
+	UPROPERTY() FName SelectedUltimateActorId;
 	UPROPERTY() FName SelectedTargetId;
 	FHSRBattleCommandStateChanged Changed;
 	FHSRBattleResultConfirmRequested ResultConfirmRequested;

@@ -29,6 +29,10 @@
 #include "../Reward/HSRSettlementAuthority.h"
 #include "../Inventory/HSRInventorySubsystem.h"
 #include "../Challenge/HSRChallengeProgressionSubsystem.h"
+#include "../GAS/HSRCombatEnergyEffect.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Kismet/GameplayStatics.h"
 
 namespace
 {
@@ -1921,7 +1925,30 @@ void AHSRBattleGameMode::BeginPlay()
 	}
 
 	// Consume the pending encounter exactly once
+	#if !UE_BUILD_SHIPPING
+	if (FParse::Param(FCommandLine::Get(), TEXT("HSRUltimatePractice")))
+		if (auto* PracticeCatalog = LoadObject<UHSRCharacterCatalog>(nullptr, TEXT("/Game/Data/VerticalSlice/Characters/DA_CharacterCatalog_VerticalSlice.DA_CharacterCatalog_VerticalSlice"))) CharacterCatalog = PracticeCatalog;
+	#endif
 	FHSREncounterResult ConsumeResult = Subsystem->ConsumePendingEncounter();
+#if !UE_BUILD_SHIPPING
+	// Explicit local practice entry. Uses production roster/GAS/UI, never writes a save or reward.
+	if (FParse::Param(FCommandLine::Get(), TEXT("HSRUltimatePractice")) && CharacterCatalog && EnemyDefinition)
+	{
+		FHSREncounterRequest Practice;
+		Practice.RequestId = FGuid::NewGuid();
+		Practice.EncounterId = TEXT("Development.UltimatePractice");
+		Practice.EnemyDefinitionId = EnemyDefinition->EnemyDefinitionId;
+		Practice.BattleMapPath = TEXT("/Game/Maps/VerticalSlice/Map_HertaSupportSection");
+		Practice.ExplorationMapPath = TEXT("/Game/Maps/VerticalSlice/Map_ObservationCar");
+		for (const auto& Character : CharacterCatalog->CharacterAssets)
+			if (Character && Practice.PlayerPartyIds.Num() < 4) Practice.PlayerPartyIds.AddUnique(Character->CharacterId);
+		for (const auto& Class : CharacterCatalog->Characters)
+			if (Class && Practice.PlayerPartyIds.Num() < 4) Practice.PlayerPartyIds.AddUnique(Class->GetDefaultObject<UHSRCharacterDefinition>()->CharacterId);
+		if (!Practice.PlayerPartyIds.IsEmpty()) Practice.PlayerCharacterId = Practice.PlayerPartyIds[0];
+		ConsumeResult = FHSREncounterResult::MakeSuccess(Practice.RequestId);
+		ConsumeResult.ConsumedRequest = Practice;
+	}
+#endif
 	if (ConsumeResult.ResultType != EHSREncounterResultType::Success)
 	{
 		UE_LOG(LogTemp, Warning,
@@ -2089,6 +2116,24 @@ void AHSRBattleGameMode::BeginPlay()
 		return;
 	}
 	TryConsumePendingRestore();
+#if !UE_BUILD_SHIPPING
+	if (FParse::Param(FCommandLine::Get(), TEXT("HSRUltimatePractice")))
+	{
+		for (const auto& P : Coordinator->GetParticipants())
+		{
+			if (P.Team != EHSRBattleParticipantTeam::Player || !P.AbilitySystemComponent.IsValid()) continue;
+			auto* ASC = P.AbilitySystemComponent.Get();
+			ASC->SetNumericAttributeBase(UHSRCoreAttributeSet::GetHealthAttribute(), ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxHealthAttribute()) * .7f);
+			auto Energy = ASC->MakeOutgoingSpec(UHSRCombatEnergyEffect::StaticClass(), 1.f, ASC->MakeEffectContext());
+			if (Energy.IsValid())
+			{
+				Energy.Data->SetSetByCallerMagnitude(FGameplayTag::RequestGameplayTag(TEXT("Resource.EnergyDelta")), ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxEnergyAttribute()));
+				ASC->ApplyGameplayEffectSpecToSelf(*Energy.Data.Get());
+			}
+		}
+		UE_LOG(LogTemp, Log, TEXT("UltimatePractice Ready ProductionRoster=%d InitialEnergy=Full InitialHealth=70percent SaveWrites=0"), Coordinator->GetPlayerRoster().Num());
+	}
+#endif
 
 #if WITH_EDITOR
 	if (bRunP8ContractHarness)
@@ -2990,6 +3035,19 @@ void AHSRBattleGameMode::HandleBattleResultConfirmRequested(const FGuid& Request
 		UE_LOG(LogTemp, Warning, TEXT("AHSRBattleGameMode::HandleBattleResultConfirmRequested - REJECTED stale request RequestId=%s"), *RequestId.ToString());
 		return;
 	}
+
+#if !UE_BUILD_SHIPPING
+	if (FParse::Param(FCommandLine::Get(), TEXT("HSRUltimatePractice")))
+	{
+		FHSRBattleResult PracticeResult;
+		if (Coordinator->GetBattleResultForPresentation(PracticeResult))
+		{
+			// Practice has no persistent settlement. A fresh World exercises real teardown/re-entry.
+			UGameplayStatics::OpenLevel(this, TEXT("/Game/Maps/VerticalSlice/Map_HertaSupportSection"));
+			return;
+		}
+	}
+#endif
 
 	UHSRBattleTransitionSubsystem* Subsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHSRBattleTransitionSubsystem>() : nullptr;
 	if (!Subsystem)

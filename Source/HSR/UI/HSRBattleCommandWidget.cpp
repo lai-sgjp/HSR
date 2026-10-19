@@ -4,6 +4,8 @@
 #include "HSRSkillButtonWidget.h"
 #include "Components/Button.h"
 #include "Components/PanelWidget.h"
+#include "Components/VerticalBox.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Components/ComboBoxString.h"
 #include "Components/TextBlock.h"
 #include "InputCoreTypes.h"
@@ -45,6 +47,16 @@ void UHSRBattleCommandWidget::NativeConstruct()
 FReply UHSRBattleCommandWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
 	const FKey Key = InKeyEvent.GetKey();
+	const FHSRBattleCommandViewState Snapshot = GetCurrentViewState();
+	if (!Snapshot.ResultViewState.bVisible)
+	{
+		const int32 UltimateIndex = Key == EKeys::One ? 0 : Key == EKeys::Two ? 1 : Key == EKeys::Three ? 2 : Key == EKeys::Four ? 3 : INDEX_NONE;
+		if (Snapshot.UltimateSkills.IsValidIndex(UltimateIndex))
+		{
+			SelectUltimate(Snapshot.UltimateSkills[UltimateIndex].ActorParticipantId);
+			return FReply::Handled();
+		}
+	}
 	if (PR_Skills && !GetCurrentViewState().ResultViewState.bVisible)
 	{
 		const FHSRBattleCommandViewState State = GetCurrentViewState();
@@ -89,6 +101,24 @@ FReply UHSRBattleCommandWidget::NativeOnMouseButtonDown(const FGeometry& Geometr
 void UHSRBattleCommandWidget::RefreshPresentationCards(const FHSRBattleCommandViewState& State)
 {
 	if (!PR_Party || !PR_Enemies || !PR_Order || !PR_Skills || !WidgetTree) return;
+	if (!bPartyUltimateLayoutApplied && !State.UltimateSkills.IsEmpty())
+	{
+		// The existing party strip is bottom anchored. Grow upwards to keep its new controls on screen.
+		if (auto* PartySlot = Cast<UCanvasPanelSlot>(PR_Party->Slot))
+		{
+			const FAnchors Anchors = PartySlot->GetAnchors();
+			if (Anchors.Minimum.Y == 1.f && Anchors.Maximum.Y == 1.f)
+			{
+				FMargin Offsets = PartySlot->GetOffsets();
+				Offsets.Top -= 110.f;
+				Offsets.Bottom += 110.f;
+				PartySlot->SetOffsets(Offsets);
+			}
+		}
+		if (auto* Help = Cast<UTextBlock>(WidgetTree->FindWidget(TEXT("PR_Help"))))
+			Help->SetText(NSLOCTEXT("HSRCommand", "UltimateInputHelp", "Q / E / R  技能    1–4  队友终结技    ← / →  目标    Enter  确认"));
+		bPartyUltimateLayoutApplied = true;
+	}
 	TSet<FName> Live;
 	const auto Card = [&](FName Key, FName Id, UPanelWidget* Panel, bool bSkill)
 	{
@@ -99,14 +129,48 @@ void UHSRBattleCommandWidget::RefreshPresentationCards(const FHSRBattleCommandVi
 	};
 	const bool bUnlocked=State.bCurrentActorPlayerControlled && !State.bCommandPending && !State.bPresentationLocked && !State.ResultViewState.bVisible;
 	const auto* Skill=State.FindSelectedSkill();
+	const bool bSelectingUltimate = !State.SelectedUltimateActorId.IsNone();
+	const bool bTargetsUnlocked = !State.ResultViewState.bVisible && (bSelectingUltimate || bUnlocked)
+		&& Skill && !Skill->bPending && !Skill->bExecuting;
+	UltimateCardActorIds.Reset();
 	for (const auto& V : State.Participants)
 	{
 		const bool bCandidate=Skill && Skill->CandidateTargetIds.Contains(V.ParticipantId);
-		Card(FName(*(TEXT("Party_")+V.ParticipantId.ToString())),V.ParticipantId,V.bPlayerTeam ? PR_Party.Get() : PR_Enemies.Get(),false)
-			->ShowParticipant(V,V.ParticipantId==State.SelectedTargetId,bUnlocked && bCandidate);
+		UPanelWidget* ParticipantPanel = PR_Enemies;
+		if (V.bPlayerTeam)
+		{
+			TObjectPtr<UVerticalBox>& Container = PartyCardContainers.FindOrAdd(V.ParticipantId);
+			if (!Container)
+			{
+				Container = WidgetTree->ConstructWidget<UVerticalBox>();
+				PR_Party->AddChild(Container);
+			}
+			ParticipantPanel = Container;
+		}
+		Card(FName(*(TEXT("Party_")+V.ParticipantId.ToString())),V.ParticipantId,ParticipantPanel,false)
+			->ShowParticipant(V,V.ParticipantId==State.SelectedTargetId || (Skill && Skill->IsGroupTarget() && bCandidate),
+				bTargetsUnlocked && bCandidate && !Skill->IsGroupTarget());
+		const auto* Ultimate = State.UltimateSkills.FindByPredicate([&V](const FHSRBattleCommandSkillView& Entry)
+			{ return Entry.ActorParticipantId == V.ParticipantId; });
+		if (V.bPlayerTeam && Ultimate)
+		{
+			const FName CardId(*(TEXT("Ultimate_") + V.ParticipantId.ToString() + TEXT("_") + Ultimate->SkillId.ToString()));
+			UltimateCardActorIds.Add(CardId, V.ParticipantId);
+			FHSRBattleCommandSkillView Display = *Ultimate;
+			const FText Status = Ultimate->bExecuting ? NSLOCTEXT("HSRCommand", "UltimateExecuting", "释放中")
+				: Ultimate->bPending ? FText::Format(NSLOCTEXT("HSRCommand", "UltimateQueued", "等待安全点 · #{0}"), FText::AsNumber(Ultimate->AcceptedSequence))
+				: Ultimate->bAvailable ? NSLOCTEXT("HSRCommand", "UltimateReady", "终结技就绪")
+				: HSRBattleText::FailureReason(Ultimate->DisabledReason);
+			Display.DisplayName = FText::Format(NSLOCTEXT("HSRCommand", "PartyUltimateCard", "{0}\n能量 {1}/{2}\n{3}"),
+				Ultimate->DisplayName, FText::AsNumber(FMath::RoundToInt(V.Energy)), FText::AsNumber(FMath::RoundToInt(V.MaxEnergy)), Status);
+			auto* Entry = Card(CardId, CardId, ParticipantPanel, true);
+			Entry->ShowSkill(Display, State.SelectedUltimateActorId == V.ParticipantId, !State.ResultViewState.bVisible);
+			Entry->SetBackgroundColor(Ultimate->bExecuting ? FLinearColor(.7f,.4f,1.f) : Ultimate->bPending ? FLinearColor(.4f,.7f,1.f)
+				: Ultimate->bAvailable ? FLinearColor(1.f,.83f,.35f) : FLinearColor(.5f,.5f,.55f));
+		}
 	}
 	for (const auto& V : State.Skills)
-		Card(FName(*(TEXT("Skill_")+V.SkillId.ToString())),V.SkillId,PR_Skills,true)->ShowSkill(V,V.SkillId==State.SelectedSkillId,bUnlocked);
+		Card(FName(*(TEXT("Skill_")+V.SkillId.ToString())),V.SkillId,PR_Skills,true)->ShowSkill(V,!bSelectingUltimate && V.SkillId==State.SelectedSkillId,bUnlocked);
 	// Forecast IDs may repeat; position is the identity of a display row.
 	const int32 ForecastCount = State.TurnForecast.IsEmpty() ? State.TurnOrderParticipantIds.Num() : State.TurnForecast.Num();
 	for (int32 I=0; I<ForecastCount && I<8; ++I)
@@ -114,8 +178,13 @@ void UHSRBattleCommandWidget::RefreshPresentationCards(const FHSRBattleCommandVi
 			Card(FName(*FString::Printf(TEXT("Forecast_%d"),I)),V->ParticipantId,PR_Order,false)->ShowForecast(*V,I+1);
 	for (auto It=PresentationCards.CreateIterator();It;++It)
 		if (!Live.Contains(It.Key())) { It.Value()->RemoveFromParent(); It.RemoveCurrent(); }
+	for (auto It = PartyCardContainers.CreateIterator(); It; ++It)
+		if (!State.Participants.ContainsByPredicate([&It](const FHSRBattleParticipantView& V) { return V.bPlayerTeam && V.ParticipantId == It.Key(); }))
+		{ It.Value()->RemoveFromParent(); It.RemoveCurrent(); }
 	const auto* Target=State.FindParticipant(State.SelectedTargetId);
-	for (TActorIterator<AHSRBattleStage> It(GetWorld());It;++It) It->ShowSide(Target && Target->bPlayerTeam,State.ResultViewState.bVisible);
+	// Coordinator owns the camera throughout an executing action, including ultimate close-ups.
+	if (!State.bActionPlaying || State.ResultViewState.bVisible)
+		for (TActorIterator<AHSRBattleStage> It(GetWorld());It;++It) It->ShowSide(Target && Target->bPlayerTeam,State.ResultViewState.bVisible);
 }
 
 // 绑定 ViewModel 与命令汇（CommandSink）。命令汇必须实现 IHSRBattleCommandSink 接口，
@@ -161,7 +230,7 @@ FText UHSRBattleCommandWidget::GetCurrentActorText() const
 {
 	const auto State = GetCurrentViewState();
 	if (State.bActionPlaying)
-		return FText::Format(NSLOCTEXT("HSRBattle", "PlayingAction", "{0} · {1}"), State.GetParticipantLabel(State.CurrentActorId), State.PlayingSkillName);
+		return FText::Format(NSLOCTEXT("HSRBattle", "PlayingAction", "{0} · {1}"), State.GetParticipantLabel(State.ExecutingUltimateActorId.IsNone() ? State.CurrentActorId : State.ExecutingUltimateActorId), State.PlayingSkillName);
 	return State.CurrentActorId.IsNone() ? FText::GetEmpty() : FText::Format(
 		NSLOCTEXT("HSRBattle", "ActingCharacter", "当前行动：{0}"), State.GetParticipantLabel(State.CurrentActorId));
 }
@@ -169,8 +238,9 @@ FText UHSRBattleCommandWidget::GetCurrentActorText() const
 FText UHSRBattleCommandWidget::GetEnergyText() const
 {
 	const auto State = GetCurrentViewState();
+	const auto* UltimateOwner = State.SelectedUltimateActorId.IsNone() ? nullptr : State.FindParticipant(State.SelectedUltimateActorId);
 	return FText::Format(NSLOCTEXT("HSRBattle", "EnergyDisplay", "能量 {0} / {1}"),
-		FText::AsNumber(FMath::RoundToInt(State.Energy)), FText::AsNumber(FMath::RoundToInt(State.MaxEnergy)));
+		FText::AsNumber(FMath::RoundToInt(UltimateOwner ? UltimateOwner->Energy : State.Energy)), FText::AsNumber(FMath::RoundToInt(UltimateOwner ? UltimateOwner->MaxEnergy : State.MaxEnergy)));
 }
 
 FText UHSRBattleCommandWidget::GetSkillPointsText() const
@@ -261,7 +331,16 @@ bool UHSRBattleCommandWidget::SelectSkill(EHSRSkillCategory Category)
 
 bool UHSRBattleCommandWidget::SelectSkillById(FName SkillId)
 {
+	if (const FName* ActorId = UltimateCardActorIds.Find(SkillId))
+	{
+		return SelectUltimate(*ActorId);
+	}
 	return ViewModel.IsValid() && ViewModel->SelectSkillById(SkillId);
+}
+
+bool UHSRBattleCommandWidget::SelectUltimate(FName ActorParticipantId)
+{
+	return ViewModel.IsValid() && ViewModel->SelectUltimate(ActorParticipantId);
 }
 
 // 是否启用“技能列表”模式：只有同时配置了容器与条目类才使用列表，否则回退到固定按钮布局。
@@ -393,16 +472,12 @@ FHSRAbilityResolution UHSRBattleCommandWidget::SubmitCommand(FGuid ActionId, FNa
 		return Resolution;
 	}
 
-	FHSRBattleActionCommand Command;
-	Command.ActionId = ActionId;
+	FHSRBattleActionCommand Command = VerifiedSnapshot.BuildSelectedCommand(ActionId);
 	// Use the same snapshot that passed BeginCommandSubmit.  Reading the live
 	// sink id after locking could route a stale UI command into a reset battle.
 	// 使用与 BeginCommandSubmit 相同的快照：锁定后若再读实时战斗 ID，
 	// 可能把陈旧的 UI 命令送进一场已被重置的战斗。
 	Command.BattleId = VerifiedSnapshot.BattleId;
-	Command.ActorParticipantId = ActorParticipantId;
-	Command.SkillId = SkillId;
-	Command.TargetParticipantIds.Add(TargetParticipantId);
 	// 提交瞬间战斗 ID 与命令汇当前战斗不一致：说明战斗已切换，拒绝并让 VM 收尾挂起状态。
 	if (Command.BattleId != CommandSink->GetActiveBattleId())
 	{
@@ -416,10 +491,6 @@ FHSRAbilityResolution UHSRBattleCommandWidget::SubmitCommand(FGuid ActionId, FNa
 	LastSubmittedActionId = ActionId;
 	LastSubmittedResolution = Resolution;
 	ViewModel->ResolveCommandSubmit(Command.BattleId, Resolution);
-	if (Resolution.Status == EHSRAbilityResolutionStatus::Succeeded && GetWorld())
-	{
-		for (TActorIterator<AHSRBattleStage> It(GetWorld()); It; ++It) It->ShowAction();
-	}
 	++SubmitCount;
 	UE_LOG(LogTemp, Log, TEXT("P6-004A Widget Submit Count=%d ActionId=%s ActorId=%s SkillId=%s TargetId=%s Status=%d Reason=%d"), SubmitCount, *ActionId.ToString(), *ActorParticipantId.ToString(), *SkillId.ToString(), *TargetParticipantId.ToString(), static_cast<int32>(Resolution.Status), static_cast<int32>(Resolution.FailureReason));
 	return Resolution;
@@ -429,7 +500,7 @@ FHSRAbilityResolution UHSRBattleCommandWidget::SubmitCommand(FGuid ActionId, FNa
 FHSRAbilityResolution UHSRBattleCommandWidget::SubmitSelectedSkill()
 {
 	const FHSRBattleCommandViewState State = GetCurrentViewState();
-	return SubmitCommand(FGuid::NewGuid(), State.CurrentActorId, GetSelectedSkillId(), GetSelectedTargetId());
+	return SubmitCommand(FGuid::NewGuid(), State.SelectedUltimateActorId.IsNone() ? State.CurrentActorId : State.SelectedUltimateActorId, GetSelectedSkillId(), GetSelectedTargetId());
 }
 
 // 确认战斗结果：转发给 VM 触发确认流程。
@@ -451,6 +522,13 @@ void UHSRBattleCommandWidget::HandleViewStateChanged(const FHSRBattleCommandView
 // 按类别查找技能视图：直接委托给状态的查询方法。
 const FHSRBattleCommandSkillView* UHSRBattleCommandWidget::FindSkillView(const FHSRBattleCommandViewState& State, EHSRSkillCategory Category) const
 {
+	if (Category == EHSRSkillCategory::Ultimate && !State.UltimateSkills.IsEmpty())
+	{
+		const FName ActorId = State.SelectedUltimateActorId.IsNone() ? State.CurrentActorId : State.SelectedUltimateActorId;
+		const auto* Ultimate = State.UltimateSkills.FindByPredicate([ActorId](const FHSRBattleCommandSkillView& Entry)
+			{ return Entry.ActorParticipantId == ActorId; });
+		return Ultimate ? Ultimate : &State.UltimateSkills[0];
+	}
 	return State.FindSkillByCategory(Category);
 }
 
@@ -462,7 +540,8 @@ void UHSRBattleCommandWidget::RefreshSkillControls(const FHSRBattleCommandViewSt
 	const bool bUnlockedPlayerTurn = !State.ResultViewState.bVisible && State.bCurrentActorPlayerControlled && !State.bCommandPending && !State.bPresentationLocked;
 	if (Button)
 	{
-		Button->SetIsEnabled(Skill && bUnlockedPlayerTurn);
+		Button->SetIsEnabled(Skill && (Category == EHSRSkillCategory::Ultimate && !State.UltimateSkills.IsEmpty()
+			? !State.ResultViewState.bVisible && State.BattleId.IsValid() : bUnlockedPlayerTurn));
 	}
 	if (NameText)
 	{
@@ -579,18 +658,27 @@ void UHSRBattleCommandWidget::RefreshDesignerControls(const FHSRBattleCommandVie
 
 	// “禁用原因”文本：按优先级显示当前为什么不能行动。
 	const FHSRBattleCommandSkillView* SelectedSkill = State.FindSelectedSkill();
+	const bool bUltimateSelected = !State.SelectedUltimateActorId.IsNone();
 	if (TXT_DisabledReason)
 	{
 		FText Reason = FText::GetEmpty();
-		if (!State.bCurrentActorPlayerControlled)
+		if (bUltimateSelected && SelectedSkill && SelectedSkill->bExecuting)
+		{
+			Reason = NSLOCTEXT("HSRCommand", "UltimateExecuting", "释放中");
+		}
+		else if (bUltimateSelected && SelectedSkill && SelectedSkill->bPending)
+		{
+			Reason = FText::Format(NSLOCTEXT("HSRCommand", "UltimateQueued", "等待安全点 · #{0}"), FText::AsNumber(SelectedSkill->AcceptedSequence));
+		}
+		else if (!bUltimateSelected && !State.bCurrentActorPlayerControlled)
 		{
 			Reason = NSLOCTEXT("HSRCommand", "EnemyTurn", "敌方行动中");
 		}
-		else if (State.bCommandPending)
+		else if (!bUltimateSelected && State.bCommandPending)
 		{
 			Reason = NSLOCTEXT("HSRCommand", "Pending", "正在执行行动…");
 		}
-		else if (State.bPresentationLocked)
+		else if (!bUltimateSelected && State.bPresentationLocked)
 		{
 			Reason = NSLOCTEXT("HSRCommand", "PresentationLocked", "等待行动结束");
 		}
@@ -598,12 +686,20 @@ void UHSRBattleCommandWidget::RefreshDesignerControls(const FHSRBattleCommandVie
 		{
 			Reason = HSRBattleText::FailureReason(SelectedSkill->DisabledReason);
 		}
+		else if (SelectedSkill && SelectedSkill->TargetType == EHSRTargetType::AllAllies)
+		{
+			Reason = NSLOCTEXT("HSRCommand", "AllAlliesTarget", "目标：全队");
+		}
+		else if (SelectedSkill && SelectedSkill->TargetType == EHSRTargetType::AllEnemies)
+		{
+			Reason = NSLOCTEXT("HSRCommand", "AllEnemiesTarget", "目标：全体敌人");
+		}
 		TXT_DisabledReason->SetText(Reason);
 	}
 	if (PendingOverlay)
 	{
 		PendingOverlay->SetText(State.bCommandPending ? NSLOCTEXT("HSRCommand", "PendingOverlay", "行动执行中…") : FText::GetEmpty());
-		PendingOverlay->SetVisibility((State.bCommandPending || State.bPresentationLocked) ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
+		PendingOverlay->SetVisibility((State.bCommandPending || State.bPresentationLocked) && !bUltimateSelected ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
 	}
 	if (BTN_Execute)
 	{
@@ -614,7 +710,13 @@ void UHSRBattleCommandWidget::RefreshDesignerControls(const FHSRBattleCommandVie
 	if (CB_Target)
 	{
 		CB_Target->ClearOptions();
-		if (SelectedSkill)
+		if (SelectedSkill && SelectedSkill->IsGroupTarget())
+		{
+			CB_Target->AddOption((SelectedSkill->TargetType == EHSRTargetType::AllAllies
+				? NSLOCTEXT("HSRCommand", "AllAllies", "全队") : NSLOCTEXT("HSRCommand", "AllEnemies", "全体敌人")).ToString());
+			CB_Target->SetSelectedIndex(0);
+		}
+		else if (SelectedSkill)
 		{
 			for (const FName TargetId : SelectedSkill->CandidateTargetIds)
 			{
@@ -625,7 +727,8 @@ void UHSRBattleCommandWidget::RefreshDesignerControls(const FHSRBattleCommandVie
 		{
 			CB_Target->SetSelectedOption(State.SelectedTargetId.ToString());
 		}
-		CB_Target->SetIsEnabled(!State.ResultViewState.bVisible && State.bCurrentActorPlayerControlled && !State.bCommandPending && !State.bPresentationLocked && SelectedSkill && SelectedSkill->CandidateTargetIds.Num() > 1);
+		CB_Target->SetIsEnabled(!State.ResultViewState.bVisible && (bUltimateSelected || (State.bCurrentActorPlayerControlled && !State.bCommandPending && !State.bPresentationLocked))
+			&& SelectedSkill && !SelectedSkill->IsGroupTarget() && !SelectedSkill->bPending && !SelectedSkill->bExecuting && SelectedSkill->CandidateTargetIds.Num() > 1);
 	}
 	if (PR_Party && WidgetTree)
 	{

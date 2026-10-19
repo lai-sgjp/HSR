@@ -19,7 +19,9 @@ enum class EHSRTargetType : uint8
 {
 	SingleEnemy,
 	SingleAlly,
-	Self
+	Self,
+	AllAllies,
+	AllEnemies
 };
 
 UENUM(BlueprintType)

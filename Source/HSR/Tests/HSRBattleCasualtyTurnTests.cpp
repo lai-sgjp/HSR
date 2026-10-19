@@ -11,6 +11,7 @@
 #include "../Battle/HSRTurnManager.h"
 #include "../Data/HSRSkillDefinition.h"
 #include "../Data/Definitions/HSRCharacterDefinition.h"
+#include "../Data/Definitions/HSREnemyDefinition.h"
 #include "../Progression/HSRCharacterProfileSubsystem.h"
 #include "../GAS/Attribute/HSRCoreAttributeSet.h"
 
@@ -102,6 +103,15 @@ bool FHSRBossPartialCasualtyTurnTest::RunTest(const FString&)
 {
 	HSR::CasualtyTurnTests::FFixture F;
 	if (!F.Initialize(*this, 4, 1)) return false;
+	// The production AI now samples weighted living targets instead of always
+	// choosing the leader. This scenario explicitly needs a wounded-leader kill.
+	// Configure a private definition, preserving authored assets and the real AI.
+	const auto* AuthoredEnemy = LoadObject<UHSREnemyDefinition>(nullptr,
+		TEXT("/Game/Data/VerticalSlice/Enemies/DA_Enemy_SupportSectionInspector.DA_Enemy_SupportSectionInspector"));
+	if (!TestNotNull(TEXT("Production enemy tactics definition loads"), AuthoredEnemy)) return false;
+	auto* WoundedTargetEnemy = DuplicateObject<UHSREnemyDefinition>(AuthoredEnemy, F.GI);
+	WoundedTargetEnemy->bPreferWoundedTargets = true;
+	F.Coordinator->SetEnemyDefinition(WoundedTargetEnemy);
 	F.SetHealth(TEXT("Player"), 1.f);
 	const int32 RejectedBefore = F.Coordinator->GetEnemyTurnRejectedCountForDevelopmentTest();
 	for (int32 Step = 0; Step < 8 && F.Coordinator->FindParticipant(TEXT("Player"))->IsAlive(); ++Step)
@@ -113,12 +123,16 @@ bool FHSRBossPartialCasualtyTurnTest::RunTest(const FString&)
 	const auto* Current = F.Coordinator->FindParticipant(F.Coordinator->GetTurnManager()->GetCurrentParticipantId());
 	if (!TestTrue(TEXT("Lethal enemy action hands control to living ally"), Current && Current->Team == EHSRBattleParticipantTeam::Player && Current->IsAlive())) return false;
 	TestEqual(TEXT("Partial casualty produces no battle result"), F.Coordinator->GetBattleResultBroadcastCountForDevelopmentTest(), 0);
-	const float Before = F.Health(TEXT("Player2"));
-	for (int32 Step = 0; Step < 8 && F.Health(TEXT("Player2")) == Before; ++Step)
+	const auto LivingTeamHealth = [&F]() { return F.Health(TEXT("Player2")) + F.Health(TEXT("Player3")) + F.Health(TEXT("Player4")); };
+	const float Before = LivingTeamHealth();
+	const int32 DispatchesBeforeRetarget = F.Coordinator->GetEnemyTurnDispatchCountForDevelopmentTest();
+	for (int32 Step = 0; Step < 8 && LivingTeamHealth() == Before; ++Step)
 	{
 		if (!TestTrue(TEXT("Surviving allies continue issuing commands"), F.Coordinator->RequestAction(F.Command(TEXT("Enemy"))).Succeeded())) return false;
 	}
-	TestTrue(TEXT("Next enemy turn chooses a living teammate"), F.Health(TEXT("Player2")) < Before);
+	TestTrue(TEXT("Next enemy turn chooses a living teammate"), LivingTeamHealth() < Before);
+	TestEqual(TEXT("One subsequent automated enemy turn produced the living-target damage"), F.Coordinator->GetEnemyTurnDispatchCountForDevelopmentTest(), DispatchesBeforeRetarget + 1);
+	TestEqual(TEXT("Dead leader was not targeted for additional damage"), F.Health(TEXT("Player")), 0.f);
 	TestEqual(TEXT("Automated enemy commands were not rejected"), F.Coordinator->GetEnemyTurnRejectedCountForDevelopmentTest(), RejectedBefore);
 	TestEqual(TEXT("Action execution remains non-recursive"), F.Coordinator->GetMaxCoreExecutionDepthForDevelopmentTest(), 1);
 	return true;

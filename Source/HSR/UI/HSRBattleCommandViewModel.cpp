@@ -16,6 +16,12 @@ void UHSRBattleCommandViewModel::BeginDestroy()
 // 挂起提交的匹配条件是——战斗 ID 一致，且最后一次解析记录恰好是我们等待的那个动作。
 void UHSRBattleCommandViewModel::SetState(const FHSRBattleCommandViewState& InState)
 {
+	if (State.BattleId != InState.BattleId)
+	{
+		SelectedUltimateActorId = NAME_None;
+		SelectedSkillId = NAME_None;
+		SelectedTargetId = NAME_None;
+	}
 	State = InState;
 	// 若存在挂起的提交，且满足“战斗已切换/战斗失效/该动作已被解析”之一，则清除挂起状态。
 	if (bCommandPending && (!PendingBattleId.IsValid() || State.BattleId != PendingBattleId || !State.BattleId.IsValid()
@@ -53,6 +59,13 @@ void UHSRBattleCommandViewModel::UnbindCoordinator()
 // 在当前快照中查找“已选技能”的视图数据；未选择或不存在时返回 nullptr。
 const FHSRBattleCommandSkillView* UHSRBattleCommandViewModel::FindSelectedSkill() const
 {
+	if (!SelectedUltimateActorId.IsNone())
+	{
+		return State.UltimateSkills.FindByPredicate([this](const FHSRBattleCommandSkillView& Skill)
+		{
+			return Skill.ActorParticipantId == SelectedUltimateActorId && Skill.SkillId == SelectedSkillId;
+		});
+	}
 	return State.FindSkill(SelectedSkillId);
 }
 
@@ -120,10 +133,15 @@ void UHSRBattleCommandViewModel::RefreshPresentationAndSelection()
 	const FHSRBattleCommandSkillView* SelectedSkill = FindSelectedSkill();
 	if (!SelectedSkill)
 	{
+		SelectedUltimateActorId = NAME_None;
 		SelectedSkillId = State.Skills.Num() > 0 ? State.Skills[0].SkillId : NAME_None;
 		SelectedSkill = FindSelectedSkill();
 	}
-	if (!SelectedSkill || !SelectedSkill->CandidateTargetIds.Contains(SelectedTargetId))
+	if (SelectedSkill && SelectedSkill->IsGroupTarget())
+	{
+		SelectedTargetId = NAME_None;
+	}
+	else if (!SelectedSkill || !SelectedSkill->CandidateTargetIds.Contains(SelectedTargetId))
 	{
 		SelectedTargetId = SelectedSkill && SelectedSkill->CandidateTargetIds.Num() > 0 ? SelectedSkill->CandidateTargetIds[0] : NAME_None;
 	}
@@ -140,9 +158,34 @@ bool UHSRBattleCommandViewModel::SelectSkillById(FName SkillId)
 		return false;
 	}
 
+	if (Skill->Category == EHSRSkillCategory::Ultimate && State.UltimateSkills.ContainsByPredicate([this, SkillId](const FHSRBattleCommandSkillView& Entry)
+		{ return Entry.ActorParticipantId == State.CurrentActorId && Entry.SkillId == SkillId; }))
+	{
+		return SelectUltimate(State.CurrentActorId);
+	}
+	SelectedUltimateActorId = NAME_None;
 	SelectedSkillId = Skill->SkillId;
-	SelectedTargetId = Skill->CandidateTargetIds.Num() > 0 ? Skill->CandidateTargetIds[0] : NAME_None;
+	SelectedTargetId = !Skill->IsGroupTarget() && !Skill->CandidateTargetIds.IsEmpty() ? Skill->CandidateTargetIds[0] : NAME_None;
 
+	RefreshReadOnlyBattlePresentation();
+	RefreshCommandState();
+	Changed.Broadcast(State);
+	return true;
+}
+
+bool UHSRBattleCommandViewModel::SelectUltimate(FName ActorParticipantId)
+{
+	const FHSRBattleCommandSkillView* Skill = State.UltimateSkills.FindByPredicate([ActorParticipantId](const FHSRBattleCommandSkillView& Entry)
+	{
+		return Entry.ActorParticipantId == ActorParticipantId;
+	});
+	if (!Skill || !State.BattleId.IsValid() || State.ResultViewState.bVisible)
+	{
+		return false;
+	}
+	SelectedUltimateActorId = ActorParticipantId;
+	SelectedSkillId = Skill->SkillId;
+	SelectedTargetId = !Skill->IsGroupTarget() && !Skill->CandidateTargetIds.IsEmpty() ? Skill->CandidateTargetIds[0] : NAME_None;
 	RefreshReadOnlyBattlePresentation();
 	RefreshCommandState();
 	Changed.Broadcast(State);
@@ -155,6 +198,12 @@ bool UHSRBattleCommandViewModel::SelectSkillById(FName SkillId)
 // 新代码应优先使用 SelectSkillById 精确选择。
 bool UHSRBattleCommandViewModel::SelectSkill(EHSRSkillCategory Category)
 {
+	if (Category == EHSRSkillCategory::Ultimate && !State.UltimateSkills.IsEmpty())
+	{
+		const auto* CurrentUltimate = State.UltimateSkills.FindByPredicate([this](const FHSRBattleCommandSkillView& Entry)
+			{ return Entry.ActorParticipantId == State.CurrentActorId; });
+		return SelectUltimate(CurrentUltimate ? CurrentUltimate->ActorParticipantId : State.UltimateSkills[0].ActorParticipantId);
+	}
 	const FHSRBattleCommandSkillView* Skill = State.FindSkillByCategory(Category);
 	if (Skill)
 	{
@@ -177,7 +226,8 @@ TArray<FName> UHSRBattleCommandViewModel::GetTargetOptions() const
 // 选择目标：目标必须是当前所选技能的合法候选目标，否则拒绝。
 bool UHSRBattleCommandViewModel::SelectTarget(FName TargetId)
 {
-	if (!GetTargetOptions().Contains(TargetId))
+	const auto* Skill = FindSelectedSkill();
+	if (!Skill || Skill->IsGroupTarget() || !GetTargetOptions().Contains(TargetId))
 	{
 		return false;
 	}
@@ -193,11 +243,21 @@ bool UHSRBattleCommandViewModel::SelectTarget(FName TargetId)
 // 才登记“挂起提交”，等待后续 ResolveCommandSubmit 带回解析结果。
 bool UHSRBattleCommandViewModel::BeginCommandSubmit(const FGuid& ActionId, FName ActorParticipantId, FName SkillId, FName TargetParticipantId)
 {
-	const FHSRBattleCommandSkillView* Skill = State.FindSkill(SkillId);
-	if (!ActionId.IsValid() || !State.BattleId.IsValid() || !State.bCurrentActorPlayerControlled || bCommandPending || State.bPresentationLocked || ActorParticipantId != State.CurrentActorId
-		|| !Skill || !Skill->bAvailable || SkillId != SelectedSkillId || TargetParticipantId != SelectedTargetId || !Skill->CandidateTargetIds.Contains(TargetParticipantId))
+	const FHSRBattleCommandSkillView* Skill = FindSelectedSkill();
+	const bool bUltimate = !SelectedUltimateActorId.IsNone();
+	const bool bActorAllowed = bUltimate ? ActorParticipantId == SelectedUltimateActorId
+		: State.bCurrentActorPlayerControlled && ActorParticipantId == State.CurrentActorId && !bCommandPending && !State.bPresentationLocked;
+	const bool bTargetAllowed = Skill && (Skill->IsGroupTarget()
+		? TargetParticipantId.IsNone() && !Skill->CandidateTargetIds.IsEmpty() : Skill->CandidateTargetIds.Contains(TargetParticipantId));
+	if (!ActionId.IsValid() || !State.BattleId.IsValid() || State.ResultViewState.bVisible || !bActorAllowed
+		|| !Skill || !Skill->bAvailable || Skill->bPending || Skill->bExecuting || SkillId != SelectedSkillId || TargetParticipantId != SelectedTargetId || !bTargetAllowed)
 	{
 		return false;
+	}
+	// An ultimate request is queued and owned by the Coordinator, never by this local normal-command lock.
+	if (bUltimate)
+	{
+		return true;
 	}
 	PendingBattleId = State.BattleId;
 	PendingActionId = ActionId;
@@ -303,13 +363,18 @@ void UHSRBattleCommandViewModel::ClearBattleResult()
 void UHSRBattleCommandViewModel::RefreshCommandState()
 {
 	State.SelectedSkillId = SelectedSkillId;
+	State.SelectedUltimateActorId = SelectedUltimateActorId;
 	State.SelectedTargetId = SelectedTargetId;
 	State.bCommandPending = bCommandPending;
 	State.bPresentationLocked = bPresentationLocked || State.bActionPlaying;
 	State.PendingActionId = PendingActionId;
 	const FHSRBattleCommandSkillView* Skill = FindSelectedSkill();
-	State.bCanSubmit = !State.ResultViewState.bVisible && !bCommandPending && !State.bPresentationLocked && Coordinator.IsValid() && State.BattleId.IsValid() && State.bCurrentActorPlayerControlled
-		&& Skill && Skill->bAvailable && Skill->CandidateTargetIds.Contains(SelectedTargetId);
+	const bool bInputAllowed = !SelectedUltimateActorId.IsNone()
+		|| (!bCommandPending && !State.bPresentationLocked && State.bCurrentActorPlayerControlled);
+	const bool bTargetAllowed = Skill && (Skill->IsGroupTarget()
+		? !Skill->CandidateTargetIds.IsEmpty() : Skill->CandidateTargetIds.Contains(SelectedTargetId));
+	State.bCanSubmit = !State.ResultViewState.bVisible && bInputAllowed && Coordinator.IsValid() && State.BattleId.IsValid()
+		&& Skill && Skill->bAvailable && !Skill->bPending && !Skill->bExecuting && bTargetAllowed;
 }
 
 // 刷新只读的战斗展示（弱点/韧性/破盾/延迟）。

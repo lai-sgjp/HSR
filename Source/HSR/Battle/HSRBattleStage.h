@@ -25,6 +25,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="Stage") void ShowSide(bool bAllies, bool bResult=false);
     /** A short optional camera accent. Its timer has no connection to battle authority. */
     UFUNCTION(BlueprintCallable, Category="Stage") void ShowAction();
+    void ShowUltimate(AActor* Source);
 protected:
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

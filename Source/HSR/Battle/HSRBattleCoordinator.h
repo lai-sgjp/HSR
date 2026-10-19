@@ -12,6 +12,7 @@
 #include "../Equipment/HSREquipmentEffectBridge.h"
 #include "../Equipment/HSREquipmentSubsystem.h"
 #include "../UI/HSRBattleCommandSink.h"
+#include "HSRUltimateTypes.h"
 #include "HSRBattleCoordinator.generated.h"
 
 class UWorld;
@@ -87,6 +88,9 @@ public:
 	/** Requests one synchronous basic attack. Only a current participant may attack an opposing valid target. */
 	bool RequestBasicAttack(FName AttackerParticipantId, FName TargetParticipantId);
 	FHSRAbilityResolution RequestAction(const FHSRBattleActionCommand& Command);
+	/** Read-only request journal; authoritative queue and execution remain battle local. */
+	const TArray<FHSRUltimateRequestRecord>& GetUltimateRequestHistory() const { return UltimateRequestHistory; }
+	uint64 GetBattleGeneration() const { return BattleGeneration; }
 	FHSRDamageResult ResolveStatusDamage(FName SourceParticipantId, FName TargetParticipantId, const FGuid& ActionId, const UHSRStatusDefinition* Definition);
 	void FinalizeStatusDamage();
 	/** Replaces the default loadout wholesale.  Order becomes command-panel order. */
@@ -256,6 +260,8 @@ private:
 	TArray<FHSRBattleParticipant> Participants;
 	TArray<FHSRBattleParticipantDefinition> ParticipantDefinitions;
 	TMap<FName, FDelegateHandle> HealthChangedHandles;
+	struct FResourceObserverHandles { FDelegateHandle Energy; FDelegateHandle MaxEnergy; FDelegateHandle Stunned; FDelegateHandle UltimateBlocked; };
+	TMap<FName, FResourceObserverHandles> ResourceObserverHandles;
 	FHSRBattleResult BattleResult;
 	bool bBattleResultProduced = false;
 	bool bBattleResultConsumed = false;
@@ -379,7 +385,10 @@ private:
 	/** Health observers defer terminal publication while the one synchronous
 	 * formal-damage application is still transactional. */
 	bool bFormalDamageTransactionOpen = false;
-	FName PendingDefeatedParticipantId;
+	TArray<FName> PendingDefeatedParticipantIds;
+	bool bDeferringTerminalDefeat = false;
+	void FinalizeDeferredDefeats();
+	void ResolveTargetToughness(const FHSRBattleActionCommand& Command, const UHSRSkillDefinition* Definition, const FHSRBattleParticipant* Attacker, FHSRBattleParticipant* Target, bool bTargetAliveAtAdmission, FHSRAbilityResolution& Resolution);
 
 	UPROPERTY()
 	TObjectPtr<UHSRTurnManager> TurnManager;
@@ -406,6 +415,28 @@ private:
 	void RecordCurrentEnemyTurnIfNeeded();
 	void DrainPendingEnemyTurns();
 	FHSRAbilityResolution QueuePresentedAction(const FHSRBattleActionCommand& Command);
+	const UHSRSkillDefinition* FindParticipantSkill(FName ActorId, FName SkillId) const;
+	FHSRAbilityResolution RequestUltimate(const FHSRBattleActionCommand& Command);
+	EHSRAbilityFailureReason ValidateUltimate(const FHSRBattleActionCommand& Command) const;
+	void PumpBattleFlow();
+	void CompleteActiveUltimate(const FHSRAbilityResolution& Result);
+	void CancelUltimateRequests(FName ActorId = NAME_None);
+	void TraceUltimate(const TCHAR* Event, const FHSRUltimateRequestRecord& Request) const;
+	void ApplyCombatEnergy(UAbilitySystemComponent& ASC, float Delta);
+	void AppendUltimateCommandViews(FHSRBattleCommandViewState& State) const;
+	TArray<FHSRUltimateRequestRecord> PendingUltimates;
+	TOptional<FHSRUltimateRequestRecord> ActiveUltimate;
+	TArray<FHSRUltimateRequestRecord> UltimateRequestHistory;
+	uint64 BattleGeneration = 1;
+	uint64 NextUltimateSequence = 0;
+	bool bPumpingBattleFlow = false;
+	bool bResetRequested = false;
+	bool bExtraActionChain = false;
+	bool bExecutingUltimateCore = false;
+	bool bPresentedRulesResolved = false;
+	FName SuspendedNormalFinalization;
+	FHSRAbilityResolution PresentedResolution;
+	void SchedulePresentationPhase(bool bImpact, float Delay);
 	void ApplyPresentedAction();
 	void FinishPresentedAction();
 	bool ResolveActionOrWait(FName ActorId);
@@ -436,6 +467,9 @@ private:
 	void RollbackStageBuffs(bool bRefundResources);
 	void BindHealthObserver(const FHSRBattleParticipant& Participant);
 	void HandleHealthChanged(const FOnAttributeChangeData& ChangeData, FName ParticipantId);
+	void HandleResourceChanged(const FOnAttributeChangeData& ChangeData, FName ParticipantId);
+	void HandleUltimateBlockChanged(const FGameplayTag Tag, int32 Count, FName ParticipantId);
+	UFUNCTION() void HandleParticipantDestroyed(AActor* DestroyedActor);
 	void ResolveDefeat(FName DefeatedParticipantId);
 	void ClearRuntimeDelegates();
 	bool InitializeStatusComponents();

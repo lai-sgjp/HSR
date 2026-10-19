@@ -32,6 +32,7 @@ TArray<FName> FHSRTargetingPolicy::BuildCandidateTargetIds(
 		switch (SkillDefinition.TargetType)
 		{
 		case EHSRTargetType::SingleEnemy:
+		case EHSRTargetType::AllEnemies:
 			if (Candidate.Team != Actor.Team)
 			{
 				CandidateIds.Add(Candidate.ParticipantId);
@@ -42,6 +43,9 @@ TArray<FName> FHSRTargetingPolicy::BuildCandidateTargetIds(
 			{
 				CandidateIds.Add(Candidate.ParticipantId);
 			}
+			break;
+		case EHSRTargetType::AllAllies:
+			if (Candidate.Team == Actor.Team) CandidateIds.Add(Candidate.ParticipantId);
 			break;
 		case EHSRTargetType::Self:
 			if (Candidate.ParticipantId == Actor.ParticipantId)
@@ -64,6 +68,18 @@ bool FHSRTargetingPolicy::ValidateTargetIds(
 	const TArray<FHSRBattleParticipant>& Participants,
 	const TArray<FName>& TargetParticipantIds)
 {
+	if (SkillDefinition.TargetType == EHSRTargetType::AllAllies || SkillDefinition.TargetType == EHSRTargetType::AllEnemies)
+	{
+		const auto Candidates = BuildCandidateTargetIds(SkillDefinition, Actor, Participants);
+		if (Candidates.IsEmpty() || Candidates.Num() != TargetParticipantIds.Num()) return false;
+		TSet<FName> Unique;
+		for (FName Id : TargetParticipantIds)
+		{
+			if (!Candidates.Contains(Id) || Unique.Contains(Id)) return false;
+			Unique.Add(Id);
+		}
+		return true;
+	}
 	if (TargetParticipantIds.Num() != 1 || TargetParticipantIds[0].IsNone())
 	{
 		return false;

@@ -2,7 +2,9 @@
 
 #include "HSRAbilityTypes.h"
 #include "AbilitySystemComponent.h"
+#include "GameFramework/Actor.h"
 #include "../Damage/HSRDamageEffectContext.h"
+#include "../Attribute/HSRCoreAttributeSet.h"
 
 // 构造函数：能力默认按“每 Actor 实例化”策略创建（每个角色一份实例，可持有跨激活状态）。
 UHSRGameplayAbilityBase::UHSRGameplayAbilityBase()
@@ -14,6 +16,11 @@ UHSRGameplayAbilityBase::UHSRGameplayAbilityBase()
 bool UHSRGameplayAbilityBase::SetPendingTarget(UAbilitySystemComponent* InTargetAbilitySystem)
 {
 	return false;
+}
+
+bool UHSRGameplayAbilityBase::SetPendingTargets(const TArray<UAbilitySystemComponent*>& InTargetAbilitySystems)
+{
+	return InTargetAbilitySystems.Num() == 1 && SetPendingTarget(InTargetAbilitySystems[0]);
 }
 
 // 清除待处理目标（基类空实现）。
@@ -62,6 +69,8 @@ bool UHSRGameplayAbilityBase::ConfigureFromSkillDefinition(const UHSRSkillDefini
 bool UHSRGameplayAbilityBase::PrepareFormalDamage(const FHSRFormalDamageRequest& Request, const FGameplayEffectSpecHandle& Spec, UAbilitySystemComponent* TargetAbilitySystem, FHSRFormalDamagePrepareResult& OutResult)
 {
 	ClearPreparedFormalDamage();
+	LastAdditionalFormalDamageResults.Reset();
+	OutResult = FHSRFormalDamagePrepareResult();
 	OutResult.ActionId = Request.ActionId;
 	if (!Request.ActionId.IsValid() || !Spec.IsValid() || !TargetAbilitySystem)
 	{
@@ -77,41 +86,94 @@ bool UHSRGameplayAbilityBase::PrepareFormalDamage(const FHSRFormalDamageRequest&
 	return true;
 }
 
+bool UHSRGameplayAbilityBase::PrepareAdditionalFormalDamage(const FHSRFormalDamageRequest& Request,
+	const FGameplayEffectSpecHandle& Spec, UAbilitySystemComponent* TargetAbilitySystem, FHSRFormalDamagePrepareResult& OutResult)
+{
+	OutResult = FHSRFormalDamagePrepareResult();
+	OutResult.ActionId = Request.ActionId;
+	OutResult.Result = EHSRDamageResultType::SpecCreationFailed;
+	if (bApplyingPreparedDamage || !PreparedFormalDamage.bPrepared || !Spec.IsValid() || !IsValid(TargetAbilitySystem)
+		|| Request.ActionId != PreparedFormalDamage.Request.ActionId || Request.BattleId != PreparedFormalDamage.Request.BattleId
+		|| Request.SourceParticipantId != PreparedFormalDamage.Request.SourceParticipantId
+		|| Request.TargetParticipantId.IsNone() || Request.TargetParticipantId == PreparedFormalDamage.Request.TargetParticipantId
+		|| TargetAbilitySystem == PreparedFormalDamage.Target.Get()
+		|| AdditionalPreparedFormalDamage.ContainsByPredicate([&](const auto& Entry)
+		{
+			return Entry.Target.Get() == TargetAbilitySystem || Entry.Request.TargetParticipantId == Request.TargetParticipantId;
+		})) return false;
+	FHSRPreparedFormalDamage& Additional = AdditionalPreparedFormalDamage.AddDefaulted_GetRef();
+	Additional.Request = Request;
+	Additional.Spec = Spec;
+	Additional.Target = TargetAbilitySystem;
+	Additional.bPrepared = true;
+	OutResult.Result = EHSRDamageResultType::DamageResolved;
+	OutResult.bPrepared = true;
+	return true;
+}
+
 // 清除已准备的正式伤害数据。
 void UHSRGameplayAbilityBase::ClearPreparedFormalDamage()
 {
 	PreparedFormalDamage = FHSRPreparedFormalDamage();
+	AdditionalPreparedFormalDamage.Reset();
 }
 
 // 施加已准备的正式伤害：把暂存的 GE spec 施加到目标 ASC，并记录执行结果。
 bool UHSRGameplayAbilityBase::ApplyPreparedFormalDamage(UAbilitySystemComponent* SourceAbilitySystem)
 {
-	LastFormalDamageExecutionResult = FHSRFormalDamageExecutionResult();
-	if (!SourceAbilitySystem || !PreparedFormalDamage.bPrepared
-		|| !PreparedFormalDamage.Target.IsValid() || !PreparedFormalDamage.Spec.IsValid())
+	if (bApplyingPreparedDamage) return false;
+	TGuardValue<bool> Applying(bApplyingPreparedDamage, true);
+	// Consume prepared specs before invoking external attribute delegates; they cannot
+	// re-enter this seam and apply the same effects a second time.
+	const FHSRPreparedFormalDamage Primary = MoveTemp(PreparedFormalDamage);
+	const TArray<FHSRPreparedFormalDamage> Additional = MoveTemp(AdditionalPreparedFormalDamage);
+	ClearPreparedFormalDamage();
+	LastAdditionalFormalDamageResults.Reset();
+	LastFormalDamageExecutionResult = ApplyOnePreparedFormalDamage(Primary, SourceAbilitySystem);
+	int32 SuccessCount = LastFormalDamageExecutionResult.bSucceeded ? 1 : 0;
+	for (const auto& Entry : Additional)
 	{
-		ClearPreparedFormalDamage();
-		return false;
+		FHSRFormalDamageExecutionResult Result = ApplyOnePreparedFormalDamage(Entry, SourceAbilitySystem);
+		if (Result.bSucceeded) ++SuccessCount;
+		LastAdditionalFormalDamageResults.Add(Result);
 	}
+	if (SuccessCount > 0 && SuccessCount != 1 + Additional.Num())
+		UE_LOG(LogTemp, Warning, TEXT("UltimateDamage PartialSettlement ActionId=%s Applied=%d Requested=%d PrimaryResult=%d"),
+			*Primary.Request.ActionId.ToString(), SuccessCount, 1 + Additional.Num(), int32(LastFormalDamageExecutionResult.DamageResult.Result));
+	// DamageResult remains the primary target's result. bSucceeded is the overall
+	// transaction flag so a partial AOE cannot refund Cost after applying valid damage.
+	LastFormalDamageExecutionResult.bSucceeded = SuccessCount > 0;
+	return LastFormalDamageExecutionResult.bSucceeded;
+}
+
+FHSRFormalDamageExecutionResult UHSRGameplayAbilityBase::ApplyOnePreparedFormalDamage(
+	const FHSRPreparedFormalDamage& Prepared, UAbilitySystemComponent* SourceAbilitySystem)
+{
+	FHSRFormalDamageExecutionResult Result;
+	Result.DamageResult.ActionId = Prepared.Request.ActionId;
+	Result.DamageResult.Result = EHSRDamageResultType::EffectApplicationFailed;
+	if (!IsValid(SourceAbilitySystem) || !Prepared.bPrepared || !Prepared.Target.IsValid() || !Prepared.Spec.IsValid()
+		|| Prepared.Target->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) <= 0.f) return Result;
+	UAbilitySystemComponent* Target = Prepared.Target.Get();
+	if (!IsValid(SourceAbilitySystem->GetOwnerActor()) || !IsValid(SourceAbilitySystem->GetAvatarActor())
+		|| !IsValid(Target->GetOwnerActor()) || !IsValid(Target->GetAvatarActor())) return Result;
+	const float HealthBefore = Target->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+	const FGameplayEffectContext* RawContext = Prepared.Spec.Data->GetContext().Get();
+	if (!RawContext || RawContext->GetScriptStruct() != FHSRDamageEffectContext::StaticStruct()) return Result;
+	const FHSRDamageEffectContext* DamageContext = static_cast<const FHSRDamageEffectContext*>(RawContext);
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
-	if (const FHSRDamageEffectContext* DamageContext = static_cast<const FHSRDamageEffectContext*>(PreparedFormalDamage.Spec.Data->GetContext().Get()))
-	{
-		UE_LOG(LogTemp, Log, TEXT("P7-004 AbilityApply Context ActionId=%s Injection=%d"), *DamageContext->DamageContext.ActionId.ToString(), static_cast<int32>(DamageContext->TestInjection));
-	}
+	UE_LOG(LogTemp, Log, TEXT("P7-004 AbilityApply Context ActionId=%s Target=%s Injection=%d"),
+		*DamageContext->DamageContext.ActionId.ToString(), *Prepared.Request.TargetParticipantId.ToString(), static_cast<int32>(DamageContext->TestInjection));
 	// 开发测试注入：强制“提交成本后施加失败”场景。
-	if (const FHSRDamageEffectContext* DamageContext = static_cast<const FHSRDamageEffectContext*>(PreparedFormalDamage.Spec.Data->GetContext().Get());
-		DamageContext && DamageContext->TestInjection == EHSRDamageTestInjection::ForcePostCostApplyFailure)
+	if (DamageContext->TestInjection == EHSRDamageTestInjection::ForcePostCostApplyFailure)
 	{
-		LastFormalDamageExecutionResult.DamageResult.Result = EHSRDamageResultType::EffectApplicationFailed;
-		ClearPreparedFormalDamage();
-		return false;
+		return Result;
 	}
 #endif
-	const FActiveGameplayEffectHandle Applied = SourceAbilitySystem->ApplyGameplayEffectSpecToTarget(*PreparedFormalDamage.Spec.Data.Get(), PreparedFormalDamage.Target.Get());
-	LastFormalDamageExecutionResult.bSucceeded = Applied.WasSuccessfullyApplied();
-	if (const FHSRDamageEffectContext* DamageContext = static_cast<const FHSRDamageEffectContext*>(PreparedFormalDamage.Spec.Data->GetContext().Get()))
+	const FActiveGameplayEffectHandle Applied = SourceAbilitySystem->ApplyGameplayEffectSpecToTarget(*Prepared.Spec.Data.Get(), Target);
+	Result.bSucceeded = Applied.WasSuccessfullyApplied();
 	{
-		LastFormalDamageExecutionResult.DamageResult = DamageContext->DamageResult;
+		Result.DamageResult = DamageContext->DamageResult;
 		#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 		const bool bInjectedFailure = DamageContext->TestInjection == EHSRDamageTestInjection::ForceCaptureFailed
 			|| DamageContext->TestInjection == EHSRDamageTestInjection::ForceInvalidCapturedValue
@@ -121,24 +183,31 @@ bool UHSRGameplayAbilityBase::ApplyPreparedFormalDamage(UAbilitySystemComponent*
 		#endif
 		// GAS 可能重复求值执行上下文，导致纯诊断结果停留在默认值而 Apply 句柄却有效。
 		// 正常路径的权威成功标志是句柄；只有注入式失败必须保留非成功结果。
-		if (LastFormalDamageExecutionResult.bSucceeded && !bInjectedFailure
-			&& LastFormalDamageExecutionResult.DamageResult.Result != EHSRDamageResultType::CaptureFailed
-			&& LastFormalDamageExecutionResult.DamageResult.Result != EHSRDamageResultType::InvalidCapturedValue)
+		if (Result.bSucceeded && !bInjectedFailure
+			&& Result.DamageResult.Result != EHSRDamageResultType::CaptureFailed
+			&& Result.DamageResult.Result != EHSRDamageResultType::InvalidCapturedValue)
 		{
-			LastFormalDamageExecutionResult.DamageResult.Result = EHSRDamageResultType::DamageResolved;
+			Result.DamageResult.Result = EHSRDamageResultType::DamageResolved;
 		}
 	}
 	// 最终成功 = 句柄有效 且 结果为 DamageResolved。
-	LastFormalDamageExecutionResult.bSucceeded = LastFormalDamageExecutionResult.bSucceeded
-		&& LastFormalDamageExecutionResult.DamageResult.Result == EHSRDamageResultType::DamageResolved;
-	// 句柄失败但结果不是已知的诊断失败时，归一化为 EffectApplicationFailed。
-	if (!LastFormalDamageExecutionResult.bSucceeded
-		&& LastFormalDamageExecutionResult.DamageResult.Result != EHSRDamageResultType::CaptureFailed
-		&& LastFormalDamageExecutionResult.DamageResult.Result != EHSRDamageResultType::InvalidCapturedValue)
+	Result.bSucceeded = Result.bSucceeded && Result.DamageResult.Result == EHSRDamageResultType::DamageResolved;
+	if (Result.bSucceeded && IsValid(Target))
 	{
-		LastFormalDamageExecutionResult.DamageResult.Result = EHSRDamageResultType::EffectApplicationFailed;
+		// GAS executes a copied effect context. Its diagnostic result may not be
+		// written back to the submitted spec even though HP changed authoritatively.
+		// Only this target's applied damage is recovered from its actual attributes;
+		// FinalDamage/crit and the other targets' breakdowns remain independent.
+		const float HealthAfter = Target->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+		Result.DamageResult.Breakdown.AppliedDamage = FMath::Max(0.f, HealthBefore - HealthAfter);
 	}
-	ClearPreparedFormalDamage();
-	return LastFormalDamageExecutionResult.bSucceeded;
+	// 句柄失败但结果不是已知的诊断失败时，归一化为 EffectApplicationFailed。
+	if (!Result.bSucceeded
+		&& Result.DamageResult.Result != EHSRDamageResultType::CaptureFailed
+		&& Result.DamageResult.Result != EHSRDamageResultType::InvalidCapturedValue)
+	{
+		Result.DamageResult.Result = EHSRDamageResultType::EffectApplicationFailed;
+	}
+	return Result;
 }
 

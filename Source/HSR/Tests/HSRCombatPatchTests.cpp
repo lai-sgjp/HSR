@@ -1476,18 +1476,23 @@ bool FHSREnemyCatalogResolutionTest::RunTest(const FString&)
 	TestEqual(TEXT("Catalog carries the boss enemy"), Catalog->Enemies[1]->EnemyDefinitionId,
 		FName(TEXT("Demo.Boss.Laigushi")));
 
-	// The authored catalog asset exists with both formal enemies.
+	// The authored catalog includes the inspector, patrol and boss. Order is an
+	// authoring detail; stable enemy IDs are the actual resolution contract.
 	UHSREnemyCatalog* AuthoredCatalog = LoadObject<UHSREnemyCatalog>(nullptr,
 		TEXT("/Game/Data/VerticalSlice/Enemies/DA_EnemyCatalog.DA_EnemyCatalog"));
 	if (!TestNotNull(TEXT("Authored enemy catalog loads"), AuthoredCatalog))
 	{
 		return false;
 	}
-	TestEqual(TEXT("Authored catalog has two enemies"), AuthoredCatalog->Enemies.Num(), 2);
-	TestEqual(TEXT("Authored catalog includes the inspector"),
-		AuthoredCatalog->Enemies[0]->EnemyDefinitionId, FName(TEXT("Demo.Enemy.SupportSectionInspector")));
-	TestEqual(TEXT("Authored catalog includes the boss"),
-		AuthoredCatalog->Enemies[1]->EnemyDefinitionId, FName(TEXT("Demo.Boss.Laigushi")));
+	TestEqual(TEXT("Authored catalog has three enemies"), AuthoredCatalog->Enemies.Num(), 3);
+	for (const FName ExpectedId : {FName(TEXT("Demo.Enemy.SupportSectionInspector")), FName(TEXT("Demo.Enemy.CourtyardPatrol")), FName(TEXT("Demo.Boss.Laigushi"))})
+	{
+		const auto* Entry = AuthoredCatalog->Enemies.FindByPredicate([ExpectedId](const auto& Enemy)
+		{
+			return Enemy && Enemy->EnemyDefinitionId == ExpectedId;
+		});
+		TestTrue(*FString::Printf(TEXT("Authored catalog resolves stable enemy ID %s"), *ExpectedId.ToString()), Entry && *Entry);
+	}
 	return true;
 }
 

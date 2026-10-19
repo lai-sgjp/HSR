@@ -178,6 +178,14 @@ void UHSRTurnManager::HandleSpeedChanged(FName ParticipantId, UAbilitySystemComp
 }
 
 // 解析当前回合者的行动：先广播 TurnEnded，再充值行动距离并推进到下一个合法回合。
+bool UHSRTurnManager::AdvancePastInvalidCurrentTurn()
+{
+	if (bSelectingOrResolving || State == EHSRTurnManagerState::Finished || IsCurrentParticipantValid()) return false;
+	TGuardValue<bool> Resolving(bSelectingOrResolving, true);
+	PendingPostActionOperations.Reset();
+	return AdvanceToNextValidTurn();
+}
+
 bool UHSRTurnManager::ResolveAction(FName ResolvingParticipantId)
 {
 	if (bSelectingOrResolving || CurrentTurnIndex == INDEX_NONE || State == EHSRTurnManagerState::Finished

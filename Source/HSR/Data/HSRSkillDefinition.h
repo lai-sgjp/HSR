@@ -57,6 +57,15 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Costs", meta = (ClampMin = "0.0"))
 	float DisplayEnergyCost = 0.0f;
 
+	/** Minimum Energy needed to release an Ultimate. Zero uses the actual Cost GE amount;
+	 * positive values are independent of MaxEnergy. GAS must still be able to pay the Cost. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Costs", meta = (ClampMin = "0.0"))
+	float UltimateReleaseThreshold = 0.0f;
+
+	/** Selects the existing single-ally healing GE path for an Ultimate. No character-name branching. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
+	bool bUltimateRestoresHealth = false;
+
 	/** Instant positive-Energy GAS compensation used only when an Ultimate
 	 * cost committed but its prepared damage application failed. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Costs")
@@ -109,7 +118,9 @@ public:
 	{
 		return IsValidDefinition()
 			&& Category == EHSRSkillCategory::Ultimate
-			&& TargetType == EHSRTargetType::SingleEnemy
+			&& ((!bUltimateRestoresHealth && (TargetType == EHSRTargetType::SingleEnemy || TargetType == EHSRTargetType::AllEnemies))
+				|| (bUltimateRestoresHealth && (TargetType == EHSRTargetType::SingleAlly || TargetType == EHSRTargetType::Self || TargetType == EHSRTargetType::AllAllies)))
+			&& FMath::IsFinite(UltimateReleaseThreshold) && UltimateReleaseThreshold >= 0.0f
 			&& !CostGameplayEffectClass.IsNull()
 			&& !EnergyRefundGameplayEffectClass.IsNull()
 			&& !EffectGameplayEffectClass.IsNull();
@@ -252,7 +263,7 @@ public:
 	 *  sampling on capability rather than on being literally the Heal category. */
 	bool RestoresHealth() const
 	{
-		return Category == EHSRSkillCategory::Heal;
+		return Category == EHSRSkillCategory::Heal || (Category == EHSRSkillCategory::Ultimate && bUltimateRestoresHealth);
 	}
 
 	/** True when this skill resolves through the formal prepared-damage seam. Heal deliberately
@@ -261,7 +272,7 @@ public:
 	{
 		return Category == EHSRSkillCategory::BasicAttack
 			|| Category == EHSRSkillCategory::Skill
-			|| Category == EHSRSkillCategory::Ultimate;
+			|| (Category == EHSRSkillCategory::Ultimate && !bUltimateRestoresHealth);
 	}
 
 	/** True when granting this skill must also configure the ability instance. BasicAttack carries

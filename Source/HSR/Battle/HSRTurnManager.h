@@ -34,6 +34,8 @@ class HSR_API UHSRTurnManager : public UObject
 public:
 	bool Initialize(const TArray<FHSRBattleParticipant>& InParticipants);
 	bool ResolveAction(FName ResolvingParticipantId);
+	/** Drop an invalid current actor without recharging AV or inventing an action. */
+	bool AdvancePastInvalidCurrentTurn();
 	FHSRActionDistanceResult RequestActionDistanceAdjustment(const FHSRActionDistanceRequest& Request);
 	/** P8 compatibility bridge. It keeps no second delay state. */
 	bool ConsumeBreakDelay(const FHSRTurnDelayRequest& Request);

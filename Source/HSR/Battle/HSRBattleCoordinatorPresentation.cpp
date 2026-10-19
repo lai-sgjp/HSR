@@ -14,6 +14,8 @@
 
 FHSRAbilityResolution UHSRBattleCoordinator::SubmitBattleCommand(const FHSRBattleActionCommand& Command)
 {
+	if (const auto* Skill = FindParticipantSkill(Command.ActorParticipantId, Command.SkillId))
+		if (Skill->Category == EHSRSkillCategory::Ultimate) return RequestUltimate(Command);
 	return PresentationWorld.IsValid() ? QueuePresentedAction(Command) : RequestAction(Command);
 }
 
@@ -32,38 +34,61 @@ FHSRAbilityResolution UHSRBattleCoordinator::QueuePresentedAction(const FHSRBatt
 	}
 	const FHSRBattleCommandViewState View = GetCommandViewState();
 	const FHSRBattleCommandSkillView* Skill = View.FindSkill(Command.SkillId);
+	const bool bUltimate = ActiveUltimate.IsSet() && ActiveUltimate->Command.ActionId == Command.ActionId;
+	if (bResetRequested || (!bUltimate && (RequestActionDispatchDepth != 0 || bFormalDamageTransactionOpen || bPumpingBattleFlow)))
+	{
+		Result.FailureReason = EHSRAbilityFailureReason::AbilityUnavailable;
+		return Result;
+	}
 	if (!PresentationWorld.IsValid() || !Command.ActionId.IsValid() || Command.BattleId != CurrentRequestId
-		|| CurrentState != EHSRBattleCoordinatorState::Spawned || Command.ActorParticipantId != View.CurrentActorId)
+		|| CurrentState != EHSRBattleCoordinatorState::Spawned || (!bUltimate && Command.ActorParticipantId != View.CurrentActorId))
 	{
 		Result.FailureReason = EHSRAbilityFailureReason::InvalidBattle;
 		return Result;
 	}
-	if (!Skill || !Skill->bAvailable || Command.TargetParticipantIds.Num() != 1
-		|| !Skill->CandidateTargetIds.Contains(Command.TargetParticipantIds[0]))
+	if (!bUltimate && (!Skill || !Skill->bAvailable || Command.TargetParticipantIds.Num() != 1
+		|| !Skill->CandidateTargetIds.Contains(Command.TargetParticipantIds[0])))
 	{
 		Result.FailureReason = Skill && !Skill->bAvailable ? Skill->DisabledReason : EHSRAbilityFailureReason::InvalidTarget;
 		return Result;
 	}
 	PresentedAction = Command;
+	bPresentedRulesResolved = false;
 	PresentedTurnToResolve = NAME_None;
-	for (TActorIterator<AHSRBattleStage> It(PresentationWorld.Get()); It; ++It) It->ShowAction();
+	for (TActorIterator<AHSRBattleStage> It(PresentationWorld.Get()); It; ++It)
+	{
+		const auto* Source = FindParticipant(Command.ActorParticipantId);
+		if (bUltimate && Source) It->ShowUltimate(Source->Actor.Get()); else It->ShowAction();
+	}
 	PlayActionMotion(Command, false);
 	PublishCommandViewState();
 	// Rule settlement has a fixed bounded windup, independent of animation notifies.
-	PresentationWorld->GetTimerManager().SetTimer(PresentationTimer, this, &ThisClass::ApplyPresentedAction, .4f, false);
+	SchedulePresentationPhase(true, .4f);
 	Result.Status = EHSRAbilityResolutionStatus::Accepted;
 	return Result;
 }
 
 void UHSRBattleCoordinator::ApplyPresentedAction()
 {
-	if (!PresentedAction.IsSet() || !PresentationWorld.IsValid()) return;
+	if (!PresentedAction.IsSet() || !PresentationWorld.IsValid() || bPresentedRulesResolved) return;
+	bPresentedRulesResolved = true;
 	const FHSRBattleActionCommand Command = PresentedAction.GetValue();
 	FHSRAbilityResolution Result;
 	{
 		TGuardValue<bool> Applying(bApplyingPresentedAction, true);
-		Result = RequestAction(Command);
+		TGuardValue<bool> Ultimate(bExecutingUltimateCore, ActiveUltimate.IsSet() && ActiveUltimate->Command.ActionId == Command.ActionId);
+		const auto Failure = bExecutingUltimateCore ? ValidateUltimate(Command) : EHSRAbilityFailureReason::None;
+		if (Failure == EHSRAbilityFailureReason::None) Result = RequestAction(Command);
+		else
+		{
+			Result.Status = EHSRAbilityResolutionStatus::Cancelled;
+			Result.FailureReason = Failure;
+			Result.ActorParticipantId = Command.ActorParticipantId;
+			Result.SkillId = Command.SkillId;
+		}
+		Result.ActionId = Command.ActionId;
 	}
+	PresentedResolution = Result;
 	if (Result.Succeeded()) PlayActionMotion(Command, true);
 	else if (const auto* Actor = FindParticipant(Command.ActorParticipantId))
 	{
@@ -72,30 +97,30 @@ void UHSRBattleCoordinator::ApplyPresentedAction()
 		if (Actor->Team == EHSRBattleParticipantTeam::Enemy) PresentedTurnToResolve = Actor->ParticipantId;
 	}
 	if (!PresentedAction.IsSet()) return;
-	PresentationWorld->GetTimerManager().SetTimer(PresentationTimer, this, &ThisClass::FinishPresentedAction, 1.f, false);
+	SchedulePresentationPhase(false, 1.f);
 }
 
 bool UHSRBattleCoordinator::ResolveActionOrWait(FName ActorId)
 {
-	if (bApplyingPresentedAction && PresentedAction.IsSet())
-	{
-		PresentedTurnToResolve = ActorId;
-		return true;
-	}
-	return TurnManager && TurnManager->ResolveAction(ActorId);
+	if (bExecutingUltimateCore) return true;
+	SuspendedNormalFinalization = ActorId;
+	return TurnManager != nullptr;
 }
 
 void UHSRBattleCoordinator::FinishPresentedAction()
 {
-	if (!PresentedAction.IsSet()) return;
+	if (!PresentedAction.IsSet() || !bPresentedRulesResolved) return;
+	const auto CompletedCommand = PresentedAction.GetValue();
 	PresentedAction.Reset();
+	bPresentedRulesResolved = false;
+	if (ActiveUltimate.IsSet() && ActiveUltimate->Command.ActionId == CompletedCommand.ActionId)
+		CompleteActiveUltimate(PresentedResolution);
 	const FName ActorId = PresentedTurnToResolve;
 	PresentedTurnToResolve = NAME_None;
 	if (CurrentState == EHSRBattleCoordinatorState::Spawned && TurnManager)
 	{
-		if (!ActorId.IsNone() && TurnManager->GetCurrentParticipantId() == ActorId) TurnManager->ResolveAction(ActorId);
-		PublishCommandViewState();
-		DrainPendingEnemyTurns();
+		if (!ActorId.IsNone()) SuspendedNormalFinalization = ActorId;
+		PumpBattleFlow();
 	}
 	else if (bBattleResultProduced)
 	{
@@ -128,5 +153,5 @@ void UHSRBattleCoordinator::PlayActionMotion(const FHSRBattleActionCommand& Comm
 	if (!bImpact && Definition && Skill && Skill->Category != EHSRSkillCategory::BasicAttack)
 		if (auto* SkillAnimation = Definition->SkillAnimation.LoadSynchronous()) Animation = SkillAnimation;
 	if (bImpact) Motion->React(Animation, !Subject->IsAlive());
-	else Motion->Attack(Target->Actor.Get(), Animation, !bHealing && (!Definition || Definition->bMeleeBasicAttack) && (!Skill || Skill->Category == EHSRSkillCategory::BasicAttack));
+	else Motion->Attack(Target->Actor.Get(), Animation, !bHealing && (!Definition || Definition->bMeleeBasicAttack) && (!Skill || Skill->Category == EHSRSkillCategory::BasicAttack), Skill && Skill->Category == EHSRSkillCategory::Ultimate, bHealing);
 }

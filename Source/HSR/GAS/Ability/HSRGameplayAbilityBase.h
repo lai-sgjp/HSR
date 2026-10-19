@@ -30,6 +30,8 @@ public:
 	/** Synchronous target handoff for the P6-001 action slice. Derived abilities
 	 * that support it must consume and clear the target during activation. */
 	virtual bool SetPendingTarget(UAbilitySystemComponent* InTargetAbilitySystem);
+	/** Multi-target handoff. Abilities which only support one target reject larger sets. */
+	virtual bool SetPendingTargets(const TArray<UAbilitySystemComponent*>& InTargetAbilitySystems);
 	virtual void ClearPendingTarget();
 	virtual bool DidLastActivationSucceed() const;
 	virtual EHSRAbilityFailureReason GetLastFailureReason() const;
@@ -42,7 +44,10 @@ public:
 #endif
 	virtual bool ConfigureFromSkillDefinition(const UHSRSkillDefinition& Definition);
 	bool PrepareFormalDamage(const FHSRFormalDamageRequest& Request, const FGameplayEffectSpecHandle& Spec, UAbilitySystemComponent* TargetAbilitySystem, FHSRFormalDamagePrepareResult& OutResult);
+	/** Append another target to this same action. Cost remains owned by the one Ability activation. */
+	bool PrepareAdditionalFormalDamage(const FHSRFormalDamageRequest& Request, const FGameplayEffectSpecHandle& Spec, UAbilitySystemComponent* TargetAbilitySystem, FHSRFormalDamagePrepareResult& OutResult);
 	const FHSRFormalDamageExecutionResult& GetLastFormalDamageExecutionResult() const { return LastFormalDamageExecutionResult; }
+	const TArray<FHSRFormalDamageExecutionResult>& GetLastAdditionalFormalDamageResults() const { return LastAdditionalFormalDamageResults; }
 	void ClearPreparedFormalDamage();
 	bool ApplyPreparedFormalDamage(UAbilitySystemComponent* SourceAbilitySystem);
 
@@ -59,8 +64,12 @@ private:
 		TWeakObjectPtr<UAbilitySystemComponent> Target;
 		bool bPrepared = false;
 	};
+	FHSRFormalDamageExecutionResult ApplyOnePreparedFormalDamage(const FHSRPreparedFormalDamage& Prepared, UAbilitySystemComponent* SourceAbilitySystem);
 	FHSRPreparedFormalDamage PreparedFormalDamage;
+	TArray<FHSRPreparedFormalDamage> AdditionalPreparedFormalDamage;
 	FHSRFormalDamageExecutionResult LastFormalDamageExecutionResult;
+	TArray<FHSRFormalDamageExecutionResult> LastAdditionalFormalDamageResults;
+	bool bApplyingPreparedDamage = false;
 #if WITH_EDITOR
 	mutable int32 AvailabilityQueryCount = 0;
 #endif

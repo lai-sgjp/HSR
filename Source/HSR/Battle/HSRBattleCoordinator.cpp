@@ -602,7 +602,18 @@ bool UHSRBattleCoordinator::RequestBasicAttack(FName AttackerParticipantId, FNam
 // 公开指令入口：维护调度深度计数，交给核心解析，并在最外层解析结束后排空敌人回合队列。
 FHSRAbilityResolution UHSRBattleCoordinator::RequestAction(const FHSRBattleActionCommand& Command)
 {
-	if (PresentedAction.IsSet() && !bApplyingPresentedAction)
+	if (bResetRequested)
+	{
+		FHSRAbilityResolution Result; Result.ActionId = Command.ActionId;
+		Result.FailureReason = EHSRAbilityFailureReason::InvalidBattle;
+		return Result;
+	}
+	const auto* RequestedSkill = FindParticipantSkill(Command.ActorParticipantId, Command.SkillId);
+	const bool bIsPresentedImpactCommand = bApplyingPresentedAction && PresentedAction.IsSet()
+		&& PresentedAction->ActionId == Command.ActionId && RequestActionDispatchDepth == 0;
+	if (RequestedSkill && RequestedSkill->Category == EHSRSkillCategory::Ultimate && !bIsPresentedImpactCommand)
+		return RequestUltimate(Command);
+	if (RequestActionDispatchDepth != 0 || (PresentedAction.IsSet() && !bIsPresentedImpactCommand))
 	{
 		FHSRAbilityResolution Busy;
 		Busy.ActionId = Command.ActionId;
@@ -628,7 +639,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestAction(const FHSRBattleActio
 	// 仅当回到最外层调用时才排空敌人回合，避免递归调度互相嵌套。
 	if (RequestActionDispatchDepth == 0)
 	{
-		DrainPendingEnemyTurns();
+		PumpBattleFlow();
 	}
 	return Resolution;
 }
@@ -749,11 +760,15 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 	{
 		return Reject(EHSRAbilityFailureReason::DuplicateAction);
 	}
-	if (TurnManager->GetCurrentParticipantId() != Command.ActorParticipantId)
+	const UHSRSkillDefinition* ActionDefinition = FindParticipantSkill(Command.ActorParticipantId, Command.SkillId);
+	const bool bUltimate = ActionDefinition && ActionDefinition->Category == EHSRSkillCategory::Ultimate;
+	if (bUltimate && (!bExecutingUltimateCore || !ActiveUltimate.IsSet() || ActiveUltimate->Command.ActionId != Command.ActionId))
+		return Reject(EHSRAbilityFailureReason::AbilityUnavailable);
+	if (!bUltimate && TurnManager->GetCurrentParticipantId() != Command.ActorParticipantId)
 	{
 		return Reject(EHSRAbilityFailureReason::NotCurrentActor);
 	}
-	const UHSRSkillDefinition* ResolvedSkillDefinition = FindSkillDefinition(Command.SkillId);
+	const UHSRSkillDefinition* ResolvedSkillDefinition = ActionDefinition;
 	if (!ResolvedSkillDefinition || !ResolvedSkillDefinition->IsValidDefinition())
 	{
 		return Reject(EHSRAbilityFailureReason::DefinitionMissing);
@@ -773,8 +788,19 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 	// 记录目标在“录取”时是否存活（用于破韧延迟 + 延迟死亡判定）。
 	const bool bTargetAliveAtAdmission = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) > 0.0f;
 	// 治疗技能对已满血目标直接拒绝。
-	if (ResolvedSkillDefinition->RestoresHealth()
-		&& Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) >= Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxHealthAttribute()))
+	TArray<UAbilitySystemComponent*> TargetASCs;
+	float TotalTargetHealthBefore = 0.f;
+	bool bAnyTargetWounded = false;
+	for (FName Id : Command.TargetParticipantIds)
+	{
+		const auto* P = FindParticipant(Id);
+		if (!P || !P->AbilitySystemComponent.IsValid()) return Reject(EHSRAbilityFailureReason::InvalidTarget);
+		auto* ASC = P->AbilitySystemComponent.Get();
+		TargetASCs.Add(ASC);
+		TotalTargetHealthBefore += ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+		bAnyTargetWounded |= ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) < ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxHealthAttribute());
+	}
+	if (ResolvedSkillDefinition->RestoresHealth() && !bAnyTargetWounded)
 	{
 		return Reject(EHSRAbilityFailureReason::AlreadyAtFullHealth);
 	}
@@ -788,7 +814,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		{
 			return Participant.ParticipantId == Command.ActorParticipantId;
 		});
-	if (!TurnParticipant || !TurnParticipant->IsValid())
+	if (!bUltimate && (!TurnParticipant || !TurnParticipant->IsValid()))
 	{
 		return Reject(EHSRAbilityFailureReason::NotCurrentActor);
 	}
@@ -797,6 +823,11 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 	UHSRGameplayAbilityBase* Ability = AbilitySpec ? Cast<UHSRGameplayAbilityBase>(AbilitySpec->GetPrimaryInstance()) : nullptr;
 	if (!Ability || !Ability->SetPendingTarget(Target->AbilitySystemComponent.Get()))
 	{
+		return Reject(EHSRAbilityFailureReason::AbilityUnavailable);
+	}
+	if (TargetASCs.Num() > 1 && !Ability->SetPendingTargets(TargetASCs))
+	{
+		Ability->ClearPendingTarget();
 		return Reject(EHSRAbilityFailureReason::AbilityUnavailable);
 	}
 	// Damage-dealing skills use the formal prepared-damage seam; a purely restorative skill has
@@ -850,6 +881,20 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 			Request.MinDamage, Request.CritRoll);
 		FHSRFormalDamagePrepareResult PrepareResult;
 		if (!Ability->PrepareFormalDamage(Request, DamageSpec, Target->AbilitySystemComponent.Get(), PrepareResult)) { UE_LOG(LogTemp, Warning, TEXT("P7-003 Formal Stage=Prepare Result=FAIL ActionId=%s Skill=%s DamageResult=%d"), *Command.ActionId.ToString(), *Command.SkillId.ToString(), static_cast<int32>(PrepareResult.Result)); Ability->ClearPendingTarget(); return Reject(EHSRAbilityFailureReason::EffectFailed); }
+		for (int32 Index = 1; Index < Command.TargetParticipantIds.Num(); ++Index)
+		{
+			FHSRFormalDamageRequest AdditionalRequest = Request;
+			AdditionalRequest.TargetParticipantId = Command.TargetParticipantIds[Index];
+			AdditionalRequest.CritRoll = PreviewStream.GetFraction();
+			auto AdditionalContext = ContextHandle.Duplicate();
+			auto* AdditionalDamageContext = static_cast<FHSRDamageEffectContext*>(AdditionalContext.Get());
+			AdditionalDamageContext->DamageContext.CritRoll = AdditionalRequest.CritRoll;
+			auto AdditionalSpec = Attacker->AbilitySystemComponent->MakeOutgoingSpec(DamageEffect, 1.f, AdditionalContext);
+			if (!AdditionalSpec.IsValid()) { Ability->ClearPreparedFormalDamage(); Ability->ClearPendingTarget(); return Reject(EHSRAbilityFailureReason::EffectFailed); }
+			DamageTags.ApplyTo(*AdditionalSpec.Data, AdditionalRequest.AbilityMultiplier, AdditionalRequest.DefenseCoefficient, AdditionalRequest.MinDamage, AdditionalRequest.CritRoll);
+			if (!Ability->PrepareAdditionalFormalDamage(AdditionalRequest, AdditionalSpec, TargetASCs[Index], PrepareResult))
+			{ Ability->ClearPreparedFormalDamage(); Ability->ClearPendingTarget(); return Reject(EHSRAbilityFailureReason::EffectFailed); }
+		}
 		const bool bUsesPlayerSkillPoints = Attacker->Team == EHSRBattleParticipantTeam::Player;
 		const int32 SkillPointDelta = bUsesPlayerSkillPoints ? ResolvedSkillDefinition->GetSkillPointDelta() : 0;
 		if (!ReserveSkillPoints(Command.ActionId, SkillPointDelta))
@@ -860,7 +905,7 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		}
 		Ability->SetActionContext(Command.ActionId, Command.SkillId);
 		bFormalDamageTransactionOpen = true;
-		PendingDefeatedParticipantId = NAME_None;
+		PendingDefeatedParticipantIds.Reset();
 		const bool bActivated = Attacker->AbilitySystemComponent->TryActivateAbility(AbilitySpec->Handle);
 		const FHSRFormalDamageExecutionResult ExecutionResult = Ability->GetLastFormalDamageExecutionResult();
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
@@ -873,156 +918,53 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 			Resolution.bHasDamageResult = true;
 			Resolution.DamageResult = ExecutionResult.DamageResult;
 			UE_LOG(LogTemp, Warning, TEXT("P7-003 Formal Stage=Activate Result=FAIL ActionId=%s Skill=%s TryActivate=%d AbilitySuccess=%d ExecutionSuccess=%d DamageResult=%d CostCommitted=%d Refund=%d EnergyBefore=%.2f EnergyAfter=%.2f"), *Command.ActionId.ToString(), *Command.SkillId.ToString(), bActivated ? 1 : 0, Ability->DidLastActivationSucceed() ? 1 : 0, ExecutionResult.bSucceeded ? 1 : 0, static_cast<int32>(ExecutionResult.DamageResult.Result), ExecutionResult.bCostCommitted ? 1 : 0, ExecutionResult.bRefundApplied ? 1 : 0, ExecutionResult.EnergyBefore, ExecutionResult.EnergyAfter);
-			PendingDefeatedParticipantId = NAME_None;
+			PendingDefeatedParticipantIds.Reset();
 			RollbackSkillPoints(Command.ActionId);
 			return Reject(EHSRAbilityFailureReason::EffectFailed);
 		}
 		DevelopmentDamageRandomStream = PreviewStream;
-		++DevelopmentDamageConsumeCount;
+		DevelopmentDamageConsumeCount += Command.TargetParticipantIds.Num();
 		CommitActionEnergyGain(Command.ActionId, *ResolvedSkillDefinition, *Attacker->AbilitySystemComponent);
+		if (ExecutionResult.DamageResult.Breakdown.AppliedDamage > 0.f && Target->IsAlive())
+			ApplyCombatEnergy(*Target->AbilitySystemComponent, 10.f);
+		if (!Target->IsAlive()) ApplyCombatEnergy(*Attacker->AbilitySystemComponent, 10.f);
 		CommitSkillPoints(Command.ActionId);
 		ApplyAuthoredSkillStatuses(*ResolvedSkillDefinition, Command.ActorParticipantId, Command.TargetParticipantIds);
 		Resolution.Status = EHSRAbilityResolutionStatus::Succeeded;
 		Resolution.FailureReason = EHSRAbilityFailureReason::None;
-		Resolution.bHasDamageResult = true;
+		Resolution.bHasDamageResult = ExecutionResult.DamageResult.Result == EHSRDamageResultType::DamageResolved;
 		Resolution.DamageResult = ExecutionResult.DamageResult;
 		// Toughness is an independent post-HP result.  Its failure deliberately
 		// never rewrites the already-committed formal damage transaction.
-		Resolution.bHasToughnessResult = true;
-		FHSRToughnessResult& ToughnessResult = Resolution.ToughnessResult;
-		ToughnessResult.Before = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetToughnessAttribute());
-		ToughnessResult.After = ToughnessResult.Before;
-		const FString ElementName = ResolvedSkillDefinition->ElementTag.ToString();
-		const FString ElementPrefix(TEXT("Element."));
-		if (!ResolvedSkillDefinition->ElementTag.IsValid() || !ElementName.StartsWith(ElementPrefix))
+		if (ExecutionResult.DamageResult.Result == EHSRDamageResultType::DamageResolved)
+			ResolveTargetToughness(Command, ResolvedSkillDefinition, Attacker, Target, bTargetAliveAtAdmission, Resolution);
+		const auto& AdditionalResults = Ability->GetLastAdditionalFormalDamageResults();
+		for (int32 Index = 0; Index < AdditionalResults.Num(); ++Index)
 		{
-			ToughnessResult.FailureReason = EHSRToughnessFailureReason::MissingElement;
-		}
-		else if (Target->WeaknessTags.IsEmpty())
-		{
-			ToughnessResult.FailureReason = EHSRToughnessFailureReason::EmptyWeaknesses;
-		}
-		else
-		{
-			const FGameplayTag MatchingWeakness = FHSRToughnessConfiguration::GetWeaknessTagFor(ResolvedSkillDefinition->ElementTag);
-			if (!MatchingWeakness.IsValid() || !Target->WeaknessTags.HasTagExact(MatchingWeakness))
+			if (!AdditionalResults[Index].bSucceeded) continue;
+			auto* AdditionalTarget = FindParticipant(Command.TargetParticipantIds[Index + 1]);
+			if (!AdditionalTarget || !AdditionalTarget->AbilitySystemComponent.IsValid()) continue;
+			if (AdditionalResults[Index].DamageResult.Breakdown.AppliedDamage > 0.f)
 			{
-				ToughnessResult.FailureReason = EHSRToughnessFailureReason::NoWeaknessMatch;
+				if (AdditionalTarget->IsAlive()) ApplyCombatEnergy(*AdditionalTarget->AbilitySystemComponent, 10.f);
+				else ApplyCombatEnergy(*Attacker->AbilitySystemComponent, 10.f);
 			}
-			else if (!FMath::IsFinite(ResolvedSkillDefinition->ToughnessDamage) || ResolvedSkillDefinition->ToughnessDamage <= 0.0f)
-			{
-				ToughnessResult.FailureReason = EHSRToughnessFailureReason::InvalidDamage;
-			}
-			else
-			{
-				ToughnessResult.bMatched = true;
-				ToughnessResult.Damage = ResolvedSkillDefinition->ToughnessDamage;
-				const TSubclassOf<UGameplayEffect> ToughnessEffect = ResolvedSkillDefinition->ToughnessDamageGameplayEffectClass.LoadSynchronous();
-				const FGameplayTag ToughnessDamageTag = FGameplayTag::RequestGameplayTag(TEXT("Damage.Data.ToughnessDamage"), false);
-				if (!ToughnessEffect || !ToughnessDamageTag.IsValid())
-				{
-					ToughnessResult.FailureReason = EHSRToughnessFailureReason::MissingGameplayEffect;
-				}
-				else
-				{
-					FGameplayEffectSpecHandle ToughnessSpec = Attacker->AbilitySystemComponent->MakeOutgoingSpec(ToughnessEffect, 1.0f, Attacker->AbilitySystemComponent->MakeEffectContext());
-					if (!ToughnessSpec.IsValid())
-					{
-						ToughnessResult.FailureReason = EHSRToughnessFailureReason::EffectApplicationFailed;
-					}
-					else
-					{
-						ToughnessSpec.Data->SetSetByCallerMagnitude(ToughnessDamageTag, ToughnessResult.Damage);
-						// Instant GameplayEffects may apply immediately without retaining an
-						// active-effect handle.  Audit the AttributeSet write instead of
-						// interpreting that invalid handle as an application failure.
-						Target->AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*ToughnessSpec.Data.Get());
-						ToughnessResult.After = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetToughnessAttribute());
-						const float MaxToughness = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxToughnessAttribute());
-						const float ExpectedAfter = FMath::Clamp(ToughnessResult.Before - ToughnessResult.Damage, 0.0f, MaxToughness);
-						if (FMath::IsNearlyEqual(ToughnessResult.After, ExpectedAfter))
-						{
-							ToughnessResult.bReachedZero = ToughnessResult.Before > 0.0f && ToughnessResult.After <= 0.0f;
-						}
-						else
-						{
-							ToughnessResult.FailureReason = EHSRToughnessFailureReason::EffectApplicationFailed;
-						}
-					}
-				}
-			}
+			FHSRAbilityResolution AdditionalResolution;
+			FHSRBattleActionCommand SubAction = Command;
+			SubAction.ActionId = FGuid::NewGuid(); // A child operation, unique across per-target Break/AV effects.
+			SubAction.TargetParticipantIds = {AdditionalTarget->ParticipantId};
+			ResolveTargetToughness(SubAction, ResolvedSkillDefinition, Attacker, AdditionalTarget, true, AdditionalResolution);
+			FHSRBattlePresentationEvent& Event = PresentationEvents.AddDefaulted_GetRef();
+			Event.EventId = FGuid::NewGuid(); Event.ActionId = Command.ActionId; Event.SourceParticipantId = Command.ActorParticipantId;
+			Event.TargetParticipantId = AdditionalTarget->ParticipantId; Event.EventType = EHSRPresentationEventType::Damage;
+			Event.Value = AdditionalResults[Index].DamageResult.Breakdown.AppliedDamage;
+			Event.bCritical = AdditionalResults[Index].DamageResult.Breakdown.bCritical;
+			UE_LOG(LogTemp, Verbose, TEXT("UltimateTargetEffect ParentRequest=%s Target=%s ChildOperation=%s Damage=%.2f"), *Command.ActionId.ToString(), *AdditionalTarget->ParticipantId.ToString(), *SubAction.ActionId.ToString(), Event.Value);
 		}
-		const FGameplayTag ExpectedWeaknessTag = FHSRToughnessConfiguration::GetWeaknessTagFor(ResolvedSkillDefinition->ElementTag);
-		const FString ExpectedWeakness = ExpectedWeaknessTag.IsValid() ? ExpectedWeaknessTag.ToString() : TEXT("<invalid>");
-		UE_LOG(LogTemp, Log, TEXT("P8-002 Toughness ActionId=%s Actor=%s Target=%s Element=%s ExpectedWeakness=%s Matched=%d Before=%.2f Damage=%.2f After=%.2f ReachedZero=%d FailureReason=%d"),
-			*Command.ActionId.ToString(), *Command.ActorParticipantId.ToString(), *Target->ParticipantId.ToString(), *ElementName,
-			*ExpectedWeakness,
-			ToughnessResult.bMatched ? 1 : 0, ToughnessResult.Before, ToughnessResult.Damage, ToughnessResult.After,
-			ToughnessResult.bReachedZero ? 1 : 0, static_cast<int32>(ToughnessResult.FailureReason));
-		// A Break is owned by this ActionId transaction: only the observed
-		// positive-to-zero Toughness edge may publish it.  RequestAction caches
-		// the completed Resolution, so an ActionId replay never reaches here.
-		Resolution.bHasBreakResult = true;
-		FHSRBreakResult& BreakResult = Resolution.BreakResult;
-		BreakResult.ActionId = Command.ActionId;
-		BreakResult.TargetParticipantId = Target->ParticipantId;
-		BreakResult.ToughnessBefore = ToughnessResult.Before;
-		BreakResult.ToughnessAfter = ToughnessResult.After;
-		if (bBattleResultProduced || CurrentState != EHSRBattleCoordinatorState::Spawned)
-		{
-			BreakResult.FailureReason = EHSRBreakFailureReason::BattleFinished;
-		}
-		else if (!Target->IsValid())
-		{
-			BreakResult.FailureReason = EHSRBreakFailureReason::InvalidTarget;
-		}
-		else if (!ToughnessResult.bReachedZero || ToughnessResult.Before <= 0.0f || !FMath::IsNearlyZero(ToughnessResult.After))
-		{
-			BreakResult.FailureReason = EHSRBreakFailureReason::ToughnessNotDepleted;
-		}
-		else
-		{
-			BreakResult.bTriggered = true;
-		}
-		UE_LOG(LogTemp, Log, TEXT("P8-003 Break ActionId=%s Target=%s Before=%.2f After=%.2f Triggered=%d Replay=0 FailureReason=%d"),
-			*BreakResult.ActionId.ToString(), *BreakResult.TargetParticipantId.ToString(), BreakResult.ToughnessBefore,
-			BreakResult.ToughnessAfter, BreakResult.bTriggered ? 1 : 0, static_cast<int32>(BreakResult.FailureReason));
-		if (BreakResult.bTriggered)
-		{
-			const bool bAllowPendingDeferredDefeat = bTargetAliveAtAdmission
-				&& PendingDefeatedParticipantId == Target->ParticipantId;
-			const EHSRStatusOperationResult BreakStatusResult = RequestBreakStatus(
-				Command.ActorParticipantId, BreakResult.TargetParticipantId, BreakResult.ActionId, bAllowPendingDeferredDefeat);
-#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
-			LastBreakStatusResultForTest = BreakStatusResult;
-			if (BreakStatusResult == EHSRStatusOperationResult::Success)
-			{
-				++BreakStatusRequestCountForTest;
-			}
-#endif
-			UE_LOG(LogTemp, Log, TEXT("P9-003 BreakStatus ActionId=%s Target=%s Result=%d"), *BreakResult.ActionId.ToString(), *BreakResult.TargetParticipantId.ToString(), static_cast<int32>(BreakStatusResult));
-			FHSRTurnDelayRequest DelayRequest;
-			DelayRequest.ActionId = BreakResult.ActionId;
-			DelayRequest.TargetParticipantId = BreakResult.TargetParticipantId;
-			LastBreakDelayActionId = DelayRequest.ActionId;
-			bLastBreakDelayRegistered = bAllowPendingDeferredDefeat
-				? TurnManager->ConsumeAdmittedBreakDelay(DelayRequest)
-				: TurnManager->ConsumeBreakDelay(DelayRequest);
-#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
-			bLastBreakDelayAcceptedForTest = bLastBreakDelayRegistered;
-			if (bLastBreakDelayRegistered)
-			{
-				++BreakDelayRegistrationCountForTest;
-			}
-#endif
-		}
+
 		Finalize(Resolution);
-		if (!PendingDefeatedParticipantId.IsNone())
-		{
-			const FName Defeated = PendingDefeatedParticipantId;
-			PendingDefeatedParticipantId = NAME_None;
-			ResolveDefeat(Defeated);
-		}
+		bFormalDamageTransactionOpen = false;
+		FinalizeDeferredDefeats();
 		// A casualty may leave teammates alive. Its killer must still finish this action;
 		// only a terminal team wipe stops the turn loop. Otherwise an automated enemy's
 		// already-consumed turn key leaves the battle permanently on that enemy.
@@ -1054,8 +996,6 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 	{
 		return Reject(EHSRAbilityFailureReason::InsufficientSkillPoint);
 	}
-	const float HealHealthBefore = ResolvedSkillDefinition->RestoresHealth()
-		? Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) : 0.0f;
 	Ability->SetActionContext(Command.ActionId, Command.SkillId);
 	if (!Attacker->AbilitySystemComponent->TryActivateAbility(AbilitySpec->Handle) || !Ability->DidLastActivationSucceed())
 	{
@@ -1072,12 +1012,16 @@ FHSRAbilityResolution UHSRBattleCoordinator::RequestActionCore(const FHSRBattleA
 		return Reject(EHSRAbilityFailureReason::EffectFailed);
 	}
 	CommitSkillPoints(Command.ActionId);
+	CommitActionEnergyGain(Command.ActionId, *ResolvedSkillDefinition, *Attacker->AbilitySystemComponent);
+	ApplyAuthoredSkillStatuses(*ResolvedSkillDefinition, Command.ActorParticipantId, Command.TargetParticipantIds);
 	Resolution.Status = EHSRAbilityResolutionStatus::Succeeded;
 	Resolution.FailureReason = EHSRAbilityFailureReason::None;
 	if (ResolvedSkillDefinition->RestoresHealth())
 	{
 		Resolution.bHasHealResult = true;
-		Resolution.HealAmount = FMath::Max(0.0f, Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute()) - HealHealthBefore);
+		float TotalAfter = 0.f;
+		for (auto* ASC : TargetASCs) TotalAfter += ASC->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
+		Resolution.HealAmount = FMath::Max(0.f, TotalAfter - TotalTargetHealthBefore);
 	}
 	Finalize(Resolution);
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::RequestAction - SUCCESS ActionId=%s Skill=%s Actor=%s Target=%s"), *Command.ActionId.ToString(), *Command.SkillId.ToString(), *Command.ActorParticipantId.ToString(), *Command.TargetParticipantIds[0].ToString());
@@ -1095,7 +1039,7 @@ void UHSRBattleCoordinator::CommitActionEnergyGain(const FGuid& ActionId, const 
 	}
 
 	const float EnergyBefore = SourceASC.GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
-	SourceASC.ApplyModToAttribute(UHSRCoreAttributeSet::GetEnergyAttribute(), EGameplayModOp::Additive, ActionSkillDefinition.EnergyGain);
+	ApplyCombatEnergy(SourceASC, ActionSkillDefinition.EnergyGain);
 	const float EnergyAfter = SourceASC.GetNumericAttribute(UHSRCoreAttributeSet::GetEnergyAttribute());
 	UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::CommitActionEnergyGain - ActionId=%s Skill=%s Requested=%.2f Energy=%.2f->%.2f"),
 		*ActionId.ToString(), *ActionSkillDefinition.SkillId.ToString(), ActionSkillDefinition.EnergyGain, EnergyBefore, EnergyAfter);
@@ -1223,7 +1167,7 @@ void UHSRBattleCoordinator::RecordCurrentEnemyTurnIfNeeded()
 
 void UHSRBattleCoordinator::DrainPendingEnemyTurns()
 {
-	if (bDrainingEnemyTurns || RequestActionDispatchDepth != 0 || PresentedAction.IsSet())
+	if (bDrainingEnemyTurns || RequestActionDispatchDepth != 0 || PresentedAction.IsSet() || ActiveUltimate.IsSet() || !PendingUltimates.IsEmpty())
 	{
 		return;
 	}
@@ -1313,6 +1257,7 @@ void UHSRBattleCoordinator::DrainPendingEnemyTurns()
 #endif
 		check(RequestActionDispatchDepth > 0);
 		--RequestActionDispatchDepth;
+		PumpBattleFlow();
 	}
 	bDrainingEnemyTurns = false;
 }
@@ -1391,6 +1336,7 @@ FHSRBattleCommandViewState UHSRBattleCoordinator::GetCommandViewState() const
 	{
 		return State;
 	}
+	AppendUltimateCommandViews(State);
 
 	const FHSRBattleParticipant* Actor = FindParticipant(State.CurrentActorId);
 	if (!Actor || !Actor->AbilitySystemComponent.IsValid())
@@ -1631,6 +1577,22 @@ FHSRBattleInitResult UHSRBattleCoordinator::BuildAndValidateParticipantDefinitio
 
 void UHSRBattleCoordinator::Reset()
 {
+	if (RequestActionDispatchDepth != 0 || bFormalDamageTransactionOpen || bPumpingBattleFlow)
+	{
+		// GAS/attribute delegates may ask for teardown inside the atomic transaction.
+		// Preserve its participant storage until the outer dispatch reaches a safe point.
+		bResetRequested = true;
+		return;
+	}
+	bResetRequested = false;
+	++BattleGeneration;
+	CancelUltimateRequests();
+	PendingUltimates.Reset();
+	ActiveUltimate.Reset();
+	UltimateRequestHistory.Reset();
+	NextUltimateSequence = 0;
+	bExtraActionChain = false;
+	SuspendedNormalFinalization = NAME_None;
 	UE_LOG(LogTemp, Log,
 		TEXT("UHSRBattleCoordinator::Reset - Clearing state. Previous state=%d RequestId=%s"),
 		static_cast<int32>(CurrentState), *CurrentRequestId.ToString());
@@ -1770,7 +1732,7 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticip
 	const float HealthBefore = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetHealthAttribute());
 	// 状态伤害也是一次正式伤害事务：死亡延迟到事务结束。
 	bFormalDamageTransactionOpen = true;
-	PendingDefeatedParticipantId = NAME_None;
+	PendingDefeatedParticipantIds.Reset();
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	if (bForceStatusDamageApplyFailure)
 	{
@@ -1785,7 +1747,7 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticip
 	{
 		DevelopmentDamageRandomStream = RandomStreamBeforeApply;
 		bFormalDamageTransactionOpen = false;
-		PendingDefeatedParticipantId = NAME_None;
+		PendingDefeatedParticipantIds.Reset();
 		Failure.Result = EHSRDamageResultType::EffectApplicationFailed;
 		return Failure;
 	}
@@ -1797,7 +1759,7 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticip
 	{
 		DevelopmentDamageRandomStream = RandomStreamBeforeApply;
 		bFormalDamageTransactionOpen = false;
-		PendingDefeatedParticipantId = NAME_None;
+		PendingDefeatedParticipantIds.Reset();
 	}
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	else
@@ -1811,21 +1773,15 @@ FHSRDamageResult UHSRBattleCoordinator::ResolveStatusDamage(FName SourceParticip
 // 状态伤害事务收尾：若事务期间产生了延迟死亡，则在此结算。
 void UHSRBattleCoordinator::FinalizeStatusDamage()
 {
-	if (!PendingDefeatedParticipantId.IsNone())
-	{
-		const FName Defeated = PendingDefeatedParticipantId;
-		PendingDefeatedParticipantId = NAME_None;
-		bFormalDamageTransactionOpen = false;
-		ResolveDefeat(Defeated);
-	}
-	else
-	{
-		bFormalDamageTransactionOpen = false;
-	}
+	bFormalDamageTransactionOpen = false;
+	FinalizeDeferredDefeats();
 }
+
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 FHSRBattleInitResult UHSRBattleCoordinator::ResetAndRebuildForDevelopmentTest(UWorld* BattleWorld)
 {
+	if (RequestActionDispatchDepth != 0 || bFormalDamageTransactionOpen || bPumpingBattleFlow)
+		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Cannot rebuild inside an atomic battle transaction.")));
 	if (!BattleWorld || !LastSubmittedRequestForDevelopment.IsSet())
 	{
 		return FHSRBattleInitResult::MakeFailure(EHSRBattleInitFailureType::InitFailed, FText::FromString(TEXT("Missing saved request or BattleWorld.")));
@@ -1961,6 +1917,36 @@ void UHSRBattleCoordinator::BindHealthObserver(const FHSRBattleParticipant& Part
 	FDelegateHandle& Handle = HealthChangedHandles.FindOrAdd(Participant.ParticipantId);
 	Handle = Participant.AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetHealthAttribute()).AddUObject(
 		this, &UHSRBattleCoordinator::HandleHealthChanged, Participant.ParticipantId);
+	auto& Resources = ResourceObserverHandles.FindOrAdd(Participant.ParticipantId);
+	auto* ASC = Participant.AbilitySystemComponent.Get();
+	Resources.Energy = ASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetEnergyAttribute()).AddUObject(this, &ThisClass::HandleResourceChanged, Participant.ParticipantId);
+	Resources.MaxEnergy = ASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetMaxEnergyAttribute()).AddUObject(this, &ThisClass::HandleResourceChanged, Participant.ParticipantId);
+	Resources.Stunned = ASC->RegisterGameplayTagEvent(FGameplayTag::RequestGameplayTag(TEXT("State.Stunned")), EGameplayTagEventType::AnyCountChange).AddUObject(this, &ThisClass::HandleUltimateBlockChanged, Participant.ParticipantId);
+	Resources.UltimateBlocked = ASC->RegisterGameplayTagEvent(FGameplayTag::RequestGameplayTag(TEXT("State.UltimateBlocked")), EGameplayTagEventType::AnyCountChange).AddUObject(this, &ThisClass::HandleUltimateBlockChanged, Participant.ParticipantId);
+	if (Participant.Actor.IsValid()) Participant.Actor->OnDestroyed.AddUniqueDynamic(this, &ThisClass::HandleParticipantDestroyed);
+}
+
+void UHSRBattleCoordinator::HandleResourceChanged(const FOnAttributeChangeData&, FName ParticipantId)
+{
+	if (CurrentState == EHSRBattleCoordinatorState::Spawned && FindParticipant(ParticipantId)) PublishCommandViewState();
+}
+
+void UHSRBattleCoordinator::HandleUltimateBlockChanged(const FGameplayTag, int32, FName ParticipantId)
+{
+	if (CurrentState == EHSRBattleCoordinatorState::Spawned && FindParticipant(ParticipantId)) PublishCommandViewState();
+}
+
+void UHSRBattleCoordinator::HandleParticipantDestroyed(AActor* DestroyedActor)
+{
+	if (CurrentState != EHSRBattleCoordinatorState::Spawned || bResetRequested) return;
+	for (const auto& P : Participants)
+		if (P.Actor.Get(true) == DestroyedActor)
+		{
+			const FName Id = P.ParticipantId;
+			if (bFormalDamageTransactionOpen || RequestActionDispatchDepth != 0) PendingDefeatedParticipantIds.AddUnique(Id);
+			else { ResolveDefeat(Id); PumpBattleFlow(); }
+			return;
+		}
 }
 
 void UHSRBattleCoordinator::HandleHealthChanged(const FOnAttributeChangeData& ChangeData, FName ParticipantId)
@@ -1969,10 +1955,11 @@ void UHSRBattleCoordinator::HandleHealthChanged(const FOnAttributeChangeData& Ch
 	{
 		if (bFormalDamageTransactionOpen)
 		{
-			PendingDefeatedParticipantId = ParticipantId;
+			PendingDefeatedParticipantIds.AddUnique(ParticipantId);
 			return;
 		}
 		ResolveDefeat(ParticipantId);
+		if (!PresentedAction.IsSet() && RequestActionDispatchDepth == 0) PumpBattleFlow();
 	}
 }
 
@@ -2009,6 +1996,7 @@ void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
 	}
 
 	Defeated->bDefeated = true;
+	CancelUltimateRequests(DefeatedParticipantId);
 #if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
 	LastSourceInvalidRemovedCount = RouteSourceInvalid(DefeatedParticipantId);
 #else
@@ -2026,7 +2014,7 @@ void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
 	// No explicit turn-order removal is needed: UHSRTurnManager::IsParticipantTurnEligible
 	// already gates on Health > 0, so a downed member is skipped by AdvanceToNextValidTurn.
 	const EHSRBattleParticipantTeam DefeatedTeam = Defeated->Team;
-	if (!IsTeamWiped(DefeatedTeam))
+	if (bDeferringTerminalDefeat || !IsTeamWiped(DefeatedTeam))
 	{
 		UE_LOG(LogTemp, Log, TEXT("UHSRBattleCoordinator::ResolveDefeat - PARTIAL Defeated=%s SurvivorsRemain=1"), *DefeatedParticipantId.ToString());
 		ParticipantDefeated.Broadcast(DefeatedParticipantId);
@@ -2042,6 +2030,7 @@ void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
 	BattleResult.Outcome = DefeatedTeam == EHSRBattleParticipantTeam::Enemy ? EHSRBattleOutcome::PlayerVictory : EHSRBattleOutcome::PlayerDefeat;
 	bBattleResultProduced = true;
 	CurrentState = EHSRBattleCoordinatorState::Finished;
+	CancelUltimateRequests();
 	ClearEnemyTurnAutomation();
 	if (TurnManager)
 	{
@@ -2059,6 +2048,10 @@ void UHSRBattleCoordinator::ResolveDefeat(FName DefeatedParticipantId)
 
 void UHSRBattleCoordinator::ClearRuntimeDelegates()
 {
+	++BattleGeneration;
+	CancelUltimateRequests();
+	SuspendedNormalFinalization = NAME_None;
+	bPresentedRulesResolved = false;
 	if (PresentationWorld.IsValid()) PresentationWorld->GetTimerManager().ClearTimer(PresentationTimer);
 	PresentedAction.Reset();
 	PresentedTurnToResolve = NAME_None;
@@ -2067,15 +2060,25 @@ void UHSRBattleCoordinator::ClearRuntimeDelegates()
 	ClearStatusComponents();
 	for (const FHSRBattleParticipant& Participant : Participants)
 	{
+		if (Participant.Actor.IsValid()) Participant.Actor->OnDestroyed.RemoveDynamic(this, &ThisClass::HandleParticipantDestroyed);
 		if (Participant.AbilitySystemComponent.IsValid())
 		{
 			if (const FDelegateHandle* Handle = HealthChangedHandles.Find(Participant.ParticipantId))
 			{
 				Participant.AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetHealthAttribute()).Remove(*Handle);
 			}
+			if (const auto* Resources = ResourceObserverHandles.Find(Participant.ParticipantId))
+			{
+				auto* ASC = Participant.AbilitySystemComponent.Get();
+				ASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetEnergyAttribute()).Remove(Resources->Energy);
+				ASC->GetGameplayAttributeValueChangeDelegate(UHSRCoreAttributeSet::GetMaxEnergyAttribute()).Remove(Resources->MaxEnergy);
+				ASC->RegisterGameplayTagEvent(FGameplayTag::RequestGameplayTag(TEXT("State.Stunned")), EGameplayTagEventType::AnyCountChange).Remove(Resources->Stunned);
+				ASC->RegisterGameplayTagEvent(FGameplayTag::RequestGameplayTag(TEXT("State.UltimateBlocked")), EGameplayTagEventType::AnyCountChange).Remove(Resources->UltimateBlocked);
+			}
 		}
 	}
 	HealthChangedHandles.Empty();
+	ResourceObserverHandles.Empty();
 }
 
 AActor* UHSRBattleCoordinator::SpawnParticipantActor(UWorld* World, const FHSRBattleParticipantDefinition& Definition)
@@ -3369,4 +3372,136 @@ bool UHSRBattleCoordinator::InitializeFormalEquipment(UWorld* BattleWorld)
 	// Match the character detail contract: persistent piece modifiers are projected once per instance.
 	// Do not synthesize test set bonuses from a set id while the UI has no authored set-stat projection.
 	return ProjectEquipmentRestore(Candidate);
+}
+
+void UHSRBattleCoordinator::ResolveTargetToughness(const FHSRBattleActionCommand& Command, const UHSRSkillDefinition* ResolvedSkillDefinition, const FHSRBattleParticipant* Attacker, FHSRBattleParticipant* Target, bool bTargetAliveAtAdmission, FHSRAbilityResolution& Resolution)
+{
+	Resolution.bHasToughnessResult = true;
+	FHSRToughnessResult& ToughnessResult = Resolution.ToughnessResult;
+	ToughnessResult.Before = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetToughnessAttribute());
+	ToughnessResult.After = ToughnessResult.Before;
+	const FString ElementName = ResolvedSkillDefinition->ElementTag.ToString();
+	const FString ElementPrefix(TEXT("Element."));
+	if (!ResolvedSkillDefinition->ElementTag.IsValid() || !ElementName.StartsWith(ElementPrefix))
+	{
+		ToughnessResult.FailureReason = EHSRToughnessFailureReason::MissingElement;
+	}
+	else if (Target->WeaknessTags.IsEmpty())
+	{
+		ToughnessResult.FailureReason = EHSRToughnessFailureReason::EmptyWeaknesses;
+	}
+	else
+	{
+		const FGameplayTag MatchingWeakness = FHSRToughnessConfiguration::GetWeaknessTagFor(ResolvedSkillDefinition->ElementTag);
+		if (!MatchingWeakness.IsValid() || !Target->WeaknessTags.HasTagExact(MatchingWeakness))
+		{
+			ToughnessResult.FailureReason = EHSRToughnessFailureReason::NoWeaknessMatch;
+		}
+		else if (!FMath::IsFinite(ResolvedSkillDefinition->ToughnessDamage) || ResolvedSkillDefinition->ToughnessDamage <= 0.0f)
+		{
+			ToughnessResult.FailureReason = EHSRToughnessFailureReason::InvalidDamage;
+		}
+		else
+		{
+			ToughnessResult.bMatched = true;
+			ToughnessResult.Damage = ResolvedSkillDefinition->ToughnessDamage;
+			const TSubclassOf<UGameplayEffect> ToughnessEffect = ResolvedSkillDefinition->ToughnessDamageGameplayEffectClass.LoadSynchronous();
+			const FGameplayTag ToughnessDamageTag = FGameplayTag::RequestGameplayTag(TEXT("Damage.Data.ToughnessDamage"), false);
+			if (!ToughnessEffect || !ToughnessDamageTag.IsValid())
+			{
+				ToughnessResult.FailureReason = EHSRToughnessFailureReason::MissingGameplayEffect;
+			}
+			else
+			{
+				FGameplayEffectSpecHandle ToughnessSpec = Attacker->AbilitySystemComponent->MakeOutgoingSpec(ToughnessEffect, 1.0f, Attacker->AbilitySystemComponent->MakeEffectContext());
+				if (!ToughnessSpec.IsValid())
+				{
+					ToughnessResult.FailureReason = EHSRToughnessFailureReason::EffectApplicationFailed;
+				}
+				else
+				{
+					ToughnessSpec.Data->SetSetByCallerMagnitude(ToughnessDamageTag, ToughnessResult.Damage);
+					// Instant GameplayEffects may apply immediately without retaining an
+					// active-effect handle.  Audit the AttributeSet write instead of
+					// interpreting that invalid handle as an application failure.
+					Target->AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*ToughnessSpec.Data.Get());
+					ToughnessResult.After = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetToughnessAttribute());
+					const float MaxToughness = Target->AbilitySystemComponent->GetNumericAttribute(UHSRCoreAttributeSet::GetMaxToughnessAttribute());
+					const float ExpectedAfter = FMath::Clamp(ToughnessResult.Before - ToughnessResult.Damage, 0.0f, MaxToughness);
+					if (FMath::IsNearlyEqual(ToughnessResult.After, ExpectedAfter))
+					{
+						ToughnessResult.bReachedZero = ToughnessResult.Before > 0.0f && ToughnessResult.After <= 0.0f;
+					}
+					else
+					{
+						ToughnessResult.FailureReason = EHSRToughnessFailureReason::EffectApplicationFailed;
+					}
+				}
+			}
+		}
+	}
+	const FGameplayTag ExpectedWeaknessTag = FHSRToughnessConfiguration::GetWeaknessTagFor(ResolvedSkillDefinition->ElementTag);
+	const FString ExpectedWeakness = ExpectedWeaknessTag.IsValid() ? ExpectedWeaknessTag.ToString() : TEXT("<invalid>");
+	UE_LOG(LogTemp, Log, TEXT("P8-002 Toughness ActionId=%s Actor=%s Target=%s Element=%s ExpectedWeakness=%s Matched=%d Before=%.2f Damage=%.2f After=%.2f ReachedZero=%d FailureReason=%d"),
+		*Command.ActionId.ToString(), *Command.ActorParticipantId.ToString(), *Target->ParticipantId.ToString(), *ElementName,
+		*ExpectedWeakness,
+		ToughnessResult.bMatched ? 1 : 0, ToughnessResult.Before, ToughnessResult.Damage, ToughnessResult.After,
+		ToughnessResult.bReachedZero ? 1 : 0, static_cast<int32>(ToughnessResult.FailureReason));
+	// A Break is owned by this ActionId transaction: only the observed
+	// positive-to-zero Toughness edge may publish it.  RequestAction caches
+	// the completed Resolution, so an ActionId replay never reaches here.
+	Resolution.bHasBreakResult = true;
+	FHSRBreakResult& BreakResult = Resolution.BreakResult;
+	BreakResult.ActionId = Command.ActionId;
+	BreakResult.TargetParticipantId = Target->ParticipantId;
+	BreakResult.ToughnessBefore = ToughnessResult.Before;
+	BreakResult.ToughnessAfter = ToughnessResult.After;
+	if (bBattleResultProduced || CurrentState != EHSRBattleCoordinatorState::Spawned)
+	{
+		BreakResult.FailureReason = EHSRBreakFailureReason::BattleFinished;
+	}
+	else if (!Target->IsValid())
+	{
+		BreakResult.FailureReason = EHSRBreakFailureReason::InvalidTarget;
+	}
+	else if (!ToughnessResult.bReachedZero || ToughnessResult.Before <= 0.0f || !FMath::IsNearlyZero(ToughnessResult.After))
+	{
+		BreakResult.FailureReason = EHSRBreakFailureReason::ToughnessNotDepleted;
+	}
+	else
+	{
+		BreakResult.bTriggered = true;
+	}
+	UE_LOG(LogTemp, Log, TEXT("P8-003 Break ActionId=%s Target=%s Before=%.2f After=%.2f Triggered=%d Replay=0 FailureReason=%d"),
+		*BreakResult.ActionId.ToString(), *BreakResult.TargetParticipantId.ToString(), BreakResult.ToughnessBefore,
+		BreakResult.ToughnessAfter, BreakResult.bTriggered ? 1 : 0, static_cast<int32>(BreakResult.FailureReason));
+	if (BreakResult.bTriggered)
+	{
+		const bool bAllowPendingDeferredDefeat = bTargetAliveAtAdmission
+			&& PendingDefeatedParticipantIds.Contains(Target->ParticipantId);
+		const EHSRStatusOperationResult BreakStatusResult = RequestBreakStatus(
+			Command.ActorParticipantId, BreakResult.TargetParticipantId, BreakResult.ActionId, bAllowPendingDeferredDefeat);
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
+		LastBreakStatusResultForTest = BreakStatusResult;
+		if (BreakStatusResult == EHSRStatusOperationResult::Success)
+		{
+			++BreakStatusRequestCountForTest;
+		}
+#endif
+		UE_LOG(LogTemp, Log, TEXT("P9-003 BreakStatus ActionId=%s Target=%s Result=%d"), *BreakResult.ActionId.ToString(), *BreakResult.TargetParticipantId.ToString(), static_cast<int32>(BreakStatusResult));
+		FHSRTurnDelayRequest DelayRequest;
+		DelayRequest.ActionId = BreakResult.ActionId;
+		DelayRequest.TargetParticipantId = BreakResult.TargetParticipantId;
+		LastBreakDelayActionId = DelayRequest.ActionId;
+		bLastBreakDelayRegistered = bAllowPendingDeferredDefeat
+			? TurnManager->ConsumeAdmittedBreakDelay(DelayRequest)
+			: TurnManager->ConsumeBreakDelay(DelayRequest);
+#if WITH_EDITOR || WITH_DEV_AUTOMATION_TESTS
+		bLastBreakDelayAcceptedForTest = bLastBreakDelayRegistered;
+		if (bLastBreakDelayRegistered)
+		{
+			++BreakDelayRegistrationCountForTest;
+		}
+#endif
+	}
 }

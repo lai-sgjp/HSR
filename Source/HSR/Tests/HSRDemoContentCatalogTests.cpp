@@ -38,6 +38,7 @@ namespace HSR::Demo::ContentCatalogTests
 		int32 SkillPointDelta;
 		float EnergyCost;
 		float ToughnessDamage;
+		float ExpectedEnergyGain = -1.0f;
 	};
 
 	static const FSkillSpec SkillSpecs[] =
@@ -50,10 +51,10 @@ namespace HSR::Demo::ContentCatalogTests
 		{ TEXT("/Game/Data/VerticalSlice/Skills/DA_Skill_Huohua_GrandOpening.DA_Skill_Huohua_GrandOpening"), TEXT("Demo.Skill.Huohua.GrandOpening"), EHSRSkillCategory::Ultimate, EHSRTargetType::SingleEnemy, 1.70f, 0, 100.0f, 2.0f },
 		{ TEXT("/Game/Data/VerticalSlice/Skills/DA_Skill_Remiel_Basic.DA_Skill_Remiel_Basic"), TEXT("Demo.Skill.Remiel.Basic"), EHSRSkillCategory::BasicAttack, EHSRTargetType::SingleEnemy, 0.90f, 1, 0.0f, 2.0f },
 		{ TEXT("/Game/Data/VerticalSlice/Skills/DA_Skill_Remiel_Riftlight.DA_Skill_Remiel_Riftlight"), TEXT("Demo.Skill.Remiel.Riftlight"), EHSRSkillCategory::Skill, EHSRTargetType::SingleEnemy, 1.25f, -1, 0.0f, 4.0f },
-		{ TEXT("/Game/Data/VerticalSlice/Skills/DA_Skill_Remiel_SkyJudgment.DA_Skill_Remiel_SkyJudgment"), TEXT("Demo.Skill.Remiel.SkyJudgment"), EHSRSkillCategory::Ultimate, EHSRTargetType::SingleEnemy, 1.90f, 0, 100.0f, 6.0f },
+		{ TEXT("/Game/Data/VerticalSlice/Skills/DA_Skill_Remiel_SkyJudgment.DA_Skill_Remiel_SkyJudgment"), TEXT("Demo.Skill.Remiel.SkyJudgment"), EHSRSkillCategory::Ultimate, EHSRTargetType::AllEnemies, 1.90f, 0, 100.0f, 6.0f, 20.0f },
 		{ TEXT("/Game/Data/VerticalSlice/Skills/DA_Skill_Verina_Basic.DA_Skill_Verina_Basic"), TEXT("Demo.Skill.Verina.Basic"), EHSRSkillCategory::BasicAttack, EHSRTargetType::SingleEnemy, 0.70f, 1, 0.0f, 1.0f },
 		{ TEXT("/Game/Data/VerticalSlice/Skills/DA_Skill_Verina_HealingSprout.DA_Skill_Verina_HealingSprout"), TEXT("Demo.Skill.Verina.HealingSprout"), EHSRSkillCategory::Heal, EHSRTargetType::SingleAlly, 1.00f, -1, 0.0f, 1.0f },
-		{ TEXT("/Game/Data/VerticalSlice/Skills/DA_Skill_Verina_BreathingGarden.DA_Skill_Verina_BreathingGarden"), TEXT("Demo.Skill.Verina.BreathingGarden"), EHSRSkillCategory::Heal, EHSRTargetType::SingleAlly, 1.80f, 0, 100.0f, 1.0f },
+		{ TEXT("/Game/Data/VerticalSlice/Skills/DA_Skill_Verina_BreathingGarden.DA_Skill_Verina_BreathingGarden"), TEXT("Demo.Skill.Verina.BreathingGarden"), EHSRSkillCategory::Ultimate, EHSRTargetType::AllAllies, 1.80f, 0, 100.0f, 1.0f, 5.0f },
 	};
 }
 
@@ -148,6 +149,8 @@ bool FHSRDemoCharactersAndSkillsTest::RunTest(const FString&)
 			TestTrue(TEXT("ability multiplier"), FMath::IsNearlyEqual(Skill->AbilityMultiplier, Spec.Multiplier));
 			TestEqual(TEXT("skill point delta"), Skill->SkillPointDelta, Spec.SkillPointDelta);
 			TestTrue(TEXT("toughness damage"), FMath::IsNearlyEqual(Skill->ToughnessDamage, Spec.ToughnessDamage));
+			if (Spec.ExpectedEnergyGain >= 0.f)
+				TestEqual(TEXT("authored post-ultimate energy recovery"), Skill->EnergyGain, Spec.ExpectedEnergyGain);
 			TestTrue(TEXT("category-required references are valid"), Skill->IsValidForCategory());
 			if (Spec.EnergyCost > 0.0f)
 			{
@@ -246,7 +249,7 @@ bool FHSRDemoFlowCatalogTest::RunTest(const FString&)
 		{
 			TestEqual(TEXT("encounter id"), Encounter->EncounterId, FName(Spec.Id));
 			TestEqual(TEXT("encounter enemy id"), Encounter->EnemyDefinitionId, FName(Spec.EnemyId));
-			TestEqual(TEXT("battle map"), Encounter->BattleMap.ToSoftObjectPath().GetLongPackageName(), FString(TEXT("/Game/Maps/Map_Battle")));
+			TestEqual(TEXT("battle map"), Encounter->BattleMap.ToSoftObjectPath().GetLongPackageName(), FString(TEXT("/Game/Maps/VerticalSlice/Map_HertaSupportSection")));
 			TestNotNull(TEXT("victory reward definition"), Encounter->VictoryRewardDefinition.Get());
 			if (Encounter->VictoryRewardDefinition)
 			{
@@ -258,7 +261,7 @@ bool FHSRDemoFlowCatalogTest::RunTest(const FString&)
 	struct FRewardSpec { const TCHAR* Path; const TCHAR* Id; int32 ItemCount; };
 	const FRewardSpec Rewards[] =
 	{
-		{ TEXT("/Game/Data/VerticalSlice/Rewards/DA_Reward_WangXiaYiTong.DA_Reward_WangXiaYiTong"), TEXT("Demo.Reward.WangXiaYiTong"), 1 },
+		{ TEXT("/Game/Data/VerticalSlice/Rewards/DA_Reward_WangXiaYiTong.DA_Reward_WangXiaYiTong"), TEXT("Demo.Reward.WangXiaYiTong"), 3 },
 		{ TEXT("/Game/Data/VerticalSlice/Rewards/DA_Reward_SupportSectionInspector.DA_Reward_SupportSectionInspector"), TEXT("Demo.Reward.SupportSectionInspector"), 1 },
 		{ TEXT("/Game/Data/VerticalSlice/Rewards/DA_Reward_Laigushi.DA_Reward_Laigushi"), TEXT("Demo.Reward.Laigushi"), 4 },
 		{ TEXT("/Game/Data/VerticalSlice/Rewards/DA_Reward_DomainEcho.DA_Reward_DomainEcho"), TEXT("Demo.Reward.DomainEcho"), 1 },
@@ -269,6 +272,22 @@ bool FHSRDemoFlowCatalogTest::RunTest(const FString&)
 		{
 			TestEqual(TEXT("reward id"), Reward->RewardDefinitionId, FName(Spec.Id));
 			TestEqual(TEXT("fixed reward item count"), Reward->FixedItems.Num(), Spec.ItemCount);
+			if (Reward->RewardDefinitionId == FName(TEXT("Demo.Reward.WangXiaYiTong")))
+			{
+				// Existing author_content.py adds a weapon and 12 growth materials to
+				// the original sphere. reward_1920.json records the real reward readback.
+				const TMap<FName, int32> ExpectedItems = {
+					{TEXT("Demo.Relic.HeavenLiveRoom.PlanarSphere"), 1},
+					{TEXT("Demo.Item.EchoConductor"), 1},
+					{TEXT("Demo.Item.DomainEchoGrowthMaterial"), 12}
+				};
+				for (const auto& Expected : ExpectedItems)
+				{
+					const auto* Item = Reward->FixedItems.FindByPredicate([&](const auto& Entry) { return Entry.ItemId == Expected.Key; });
+					if (TestNotNull(*FString::Printf(TEXT("Chest contains exact authored item %s"), *Expected.Key.ToString()), Item))
+						TestEqual(*FString::Printf(TEXT("Chest quantity for %s"), *Expected.Key.ToString()), Item->Quantity, Expected.Value);
+				}
+			}
 		}
 	}
 	return true;
